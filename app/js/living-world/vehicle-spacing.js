@@ -26,8 +26,12 @@ export function createVehicleSpacing(agents, poseOf, obstacles=[]) {
     },
     allowsPose(agent,pose){
       const current=entries.get(agent);if(!current||!pose)return true;
-      for(const other of entries.values())if(other.agent!==agent &&
-        sweptChassisContact(current.pose,pose,agent.variant,other.pose,other.agent.variant,.2)<1)return false;
+      const dx=pose.x-current.x,dz=pose.z-current.z,turn=Math.atan2(Math.sin(pose.yaw-current.pose.yaw),Math.cos(pose.yaw-current.pose.yaw));
+      for(const other of entries.values())if(other.agent!==agent){
+        if(Math.hypot(other.x-current.x,other.z-current.z)>current.length+current.width+other.length+other.width+Math.hypot(dx,dz))continue;
+        const fraction=Math.abs(turn)<1e-8?contactFraction(current,other,dx,dz):sweptChassisContact(current.pose,pose,agent.variant,other.pose,other.agent.variant,.2);
+        if(fraction<1)return false;
+      }
       return true;
     },
     update(agent,pose){if(pose)entries.set(agent,box(agent,pose));}

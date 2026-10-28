@@ -53,3 +53,14 @@ export function stepRaceVehicle(course,car,actions,dt,profile){
 export function raceVehicleSpeedMetersPerSecond(car){return carSpeedToMph(car.speed)*.44704;}
 export function raceVehicleGroundPose(car){return {x:car.x,y:car.y-VEHICLE_ROOT_TO_GROUND_METERS,z:car.z,yaw:car.angle};}
 export function raceVehicleWheelDistance(car,dt){return carSpeedToWorldUnitsPerSecond(car.speed,1)*dt;}
+
+// One explicit frame contract for session snapshots and the existing physics
+// delegate. Input smoothing and drift state must travel with the owned actor.
+export const RACE_VEHICLE_NUMERIC_FIELDS=Object.freeze(['x','y','z','angle','speed','vFwd','vLat','vx','vz','yawRate',
+ 'steerAngle','steerSm','rearSlip','throttleSm','terrainPitch','terrainRoll','engineRpm','engineRedlineRpm','engineLoad',
+ 'driveGear','shiftTime','condition','maximumWheelPenetration','maximumWheelGap','_driveDirection','_driftHoldTimer','driftAngle']);
+export function snapshotRaceVehicle(car) {
+ if(!car)return null;const frame={};
+ for(const key of RACE_VEHICLE_NUMERIC_FIELDS)frame[key]=Number(car[key]??(key==='_driveDirection'?1:0));
+ frame.isDrifting=car.isDrifting===true;return frame;
+}

@@ -1,5 +1,5 @@
 import {createRaceProgress,advanceRaceProgress,raceGridPose}from'./course-rules.js';
-import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose}from'./vehicle-controller.js';
+import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle}from'./vehicle-controller.js';
 import {raceAiActions}from'./ai-controller.js';
 const STEP_MS=1000/60,NEUTRAL=Object.freeze({steer:0,throttle:0,reverse:0,brake:0,serviceBrake:1});
 const ACTIONS=new Set(['steer','throttle','reverse','brake','serviceBrake']);
@@ -34,7 +34,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   if(players.size<1||!activeHumans().length||[...players.values()].some(p=>!p.ready))throw Error('race_not_ready');
   if(!Number.isFinite(nowMs)||nowMs<lastNow)throw Error('invalid_race_clock');
   startAtMs=nowMs+4000;lastNow=nowMs;phase='countdown';
-  for(const p of players.values()){p.car=createRaceVehicleState(raceGridPose(course,p.slot),p.profile);p.progress=createRaceProgress(raceVehicleGroundPose(p.car),startAtMs);}
+  for(const p of players.values()){p.car=createRaceVehicleState(raceGridPose(course,p.slot),p.profile);stepRaceVehicle(course,p.car,NEUTRAL,1/60,p.profile);p.progress=createRaceProgress(raceVehicleGroundPose(p.car),startAtMs);}
   return snapshot();
  }
  function control(uid,sequence,actions,receivedAtMs){
@@ -90,8 +90,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
    players:ordered.map((p,index)=>({uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
     disconnected:p.disconnectedAt!==null,dnf:p.dnf,position:index+1,lastInputSequence:p.lastSequence,pose:p.car?raceVehicleGroundPose(p.car):null,
     speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,
-    vehicleState:p.car?Object.fromEntries(['x','y','z','angle','speed','vFwd','vLat','vx','vz','yawRate','steerAngle','steerSm','rearSlip','terrainPitch','terrainRoll',
-     'engineRpm','engineRedlineRpm','engineLoad','driveGear','shiftTime','condition','maximumWheelPenetration','maximumWheelGap'].map(key=>[key,Number(p.car[key])||0])):null,
+    vehicleState:snapshotRaceVehicle(p.car),
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
      bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null}))};
  }

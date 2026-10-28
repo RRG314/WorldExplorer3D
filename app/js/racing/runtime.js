@@ -25,34 +25,33 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
  let routeDiagnostics=null;
  let dialog=null,hud=null,loadScope=null,loadPublication=null,raceScope=null,controller=null,presentation=null,district=null,graph=null,fingerprint='',events=[],selected=0;
  let recordOwner='',records=null;
- let creatorPath=[],creatorNodes=[],customCourse=null,returnFocus=null,busy=false,recordId='',lastUiAt=-Infinity,saving=false,lastResult=null;
+ let creatorPath=[],creatorNodes=[],customCourse=null,returnFocus=null,busy=false,recordId='',lastUiAt=-Infinity,saving=false,lastResult=null,lastResultCourse=null,lastResultOwner='',resultSaved=false;
  function currentRecords() {
   const uid=getCurrentUser()?.uid||'';if(records&&recordOwner===uid)return records;
   recordOwner=uid;
   const owner=uid,namespace=uid?`:account:${uid}`:':guest-racing';
   records=createActivityCompletionStore({storage:()=>({getItem:key=>localStorage.getItem(key+namespace),setItem:(key,value)=>localStorage.setItem(key+namespace,value)}),
    recordEvent:event=>{if((getCurrentUser()?.uid||'')!==owner)throw Error('race_account_changed');return c.recordExplorerEvent?.(event);},
-   lookupEvents:ids=>c.getExplorerEventsById?.(ids),context:()=>({environment:'EARTH',locationSnapshot:{...(c.LOC||{})},regionLabel:c.LOC?.name||''})});
+   lookupEvents:ids=>c.getExplorerEventsById?.(ids),context:()=>({environment:'EARTH',locationSnapshot:{...(c.worldPublication?.location||c.LOC||{}),name:district?.locationLabel||''},regionLabel:district?.locationLabel||'Earth road race'})});
   return records;
  }
  const el=(selector)=>dialog.querySelector(selector),status=text=>{el('[data-race-status]').textContent=text;};
  function ensure() {
   if(dialog)return;dialog=document.createElement('dialog');dialog.id='racingHub';dialog.className='racing-hub';dialog.setAttribute('aria-labelledby','racingHeading');
-  dialog.innerHTML=`<header><div><p class="racing-eyebrow">WORLD EXPLORER · OPEN RIVALS</p><h2 id="racingHeading">Road racing</h2></div><button type="button" data-race-close aria-label="Close racing">Close</button></header>
+  dialog.innerHTML=`<header><div><p class="racing-eyebrow">WORLD EXPLORER · OPEN RIVALS</p><h2 id="racingHeading" data-race-heading>Road racing</h2></div><button type="button" data-race-close aria-label="Close racing">Close</button></header>
    <p data-race-location></p><div class="racing-toolbar"><button type="button" data-race-destination>Choose destination</button><button type="button" data-race-garage>My garage</button><button type="button" data-race-refresh>Refresh roads</button></div>
    <p role="status" aria-live="polite" data-race-status></p>
    <div class="racing-layout"><nav aria-label="Road events" data-race-events></nav><section><div class="racing-map" data-race-map></div>
    <h3 data-race-name>Qualifying the loaded roads…</h3><p data-race-detail></p><p data-race-record></p>
-   <label>Opponents<select data-race-rivals><option value="2">Two rivals</option><option value="1">One rival</option><option value="0">Solo practice</option></select></label>
-   <label>Difficulty<select data-race-difficulty><option value=".45">Explorer</option><option value=".65" selected>Club</option><option value=".85">Expert</option></select></label>
-   <button class="racing-primary" type="button" data-race-start disabled>Start practice</button>
-   <p class="racing-note">Closed course · ghost competitors. Device practice records are kept in your Journal. Verified online competition uses server timing.</p>
+   <div class="racing-options"><label>Opponents<select data-race-rivals><option value="2">Two rivals</option><option value="1">One rival</option><option value="0">Solo practice</option></select></label>
+   <label>Difficulty<select data-race-difficulty><option value=".45">Explorer</option><option value=".65" selected>Club</option><option value=".85">Expert</option></select></label></div>
    <details data-race-creator><summary>Create a mapped-road route</summary><p>Choose a start junction, then add connected destinations. Roads, heights and driving direction are retained.</p>
    <label>Junction<select data-race-node aria-label="Route junction"></select></label><button type="button" data-race-add>Add junction</button><button type="button" data-race-undo>Undo last</button><button type="button" data-race-reset>Clear route</button>
    <p data-race-waypoints></p><label>Route name<input data-race-route-name maxlength="100" placeholder="My city run"></label>
    <label>Discipline<select data-race-discipline><option value="sprint">Sprint</option><option value="circuit">Circuit · 2 laps</option><option value="time-trial">Time trial</option></select></label>
    <button type="button" data-race-test>Test this route</button><button type="button" data-race-save>Save route</button><p data-race-saved></p></details>
-   </section></div><section data-race-results hidden aria-labelledby="racingResultHeading"><h3 id="racingResultHeading">Race results</h3><ol data-race-order></ol><p data-race-save-state role="status"></p>
+   </section></div><footer class="racing-start-bar"><button class="racing-primary" type="button" data-race-start disabled>Start practice</button>
+   <p class="racing-note">Closed course · ghost competitors · standard road class, boosts off. Practice records are kept in your Journal.</p></footer><section data-race-results hidden aria-labelledby="racingResultHeading"><h3 id="racingResultHeading" tabindex="-1">Race results</h3><ol data-race-order></ol><p data-race-save-state role="status"></p>
    <button type="button" data-race-retry-save hidden>Retry Journal save</button><button type="button" data-race-again>Race again</button><button type="button" data-race-explore>Return to exploration</button></section>`;
   document.body.append(dialog);
   hud=document.createElement('section');hud.id='roadRaceHud';hud.className='road-race-hud';hud.hidden=true;hud.setAttribute('aria-label','Race progress');
@@ -71,13 +70,14 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   el('[data-race-save]').onclick=()=>void saveRoute();
   hud.querySelector('[data-race-leave]').onclick=()=>{stop('left_race');void open();};
   el('[data-race-explore]').onclick=()=>{stop('return_to_exploration');dialog.close();requestWorldFocus();};
-  el('[data-race-again]').onclick=()=>void begin(customCourse||events[selected]);
+  el('[data-race-again]').onclick=()=>void begin(lastResultCourse||customCourse||events[selected]);
   el('[data-race-retry-save]').onclick=()=>void persistResult();
  }
  async function open() {
-  ensure();returnFocus=document.activeElement;closeMenus();c.clearControlInputState?.('racing-menu');
+  ensure();if(!controller&&resultSaved){lastResult=null;lastResultCourse=null;}returnFocus=document.activeElement;closeMenus();c.clearControlInputState?.('racing-menu');
   c.setPauseReason?.('racing-menu',true);if(!dialog.open)dialog.showModal();
-  if(controller){renderResults();return;}
+  if(lastResult){renderResults();return;}
+  if(controller){render();return;}
   if(district&&loadScope?.isActive()&&c.worldPublication===loadPublication){render();return;}
   await qualify();
  }
@@ -93,7 +93,11 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    const facts=await collectRaceDistrict(c,{current});const derived=recommendRaceCourses(facts),hash=await raceDistrictFingerprint(facts);
    if(!current())throw Error('race_world_changed');district=facts;graph=derived.graph;events=derived.events;routeDiagnostics=derived.diagnostics;fingerprint=hash;selected=0;
    for(const saved of listStoredActivities().filter(a=>a.raceRoute&&a.locationLabel===facts.locationLabel))try{events.push(restoreRaceCourse(saved.raceRoute,district,graph,hash));}catch{/* Kept in the library for explicit recovery; never silently remap it. */}
-   const nodeSelect=el('[data-race-node]');nodeSelect.replaceChildren(...graph.nodes.map(n=>new Option(`Junction ${n.id+1}`,String(n.id))));
+   const nodeSelect=el('[data-race-node]');
+   const labels=new Map();for(const road of facts.roads)if(road.label){
+    const edge=graph.edges.find(e=>e.sourceId===road.sourceId);if(edge){for(const id of [edge.from,edge.to]){if(!labels.has(id))labels.set(id,new Set());labels.get(id).add(road.label);}}
+   }
+   nodeSelect.replaceChildren(...graph.nodes.map(n=>new Option(`${[...(labels.get(n.id)||[])].slice(0,2).join(' / ')||'Mapped junction'} · ${n.id+1}`,String(n.id))));
    status(derived.events.length?`${facts.roads.length} road spans qualified. Choose an event or create your own route.`:'The mapped roads are ready. Create a route using the qualified junctions below, or choose another destination.');
    // Store the identity on the local scope projection, not the world owner.
    loadPublication=publication;
@@ -115,7 +119,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    const node=graph.nodes.reduce((best,n)=>Math.hypot(n.x-at.x,n.z-at.y)<Math.hypot(best.x-at.x,best.z-at.y)?n:best);addJunction(node.id);});host.append(svg);
  }
  function render() {
-  if(!dialog)return;el('[data-race-location]').textContent=district?district.locationLabel:'Current selected location';
+  if(!dialog)return;dialog.dataset.raceView='events';el('[data-race-heading]').textContent='Road racing';el('[data-race-location]').textContent=district?district.locationLabel:'Current selected location';
   const list=el('[data-race-events]');list.replaceChildren();events.forEach((course,i)=>{const b=document.createElement('button');b.type='button';b.dataset.eventIndex=i;b.setAttribute('aria-pressed',String(!customCourse&&i===selected));
    const strong=document.createElement('strong'),small=document.createElement('span');strong.textContent=course.name;small.textContent=`${course.discipline} · ${(course.lengthMeters/1000).toFixed(2)} km${course.laps>1?` · ${course.laps} laps`:''}`;b.append(strong,small);list.append(b);});
   const course=customCourse||events[selected];el('[data-race-name]').textContent=course?.name||(busy?'Qualifying loaded roads…':'No qualified event available');
@@ -143,7 +147,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   }catch(error){status(message(error));}
  }
  async function begin(course) {
-  if(busy||!course)return;busy=true;status('Preparing your car and rivals…');
+  if(busy||!course)return;if(lastResult&&!resultSaved){el('[data-race-save-state]').textContent='Save your previous result before starting another run.';el('[data-race-retry-save]').hidden=false;return;}busy=true;status('Preparing your car and rivals…');
   stop('race_replaced');const scope=createLifecycleScope('racing-run'),session=captureEnvironmentSession(),request=new AbortController(),publication=c.worldPublication;
   raceScope=scope;scope.defer(()=>request.abort(),'preparation');scope.listen(session.signal,'abort',()=>stop('world_changed'));
   const uid=getCurrentUser()?.uid||'practice-player',current=()=>scope.isActive()&&session.isCurrent()&&publication===c.worldPublication&&(getCurrentUser()?.uid||'practice-player')===uid;
@@ -168,23 +172,26 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    run.start();controller=run;c.roadRaceController=run;presentation=prepared;prepared.mount();
    const population=c.livingWorldRuntime?.population;population?.setRaceClosure(course);scope.defer(()=>population?.setRaceClosure(null),'civilian-course');
    scope.defer(c.setUrbanRaceClosure?.(course),'urban-course');
-   lastResult=null;el('[data-race-results]').hidden=true;dialog.close();hud.hidden=false;c.clearControlInputState?.('race_countdown');requestWorldFocus();
+   lastResult=null;lastResultCourse=null;resultSaved=false;el('[data-race-results]').hidden=true;dialog.dataset.raceView='events';status('');dialog.close();hud.hidden=false;c.clearControlInputState?.('race_countdown');requestWorldFocus();
    update(0);
   }catch(error){if(raceScope===scope){stop('race_start_failed');status(error.message==='practice_leave_room_first'?'Leave the shared exploration room before starting private practice.':error.message==='stop_before_racing'?'Stop your car before entering a race.':error.message==='race_previous_result_unsaved'?'Retry saving your previous race result before starting another run.':message(error));}}
   finally {busy=false;}
  }
- function complete(result) {lastResult=result;hud.hidden=true;c.setPauseReason?.('racing-menu',true);if(!dialog.open)dialog.showModal();renderResults();void persistResult();}
+ function complete(result) {lastResult=result;lastResultCourse=controller.course;lastResultOwner=getCurrentUser()?.uid||'';resultSaved=false;status('');hud.hidden=true;c.setPauseReason?.('racing-menu',true);if(!dialog.open)dialog.showModal();renderResults();el('#racingResultHeading').focus({preventScroll:true});void persistResult();}
  function renderResults() {
-  if(!lastResult)return;el('[data-race-results]').hidden=false;const list=el('[data-race-order]');list.replaceChildren();
+  if(!lastResult)return;dialog.dataset.raceView='results';el('[data-race-heading]').textContent='Race results';el('#racingResultHeading').textContent=lastResult.courseName;el('[data-race-results]').hidden=false;const list=el('[data-race-order]');list.replaceChildren();
   for(const player of lastResult.players){const li=document.createElement('li');li.textContent=`${player.label} · ${player.dnf?'Did not finish':formatTime(player.progress?.elapsedMs)}${player.ai?' · AI rival':''}`;list.append(li);}
-  el('[data-race-save-state]').textContent='Device practice result. Saving your Journal…';
+  el('[data-race-save-state]').textContent=resultSaved?'Practice record saved in your Journal.':'Device practice result. Your Journal save needs to finish.';el('[data-race-retry-save]').hidden=resultSaved||saving;
  }
  async function persistResult() {
-  if(!lastResult||saving)return;saving=true;const result=lastResult,player=result.players.find(p=>!p.ai),id=recordId,course=controller?.course;
-  try {if(!player?.progress?.finished){el('[data-race-save-state]').textContent='Run ended without a finishing time. Your exploration progress is preserved.';return;}
+  if(!lastResult||saving)return;
+  if((getCurrentUser()?.uid||'')!==lastResultOwner){el('[data-race-save-state]').textContent='Sign back into the account that ran this race to save its result.';el('[data-race-retry-save]').hidden=false;return;}
+  saving=true;const result=lastResult,player=result.players.find(p=>!p.ai),id=recordId,course=lastResultCourse;
+  el('[data-race-save-state]').textContent='Saving your practice record in the Journal…';el('[data-race-retry-save]').hidden=true;
+  try {if(!player?.progress?.finished){resultSaved=true;el('[data-race-save-state]').textContent='Run ended without a finishing time. Your exploration progress is preserved.';return;}
    const saved=await currentRecords().complete({id,title:course.name,sourceType:'creator'},player.progress.elapsedMs,player.pose,
     {pointsFirst:0,detail:`Practice road race · ${course.locationLabel} · ${formatTime(player.progress.elapsedMs)}`,metadata:{resultOwner:'game-result',raceVerified:false,discipline:course.discipline,position:player.position}});
-   if(lastResult!==result)return;el('[data-race-save-state]').textContent=saved?'Practice record saved in your Journal.':'The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=saved;
+   if(lastResult!==result)return;resultSaved=saved;el('[data-race-save-state]').textContent=saved?'Practice record saved in your Journal.':'The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=saved;
   }finally{saving=false;}
  }
  function update(dt) {
