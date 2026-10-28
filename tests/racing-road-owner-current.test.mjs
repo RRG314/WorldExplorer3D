@@ -33,3 +33,9 @@ test('saved course references round-trip only against the same qualified road fa
  district.roads[0].b.y=8;const changed=await raceDistrictFingerprint(district);assert.notEqual(changed,fingerprint);
  assert.throws(()=>restoreRaceCourse(reference,district,h.graph,changed),/requalify/);
 });
+test('a rejected oversized race actor releases its preparation scope',async()=>{
+ const {getLifecycleRegistrySnapshot}=await import('../app/js/runtime/lifecycle-scope.js?v=2');
+ const before=getLifecycleRegistrySnapshot().activeScopeCount,h=setup();
+ assert.throws(()=>createPracticeRaceController({context:h.c,course:h.course,profile:createRaceVehicleProfile('city_bus')}),/envelope/);
+ assert.equal(getLifecycleRegistrySnapshot().activeScopeCount,before);
+});

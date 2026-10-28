@@ -22,3 +22,7 @@ test('nonfinite controls, excessive clocks and invented boost cannot create trus
  for(const controls of [{throttle:99},{steer:NaN},{boost:1},{elapsedMs:1},{throttle:'1'}])assert.throws(()=>normalizeRaceActions(controls),/invalid/);
  const {session}=setup();session.setReady('one',true);session.setReady('two',true);session.start('one',0);const result=session.advance(10000);assert.equal(result.phase,'cancelled');assert.equal(result.reason,'race_authority_stalled');
 });
+test('a course grid admits fitting everyday cars but never overlaps an oversized bus',()=>{
+ const {session}=setup();assert.throws(()=>session.add({uid:'bus',profile:createRaceVehicleProfile('city_bus')}),/envelope/);
+ assert.doesNotThrow(()=>session.add({uid:'pickup',profile:createRaceVehicleProfile('pickup')}));
+});

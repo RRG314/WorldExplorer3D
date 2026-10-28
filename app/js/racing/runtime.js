@@ -18,7 +18,7 @@ const messages={no_qualified_racing_roads:'No supported racing district is ready
  race_grid_has_no_clearance:'Start on a longer, wider straight so the grid fits.',race_turn_too_sharp:'That route contains a turn too tight for the starting grid. Choose another approach.',
  disconnected_race_route:'Those junctions are not connected by a qualified driving route.',race_circuit_not_closed:'Add a route back to the start for a circuit.',
  race_sprint_is_closed:'Use Circuit for a closed route, or finish at a different junction.',race_roads_changed_requalify_route:'Road data has changed. Re-create this route on the current qualified roads.',
- race_vehicle_needs_repair:'Repair your car to at least 30% condition before racing.',race_grid_no_longer_clear:'The start grid is no longer clear. Choose another route.',
+ race_vehicle_exceeds_course_envelope:'This course supports cars and vans up to 6.5 m long. Your larger vehicle stays available in Free Roam.',race_vehicle_needs_repair:'Repair your car to at least 30% condition before racing.',race_grid_no_longer_clear:'The start grid is no longer clear. Choose another route.',
  race_world_changed:'The location changed. Open Racing again in the current world.',activity_library_save_failed:'This device could not save the route. Free some storage and retry.'};
 const message=error=>messages[error?.message]||'This race could not complete. Your garage and exploration progress are safe. Try again.';
 export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{},chooseDestination=()=>{}}={}) {
@@ -59,7 +59,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   hud.innerHTML='<p data-race-phase aria-live="polite"></p><strong data-race-clock></strong><span data-race-progress></span><button type="button" data-race-leave>Leave race</button>';document.body.append(hud);
   dialog.querySelector('[data-race-close]').onclick=()=>dialog.close();
   dialog.addEventListener('keydown',event=>{if(event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();dialog.close();}});
-  dialog.addEventListener('close',()=>{if(lastResult&&controller)stop('results_closed');c.setPauseReason?.('racing-menu',false);c.clearControlInputState?.('racing-menu-closed');if(controller)requestWorldFocus();else returnFocus?.focus?.({preventScroll:true});});
+  dialog.addEventListener('close',()=>{if(busy&&!controller){loadScope?.dispose('menu_closed');if(raceScope)stop('menu_closed');busy=false;}if(lastResult&&controller)stop('results_closed');c.setPauseReason?.('racing-menu',false);c.clearControlInputState?.('racing-menu-closed');if(controller)requestWorldFocus();else returnFocus?.focus?.({preventScroll:true});});
   el('[data-race-destination]').onclick=()=>{stop('destination');dialog.close();chooseDestination();};
   el('[data-race-garage]').onclick=()=>{if(controller){status('Leave the race before changing your car.');return;}dialog.close();c.openVehicleGarage?.();};
   el('[data-race-refresh]').onclick=()=>void qualify();

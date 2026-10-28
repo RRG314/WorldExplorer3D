@@ -124,7 +124,7 @@ export function createRaceCourse(graph,path,settings={}){
  if(gridRun<gridLength)throw Error('race_grid_has_no_clearance');
  const course={version:RACE_COURSE_VERSION,sourcePath:[...path],startOffsetMeters:closed?Number(settings.startOffsetMeters??edges[0].length*.5):null,name:clean(settings.name)||'Mapped road run',description:String(settings.description||'').trim().slice(0,400),
   locationId:clean(settings.locationId),locationLabel:clean(settings.locationLabel),anchor:settings.anchor?{lat:Number(settings.anchor.lat),lon:Number(settings.anchor.lon)}:null,
-  discipline,laps,participants,metersPerUnit:graph.metersPerUnit,vehicleClass:settings.vehicleClass||'road',traffic:'closed-course',collision:'ghost',
+  discipline,laps,participants,vehicleEnvelope:{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},metersPerUnit:graph.metersPerUnit,vehicleClass:settings.vehicleClass||'road',traffic:'closed-course',collision:'ghost',
   lengthMeters,segments,points,gateSpacingMeters:Math.min(30,Math.max(15,Number(settings.gateSpacingMeters)||25)),gates:[]};
  let at=course.gateSpacingMeters;
  for(let index=0;index<segments.length;index++){

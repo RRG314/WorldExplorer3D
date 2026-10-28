@@ -15,7 +15,7 @@ export function pointOnRaceCourse(course,distanceMeters){
 export function raceAiActions(course,car,progress,profile,{difficulty=.65}={}){
  if(progress.finished)return {steer:0,throttle:0,serviceBrake:1};
  const goal=course.gates[progress.nextGate],pose=raceVehicleGroundPose(car),speed=Math.abs(raceVehicleSpeedMetersPerSecond(car));
- const projection=projectRacePosition(course,pose,{minimumMeters:Math.max(0,goal.distanceMeters-55),maximumMeters:Math.min(course.lengthMeters,goal.distanceMeters+15)});
+ const projection=projectRacePosition(course,pose,{minimumMeters:Math.max(0,(course.gates[progress.nextGate-1]?.distanceMeters||0)-8),maximumMeters:Math.min(course.lengthMeters,goal.distanceMeters+15)});
  if(!projection)return {steer:0,throttle:0,serviceBrake:1};
  const look=clamp(3.5+speed*.6,4,15),target=pointOnRaceCourse(course,projection.distanceMeters+look);
  const dx=(target.x-car.x)*course.metersPerUnit,dz=(target.z-car.z)*course.metersPerUnit,heading=Math.atan2(dx,dz),error=wrap(heading-car.angle);

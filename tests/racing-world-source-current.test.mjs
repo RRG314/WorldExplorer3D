@@ -27,3 +27,14 @@ test('recommended races accept densely surveyed real-road topology, not only lon
  assert.ok(result.events.some(e=>e.discipline==='circuit'));assert.ok(result.events.some(e=>e.discipline==='sprint'));
  assert.ok(result.events.every(e=>e.points.length>15),'segmented source geometry is retained');
 });
+
+test('the actual coordinate-only origin uses published world identity and matching load metadata',async()=>{
+ const h=setup();h.context.LOC={lat:43,lon:7};h.context.worldPublication.sequence=12;
+ h.context.livingWorldPublication={worldIdentity:{latitudeE7:430000000,longitudeE7:70000000,locationKey:'custom'}};
+ h.context.worldLoadRuntimeState={sequence:12,location:{lat:43,lon:7,name:'Monaco'}};
+ const district=await collectRaceDistrict(h.context,{yieldWork:async()=>{}});
+ assert.equal(district.locationId,'earth:430000000:70000000');assert.equal(district.locationLabel,'Monaco');
+ assert.ok(recommendRaceCourses(district).events.length>0);
+ h.context.worldLoadRuntimeState.sequence=13;const stale=await collectRaceDistrict(h.context,{yieldWork:async()=>{}});
+ assert.notEqual(stale.locationLabel,'Monaco','new selection metadata cannot relabel an older published world');
+});

@@ -22,6 +22,8 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
  function lobby(){if(phase!=='lobby')throw Error('race_roster_locked');}
  function add({uid,label,profile,ai=false,difficulty=.65}){
   lobby();if(!uid||players.has(uid)||players.size>=course.participants||(!ai&&String(uid).startsWith('rival:')))throw Error('race_roster_unavailable');
+  const envelope=course.vehicleEnvelope||{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},handling=profile?.handling;
+  if(!handling||handling.width>envelope.widthMeters||handling.length>envelope.lengthMeters||handling.height>envelope.heightMeters)throw Error('race_vehicle_exceeds_course_envelope');
   const p={uid,label:String(label||'Explorer').slice(0,40),profile,ai:ai===true,difficulty:Math.max(0,Math.min(1,Number(difficulty)||.65)),ready:ai===true,
    slot:players.size,car:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false};
   players.set(uid,p);return snapshot();

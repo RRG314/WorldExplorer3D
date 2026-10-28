@@ -609,11 +609,13 @@ function initTitleScreenUi({
   document.getElementById('locationSearch')?.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') appCtx.searchLocation();
   });
-  document.querySelectorAll('.mode').forEach((element) => element.addEventListener('click', () => {
-    document.querySelectorAll('.mode').forEach((node) => node.classList.remove('sel'));
-    element.classList.add('sel');
-    appCtx.gameMode = element.dataset.mode;
-  }));
+  function selectTitleGameMode(mode) {
+    const elements=[...document.querySelectorAll('.mode')],target=elements.find(element=>element.dataset.mode===mode);
+    if(!target)return false;
+    for(const element of elements)element.classList.toggle('sel',element===target);
+    appCtx.gameMode=mode;return true;
+  }
+  document.querySelectorAll('.mode').forEach(element=>element.addEventListener('click',()=>selectTitleGameMode(element.dataset.mode)));
 
   let activeLaunchMode = 'earth';
   let launchMeasurement = null;
@@ -906,6 +908,7 @@ function initTitleScreenUi({
   }
 
   return {
+    selectGameMode: selectTitleGameMode,
     getTitleLaunchMode: () => titleLaunchMode,
     setTitleLaunchMode: (mode) => setLaunchMode(mode),
     getGlobeSelector: () => globeSelector,

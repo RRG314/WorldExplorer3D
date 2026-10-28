@@ -15,9 +15,11 @@ export function createPracticeRaceController({context,course,profile,rivals=[],u
  const scope=createLifecycleScope('road-race:practice');let clock=0,sequence=0,started=false,latest=null;
  const session=createRaceSession({id:`practice:${crypto.randomUUID()}`,course,creatorUid:uid,createdAtMs:0,onComplete});
  const current=()=>scope.isActive()&&isAdmitted()&&context.worldPublication===publication&&context.car.personalVehicleId===vehicleId&&canOwnRoadRace(context);
- session.add({uid,label,profile});
- for(let i=0;i<rivals.length;i++)session.add({uid:`rival:${i}`,label:rivals[i].label,profile:rivals[i].profile,ai:true,difficulty:rivals[i].difficulty});
- session.setReady(uid,true);
+ try {
+  session.add({uid,label,profile});
+  for(let i=0;i<rivals.length;i++)session.add({uid:`rival:${i}`,label:rivals[i].label,profile:rivals[i].profile,ai:true,difficulty:rivals[i].difficulty});
+  session.setReady(uid,true);
+ } catch(error){scope.dispose('invalid_race_roster');throw error;}
  function stop(reason='practice_closed') {if(scope.isActive()){latest=session.cancel(reason);scope.dispose(reason);}return session.snapshot();}
  return Object.freeze({uid,course,profile,isCurrent:current,
   start(){

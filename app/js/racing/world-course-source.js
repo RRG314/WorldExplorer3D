@@ -70,9 +70,12 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  await drainCooperatively(collect(),{current:active,yieldWork,budgetMs:2});
  if(!active())throw Error('race_world_changed');
  if(!roads.length)throw Error('no_qualified_racing_roads');
- const anchor=publication.location||context.LOC;
- return {type:'RaceDistrictFacts',version:1,locationId:String(locationId||context.locationKey||context.LOC?.name||'').slice(0,80),
-  locationLabel:String(locationLabel||context.LOC?.name||'Mapped district').slice(0,80),anchor:{lat:Number(anchor?.lat),lon:Number(anchor?.lon)},metersPerUnit,
+ const anchor=publication.location||context.LOC,identity=context.livingWorldPublication?.worldIdentity;
+ const loaded=context.worldLoadRuntimeState&&context.worldLoadRuntimeState.sequence===publication.sequence?context.worldLoadRuntimeState.location:null;
+ const stableLocationId=identity?.latitudeE7!==undefined?`earth:${identity.latitudeE7}:${identity.longitudeE7}`:
+  `earth:${Math.round(Number(anchor?.lat)*1e7)}:${Math.round(Number(anchor?.lon)*1e7)}`;
+ return {type:'RaceDistrictFacts',version:1,locationId:String(locationId||stableLocationId).slice(0,80),
+  locationLabel:String(locationLabel||loaded?.name||identity?.location?.name||context.LOC?.name||'Mapped district').slice(0,80),anchor:{lat:Number(anchor?.lat),lon:Number(anchor?.lon)},metersPerUnit,
   radiusWorld:radius,vehicleEnvelope:envelope,roads,diagnostics,provenance:{authority:'published-world-road-qualification-v1',requestId:publication.requestId}};
 }
 

@@ -106,3 +106,20 @@ straight clear run without replacing source geometry. Recommendations consider
 short spans too; a graph remains editable even when recommendations fail.
 15 selected geometry/owner/qualification tests passed, including a dense surveyed
 circuit. Actual Monaco qualification and playable racing remain to be verified.
+
+Actual ce533c2 qualification retained136 road spans from41,685 traversal segments;
+149nodes/270directed edges. It exposed the real route-entry blocker: the adapter
+read `LOC.name`/an absent location key, whereas the current origin contains only
+coordinates.21otherwise plausible attempts failed `invalid_race_location`.
+Qualification now uses the existing published identity coordinates and matching
+world-load record. No geometry or admission limit is relaxed.
+
+Captured actual Monaco road facts also exposed an AI stall between timing gates
+175m/300m on a changing grade. The steering projection's fixed55m look-back no
+longer contained the car. It now searches from the previous accepted gate. In
+controlled source integration the actual705.99m sprint and time trial finish in
+45.70/46.10s with zero course-boundary contacts. This is not rendered/manual
+browser acceptance. Both failures are retained privately. New source fixtures
+cover coordinate-only origins, stale selection labels, sparse timing gates on
+hills, class/grid clearance and rejected-preparation cleanup. Oversized buses
+remain usable in ordinary exploration; this car/van grid does not admit them.
