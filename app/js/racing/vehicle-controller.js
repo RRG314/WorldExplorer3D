@@ -30,6 +30,7 @@ export function stepRaceVehicle(course,car,actions,dt,profile){
   surfaceDynamics:profile.surface,vehicleHandling:profile.handling,vehicleCondition:profile.condition,vehicleUpgrades:profile.upgrades,
   characterVehicle:profile.character,maxSpd:Math.min(profile.config.maxSpd,mphToCarSpeed(profile.handling.topSpeedMph)),
   friction:profile.config.friction,accel:profile.config.accel*profile.handling.accelerationScale});
+ car.steerAngle=driving.steerAngle;
  const next=integrateVehiclePlanarPosition(car,dt,driving,course.metersPerUnit,false);
  const support=projectRacePosition(course,{...next,y:car.y-VEHICLE_ROOT_TO_GROUND_METERS});
  if(!support)throw Error('race_surface_lost');

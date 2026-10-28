@@ -665,6 +665,12 @@
       "scanNearbyInteriorSupport",
       "updateInteriorInteraction"
     ],
+    "app/js/interiors/aquarium-ui.js": [
+      "screenLayout"
+    ],
+    "app/js/interiors/gallery-ui.js": [
+      "screenLayout"
+    ],
     "app/js/interiors/runtime-ui.js": [
       "buildingMeshes",
       "interiorLegendEntries",
@@ -677,6 +683,11 @@
       "camera",
       "car",
       "interiorHint"
+    ],
+    "app/js/interiors/venue-lighting.js": [
+      "camera",
+      "renderer",
+      "scene"
     ],
     "app/js/live-earth/controller.js": [
       "gameMode",
@@ -1050,6 +1061,9 @@
       "rdtSeed",
       "worldSeed"
     ],
+    "app/js/racing/runtime.js": [
+      "roadRaceController"
+    ],
     "app/js/rdt.js": [
       "*",
       "RDT_NOISE_DEFAULTS",
@@ -1187,6 +1201,9 @@
       "startSpaceFlightToMoon",
       "startSpaceFlightToSolisReach",
       "stopOceanMode"
+    ],
+    "app/js/runtime/resident-presentation-preparation.js": [
+      "renderer"
     ],
     "app/js/session-coordinator.js": [
       "beginEnvironmentTransition",
@@ -1644,9 +1661,6 @@
       "activeTransportActor",
       "currentTransportMode"
     ],
-    "app/js/transport/facility-perimeter-runtime.js": [
-      "dynamicBuildingColliders"
-    ],
     "app/js/transport/aviation-runtime.js": [
       "Walk",
       "aviationRuntime",
@@ -1654,6 +1668,9 @@
       "dynamicBuildingColliders",
       "onAircraftFlightEnded",
       "startAviationRuntime"
+    ],
+    "app/js/transport/facility-perimeter-runtime.js": [
+      "dynamicBuildingColliders"
     ],
     "app/js/transport/maritime-runtime.js": [
       "Walk",
@@ -1724,6 +1741,11 @@
       "showPathOverlays",
       "showRoads"
     ],
+    "app/js/ui/control-panel.js": [
+      "closeControlsPanel",
+      "disposeControlsPanel",
+      "openControlsPanel"
+    ],
     "app/js/ui/globe-selector.js": [
       "createGlobeSelector"
     ],
@@ -1773,6 +1795,9 @@
       "titleLaunchPending",
       "triggerTitleStart",
       "worldLoading"
+    ],
+    "app/js/ui/vehicle-garage.js": [
+      "openVehicleGarage"
     ],
     "app/js/universe/runtime.js": [
       "getUniverseCourseSnapshot",
@@ -1829,6 +1854,7 @@
       "releaseUrbanVehicleForTravel",
       "resolveUrbanActorCollision",
       "selectPersonalVehicle",
+      "setUrbanRaceClosure",
       "startUrbanSandboxRuntime",
       "toggleUrbanEquipment",
       "toggleUrbanResponderEquipment",
@@ -1836,6 +1862,15 @@
       "urbanSandboxRuntimeSnapshot",
       "wheelMeshes",
       "worldEconomy"
+    ],
+    "app/js/vr/phone-session.js": [
+      "vrPresentation"
+    ],
+    "app/js/vr/platform.js": [
+      "screenLayout"
+    ],
+    "app/js/vr/xr-session.js": [
+      "vrPresentation"
     ],
     "app/js/walking.js": [
       "createWalkingModule"
@@ -2107,8 +2142,17 @@
       "functionalPoiRecords",
       "poiTenanciesByBuilding"
     ],
+    "app/js/world/spawn-publication.js": [
+      "Walk",
+      "car",
+      "carMesh"
+    ],
     "app/js/world/spawn.js": [
       "_lastCustomStructureProbe"
+    ],
+    "app/js/world/street-interior-suspension.js": [
+      "_cancelStreetPavementBuild",
+      "_streetPavementDirty"
     ],
     "app/js/world/street-pavement-runtime.js": [
       "_cancelStreetPavementBuild",
@@ -2126,6 +2170,10 @@
       "streetPavement",
       "strokeStyle",
       "urbanSurfaceStats"
+    ],
+    "app/js/world/street-source-revision.js": [
+      "_streetPavementDirty",
+      "_streetSourceRevision"
     ],
     "app/js/world/structure-aware.js": [
       "fixedRegionalStructureWaterAreas",
@@ -2174,35 +2222,6 @@
     "app/js/world/waterway-ribbon.js": [
       "waterSurfaceRegistry"
     ],
-    "app/js/world/world-load-coordinator.js": [
-      "_worldLoadSequence"
-    ],
-    "app/js/world/world-snapshot-adapter.js": [
-      "worldPublication",
-      "worldSnapshotStore"
-    ],
-    "app/js/interiors/gallery-ui.js": [
-      "screenLayout"
-    ],
-    "app/js/interiors/aquarium-ui.js": [
-      "screenLayout"
-    ],
-    "app/js/interiors/venue-lighting.js": [
-      "camera",
-      "renderer",
-      "scene"
-    ],
-    "app/js/runtime/resident-presentation-preparation.js": [
-      "renderer"
-    ],
-    "app/js/world/street-interior-suspension.js": [
-      "_cancelStreetPavementBuild",
-      "_streetPavementDirty"
-    ],
-    "app/js/world/street-source-revision.js": [
-      "_streetPavementDirty",
-      "_streetSourceRevision"
-    ],
     "app/js/world/world-cell-adapter.js": [
       "activeFunctionalPois",
       "buildingEntranceByBuilding",
@@ -2213,27 +2232,12 @@
       "poiTenanciesByBuilding",
       "refreshActiveFunctionalPois"
     ],
-    "app/js/world/spawn-publication.js": [
-      "Walk",
-      "car",
-      "carMesh"
+    "app/js/world/world-load-coordinator.js": [
+      "_worldLoadSequence"
     ],
-    "app/js/vr/phone-session.js": [
-      "vrPresentation"
-    ],
-    "app/js/vr/platform.js": [
-      "screenLayout"
-    ],
-    "app/js/vr/xr-session.js": [
-      "vrPresentation"
-    ],
-    "app/js/ui/control-panel.js": [
-      "closeControlsPanel",
-      "disposeControlsPanel",
-      "openControlsPanel"
-    ],
-    "app/js/ui/vehicle-garage.js": [
-      "openVehicleGarage"
+    "app/js/world/world-snapshot-adapter.js": [
+      "worldPublication",
+      "worldSnapshotStore"
     ]
   }
 }

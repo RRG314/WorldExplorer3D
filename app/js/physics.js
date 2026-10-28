@@ -1,3 +1,4 @@
+import {advanceRoadRaceFrame} from './physics/road-race-delegate.js';
 import {PLANETARY_ROVER_CONFIG} from './physics/vehicle-config.js';
 import { resolvePlanetaryVehicleObstacle } from './physics/planetary-obstacle-response.js';
 import {updateVehicleWheels} from './transport/vehicle-wheel-motion.js';
@@ -140,6 +141,11 @@ function update(dt) {
   appCtx.updateInteriorInteraction?.();
 
   const actions = appCtx.readControlActions?.('drive') || {};
+  if(advanceRoadRaceFrame(appCtx,dt,actions)) {
+    presentRoadVehicle(dt,Number(appCtx.car.steerAngle||0));
+    updateRoadWorldReaders(dt);
+    return;
+  }
   const driveFrame=prepareVehicleDriveFrame(appCtx.car,actions,dt,appCtx.CFG);
 
   const vehicleHandling = vehicleHandlingProfile(appCtx.car.vehicleVariantId || 'sedan', {
@@ -431,6 +437,11 @@ function update(dt) {
       appCtx.car.vy = Math.min(0, Number(appCtx.car.vy) || 0);
     }
   }
+  presentRoadVehicle(dt,steerAngle,carY);
+  updateRoadWorldReaders(dt);
+}
+
+function presentRoadVehicle(dt,steerAngle,carY=appCtx.car.y) {
   appCtx.carMesh.position.set(appCtx.car.x, carY, appCtx.car.z);
   appCtx.carMesh.rotation.order = 'YXZ';
   appCtx.carMesh.rotation.set(
@@ -446,6 +457,9 @@ function update(dt) {
   appCtx.wheelMeshes.forEach((w) => { if (!w.userData?.radiusMeters) w.rotation.x += wheelRot; });
   updateVehicleWheels(appCtx.wheelMeshes, wheelSpeed * dt, steerAngle);
 
+}
+
+function updateRoadWorldReaders(dt) {
   appCtx.updateTrack();
   appCtx.updatePolice(dt);
   appCtx.updateMode(dt);

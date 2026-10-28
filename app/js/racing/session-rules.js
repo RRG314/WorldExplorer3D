@@ -88,6 +88,8 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
    players:ordered.map((p,index)=>({uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
     disconnected:p.disconnectedAt!==null,dnf:p.dnf,position:index+1,lastInputSequence:p.lastSequence,pose:p.car?raceVehicleGroundPose(p.car):null,
     speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,
+    vehicleState:p.car?Object.fromEntries(['x','y','z','angle','speed','vFwd','vLat','vx','vz','yawRate','steerAngle','steerSm','rearSlip','terrainPitch','terrainRoll',
+     'engineRpm','engineRedlineRpm','engineLoad','driveGear','shiftTime','condition','maximumWheelPenetration','maximumWheelGap'].map(key=>[key,Number(p.car[key])||0])):null,
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
      bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null}))};
  }

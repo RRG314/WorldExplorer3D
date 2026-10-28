@@ -1,3 +1,4 @@
+import {normalizeRaceRouteReference} from '../racing/course-library.js';
 import {
   buildActivitySummary,
   countAnchorsByType,
@@ -124,6 +125,7 @@ function normalizeStoredActivity(raw = {}) {
   return {
     id: sanitizeText(raw.id || uniqueId('activity'), 120).toLowerCase(),
     sourceType: 'creator',
+    ...(raw.raceRoute?{raceRoute:normalizeRaceRouteReference(raw.raceRoute)}:{}),
     templateId: sanitizeText(raw.templateId || '', 80).toLowerCase(),
     title: sanitizeText(raw.title || raw.name || summary.title, 120),
     description: sanitizeText(raw.description || summary.description, 220),
@@ -214,7 +216,7 @@ function saveStoredActivity(record = {}) {
     center: cloneJson(normalized.center),
     startPoint: cloneJson(normalized.startPoint)
   });
-  writeRawLibrary(items);
+  if(!writeRawLibrary(items))throw Error('activity_library_save_failed');
   return normalized;
 }
 

@@ -1,5 +1,5 @@
 import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
-import {createLifecycleScope} from '../runtime/lifecycle-scope.js';
+import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 import {resolveControlState} from './control-state.js';
 import {personalVehicleById,personalVehicleIdentity,normalizeVehicleGarage} from './vehicle-garage-rules.js';
 import {commitExplorerVehicleAction} from '../../../js/player-state-api.js?v=1';

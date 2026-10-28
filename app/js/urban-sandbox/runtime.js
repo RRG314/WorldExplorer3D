@@ -1,3 +1,4 @@
+import {raceClosureContains} from '../racing/closed-course.js';
 import {createPersonalVehicleRuntime} from '../transport/personal-vehicle-runtime.js';
 import {personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 import {consumePlayerProvision} from '../player/provisions.js';
@@ -1341,6 +1342,23 @@ function retireDisabledRoadVehicle(state, vehicle) {
   vehicle.visual?.dispose?.();
   state.vehicles.splice(index, 1);
   return true;
+}
+
+function updateRaceClosurePresentation(state) {
+  const roots=state.raceHiddenRoots ||= new Map();
+  for(const actor of [...state.npcs,...state.vehicles]) {
+    const root=actor.visual?.root;if(!root||actor.attachedToPlayer)continue;
+    const pose=actor.variant?vehiclePose(actor):npcPose(actor);
+    if(raceClosureContains(state.raceClosure,pose,actor.variant?6:4)) {
+      if(!roots.has(root))roots.set(root,root.visible);root.visible=false;
+    } else if(roots.has(root)) {root.visible=roots.get(root);roots.delete(root);}
+  }
+  if(!state.raceClosure) {for(const [root,visible]of roots)root.visible=visible;roots.clear();}
+}
+function setUrbanRaceClosure(course) {
+  const state=activeRuntime;if(!activeWorldMatches(state))return ()=>{};
+  state.raceClosure=course;updateRaceClosurePresentation(state);
+  return ()=>{if(state.raceClosure===course){state.raceClosure=null;updateRaceClosurePresentation(state);}};
 }
 
 function updateEntityLifecycle(state) {
@@ -3382,6 +3400,7 @@ function startUrbanSandboxRuntime(options = {}) {
         }
       });
       updateEntityLifecycle(state);
+      updateRaceClosurePresentation(state);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {
         state.npcPromotionElapsed = 0;
@@ -3454,6 +3473,7 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.urbanSandboxRuntime = state;
   state.vehicles.forEach((vehicle) => attachCuratedTrafficDetail(state, vehicle));
   appCtx.resolveUrbanActorCollision = resolveUrbanActorCollision;
+  appCtx.setUrbanRaceClosure = setUrbanRaceClosure;
   state.handleMechanicInteraction = () => openNearbyMechanic(state);
   appCtx.handleMechanicInteraction = state.handleMechanicInteraction;
   state.prepareAirborneParachute = (options = {}) => {

@@ -1,3 +1,4 @@
+import {raceClosureContains} from '../racing/closed-course.js';
 import {createVehicleSpacing, vehicleFollowingGap} from './vehicle-spacing.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
@@ -584,6 +585,7 @@ export function createLivingWorldPopulation(options = {}) {
   const group = new THREE.Group();
   group.name = 'Living World Population';
   let disposed = false;
+  let raceClosure=null;
   const pedestrianHosts = pedestrians.map((agent, index) => {
     const host = new THREE.Group();
     const assetId = NEARBY_NPC_ASSET_IDS[index % NEARBY_NPC_ASSET_IDS.length];
@@ -722,7 +724,7 @@ export function createLivingWorldPopulation(options = {}) {
       const host = agent.visualHost;
       if (!pose || !host) return;
       const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
-      if (agent.promoted) {
+      if (agent.promoted || raceClosureContains(raceClosure,pose)) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
@@ -754,7 +756,7 @@ export function createLivingWorldPopulation(options = {}) {
       const host = agent.visualHost;
       if (!pathPose || !host) { agent.presentationPose = null; return; }
       const distance = reference ? Math.hypot(pathPose.x - reference.x, pathPose.z - reference.z) : 0;
-      if (agent.promoted) {
+      if (agent.promoted || raceClosureContains(raceClosure,pathPose,6)) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
@@ -801,6 +803,7 @@ export function createLivingWorldPopulation(options = {}) {
 
   return Object.freeze({
     group,
+    setRaceClosure(course) {raceClosure=course||null;updateCuratedPedestrianHosts(.1);refreshVehiclePresentation();},
     residentPresentationRoots() {
       return disposed ? [] : [...pedestrianHosts, ...vehicleHosts].filter(host =>
         host.userData.curatedCharacterAttachment || host.userData.curatedTrafficVehicleAttachment);

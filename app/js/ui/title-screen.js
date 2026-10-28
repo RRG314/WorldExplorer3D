@@ -555,7 +555,7 @@ function initTitleScreenUi({
   }
 
   if (sharedExperienceParams) {
-    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock', 'livegps']);
+    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock', 'livegps', 'racing']);
     if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
       appCtx.gameMode = sharedExperienceParams.gameMode;
       const targetMode = document.querySelector(`.mode[data-mode="${sharedExperienceParams.gameMode}"]`);

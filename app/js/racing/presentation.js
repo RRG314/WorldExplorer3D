@@ -1,0 +1,44 @@
+import {createUrbanVehicleVisual} from '../urban-sandbox/vehicle-visuals.js?v=12';
+import {attachCuratedTrafficVehicle,syncCuratedVehicleGroundPivot} from '../urban-sandbox/curated-traffic-vehicle.js?v=5';
+import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
+import {carSpeedToWorldUnitsPerSecond} from '../physics/vehicle-speed-units.js?v=2';
+export async function prepareRacePresentation(THREE,context,course,rivals,{signal,current}) {
+ const root=new THREE.Group();root.name='Scoped mapped road race';const visuals=[];let disposed=false;
+ const material=new THREE.MeshBasicMaterial({color:0xb7f568,transparent:true,opacity:.8,depthWrite:false});
+ const pole=new THREE.BoxGeometry(.16,2.8,.16),gates=[];
+ for(let i=0;i<3;i++) {
+  const group=new THREE.Group();for(const side of [-1,1]){const mesh=new THREE.Mesh(pole,material);mesh.position.y=1.4;mesh.userData.side=side;group.add(mesh);}
+  root.add(group);gates.push(group);
+ }
+ const lineGeometry=new THREE.BufferGeometry().setFromPoints(course.points.map(p=>new THREE.Vector3(p.x,p.y+.08,p.z)));
+ const lineMaterial=new THREE.LineBasicMaterial({color:0xb7f568,transparent:true,opacity:.45});root.add(new THREE.Line(lineGeometry,lineMaterial));
+ const dispose=()=>{if(disposed)return;disposed=true;for(const visual of visuals)visual.dispose();root.removeFromParent();pole.dispose();material.dispose();lineGeometry.dispose();lineMaterial.dispose();};
+ try {
+  for(let i=0;i<rivals.length;i++) {
+   if(!current()||signal.aborted)throw Error('race_world_changed');
+   const profile=rivals[i].profile,visual=createUrbanVehicleVisual(THREE,{id:`rival:${i}`,variant:profile.variant,condition:profile.conditionValue});
+   visuals.push(visual);
+   const ready=await attachCuratedTrafficVehicle(THREE,visual.root,{variantId:profile.variant.id,color:[0xd05f39,0x6c9ed3,0xb4a080][i],signal,isCurrent:current});
+   if(!ready||!current())throw Error('race_rival_model_unavailable');
+   root.add(visual.root);
+  }
+  return Object.freeze({root,dispose,
+   mount(){if(disposed||!current())throw Error('race_world_changed');context.scene.add(root);},
+   update(snapshot,uid,dt){
+    const player=snapshot.players.find(p=>p.uid===uid),next=player?.progress?.nextGate||0;
+    for(let i=0;i<gates.length;i++) {
+     const gate=course.gates[next+i],host=gates[i];host.visible=!!gate&&!player?.progress?.finished;
+     if(!gate)continue;host.position.set(gate.x,gate.y+.08,gate.z);host.rotation.y=Math.atan2(gate.forward.x,gate.forward.z);
+     for(const mesh of host.children)mesh.position.x=mesh.userData.side*(gate.halfWidthMeters/course.metersPerUnit-.2);
+    }
+    for(const p of snapshot.players)if(p.ai&&p.pose) {
+     const visual=visuals[p.slot-1];if(!visual)continue;const state=p.vehicleState;
+     visual.root.position.set(p.pose.x,state?.y??p.pose.y+1.2,p.pose.z);
+     visual.root.rotation.set(state?.terrainPitch||0,p.pose.yaw,state?.terrainRoll||0,'YXZ');
+     syncCuratedVehicleGroundPivot(visual.root);
+     updateVehicleWheels(visual.wheels,carSpeedToWorldUnitsPerSecond(p.speed,course.metersPerUnit)*dt,state?.steerAngle||0);
+     visual.setCondition(p.condition);visual.updateDamageVisual(snapshot.serverAtMs/1000);
+    }
+   }});
+ } catch(error){dispose();throw error;}
+}

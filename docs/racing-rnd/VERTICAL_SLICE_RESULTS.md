@@ -74,3 +74,26 @@ without barrier contacts. These remain source fixtures.
 No authenticated low-latency service,production course catalog,racing hub/editor,
 leaderboard persistence or rivals/crew career is accepted yet. The16-step end
 point remains outstanding. Do not describe the source kernel as a complete game.
+
+## Practice integration awaiting actual-city verification
+
+The Racing gameplay plugin now loads a scoped hub, published-road qualifier,
+three discipline selectors, junction-based route creator, existing-library draft
+persistence, personal-car admission, curated AI models, countdown/HUD, standings,
+and account-scoped practice records through the existing Journal completion
+implementation. The existing road-physics frame exclusively applies session
+kinematics; ordinary controllers cannot concurrently drive a race actor. A scoped
+civilian presentation exclusion makes the qualified roads a closed course during
+practice, then restores the population. Road geometry remains unchanged.
+
+28 selected source cases passed, including grid-to-finish controls, controller and
+world rejection, route fingerprint recovery and existing-library save failures.
+First cancellation test exposed a stale controller snapshot after cancellation;
+the owner now publishes the cancelled snapshot. Actual-city routes, browser UI,
+manual race input, landscape layout and gameplay feel remain unverified at this
+point. The first artifact request was correctly rejected because shipped source
+was not yet committed. No verification gate was bypassed.
+
+This is not the complete racing release: verified online sessions, the racing
+leaderboard writer, durable server results, creator publication/moderation and the
+selected rivals/crews progression remain required.

@@ -1,3 +1,4 @@
+import {bindRacingUI} from './ui/racing.js';
 import {bindVehicleGarage,vehicleGarageMessage} from './ui/vehicle-garage.js';
 import { mountCapabilityGuide } from './product/capability-guide.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
@@ -175,6 +176,7 @@ function setupUI() {
     }
   }
   const worldFocus = bindWorldFocusControls(appCtx, closeAllFloatMenus);
+  bindRacingUI({closeMenus:closeAllFloatMenus,requestWorldFocus:worldFocus.requestWorldFocus,chooseDestination:()=>goToMainMenu()});
   bindControlPanel(appCtx, {updateMode: updateControlsModeUI, clearHeld: clearVirtualHeldInputs, requestWorldFocus: worldFocus.requestWorldFocus});
   appCtx.screenLayout.bindHudLayout();
   function goToMainMenu() {

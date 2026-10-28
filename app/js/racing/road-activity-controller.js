@@ -1,0 +1,41 @@
+import {resolveControlState} from '../transport/control-state.js';
+import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
+import {createRaceSession} from './session-rules.js';
+import {raceGridPose} from './course-rules.js';
+
+export function canOwnRoadRace(context) {
+ const control=resolveControlState(context);
+ return !context.worldLoading && !context.onMoon && !context.onMars && !context.activePlanetaryBodyId &&
+  control.frame==='surface' && control.controller==='drive' && control.occupancy==='driver';
+}
+// A subordinate road controller: the existing physics frame supplies dt/actions.
+// It never installs a timer, writes a player pose or releases another transport.
+export function createPracticeRaceController({context,course,profile,rivals=[],uid='practice-player',label='You',onChange=()=>{},onComplete=()=>{},isAdmitted=()=>true}) {
+ const publication=context.worldPublication,vehicleId=context.car.personalVehicleId;
+ const scope=createLifecycleScope('road-race:practice');let clock=0,sequence=0,started=false,latest=null;
+ const session=createRaceSession({id:`practice:${crypto.randomUUID()}`,course,creatorUid:uid,createdAtMs:0,onComplete});
+ const current=()=>scope.isActive()&&isAdmitted()&&context.worldPublication===publication&&context.car.personalVehicleId===vehicleId&&canOwnRoadRace(context);
+ session.add({uid,label,profile});
+ for(let i=0;i<rivals.length;i++)session.add({uid:`rival:${i}`,label:rivals[i].label,profile:rivals[i].profile,ai:true,difficulty:rivals[i].difficulty});
+ session.setReady(uid,true);
+ function stop(reason='practice_closed') {if(scope.isActive()){latest=session.cancel(reason);scope.dispose(reason);}return session.snapshot();}
+ return Object.freeze({uid,course,profile,isCurrent:current,
+  start(){
+   if(started||!current())throw Error('race_vehicle_or_world_changed');
+   const grid=raceGridPose(course,0);
+   // Normal surface admission proves the exact grid, including deck and water.
+   if(!context.activateSurfaceActivity?.('drive',grid,{maxDistance:1}))throw Error('race_grid_no_longer_clear');
+   if(!current())throw Error('race_vehicle_or_world_changed');
+   latest=session.start(uid,0);started=true;onChange(latest);return latest;
+  },
+  step(dt,actions){
+   if(!started||!current()){stop('race_vehicle_or_world_changed');return null;}
+   if(!(dt>0&&dt<=1/30))throw Error('invalid_race_physics_step');
+   clock+=dt*1000;
+   if(['countdown','running'].includes(latest.phase))session.control(uid,sequence++,{
+    steer:actions.steer||0,throttle:actions.throttle||0,reverse:actions.reverse||0,brake:actions.brake||0,serviceBrake:actions.serviceBrake||0},clock);
+   latest=session.advance(clock);onChange(latest);
+   return latest.players.find(p=>p.uid===uid)?.vehicleState||null;
+  },snapshot:()=>latest||session.snapshot(),stop,
+  dispose:()=>stop('practice_disposed')});
+}

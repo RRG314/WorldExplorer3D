@@ -1,5 +1,5 @@
 import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
-import {createLifecycleScope} from '../runtime/lifecycle-scope.js';
+import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 
 export const LICENSED_AIRCRAFT_ASSETS = Object.freeze({
   'expedition-prop':'aircraft-cessna-172',
