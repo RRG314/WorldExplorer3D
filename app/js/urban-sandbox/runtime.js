@@ -1303,7 +1303,6 @@ function attachCuratedTrafficDetail(state, vehicle) {
   const assetId = CURATED_TRAFFIC_ASSET_BY_VARIANT[String(vehicle.variant?.id || '')];
   if (!assetId) return false;
   const root = vehicle.visual.root;
-  root.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(root);
   void attachCuratedTrafficVehicle(THREE, root, {
     assetId,
     variantId: vehicle.variant.id,

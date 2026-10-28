@@ -29,3 +29,35 @@ rejection. This does not establish live-service or racing acceptance. Failed
 emulator setup attempts and a fixture missing the existing currency version are
 retained in private evidence. Current game visual/input checks follow the frozen
 foundation build. The16-step racing slice remains unimplemented.
+
+## Shared controller and portable racing rules (local, not a complete slice)
+
+The existing player planar controller is extracted into
+`app/js/physics/vehicle-planar-dynamics.js`; five pre-extraction trajectory cases
+(thirty numeric checkpoints) retain dry slalom,wet Fleetwood,rough pickup,Moon
+and airborne inertia behavior. Surface,collision,world-return and frame owners
+remain in the existing player physics. The race actor adapter consumes the same
+calculation rather than a second handling engine.
+
+Portable course rules enforce connected supported roads,width/grade/tunnel
+clearance,3D deck separation and abutments,valid grids,ordered swept gates/laps,
+clock/motion limits and swept off-course rejection. Circuit timing lines lie on
+straights; gates avoid corner tangents. Pure AI finished a360m sprint in20.969s
+and two480m pickup laps on reduced grip in61.712s,without barrier contacts,using
+steer/throttle/brake controls. These are source simulations,not geographic scene
+or actual browser AI acceptance. First gate/timing-line failures are retained.
+
+Portable session rules add locked roster/countdown,input-only authoritative
+physics/clock,stale input braking,disconnect/reconnect and host-leave handling,
+once-only result notification. Two simulated human input streams finished under
+that owner. This is NOT authenticated networking or leaderboard/wallet proof.
+Canonical geographic course intake,UI/editor,backend service,two actual signed-in
+browsers,persistence and selected career remain outstanding.
+
+Generic model attachment now owns its release callback and generation guard.
+A controlled real-GLB visual test exposed personal-car leases not releasing; the
+shared attachment owner fixes successful,early-disposed and obsolete-failure
+paths. Actual DeLorean/Fleetwood deformation,smoke/fire,garage landscape scrolling,
+Drive-to-world focus and Escape were exercised in an isolated component. Images
+inspected; effect textures returned tozero and both model leases tozero; idle
+templates retained within the existing64MiB budget. This is not city gameplay.

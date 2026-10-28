@@ -7,7 +7,7 @@ const messages={garage_loading:'Your account garage is loading. Please try again
   vehicle_garage_changed:'Your garage changed on another session. Please try again.',not_enough_credits:'You need more Explorer Credits.',
   leave_current_vehicle_or_interior:'Leave the current aircraft, vessel or interior first.',world_changed:'The world changed. Please choose your vehicle again.'};
 export function vehicleGarageMessage(result){return result?.ok?'Vehicle ready.':messages[result?.reason]||'This vehicle action could not complete. Please try again.';}
-let dialog,picked='bmw_e34',busy=false,returnFocus,closeMenus=()=>{};
+let dialog,picked='bmw_e34',busy=false,returnFocus,driveReady=false,closeMenus=()=>{},requestWorldFocus=()=>{};
 function refreshTravel(){
   const select=document.getElementById('travelVehicleSelect');let garage;
   try{garage=ctx.getVehicleGarage?.();}catch{return;}
@@ -51,7 +51,7 @@ export function openVehicleGarage(){
     ctx.showToast?.('Your saved garage could not be read. Your collection has been preserved.');return;
   }
   if(!garage){ctx.showToast?.('Start a location before opening your garage.');return;}
-  ensure();returnFocus=document.activeElement;picked=garage.selectedId;status('');render();
+  ensure();returnFocus=document.activeElement;driveReady=false;picked=garage.selectedId;status('');render();
   closeMenus();
   ctx.clearControlInputState?.('vehicle_garage');ctx.setPauseReason?.('vehicle-garage',true);dialog.showModal();
 }
@@ -69,6 +69,7 @@ function ensure(){
   dialog.querySelector('[data-garage-close]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('keydown',event=>{if(event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();dialog.close();}});
   dialog.addEventListener('close',()=>{ctx.cancelPersonalVehicleSelection?.();ctx.setPauseReason?.('vehicle-garage',false);ctx.clearControlInputState?.('vehicle_garage_closed');
+    if(driveReady){driveReady=false;requestWorldFocus();return;}
     const focus=returnFocus?.getClientRects?.().length?returnFocus:document.getElementById('travelBtn');focus?.focus?.({preventScroll:true});});
   dialog.querySelector('[data-garage-list]').addEventListener('click',e=>{const b=e.target.closest('[data-vehicle-id]');if(!b||busy)return;picked=b.dataset.vehicleId;render();status('');});
   const run=async action=>{
@@ -77,7 +78,7 @@ function ensure(){
     try{result=action==='drive'?await ctx.selectPersonalVehicle?.(picked):await ctx.changeVehicleGarage?.({action,vehicleId:picked,homeId:dialog.querySelector('[data-garage-home]').value});}
     catch{result={ok:false};}
     busy=false;render();status(vehicleGarageMessage(result));
-    if(result?.ok&&action==='drive')dialog.close();
+    if(result?.ok&&action==='drive'){driveReady=true;dialog.close();}
   };
   dialog.querySelector('[data-garage-drive]').addEventListener('click',()=>void run('drive'));
   dialog.querySelector('[data-garage-buy]').addEventListener('click',()=>void run('buy'));
@@ -85,6 +86,7 @@ function ensure(){
 }
 export function bindVehicleGarage(options={}){
   closeMenus=options.closeMenus||closeMenus;
+  requestWorldFocus=options.requestWorldFocus||requestWorldFocus;
   document.getElementById('fGarage')?.addEventListener('click',openVehicleGarage);
   document.getElementById('travelBtn')?.addEventListener('click',refreshTravel);
   ctx.openVehicleGarage=openVehicleGarage;

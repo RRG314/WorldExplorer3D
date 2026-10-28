@@ -9,3 +9,20 @@ Retain Firebase Auth,room admission,friends,consents,blocking and lifecycle. Use
 Proposed server session: lobby -> locked roster -> countdown -> running -> complete/cancelled. Server-owned clock and canonical course;ordered progress and plausible movement;deduplicated finish/reward receipts. Disconnect has a bounded grace thenDNF;late join is spectator;host departure cannot reset the clock. Collision policy and reconciliation must be explicit. Backend validation of checkpoints sent by a client is still weaker than server-simulated physics; label evidence honestly.
 
 Two authenticated browsers,latency/loss,reconnect,host departure,teleport/replay/reward attacks and measured operating costs remain required before competitive release. Current ordinary room operation is preserved,not relabelled a racing backend.
+
+## Selected prototype boundary
+
+Use the extracted existing vehicle calculation for server-owned race actors;
+clients send bounded controls,not poses or finish times. The portable session
+model now exercises that boundary and disconnect semantics locally. It has no
+network clock/database/renderer. A scoped service adapter must still prove real
+Auth/room admission,durable existing-wallet receipts,leaderboard integrity and
+actual two-client gameplay before release.
+
+[Cloud Run WebSocket documentation](https://docs.cloud.google.com/run/docs/triggering/websockets)
+confirms connections have request timeouts and affinity is best effort. Do not
+rely on affinity for session authority or deploy an unconstrained multi-instance
+in-memory service. Prototype a bounded single-authority room lease with explicit
+interruption/reconnect behavior and durable results; capacity beyond that needs
+a separately measured architecture. Verify Firebase sessions including revocation
+using the [existing Admin Auth contract](https://firebase.google.com/docs/auth/admin/manage-sessions).

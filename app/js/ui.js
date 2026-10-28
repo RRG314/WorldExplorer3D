@@ -28,7 +28,7 @@ function emitTutorialEvent(eventName, payload = {}) {
 function setupUI() {
   appCtx.screenLayout ||= getScreenLayoutService();
   mountTesterInvitation();
-  bindVehicleGarage({closeMenus:closeAllFloatMenus});
+  bindVehicleGarage({closeMenus:closeAllFloatMenus,requestWorldFocus:()=>worldFocus.requestWorldFocus()});
   mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {

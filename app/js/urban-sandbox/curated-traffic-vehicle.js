@@ -105,6 +105,9 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
 }
 
 function disposeCuratedTrafficVehicle(host) {
+  if(!host?.userData)return false;
+  host.userData.curatedTrafficVehicleLoadGeneration=(host.userData.curatedTrafficVehicleLoadGeneration||0)+1;
+  host.userData.curatedTrafficVehicleLoadStarted=false;
   const attachment = host?.userData?.curatedTrafficVehicleAttachment;
   if (!attachment) return false;
   const assetId = attachment.instance.record.id;
@@ -122,13 +125,16 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     ? CURATED_RESPONDER_ASSET_ID
     : CURATED_TRAFFIC_ASSET_BY_VARIANT[String(options.variantId || '')]);
   if (!assetId) return false;
+  const generation=(host.userData.curatedTrafficVehicleLoadGeneration||0)+1;
+  host.userData.curatedTrafficVehicleLoadGeneration=generation;
+  host.userData.disposeCuratedTrafficVehicle=()=>disposeCuratedTrafficVehicle(host);
   host.userData.curatedTrafficVehicleLoadStarted = true;
   let instance;
   try {
     instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
-    if (options.isCurrent && !options.isCurrent()) {
+    if (host.userData.curatedTrafficVehicleLoadGeneration!==generation || options.isCurrent && !options.isCurrent()) {
       instance.dispose();
-      host.userData.curatedTrafficVehicleLoadStarted = false;
+      if(host.userData.curatedTrafficVehicleLoadGeneration===generation)host.userData.curatedTrafficVehicleLoadStarted = false;
       return false;
     }
     const visual = prepareTrafficVisual(THREE, instance, options);
@@ -140,10 +146,11 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     syncCuratedVehicleGroundPivot(host);
     return true;
   } catch (error) {
-    disposeCuratedTrafficVehicle(host);
+    if(host.userData.curatedTrafficVehicleLoadGeneration===generation){
+      disposeCuratedTrafficVehicle(host);
+      host.userData.curatedTrafficVehicleLoadFailed = error?.name !== 'AbortError';
+    }
     instance?.dispose();
-    host.userData.curatedTrafficVehicleLoadStarted = false;
-    host.userData.curatedTrafficVehicleLoadFailed = error?.name !== 'AbortError';
     if (error?.name !== 'AbortError') console.warn('Curated traffic vehicle unavailable; vehicle remains hidden.', error);
     return false;
   }

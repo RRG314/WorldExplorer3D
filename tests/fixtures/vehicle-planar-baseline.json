@@ -1,0 +1,717 @@
+{
+  "sourceCommit": "0615cab",
+  "scope": "Existing controller planar motion before extraction; canonical profile/config, no collisions or surface contact replacement",
+  "cases": [
+    {
+      "definition": {
+        "id": "sedan-dry-slalom",
+        "variant": "sedan",
+        "grip": 1,
+        "condition": 1,
+        "upgrade": 0,
+        "planetary": false
+      },
+      "sequence": [
+        {
+          "frames": 100,
+          "actions": {
+            "throttle": 1,
+            "steer": 0.15
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "throttle": 0.6,
+            "steer": -0.5
+          }
+        },
+        {
+          "frames": 40,
+          "actions": {
+            "throttle": 0.2,
+            "steer": 0.4,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 70,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 65,
+          "actions": {
+            "reverse": 1,
+            "steer": -0.3
+          }
+        },
+        {
+          "frames": 30,
+          "actions": {
+            "throttle": 1,
+            "boost": 1,
+            "steer": 0.2
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 13.337955648529775,
+          "z": 17.516041177903695,
+          "speed": 140.31845898478903,
+          "vFwd": 132.53605680380193,
+          "vLat": -0.018532689880328617,
+          "yawRate": 0.8949344627028631,
+          "angle": 1.057561880100786,
+          "rearSlip": 0,
+          "steerSm": 0.14999999998897057,
+          "throttleSm": 0.9999546000702375,
+          "driftAngle": 0.0001398313048273092,
+          "isDrifting": false
+        },
+        {
+          "x": 30.127364768667892,
+          "z": 32.21399342765589,
+          "speed": 167.12565839533153,
+          "vFwd": 163.13624125428186,
+          "vLat": -0.10192613589687295,
+          "yawRate": -0.8614516440566792,
+          "angle": 0.572781900651631,
+          "rearSlip": 0,
+          "steerSm": -0.49998623177532514,
+          "throttleSm": 0.6044430942676344,
+          "driftAngle": 0.0006247914126893406,
+          "isDrifting": false
+        },
+        {
+          "x": 44.639889378004646,
+          "z": 40.77512395567897,
+          "speed": 103.4145817596976,
+          "vFwd": 112.88309600875094,
+          "vLat": 39.39209602958604,
+          "yawRate": 4.726847600186309,
+          "angle": 2.114662880607311,
+          "rearSlip": 0.26420962818223037,
+          "steerSm": 0.3999646292045361,
+          "throttleSm": 0.20740763366564824,
+          "driftAngle": -0.11809554852564608,
+          "isDrifting": true
+        },
+        {
+          "x": 48.75270899830443,
+          "z": 32.2041149427597,
+          "speed": 0,
+          "vFwd": 0.3852491184223461,
+          "vLat": -5.585138463663964e-9,
+          "yawRate": 5.8735820966553173e-8,
+          "angle": 2.8125051114561153,
+          "rearSlip": -0.000009763701640944868,
+          "steerSm": 3.225113836764504e-8,
+          "throttleSm": 0.0001891312806580415,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 49.45763281063582,
+          "z": 37.200015309465265,
+          "speed": -58.499999999999936,
+          "vFwd": -52.19102339440954,
+          "vLat": -0.06737295380179843,
+          "yawRate": 1.6887380260889933,
+          "angle": 3.730988569184306,
+          "rearSlip": 0,
+          "steerSm": -0.2999999223177828,
+          "throttleSm": 2.8434737995933967e-7,
+          "driftAngle": 3.1403017627047984,
+          "isDrifting": false
+        },
+        {
+          "x": 51.19927785236935,
+          "z": 39.900112280163576,
+          "speed": 15.307223404957046,
+          "vFwd": -1.3629617305467776,
+          "vLat": -0.003956636894490536,
+          "yawRate": 0.07081540633900715,
+          "angle": 3.6502830804162523,
+          "rearSlip": 0,
+          "steerSm": 0.19981762360688912,
+          "throttleSm": 0.4511883780627962,
+          "driftAngle": 0,
+          "boost": true,
+          "isDrifting": false
+        }
+      ]
+    },
+    {
+      "definition": {
+        "id": "fleetwood-wet",
+        "variant": "cadillac_fleetwood",
+        "grip": 0.7,
+        "condition": 0.65,
+        "upgrade": 1,
+        "planetary": false
+      },
+      "sequence": [
+        {
+          "frames": 100,
+          "actions": {
+            "throttle": 1,
+            "steer": 0.15
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "throttle": 0.6,
+            "steer": -0.5
+          }
+        },
+        {
+          "frames": 40,
+          "actions": {
+            "throttle": 0.2,
+            "steer": 0.4,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 70,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 65,
+          "actions": {
+            "reverse": 1,
+            "steer": -0.3
+          }
+        },
+        {
+          "frames": 30,
+          "actions": {
+            "throttle": 1,
+            "boost": 1,
+            "steer": 0.2
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 5.911024938273996,
+          "z": 14.250332779868945,
+          "speed": 96.3927012380089,
+          "vFwd": 90.96409293074188,
+          "vLat": -0.0184955165362756,
+          "yawRate": 0.42297460419181904,
+          "angle": 0.5768346199931902,
+          "rearSlip": 0,
+          "steerSm": 0.14999999998897057,
+          "throttleSm": 0.9999546000702375,
+          "driftAngle": 0.0002033276613386814,
+          "isDrifting": false
+        },
+        {
+          "x": 11.878342663447425,
+          "z": 28.440625603376553,
+          "speed": 115.22300443014267,
+          "vFwd": 112.41227342963656,
+          "vLat": -0.04510112949978253,
+          "yawRate": -0.7672324969857339,
+          "angle": 0.15187545335937663,
+          "rearSlip": 0,
+          "steerSm": -0.49998623177532514,
+          "throttleSm": 0.6044430942676344,
+          "driftAngle": 0.0004012117689979888,
+          "isDrifting": false
+        },
+        {
+          "x": 17.103403623071607,
+          "z": 39.99645394421458,
+          "speed": 71.2980814953776,
+          "vFwd": 77.82575677598693,
+          "vLat": 9.330939284110114,
+          "yawRate": 1.3224967571319155,
+          "angle": 0.8650244715756474,
+          "rearSlip": -0.03959363614072513,
+          "steerSm": 0.3999646292045361,
+          "throttleSm": 0.20740763366564824,
+          "driftAngle": -0.040741830752755614,
+          "isDrifting": true
+        },
+        {
+          "x": 21.593418591767314,
+          "z": 42.978521218750764,
+          "speed": 0,
+          "vFwd": 0.08624693825966578,
+          "vLat": -5.168813736108187e-9,
+          "yawRate": 4.665070273634933e-8,
+          "angle": 1.0057074495064389,
+          "rearSlip": -0.0000068242011370820775,
+          "steerSm": 3.225113836764504e-8,
+          "throttleSm": 0.0001891312806580415,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 18.271487240362553,
+          "z": 41.82117524316658,
+          "speed": -39.59174699999999,
+          "vFwd": -35.32197524646962,
+          "vLat": -0.061392244297171626,
+          "yawRate": 0.9468456474552769,
+          "angle": 1.4660428499535303,
+          "rearSlip": 0,
+          "steerSm": -0.2999999223177828,
+          "throttleSm": 2.8434737995933967e-7,
+          "driftAngle": 3.1398545802785227,
+          "isDrifting": false
+        },
+        {
+          "x": 16.67176787417525,
+          "z": 41.66221799411048,
+          "speed": 21.924416671108048,
+          "vFwd": 9.786144882392339,
+          "vLat": -0.005787749806583019,
+          "yawRate": 0.08328311420157639,
+          "angle": 1.4702567541854297,
+          "rearSlip": 0,
+          "steerSm": 0.19981762360688912,
+          "throttleSm": 0.7274682211228101,
+          "driftAngle": 0,
+          "boost": true,
+          "isDrifting": false
+        }
+      ]
+    },
+    {
+      "definition": {
+        "id": "pickup-rough",
+        "variant": "pickup",
+        "grip": 0.68,
+        "condition": 0.85,
+        "upgrade": 2,
+        "planetary": false
+      },
+      "sequence": [
+        {
+          "frames": 100,
+          "actions": {
+            "throttle": 1,
+            "steer": 0.15
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "throttle": 0.6,
+            "steer": -0.5
+          }
+        },
+        {
+          "frames": 40,
+          "actions": {
+            "throttle": 0.2,
+            "steer": 0.4,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 70,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 65,
+          "actions": {
+            "reverse": 1,
+            "steer": -0.3
+          }
+        },
+        {
+          "frames": 30,
+          "actions": {
+            "throttle": 1,
+            "boost": 1,
+            "steer": 0.2
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 11.7150607538804,
+          "z": 19.95913415745836,
+          "speed": 143.58600442851503,
+          "vFwd": 135.90253921916408,
+          "vLat": -0.014385494157332548,
+          "yawRate": 0.6611137659381032,
+          "angle": 0.8330819134418855,
+          "rearSlip": 0,
+          "steerSm": 0.14999999998897057,
+          "throttleSm": 0.9999546000702375,
+          "driftAngle": 0.00010585154763298465,
+          "isDrifting": false
+        },
+        {
+          "x": 26.266724742308778,
+          "z": 37.639527670281836,
+          "speed": 169.6274186121829,
+          "vFwd": 165.77891648295233,
+          "vLat": -0.0817887093908496,
+          "yawRate": -0.6533011210436401,
+          "angle": 0.4828192619224789,
+          "rearSlip": 0,
+          "steerSm": -0.49998623177532514,
+          "throttleSm": 0.6044430942676344,
+          "driftAngle": 0.00049336009964418,
+          "isDrifting": false
+        },
+        {
+          "x": 39.824159078750114,
+          "z": 49.35722831952305,
+          "speed": 104.96262943216655,
+          "vFwd": 114.57384970771326,
+          "vLat": 28.513637774305334,
+          "yawRate": 3.231104121077134,
+          "angle": 1.6569181589003472,
+          "rearSlip": 0.14067732373414887,
+          "steerSm": 0.3999646292045361,
+          "throttleSm": 0.20740763366564824,
+          "driftAngle": -0.08441366858422539,
+          "isDrifting": true
+        },
+        {
+          "x": 48.15648452500095,
+          "z": 45.22384099938806,
+          "speed": 0,
+          "vFwd": 0.2977155358844323,
+          "vLat": -2.136688178883616e-8,
+          "yawRate": 2.1388718363577246e-7,
+          "angle": 2.1113257081689945,
+          "rearSlip": -0.000009598781117640181,
+          "steerSm": 3.225113836764504e-8,
+          "throttleSm": 0.0001891312806580415,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 45.04553541270682,
+          "z": 49.633260543437274,
+          "speed": -61.94939399999993,
+          "vFwd": -55.26843388634238,
+          "vLat": -0.051658308467937744,
+          "yawRate": 1.3119409538420312,
+          "angle": 2.902164654305965,
+          "rearSlip": 0,
+          "steerSm": -0.2999999223177828,
+          "throttleSm": 2.8434737995933967e-7,
+          "driftAngle": 3.1406579737048737,
+          "isDrifting": false
+        },
+        {
+          "x": 44.20395888120569,
+          "z": 52.86298551607214,
+          "speed": 18.778380154462567,
+          "vFwd": 0.4974469322238333,
+          "vLat": -0.003755162103485251,
+          "yawRate": 0.06277478461545154,
+          "angle": 2.83312067242343,
+          "rearSlip": 0,
+          "steerSm": 0.19981762360688912,
+          "throttleSm": 0.5034147103654132,
+          "driftAngle": 0,
+          "boost": true,
+          "isDrifting": false
+        }
+      ]
+    },
+    {
+      "definition": {
+        "id": "moon-preserved",
+        "variant": "sedan",
+        "grip": 1,
+        "condition": 1,
+        "upgrade": 0,
+        "planetary": true
+      },
+      "sequence": [
+        {
+          "frames": 100,
+          "actions": {
+            "throttle": 1,
+            "steer": 0.15
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "throttle": 0.6,
+            "steer": -0.5
+          }
+        },
+        {
+          "frames": 40,
+          "actions": {
+            "throttle": 0.2,
+            "steer": 0.4,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 70,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 65,
+          "actions": {
+            "reverse": 1,
+            "steer": -0.3
+          }
+        },
+        {
+          "frames": 30,
+          "actions": {
+            "throttle": 1,
+            "boost": 1,
+            "steer": 0.2
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 12.402892364058758,
+          "z": 32.14657403373212,
+          "speed": 24,
+          "vFwd": 23.999875353288786,
+          "vLat": -0.015200447640683143,
+          "yawRate": 0.22112615596547605,
+          "angle": 0.5274916014779811,
+          "rearSlip": 0,
+          "steerSm": 0.14999999998897057,
+          "throttleSm": 0.9999546000702375,
+          "driftAngle": 0.0006333551897429457,
+          "isDrifting": false
+        },
+        {
+          "x": 17.9916896327905,
+          "z": 49.034318187317275,
+          "speed": 24,
+          "vFwd": 23.999999691031693,
+          "vLat": 0.038488266303878776,
+          "yawRate": -0.7901940470628618,
+          "angle": 0.04209939779261193,
+          "rearSlip": 0,
+          "steerSm": -0.49998623177532514,
+          "throttleSm": 0.6044430942676344,
+          "driftAngle": -0.0016036764085388538,
+          "isDrifting": false
+        },
+        {
+          "x": 18.571354900943444,
+          "z": 56.715704406922875,
+          "speed": 1.5194356315373372,
+          "vFwd": 2.927461983117012,
+          "vLat": -0.005711074102907079,
+          "yawRate": 0.06822687633009097,
+          "angle": 0.14928853979070839,
+          "rearSlip": 0,
+          "steerSm": 0.3999646292045361,
+          "throttleSm": 0.20740763366564824,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 18.622786233703245,
+          "z": 57.0538644295442,
+          "speed": 0,
+          "vFwd": 0.00025886664758332747,
+          "vLat": -5.437298008730756e-10,
+          "yawRate": 5.0112353402573765e-9,
+          "angle": 0.1535878575278016,
+          "rearSlip": 0,
+          "steerSm": 3.225113836764504e-8,
+          "throttleSm": 0.0001891312806580415,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 17.057612077190097,
+          "z": 50.59983252416048,
+          "speed": -7.199999999999999,
+          "vFwd": -7.198199490239329,
+          "vLat": -0.013290271918140209,
+          "yawRate": 0.1718754449557557,
+          "angle": 0.3147279445275843,
+          "rearSlip": 0,
+          "steerSm": -0.2999999223177828,
+          "throttleSm": 2.8434737995933967e-7,
+          "driftAngle": 3.1397463228741387,
+          "isDrifting": false
+        },
+        {
+          "x": 19.067091324845435,
+          "z": 55.75697090368936,
+          "speed": 24,
+          "vFwd": 22.53574070843749,
+          "vLat": -0.019241238865468097,
+          "yawRate": 0.29314069249900093,
+          "angle": 0.4075303406724757,
+          "rearSlip": 0,
+          "steerSm": 0.19981762360688912,
+          "throttleSm": 0.9327945014170729,
+          "driftAngle": 0.0008538097078255591,
+          "boost": true,
+          "isDrifting": false
+        }
+      ]
+    },
+    {
+      "definition": {
+        "id": "airborne-inertia",
+        "variant": "datsun_280z",
+        "grip": 1,
+        "condition": 1,
+        "upgrade": 0,
+        "planetary": false,
+        "airborne": true
+      },
+      "sequence": [
+        {
+          "frames": 100,
+          "actions": {
+            "throttle": 1,
+            "steer": 0.15
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "throttle": 0.6,
+            "steer": -0.5
+          }
+        },
+        {
+          "frames": 40,
+          "actions": {
+            "throttle": 0.2,
+            "steer": 0.4,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 70,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 65,
+          "actions": {
+            "reverse": 1,
+            "steer": -0.3
+          }
+        },
+        {
+          "frames": 30,
+          "actions": {
+            "throttle": 1,
+            "boost": 1,
+            "steer": 0.2
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 0,
+          "z": 0,
+          "speed": 0,
+          "vFwd": 0,
+          "vLat": 0,
+          "yawRate": 0,
+          "angle": 0.2,
+          "rearSlip": 0,
+          "steerSm": 0.14999999998897057,
+          "throttleSm": 0.9999546000702375,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "speed": 0,
+          "vFwd": 0,
+          "vLat": 0,
+          "yawRate": 0,
+          "angle": 0.2,
+          "rearSlip": 0,
+          "steerSm": -0.49998623177532514,
+          "throttleSm": 0.6044430942676344,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "speed": 0,
+          "vFwd": 0,
+          "vLat": 0,
+          "yawRate": 0,
+          "angle": 0.2,
+          "rearSlip": 0,
+          "steerSm": 0.3999646292045361,
+          "throttleSm": 0.20740763366564824,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "speed": 0,
+          "vFwd": 0,
+          "vLat": 0,
+          "yawRate": 0,
+          "angle": 0.2,
+          "rearSlip": 0,
+          "steerSm": 3.225113836764504e-8,
+          "throttleSm": 0.0001891312806580415,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "speed": 0,
+          "vFwd": 0,
+          "vLat": 0,
+          "yawRate": 0,
+          "angle": 0.2,
+          "rearSlip": 0,
+          "steerSm": -0.2999999223177828,
+          "throttleSm": 2.8434737995933967e-7,
+          "driftAngle": 0,
+          "isDrifting": false
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "speed": 0,
+          "vFwd": 0,
+          "vLat": 0,
+          "yawRate": 0,
+          "angle": 0.2,
+          "rearSlip": 0,
+          "steerSm": 0.19981762360688912,
+          "throttleSm": 0.9502129457889587,
+          "driftAngle": 0,
+          "boost": true,
+          "isDrifting": false
+        }
+      ]
+    }
+  ]
+}
