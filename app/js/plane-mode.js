@@ -282,16 +282,26 @@ function preparePlaneMode(options = {}) {
   ) return false;
   const reference = referencePosition();
   if (!Number.isFinite(reference.x) || !Number.isFinite(reference.z)) return false;
+  // A mode-only aircraft choice continues the current flight. Explicit airport,
+  // saved-pose and passenger entries retain their own placement/admission rules.
+  const flightContinuation = state.active && state.airborne && !state.passengerMode &&
+    !options.anchorFacilityId && options.airportPassenger !== true &&
+    !['x', 'y', 'z'].some(key => Number.isFinite(options[key]))
+    ? { x: state.x, y: state.y, z: state.z, yaw: state.yaw,
+      pitch: state.pitch, roll: state.roll, speed: state.speed,
+      throttle: state.throttle, airborne: true }
+    : null;
   const catalog = getAviationCatalogEntry(options.transportCatalogId);
   const mesh = ensurePlaneMesh(catalog);
   if (!mesh) return false;
-  return {catalog, mesh, reference};
+  return {catalog, mesh, reference, flightContinuation};
 }
 
 function startPlaneMode(options = {}, prepared = null) {
   const entry = prepared || preparePlaneMode(options);
   if (!entry) return false;
   const {catalog, mesh, reference} = entry;
+  options = { ...entry.flightContinuation, ...options };
   state.transportEntityId = String(options.transportEntityId || `direct-flight:${catalog.id}`);
   state.transportCatalogId = catalog.id;
   state.durabilityPolicy = catalog.damage.durabilityPolicy;
