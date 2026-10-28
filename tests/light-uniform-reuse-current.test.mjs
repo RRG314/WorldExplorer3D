@@ -45,13 +45,23 @@ test('installation is idempotent and renderer disposal restores owned hooks',()=
  assert.deepEqual(calls,['dispose']);control.dispose();
 });
 
-test('single numeric caches retain exact doubles across enable/disable and disposal without changing dynamic arrays',()=>{
- const values=[1/3,-0,1+Number.EPSILON],uniform={cache:[],setValue(_gl,value){for(let i=0;i<value.length;i++)this.cache[i]=value[i];}};
- const array={cache:[],size:3,setValue:uniform.setValue},original=uniform.cache;
- const renderer={info:{programs:[{getUniforms:()=>({map:{diffuse:uniform,weights:array}})}]},render(){uniform.setValue(null,values);array.setValue(null,values);}};
- const control=installLightUniformExperiment({renderer});renderer.render({},{});
- assert.ok(uniform.cache instanceof Float64Array);assert.deepEqual([...uniform.cache],values);assert.ok(Array.isArray(array.cache));
- const buffer=uniform.cache;renderer.render({},{});assert.equal(uniform.cache,buffer);
- control.setEnabled(false);assert.equal(uniform.cache,original);renderer.render({},{});assert.deepEqual(uniform.cache,values);
- control.setEnabled(true);assert.equal(uniform.cache,buffer);control.dispose();assert.equal(uniform.cache,original);assert.deepEqual(uniform.cache,values);
+test('fixed float uniforms retain exact comparisons and restore original setters without changing pure arrays',()=>{
+ const values=[1/3,-0,1+Number.EPSILON],uploads=[],gl={ACTIVE_UNIFORMS:35718,getProgramParameter:()=>2,
+ getActiveUniform:(_program,i)=>({name:i?'weights':'diffuse',type:35665}),uniform3f(_location,x,y,z){uploads.push([x,y,z]);}};
+ const originalSetter=function(_gl,value){for(let i=0;i<value.length;i++)this.cache[i]=value[i];uploads.push([...value]);};
+ const uniform={cache:[],setValue:originalSetter},array={cache:[],size:3,setValue(){}};
+ const renderer={getContext:()=>gl,info:{programs:[{program:{},getUniforms:()=>({map:{diffuse:uniform,weights:array}})}]},render(){uniform.setValue(gl,values);}};
+ const control=installLightUniformExperiment({renderer});renderer.render({},{});renderer.render({},{});
+ assert.deepEqual(uploads,[values]);assert.equal(control.snapshot().numericConverted,1);assert.equal(array.setValue.name,'setValue');
+ control.setEnabled(false);assert.deepEqual(uniform.cache,values);renderer.render({},{});assert.equal(uploads.length,2);
+ control.setEnabled(true);renderer.render({},{});assert.equal(uploads.length,3);control.dispose();assert.equal(uniform.setValue,originalSetter);assert.deepEqual(uniform.cache,values);
+});
+
+test('matrix uploads reuse their Float32 storage while preserving exact cache precision across views',()=>{
+ const uploads=[],gl={ACTIVE_UNIFORMS:35718,getProgramParameter:()=>1,getActiveUniform:()=>({name:'modelViewMatrix',type:35676}),uniformMatrix4fv(_addr,transpose,data){uploads.push({transpose,data,values:[...data]});}};
+ const originalSetter=function(_gl,value){this.cache=[...value.elements];},uniform={cache:[],setValue:originalSetter};let matrix={elements:Array.from({length:16},(_,i)=>i/7)};
+ const renderer={getContext:()=>gl,info:{programs:[{program:{},getUniforms:()=>({map:{modelViewMatrix:uniform}})}]},render(){uniform.setValue(gl,matrix);}};
+ const control=installLightUniformExperiment({renderer});renderer.render({},{});renderer.render({},{});assert.equal(uploads.length,1);
+ matrix.elements[12]=1234.123456789;renderer.render({},{});assert.equal(uploads.length,2);assert.equal(uploads[0].data,uploads[1].data);assert.deepEqual(uploads[1].values,[...Float32Array.from(matrix.elements)]);assert.equal(uploads[1].transpose,false);
+ control.dispose();assert.equal(uniform.setValue,originalSetter);assert.deepEqual(uniform.cache,matrix.elements);
 });

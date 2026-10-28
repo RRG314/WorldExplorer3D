@@ -10,7 +10,8 @@ const directional=new THREE.DirectionalLight(0xffddbb,.8);directional.position.s
 const point=new THREE.PointLight(0x33bbff,3,20);point.position.set(-3,3,1);scene.add(point);
 const spot=new THREE.SpotLight(0xffaa44,3,25,.7,.4);spot.position.set(4,6,0);scene.add(spot,spot.target);
 const hemisphere=new THREE.HemisphereLight(0x4466cc,0x554422,.4);scene.add(hemisphere);
-const experiment=installLightUniformExperiment({renderer});
+let experiment=installLightUniformExperiment({renderer});
+window.useUniformInstaller=installer=>{experiment.dispose();experiment=installer({renderer});};
 const capture=cam=>{renderer.render(scene,cam);const gl=renderer.getContext(),out=new Uint8Array(640*400*4);gl.readPixels(0,0,640,400,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError())throw Error('WebGL error');return out;};
 function compare(name,cam=camera){experiment.setEnabled(false);capture(cam);const before=capture(cam);experiment.setEnabled(true);capture(cam);const after=capture(cam);let changed=0,max=0;const colors=new Set();for(let i=0;i<before.length;i+=4){colors.add((before[i]<<16)|(before[i+1]<<8)|before[i+2]);let diff=false;for(let c=0;c<3;c++){const d=Math.abs(before[i+c]-after[i+c]);max=Math.max(max,d);diff||=d>0;}if(diff)changed++;}if(colors.size<100||changed)throw Error(JSON.stringify({name,changed,max,colors:colors.size}));return {name,changed,max,colors:colors.size};}
 const rows=[];rows.push(compare('multiple programs'));
@@ -19,5 +20,6 @@ point.intensity=4;point.position.set(3,2,-2);spot.intensity=6;spot.target.positi
 camera.position.set(-9,4,8);camera.lookAt(0,0,0);rows.push(compare('changed camera'));
 const left=camera.clone(),right=camera.clone();left.aspect=right.aspect=.8;left.updateProjectionMatrix();right.updateProjectionMatrix();left.viewport=new THREE.Vector4(0,0,320,400);right.viewport=new THREE.Vector4(320,0,320,400);right.position.x+=3;right.lookAt(0,0,0);const array=new THREE.ArrayCamera([left,right]);rows.push(compare('array camera'));
 if(!experiment.snapshot().numericConverted)throw Error("Numeric cache path was not exercised");
+window.allocationTrial=async enabled=>{experiment.setEnabled(enabled);for(let i=0;i<180;i++){camera.position.x=7+Math.sin(i/30);camera.lookAt(0,0,0);point.position.x=-3+Math.cos(i/40);renderer.render(scene,camera);await new Promise(requestAnimationFrame);}};
 window.result={rows,uniforms:experiment.snapshot()};capture(camera);window.ready=true;
 </script>
