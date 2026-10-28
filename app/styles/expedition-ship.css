@@ -101,3 +101,6 @@
 .ship-station-actions.ship-station-lunar{display:flex;flex-direction:column;align-items:stretch}
 .ship-station-lunar p{margin:4px 0;line-height:1.5}
 .ship-station-lunar small{margin-bottom:8px}
+
+/* Keep the landscape touch-action lane clear; Map remains in the ship header. */
+@media (max-height:560px) and (pointer:coarse){#shipMiniMap.show{display:none}}

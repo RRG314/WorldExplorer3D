@@ -1868,7 +1868,7 @@ function ensureShipMaps(session) {
     const link = document.createElement('link');
     link.id = 'expeditionShipStyles';
     link.rel = 'stylesheet';
-    link.href = '/app/styles/expedition-ship.css?v=8';
+    link.href = '/app/styles/expedition-ship.css?v=9';
     document.head.appendChild(link);
   }
   let mini = document.getElementById('shipMiniMap');
