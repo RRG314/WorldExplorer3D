@@ -28,6 +28,13 @@ test('a cached time without matching Journal evidence is excluded without changi
  cache[record].bestTimeMs=1000;cache[record].bestJournalEventId=null;f.disk.set(key,JSON.stringify(cache));assert.equal((await f.read('account-a')).entries.length,1,'legacy row is usable only when its last event actually matches the best');
  f.events.clear();assert.equal((await f.read('account-a')).entries.length,0);
 });
+test('accepted long-race Journal times remain visible and out-of-bound times cannot become practice records',async()=>{
+ const f=fixture(),store=f.store('long-course-driver');
+ await f.save(store,'long-course-driver',1200000);
+ assert.equal((await f.read('long-course-driver')).entries[0].timeMs,1200000);
+ const invalid='race-practice-'+'f'.repeat(32);await f.save(store,'long-course-driver',2700001,invalid);
+ const read=await f.read('long-course-driver');assert.equal(read.entries.length,1);assert.equal(read.entries[0].timeMs,1200000);
+});
 test('Journal reads stay bounded and an obsolete owner cannot publish a partial board',async()=>{
  const f=fixture(),s=f.store('account-a');for(let i=0;i<65;i++)await f.save(s,'account-a',1000+i,'race-practice-'+i.toString(16).padStart(32,'0'));
  assert.equal((await f.read('account-a')).entries.length,65);assert.deepEqual(f.queries.map(ids=>ids.length),[32,32,1]);

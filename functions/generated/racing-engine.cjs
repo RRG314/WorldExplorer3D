@@ -1051,6 +1051,7 @@ var require_economy_authority = __commonJS({
 // services/racing/engine-entry.mjs
 var engine_entry_exports = {};
 __export(engine_entry_exports, {
+  RACE_MAXIMUM_DURATION_MS: () => RACE_MAXIMUM_DURATION_MS,
   RACE_PHYSICS_VERSION: () => RACE_PHYSICS_VERSION,
   RACING_CAREER_LIMITS: () => RACING_CAREER_LIMITS,
   assertRaceCourseInDistrict: () => assertRaceCourseInDistrict,
@@ -1071,6 +1072,7 @@ __export(engine_entry_exports, {
   raceCourseReference: () => raceCourseReference,
   raceDistrictFingerprint: () => raceDistrictFingerprint,
   raceGridPose: () => raceGridPose,
+  raceMaximumDurationMs: () => raceMaximumDurationMs,
   racePublicationIdentity: () => racePublicationIdentity,
   raceRecordConfiguration: () => raceRecordConfiguration,
   raceVehicleWorldPose: () => raceVehicleWorldPose,
@@ -2913,7 +2915,14 @@ function raceAiActions(course, car, progress, profile, { difficulty = 0.65 } = {
 }
 
 // app/js/racing/session-limits.js
-var RACE_MAXIMUM_DURATION_MS = 6e5;
+var RACE_MINIMUM_DURATION_MS = 6e5;
+var RACE_MAXIMUM_DURATION_MS = 27e5;
+var RACE_MAXIMUM_EVENT_DISTANCE_METERS = 64e3;
+function raceMaximumDurationMs(course) {
+  const length = course?.lengthMeters, laps = course?.laps;
+  if (!Number.isFinite(length) || length < 200 || length > 3e4 || !Number.isInteger(laps) || laps < 1 || laps > 8 || length * laps > RACE_MAXIMUM_EVENT_DISTANCE_METERS) throw Error("invalid_race_duration_course");
+  return Math.max(RACE_MINIMUM_DURATION_MS, Math.min(RACE_MAXIMUM_DURATION_MS, Math.ceil((length * laps / 10 + 120) / 60) * 6e4));
+}
 
 // app/js/racing/session-rules.js
 var STEP_MS = 1e3 / 60;
@@ -2929,9 +2938,12 @@ function normalizeRaceActions(value) {
   }
   return result;
 }
-function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDurationMs = RACE_MAXIMUM_DURATION_MS, onComplete = () => {
+function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDurationMs, onComplete = () => {
 } }) {
   if (!id || !course || !creatorUid || !Number.isFinite(createdAtMs)) throw Error("invalid_race_session");
+  const allowedDurationMs = raceMaximumDurationMs(course);
+  maximumDurationMs ??= allowedDurationMs;
+  if (!Number.isFinite(maximumDurationMs) || maximumDurationMs <= 0 || maximumDurationMs > allowedDurationMs) throw Error("invalid_race_duration");
   course = structuredClone(course);
   const players = /* @__PURE__ */ new Map();
   let phase = "lobby", leaderUid = creatorUid, startAtMs = null, tick = 0, lastNow = createdAtMs, completedAtMs = null, reason = "", outcomeEmitted = false;
@@ -3112,6 +3124,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       leaderUid,
       createdAtMs,
       startAtMs,
+      maximumDurationMs,
       serverAtMs: lastNow,
       simulationAtMs: startAtMs === null ? null : startAtMs + tick * STEP_MS,
       completedAtMs,
@@ -3403,6 +3416,7 @@ function racingRivalOutcome(challenge) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  RACE_MAXIMUM_DURATION_MS,
   RACE_PHYSICS_VERSION,
   RACING_CAREER_LIMITS,
   assertRaceCourseInDistrict,
@@ -3423,6 +3437,7 @@ function racingRivalOutcome(challenge) {
   raceCourseReference,
   raceDistrictFingerprint,
   raceGridPose,
+  raceMaximumDurationMs,
   racePublicationIdentity,
   raceRecordConfiguration,
   raceVehicleWorldPose,

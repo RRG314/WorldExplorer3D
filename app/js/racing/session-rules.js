@@ -1,7 +1,7 @@
 import {createRaceProgress,advanceRaceProgress,raceGridPose}from'./course-rules.js';
 import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle}from'./vehicle-controller.js';
 import {raceAiActions}from'./ai-controller.js';
-import {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
+import {raceMaximumDurationMs} from './session-limits.js';
 export {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
 const STEP_MS=1000/60,NEUTRAL=Object.freeze({steer:0,throttle:0,reverse:0,brake:0,serviceBrake:1});
 const ACTIONS=new Set(['steer','throttle','reverse','brake','serviceBrake']);
@@ -15,8 +15,11 @@ export function normalizeRaceActions(value){
 // canonical courses and durable reward transactions are supplied by the existing
 // application/backend. Browser practice uses the same rules without verified
 // rewards. No timer, database, renderer, global room registry or wallet here.
-export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurationMs=RACE_MAXIMUM_DURATION_MS,onComplete=()=>{}}){
+export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurationMs,onComplete=()=>{}}){
  if(!id||!course||!creatorUid||!Number.isFinite(createdAtMs))throw Error('invalid_race_session');
+ const allowedDurationMs=raceMaximumDurationMs(course);
+ maximumDurationMs??=allowedDurationMs;
+ if(!Number.isFinite(maximumDurationMs)||maximumDurationMs<=0||maximumDurationMs>allowedDurationMs)throw Error('invalid_race_duration');
  course=structuredClone(course);
  const players=new Map();let phase='lobby',leaderUid=creatorUid,startAtMs=null,tick=0,lastNow=createdAtMs,completedAtMs=null,reason='',outcomeEmitted=false;
  const activeHumans=()=>[...players.values()].filter(p=>!p.ai&&!p.left);
@@ -95,7 +98,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   const ordered=[...players.values()].sort((a,b)=>a.dnf-b.dnf||(a.progress?.finished&&b.progress?.finished?a.progress.elapsedMs-b.progress.elapsedMs:a.progress?.finished?-1:b.progress?.finished?1:
    (b.progress?.lap||1)-(a.progress?.lap||1)||(b.progress?.nextGate||0)-(a.progress?.nextGate||0)));
   let previousPosition=0;
-  return {id,phase,reason,courseName:course.name,discipline:course.discipline,laps:course.laps,creatorUid,leaderUid,createdAtMs,startAtMs,
+  return {id,phase,reason,courseName:course.name,discipline:course.discipline,laps:course.laps,creatorUid,leaderUid,createdAtMs,startAtMs,maximumDurationMs,
    serverAtMs:lastNow,simulationAtMs:startAtMs===null?null:startAtMs+tick*STEP_MS,completedAtMs,
    players:ordered.map((p,index)=>{const previous=ordered[index-1],tied=!p.dnf&&p.progress?.finished&&previous?.progress?.finished&&p.progress.elapsedMs===previous.progress.elapsedMs;
     const position=tied?previousPosition:index+1;previousPosition=position;return {uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,

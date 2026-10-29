@@ -54,6 +54,16 @@ that topology; self-collapsed graph edges are rejected. A shared 1,024-edge rout
 bound accommodates the GP's 506 spans. City distance, width, deck, tunnel,
 building, water, control and timing admission rules still apply.
 
+Session allowance now comes from one shared course policy: ten minutes minimum,
+ten metres/second over the event distance plus two recovery minutes, rounded up
+to a whole minute, with a 45-minute absolute cap and a 64 km event-distance cap.
+Silverstone receives 12 minutes for one lap and 22 for two. Session snapshots
+carry the actual allowance; an authority can shorten it but cannot remove or
+extend the bound. The Racing menu shows it, Journal/Rankings readers accept the
+same absolute bound, and career finalization grace uses that shared maximum.
+Clock-stall and reconnect fences remain separate. This does not itself admit
+longer geographic routes or clear the remaining long-course publication limits.
+
 ## Reproduction
 
 Captured source inputs belong outside Git; store the raw EA rasters and pinned

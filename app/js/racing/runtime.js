@@ -3,6 +3,7 @@ import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import {resolveControlState} from '../transport/control-state.js';
 import {collectRaceDistrict,recommendRaceCourses} from './world-course-source.js';
 import {buildVenueRaceCourses} from './venue-courses.js';
+import {raceMaximumDurationMs} from './session-limits.js';
 import {createRaceCourse,shortestRacePath} from './course-rules.js';
 import {raceDistrictFingerprint,raceCourseReference,restoreRaceCourse,raceCourseKey} from './course-library.js';
 import {createRaceVehicleProfile} from './vehicle-controller.js';
@@ -273,7 +274,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    const strong=document.createElement('strong'),small=document.createElement('span');strong.textContent=raceCourseDisplayName(course);small.textContent=`${(course.lengthMeters/1000).toFixed(2)} km · ${course.laps} lap${course.laps===1?'':'s'}${coursePublications.get(course)?.status==='approved'?' · Shared':''}`;b.append(strong,small);list.append(b);});
   if(focused!=null)list.querySelector(`[data-event-index="${Number(focused)}"]`)?.focus({preventScroll:true});
   const course=customCourse||events[selected];el('[data-race-name]').textContent=course?raceCourseDisplayName(course):(busy?'Loading routes…':'No routes available');
-  const facts=el('[data-race-facts]');facts.replaceChildren();if(course)for(const [label,value]of[['Distance',`${(course.lengthMeters/1000).toFixed(2)} km`],['Laps',course.laps],['Event',raceDisciplineLabel(course.discipline)]]){const group=document.createElement('div'),term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;group.append(term,detail);facts.append(group);}
+  const facts=el('[data-race-facts]');facts.replaceChildren();if(course)for(const [label,value]of[['Distance',`${(course.lengthMeters/1000).toFixed(2)} km`],['Laps',course.laps],['Event',raceDisciplineLabel(course.discipline)],['Time limit',`${raceMaximumDurationMs(course)/60000} min`]]){const group=document.createElement('div'),term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;group.append(term,detail);facts.append(group);}
   const vehicle=personalVehicleById(c.car?.personalVehicleId||'bmw_e34');el('[data-race-detail]').textContent=course?`Car · ${vehicle?.label||'Personal vehicle'}`:'';
   if(!el('[data-race-image]').hidden){el('[data-race-image]').alt=`Current in-game view of ${district?.locationLabel||'this location'}`;el('[data-race-image-caption]').textContent=`Current view · ${district?.locationLabel||'this location'}`;}
   el('[data-race-start]').disabled=busy||!!online||!course;el('[data-race-rivals]').disabled=course?.discipline==='time-trial';map(course);renderOnline();

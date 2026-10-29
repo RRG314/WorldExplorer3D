@@ -1,6 +1,7 @@
 import {createActivityCompletionStore} from '../activity-discovery/completion.js';
 import {racingPracticeStorage} from './practice-storage.js';
 import {personalVehicleById} from '../transport/vehicle-garage-rules.js';
+import {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
 
 // This is a read projection of accepted Journal events, not another score store
 // or a path for sending client times to a verified competition leaderboard.
@@ -11,7 +12,7 @@ export async function readRacingPracticeBests({ownerUid='',storage=globalThis.lo
   const m=event?.metadata,car=personalVehicleById(m?.vehicleId);
   if(!m||m.racingPracticeVersion!==1||m.raceVerified!==false||m.outcome!=='completed'||event.eventType!=='activity-completed'||!car
    ||!/^race-practice-[a-f0-9]{32}$/.test(m.recordKey)||!/^road-race-[a-f0-9]{32}$/.test(m.courseId)
-   ||!Number.isFinite(m.elapsedMs)||m.elapsedMs<=0||m.elapsedMs>600000)return;
+   ||!Number.isFinite(m.elapsedMs)||m.elapsedMs<=0||m.elapsedMs>RACE_MAXIMUM_DURATION_MS)return;
   if((m.racingOwnerUid??'')!==ownerUid||cachedRow&&(m.recordKey!==cachedRow.id||m.elapsedMs!==cachedRow.bestTimeMs)){legacy++;return;}
   const old=bests.get(m.recordKey);if(old&&old.timeMs<=m.elapsedMs)return;
   const condition=m.raceConfiguration?.condition;
@@ -35,7 +36,7 @@ export async function readRacingPracticeBests({ownerUid='',storage=globalThis.lo
   }while(after);
  }
  const history=createActivityCompletionStore({storage:()=>racingPracticeStorage(ownerUid,storage)});
- const rows=history.entries().filter(row=>/^race-practice-[a-f0-9]{32}$/.test(row.id)&&Number.isFinite(row.bestTimeMs)&&row.bestTimeMs>0&&row.bestTimeMs<=600000&&row.journalSavedAt);
+ const rows=history.entries().filter(row=>/^race-practice-[a-f0-9]{32}$/.test(row.id)&&Number.isFinite(row.bestTimeMs)&&row.bestTimeMs>0&&row.bestTimeMs<=RACE_MAXIMUM_DURATION_MS&&row.journalSavedAt);
  if(!history.isReadable()){if(!listEventsByIdPrefix)throw Error('race_records_unreadable');cacheUnavailable=true;}
  if(!listEventsByIdPrefix&&!lookupEvents)throw Error('race_journal_unavailable');
  // Legacy, unprefixed events are only admitted through an account-scoped cache
