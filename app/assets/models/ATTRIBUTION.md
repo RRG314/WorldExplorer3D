@@ -328,14 +328,3 @@ All seven models below are adapted under [CC BY 4.0](https://creativecommons.org
 - [Dassault Falcon 10](https://sketchfab.com/3d-models/falcon10-0d5a676f75da403b8419154b102d55a7) — manilov.ap (https://sketchfab.com/manilov.ap). File: `vehicles/explorer-fleet/aircraft-falcon-10.glb`.
 
 The coupe author does not specify an exact model year. The long Fleetwood Brougham depicts the early 1980s. The source and derived checksums, measured budgets and transformations are recorded in `vehicles/explorer-fleet/asset-manifest.json`.
-
-## Unbranded racing fleet
-
-- [Generic front-engine grand tourer coupe](https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635), Innerscene, CC0. Named Meridian GT.
-- [Generic 1990s Japanese-style sports coupe](https://www.innerscene.com/tools/library/3d-parts/generic-1990s-japanese-style-sports-coupe-ace64592), Innerscene, CC0. Named Apex ClubSport, with original World Explorer cage, splitter and wing.
-- [Generic hot hatch](https://www.innerscene.com/tools/library/3d-parts/generic-hot-hatch-a60561a5), Innerscene, CC0. Named Kestrel Rally, with original World Explorer cage, lamp pod, vent, skid plate and mud flaps.
-
-World Explorer derivatives use uniform metre scale, forward-axis and ground
-normalization, bounded simplification, compatible glazing and separate wheel
-pivots. Exact source/derivative hashes, dimensions and budgets are in
-`vehicles/racing-fleet/asset-manifest.json`. No source gameplay code is imported.

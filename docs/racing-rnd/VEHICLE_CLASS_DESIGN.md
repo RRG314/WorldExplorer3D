@@ -10,11 +10,6 @@ Proposed event families: everyday compact/sedan; classic touring; sports; offroa
 
 Performance rating must be derived from measured acceleration,braking,turning and event surfaces, with build hash and assists. Top-speed labels alone do not establish class parity. Acquisition must remain independent of racing rank unless the owner selects a progression design requiring specific optional event rewards.
 
-The additional Meridian GT (78,000 Explorer Credits), Apex ClubSport (98,000)
-and Kestrel Rally (44,000) use the same acquisition authority and stable upgrade
-identities. They have distinct acceleration, steering, grip, braking, mass and
-wheelbase profiles, and matching original unbranded models. The Apex emphasizes
-road grip and braking; Kestrel is shorter and more responsive; Meridian is a
-heavier grand tourer. Prices are game tuning values. These additions do not
-change the free BMW or existing saved collection entries and do not enter the
-ordinary traffic population.
+Additional racing cars must use reviewed models of real vehicles, canonical server
+prices and the existing upgrade, condition, wallet and room lease identities.
+Their admission must not alter the ordinary traffic population or the free BMW.
