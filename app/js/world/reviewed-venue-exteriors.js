@@ -6,6 +6,7 @@ import {batchOwnedStaticStructure} from './static-structure-batching.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {finishVenueSurface} from './venue-surface-materials.js';
 import {replaceVenueCollision,venueComponentCollider} from './venue-collision.js';
+import {createSilverstoneWingExterior,isSilverstoneWing} from './silverstone-wing-exterior.js';
 
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
@@ -186,6 +187,20 @@ export function publishReviewedVenueExteriors(ctx,THREE){
  for(const mesh of sources.filter(m=>reviewedVenueForBuilding(m.userData)==='peale-baltimore')){
   const door=ctx.buildingEntranceCatalog?.entrances?.find(e=>e.buildingSourceId===mesh.userData.sourceBuildingId);
   const root=peale(THREE,mesh,door);if(root)added.push(root);
+ }
+ // Exterior interpretation does not confer the interior/door permissions used
+ // by reviewedVenueForBuilding. The closed pit building retains its existing
+ // mapped collision and identity; neighboring venue buildings are untouched.
+ const wings=ctx.buildingMeshes.filter(m=>!m.userData?.isRoofDetail&&isSilverstoneWing(m.userData));
+ for(const mesh of wings){
+  const root=createSilverstoneWingExterior(THREE,mesh);if(!root)continue;
+  const retired=new Set(ctx.buildingMeshes.filter(m=>isSilverstoneWing(m.userData)));
+  for(const old of retired){
+   detachSceneObject(old);old.geometry?.dispose();
+   for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();
+  }
+  ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
+  added.push(root);
  }
  for(const root of added){ctx.addEarthWorldObject(root);ctx.buildingMeshes.push(root);}
  return {published:added.map(r=>r.name)};

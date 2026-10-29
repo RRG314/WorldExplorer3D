@@ -4,6 +4,7 @@ import {prepareLaunchPadBuildingWays} from './launch-pad-facility.js';
 import {prepareKennedyBuildingWays} from './kennedy-facility.js';
 import {publishKennedyExterior} from './kennedy-exterior.js';
 import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
+import {isSilverstoneWing} from './silverstone-wing-exterior.js';
 import {publishReviewedVenueExteriors} from './reviewed-venue-exteriors.js';
 import {resolveBuildingFoundation} from './building-foundation.js';
 import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=3';
@@ -280,7 +281,7 @@ async function buildBuildingGeometryWithStorage(options, arenas) {
     // These few reviewed visitor venues retain their visible doorway contract
     // within the loaded district. Mid batches intentionally omit door attributes.
     const reviewedVenue=reviewedVenueForBuilding({sourceBuildingId:knownSourceBuildingId,tags:way.tags});
-    const lodTier = centerDist <= buildingDetailDist || reviewedVenue && centerDist <= lodThresholds.farVisible
+    const lodTier = centerDist <= buildingDetailDist || (reviewedVenue||isSilverstoneWing({sourceBuildingId:knownSourceBuildingId})) && centerDist <= lodThresholds.farVisible
       ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
     if (lodTier === 'far') {
       loadMetrics.lod.farSkipped += 1;
