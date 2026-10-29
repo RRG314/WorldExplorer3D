@@ -2,91 +2,6 @@
 export const RACING_FLEET_ASSETS=Object.freeze([
   {
     "schemaVersion": 1,
-    "id": "road-spectral-gt-rs",
-    "label": "Spectral GT RS",
-    "url": "/app/assets/models/vehicles/racing-fleet/road-spectral-gt-rs.glb",
-    "roles": [
-      "road-vehicle-presentation"
-    ],
-    "vehicleVariantIds": [
-      "spectral_gt"
-    ],
-    "license": "CC0-1.0",
-    "sourceUrl": "https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7",
-    "attribution": "Spectral GT RS: original model by JaronKBragg7337, CC0; World Explorer derivative.",
-    "sourceCredit": "JaronKBragg7337",
-    "dimensionsMeters": {
-      "width": 2.3285577297210693,
-      "height": 1.5486845970153809,
-      "length": 4.800000190734863
-    },
-    "paintMaterialNames": [
-      "Spectral Blue — Clearcoat",
-      "Midnight Blue — Shadow Panels"
-    ],
-    "wheelLayout": [
-      {
-        "id": "rear-left",
-        "position": [
-          -0.935663491487503,
-          0.49779149889945984,
-          -1.3795274794101715
-        ],
-        "radius": 0.49779149889945984
-      },
-      {
-        "id": "rear-right",
-        "position": [
-          0.935663491487503,
-          0.49779149889945984,
-          -1.3795274794101715
-        ],
-        "radius": 0.49779149889945984
-      },
-      {
-        "id": "front-left",
-        "position": [
-          -0.935663491487503,
-          0.49779149889945984,
-          1.247704952955246
-        ],
-        "radius": 0.49779149889945984
-      },
-      {
-        "id": "front-right",
-        "position": [
-          0.935663491487503,
-          0.49779149889945984,
-          1.247704952955246
-        ],
-        "radius": 0.49779149889945984
-      }
-    ],
-    "driverEyeGroundMeters": [
-      -0.396,
-      1.3,
-      -0.3
-    ],
-    "sourceUpAxis": "y",
-    "rigPolicy": "preserve-parts",
-    "collisionPolicy": "existing-road-vehicle-envelope",
-    "instancePolicy": {
-      "geometry": "shared",
-      "materials": "clone"
-    },
-    "loadPolicy": {
-      "bounded": true,
-      "timeoutMs": 20000
-    },
-    "budgets": {
-      "bytes": 2417868,
-      "triangles": 82556,
-      "textureEdgePixels": 512,
-      "maxInstances": 4
-    }
-  },
-  {
-    "schemaVersion": 1,
     "id": "road-meridian-gt",
     "label": "Meridian GT",
     "url": "/app/assets/models/vehicles/racing-fleet/road-meridian-gt.glb",
@@ -165,6 +80,174 @@ export const RACING_FLEET_ASSETS=Object.freeze([
     "budgets": {
       "bytes": 1702196,
       "triangles": 57854,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-apex-clubsport",
+    "label": "Apex ClubSport",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-apex-clubsport.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "apex_clubsport"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-1990s-japanese-style-sports-coupe-ace64592",
+    "attribution": "Apex ClubSport: original model by Innerscene, CC0; World Explorer derivative.",
+    "sourceCredit": "Innerscene",
+    "dimensionsMeters": {
+      "width": 2.091599941253662,
+      "height": 1.2870001790579408,
+      "length": 4.493067741394043
+    },
+    "paintMaterialNames": [
+      "paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.7700000107288361,
+          0.32799999869894236,
+          1.27923384308815
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7700000107288361,
+          0.32799999869894236,
+          1.27923384308815
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.7700000107288361,
+          0.32799999869894236,
+          -1.2507661879062653
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.7700000107288361,
+          0.32799999869894236,
+          -1.2507661879062653
+        ],
+        "radius": 0.3249999984400347
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.4224,
+      1.01,
+      0.02
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 1755756,
+      "triangles": 58787,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-kestrel-rally",
+    "label": "Kestrel Rally",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-kestrel-rally.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "kestrel_rally"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-hot-hatch-a60561a5",
+    "attribution": "Kestrel Rally: original model by Innerscene, CC0; World Explorer derivative.",
+    "sourceCredit": "Innerscene",
+    "dimensionsMeters": {
+      "width": 2.109799861907959,
+      "height": 1.5134999985750766,
+      "length": 4.111129320196808
+    },
+    "paintMaterialNames": [
+      "paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.7800000607967377,
+          0.31799997843336314,
+          1.2784291803836823
+        ],
+        "radius": 0.31499997817445546
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7799999415874481,
+          0.31799997843336314,
+          1.2784291803836823
+        ],
+        "radius": 0.31499997817445546
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.7800000607967377,
+          0.31799997843336314,
+          -1.251570850610733
+        ],
+        "radius": 0.31499997817445546
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.7799999415874481,
+          0.31799997843336314,
+          -1.251570850610733
+        ],
+        "radius": 0.31499997817445546
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.4272,
+      1.12,
+      0.22
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 1926484,
+      "triangles": 64495,
       "textureEdgePixels": 512,
       "maxInstances": 4
     }

@@ -4,7 +4,7 @@ import {VEHICLE_CATALOG} from '../engine/vehicle-catalog.js?v=6';
 // economy/player record; it does not grant race rank or invent another wallet.
 const prices={compact:8000,sedan:14000,suv:24000,pickup:22000,van:19000,delivery_van:26000,taxi:18000,
   box_truck:48000,city_bus:90000,delorean:55000,cadillac_coupe:22000,cadillac_fleetwood:26000,golf_ii:9000,datsun_280z:34000,
-  meridian_gt:78000,spectral_gt:125000};
+  meridian_gt:78000,apex_clubsport:98000,kestrel_rally:44000};
 export const PERSONAL_VEHICLES=Object.freeze([
   Object.freeze({id:'bmw_e34',label:'BMW 525i E34',variantId:'sedan',assetId:'vehicle-bmw-525i-e34',price:0,category:'Personal sedan',defaultVisual:true}),
   ...VEHICLE_CATALOG.map(v=>Object.freeze({id:v.id,label:v.label,variantId:v.id,assetId:v.assetId||'',

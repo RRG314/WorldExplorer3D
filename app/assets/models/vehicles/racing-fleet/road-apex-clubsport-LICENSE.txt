@@ -1,0 +1,5 @@
+Apex ClubSport
+Original model by Innerscene
+Source: https://www.innerscene.com/tools/library/3d-parts/generic-1990s-japanese-style-sports-coupe-ace64592
+CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+Derivative: World Explorer axis/base normalization, uniform metre scale, static closed rest pose, bounded simplification and texture sizes, wheel pivots and compatible glazing. No source gameplay code included. No endorsement implied.

@@ -4,25 +4,31 @@ import {NodeIO} from '@gltf-transform/core';
 import {ALL_EXTENSIONS} from '@gltf-transform/extensions';
 import {compactPrimitive,dedup,flatten,getBounds,join,prune,simplify,transformMesh,weld} from '@gltf-transform/functions';
 import {MeshoptSimplifier} from 'meshoptimizer';
-import {Matrix4} from 'three';
+import {Matrix4,BoxGeometry,CylinderGeometry,Quaternion,Vector3} from 'three';
 import sharp from 'sharp';
 import {createHash} from 'node:crypto';
 import {mkdir,readdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 const recipes=[
- {id:'road-spectral-gt-rs',variantId:'spectral_gt',label:'Spectral GT RS',file:'spectral_gt_rs_game_ready.glb',
-  sourceUrl:'https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7',
-  sourceSha256:'e7b7f0d9de0c3bc3897c8134b1ceae5631b1da2690d336df18c3ea82e7238c73',
-  author:'JaronKBragg7337',yaw:-Math.PI/2,length:4.8,paint:['Spectral Blue — Clearcoat','Midnight Blue — Shadow Panels'],
-  wheel:/^(Front|Rear)_(Left|Right)_(?:Tire|Sidewall|Rim|Spoke|Hub|Brake_(?:Disc|Hat))/,tire:/^(Front|Rear)_(Left|Right)_Tire$/,
-  caliper:/^(Front|Rear)_(Left|Right)_Brake_Caliper$/,eye:[-.396,1.30,-.30]},
  {id:'road-meridian-gt',variantId:'meridian_gt',label:'Meridian GT',file:'innerscene-gt-source.glb',
   sourceUrl:'https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635',
   sourceSha256:'a84c0b8a02bd299fd21b2fccbbd2f953c567b591e74f5b7721c5bd51da6d077b',
   author:'Innerscene',yaw:Math.PI/2,paint:['paint'],
   wheel:/^(?:Original tyre|Deep wheel barrel|Machined alloy outer|Cast swept alloy spoke|Wheel bearing hub|Wheel hex lug|Visible brake disc)/,
-  tire:/^Original tyre carcass and shaped sidewalls/,caliper:/^Brake caliper/,eye:[.461,1.035,.08]}
+  tire:/^Original tyre carcass and shaped sidewalls/,caliper:/^Brake caliper/,eye:[.461,1.035,.08]},
+ {id:'road-apex-clubsport',variantId:'apex_clubsport',label:'Apex ClubSport',file:'apex-source.glb',
+  sourceUrl:'https://www.innerscene.com/tools/library/3d-parts/generic-1990s-japanese-style-sports-coupe-ace64592',
+  sourceSha256:'ea9818049852d191e795d8bc999e2e911df696c47a846418a6497d59fbb3c29f',
+  author:'Innerscene',yaw:Math.PI/2,paint:['paint'],motorsport:'track',
+  wheel:/^(?:Original tyre|Deep wheel barrel|Machined alloy outer|Cast swept alloy spoke|Wheel bearing hub|Wheel hex lug|Visible brake disc)/,
+  tire:/^Original tyre carcass and shaped sidewalls/,caliper:/^Brake caliper/,eye:[.4224,1.01,.02]},
+ {id:'road-kestrel-rally',variantId:'kestrel_rally',label:'Kestrel Rally',file:'kestrel-source.glb',
+  sourceUrl:'https://www.innerscene.com/tools/library/3d-parts/generic-hot-hatch-a60561a5',
+  sourceSha256:'3ce9ea2664cda82468f2568acd458f417941388be39afb7c0bf6fab109194e1f',
+  author:'Innerscene',yaw:Math.PI/2,paint:['paint'],motorsport:'rally',
+  wheel:/^(?:Original tyre|Deep wheel barrel|Machined alloy outer|Cast swept alloy spoke|Wheel bearing hub|Wheel hex lug|Visible brake disc)/,
+  tire:/^Original tyre carcass and shaped sidewalls/,caliper:/^Brake caliper/,eye:[.4272,1.12,.22]}
 ];
 const [sourceDir,outputDir]=process.argv.slice(2);
 if(!sourceDir||!outputDir)throw Error('Usage: node scripts/prepare-racing-fleet-assets.mjs SOURCE EMPTY_OUTPUT');
@@ -32,6 +38,33 @@ const io=new NodeIO().registerExtensions(ALL_EXTENSIONS),records=[];
 await MeshoptSimplifier.ready;
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const triangles=d=>d.getRoot().listMeshes().flatMap(m=>m.listPrimitives()).reduce((sum,p)=>sum+(p.getIndices()?.getCount()||p.getAttribute('POSITION').getCount())/3,0);
+function addMotorsportEquipment(doc,scene,kind){
+ const buffer=doc.getRoot().listBuffers()[0],dark=doc.createMaterial('World Explorer competition trim').setBaseColorFactor([.025,.03,.034,1]).setRoughnessFactor(.66),
+  steel=doc.createMaterial('World Explorer safety cage').setBaseColorFactor([.32,.35,.37,1]).setMetallicFactor(.55).setRoughnessFactor(.4),
+  lens=doc.createMaterial('World Explorer rally lamp').setBaseColorFactor([.85,.84,.7,1]).setEmissiveFactor([.2,.19,.13]).setRoughnessFactor(.18);
+ function geometry(name,g,mat,position=[0,0,0],rotation=new Quaternion()){
+  const p=doc.createPrimitive().setMaterial(mat);
+  for(const [key,attribute]of Object.entries(g.attributes))if(['position','normal','uv'].includes(key))p.setAttribute(key==='position'?'POSITION':key==='normal'?'NORMAL':'TEXCOORD_0',doc.createAccessor().setBuffer(buffer).setType(attribute.itemSize===2?'VEC2':'VEC3').setArray(new Float32Array(attribute.array)));
+  if(g.index)p.setIndices(doc.createAccessor().setBuffer(buffer).setType('SCALAR').setArray(new Uint32Array(g.index.array)));
+  const node=doc.createNode(name).setMesh(doc.createMesh(name).addPrimitive(p)).setTranslation(position).setRotation(rotation.toArray());scene.addChild(node);g.dispose();return node;
+ }
+ const box=(name,w,h,d,x,y,z)=>geometry(name,new BoxGeometry(w,h,d),dark,[x,y,z]);
+ function beam(name,a,b){const start=new Vector3(...a),end=new Vector3(...b),delta=end.clone().sub(start);geometry(name,new CylinderGeometry(.022,.022,delta.length(),8),steel,start.add(end).multiplyScalar(.5).toArray(),new Quaternion().setFromUnitVectors(new Vector3(0,1,0),delta.normalize()));}
+ const roof=kind==='rally'?1.34:1.16,hoop=kind==='rally'?-.28:-.52;
+ for(const x of [-.59,.59]){beam('Competition roll hoop upright',[x,.33,hoop],[x,roof,hoop]);beam('Rear cage stay',[x,roof,hoop],[x,.35,hoop-.8]);}
+ beam('Competition roll hoop crown',[-.59,roof,hoop],[.59,roof,hoop]);beam('Competition cage diagonal',[-.59,.33,hoop],[.59,roof,hoop]);
+ if(kind==='track'){
+  box('ClubSport splitter',1.72,.065,.23,0,.14,2.03);
+  for(const x of [-.49,.49])box('ClubSport wing pylon',.035,.32,.07,x,.86,-1.84);
+  box('ClubSport rear wing',1.72,.055,.26,0,1.04,-1.84);
+  for(const x of [-.85,.85])box('ClubSport wing endplate',.025,.17,.29,x,1.04,-1.84);
+ }else{
+  box('Rally roof vent',.34,.065,.4,0,1.481,-.06);box('Rally skid plate',1.46,.04,.38,0,.09,1.76);
+  for(const x of [-.45,-.15,.15,.45]){const q=new Quaternion().setFromAxisAngle(new Vector3(1,0,0),Math.PI/2);geometry('Rally lamp housing',new CylinderGeometry(.13,.13,.12,24),dark,[x,.75,1.99],q);geometry('Rally lamp lens',new CylinderGeometry(.112,.112,.012,24),lens,[x,.75,2.057],q);}
+  for(const x of [-.81,.81])for(const z of [-1.6,.94])box('Rally mud flap',.26,.25,.018,x,.14,z);
+ }
+}
+
 for(const recipe of recipes){
  const original=await readFile(path.join(sourceDir,recipe.file));
  if(hash(original)!==recipe.sourceSha256)throw Error('Unreviewed source: '+recipe.id);
@@ -88,6 +121,7 @@ for(const recipe of recipes){
   wheelLayout.push({id,position,radius});
  }
  const sourceTriangles=triangles(doc);
+ if(recipe.motorsport)addMotorsportEquipment(doc,scene,recipe.motorsport);
  await doc.transform(weld(),simplify({simplifier:MeshoptSimplifier,ratio:.47,error:.001,lockBorder:false}));
  if(!root.listTextures().length)for(const mesh of root.listMeshes())for(const primitive of mesh.listPrimitives()){
   const index=primitive.getIndices(),position=primitive.getAttribute('POSITION'),normal=primitive.getAttribute('NORMAL');

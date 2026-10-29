@@ -331,8 +331,9 @@ The coupe author does not specify an exact model year. The long Fleetwood Brough
 
 ## Unbranded racing fleet
 
-- [Spectral GT RS](https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7), original model by JaronKBragg7337, CC0 1.0 Universal.
-- [Generic front-engine grand tourer coupe](https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635), original model by Innerscene, CC0 1.0 Universal. Named Meridian GT in this game.
+- [Generic front-engine grand tourer coupe](https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635), Innerscene, CC0. Named Meridian GT.
+- [Generic 1990s Japanese-style sports coupe](https://www.innerscene.com/tools/library/3d-parts/generic-1990s-japanese-style-sports-coupe-ace64592), Innerscene, CC0. Named Apex ClubSport, with original World Explorer cage, splitter and wing.
+- [Generic hot hatch](https://www.innerscene.com/tools/library/3d-parts/generic-hot-hatch-a60561a5), Innerscene, CC0. Named Kestrel Rally, with original World Explorer cage, lamp pod, vent, skid plate and mud flaps.
 
 World Explorer derivatives use uniform metre scale, forward-axis and ground
 normalization, bounded simplification, compatible glazing and separate wheel

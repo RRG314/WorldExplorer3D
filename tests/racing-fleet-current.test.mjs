@@ -7,8 +7,6 @@ import {RACING_FLEET_ASSETS} from '../app/js/assets/racing-fleet-assets.js';
 import {vehicleDefinitionById,PARKED_VEHICLE_CATALOG,vehicleHandlingProfile} from '../app/js/engine/vehicle-catalog.js';
 import {prepareVehicleGarageChange,personalVehicleIdentity} from '../app/js/transport/vehicle-garage-rules.js';
 import {vehicleDriverCamera} from '../app/js/transport/vehicle-camera-mount.js';
-import {createRaceVehicleProfile,createRaceVehicleState,stepRaceVehicle} from '../app/js/racing/vehicle-controller.js';
-import {createRaceCourse} from '../app/js/racing/course-rules.js';
 const require=createRequire(import.meta.url),{settleVehicleGarageAction}=require('../functions/economy-authority.js');
 
 test('racing fleet is self-contained, hash-pinned, within the admitted envelope and retains four working wheel groups',async()=>{
@@ -28,12 +26,12 @@ test('racing fleet is self-contained, hash-pinned, within the admitted envelope 
  }
 });
 
-test('both racing cars use canonical paid ownership and their distinct handling reaches the shared race engine',async()=>{
+test('all three racing cars use canonical paid ownership and their distinct handling reaches the shared race engine',async()=>{
  const rows=new Map(),runTransaction=async fn=>{const changes=new Map(),result=await fn({get:async k=>({exists:rows.has(k),data:()=>structuredClone(rows.get(k))}),set:(k,v)=>changes.set(k,structuredClone(v))});for(const [k,v]of changes)rows.set(k,v);return result;};
  const {personalVehicleById}=require('../functions/generated/vehicle-garage-rules.cjs');
  const service=require('../functions/generated/racing-engine.cjs');
  let garage=null;
- for(const id of ['meridian_gt','spectral_gt']){
+ for(const id of ['meridian_gt','apex_clubsport','kestrel_rally']){
   const definition=personalVehicleById(id);assert.ok(definition.price>0);
   const input={action:'buy',vehicleId:id,expectedRevision:garage?.revision||0,requestId:'fleet:'+id,price:1};
   const args={rows,runTransaction,walletRef:'wallet',progressRef:'progress',receiptRef:'receipt:'+id,uid:'driver',timestampFromMs:n=>n,nowMs:1000,input};
@@ -43,7 +41,7 @@ test('both racing cars use canonical paid ownership and their distinct handling 
   const selected=prepareVehicleGarageChange(garage,{action:'select',vehicleId:id,expectedRevision:garage.revision}).garage;
   assert.equal(selected.selectedId,id);assert.match(personalVehicleIdentity(id),/^personal-vehicle:/);
  }
- assert.equal(rows.get('wallet').credits,1000000-78000-125000);
- assert.ok(vehicleHandlingProfile('spectral_gt').accelerationScale>vehicleHandlingProfile('meridian_gt').accelerationScale);
+ assert.equal(rows.get('wallet').credits,1000000-78000-98000-44000);
+ assert.ok(vehicleHandlingProfile('apex_clubsport').accelerationScale>vehicleHandlingProfile('meridian_gt').accelerationScale);
  assert.ok(vehicleHandlingProfile('meridian_gt').brakeScale>vehicleHandlingProfile('sedan').brakeScale);
 });

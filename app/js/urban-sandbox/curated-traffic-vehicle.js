@@ -20,7 +20,8 @@ const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   golf_ii: 'road-volkswagen-golf-ii',
   datsun_280z: 'road-datsun-280z',
   meridian_gt: 'road-meridian-gt',
-  spectral_gt: 'road-spectral-gt-rs'
+  apex_clubsport: 'road-apex-clubsport',
+  kestrel_rally: 'road-kestrel-rally'
 });
 
 const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';

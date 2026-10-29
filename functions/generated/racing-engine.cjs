@@ -612,91 +612,6 @@ var require_vehicle_garage_rules = __commonJS({
     var RACING_FLEET_ASSETS2 = Object.freeze([
       {
         "schemaVersion": 1,
-        "id": "road-spectral-gt-rs",
-        "label": "Spectral GT RS",
-        "url": "/app/assets/models/vehicles/racing-fleet/road-spectral-gt-rs.glb",
-        "roles": [
-          "road-vehicle-presentation"
-        ],
-        "vehicleVariantIds": [
-          "spectral_gt"
-        ],
-        "license": "CC0-1.0",
-        "sourceUrl": "https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7",
-        "attribution": "Spectral GT RS: original model by JaronKBragg7337, CC0; World Explorer derivative.",
-        "sourceCredit": "JaronKBragg7337",
-        "dimensionsMeters": {
-          "width": 2.3285577297210693,
-          "height": 1.5486845970153809,
-          "length": 4.800000190734863
-        },
-        "paintMaterialNames": [
-          "Spectral Blue \u2014 Clearcoat",
-          "Midnight Blue \u2014 Shadow Panels"
-        ],
-        "wheelLayout": [
-          {
-            "id": "rear-left",
-            "position": [
-              -0.935663491487503,
-              0.49779149889945984,
-              -1.3795274794101715
-            ],
-            "radius": 0.49779149889945984
-          },
-          {
-            "id": "rear-right",
-            "position": [
-              0.935663491487503,
-              0.49779149889945984,
-              -1.3795274794101715
-            ],
-            "radius": 0.49779149889945984
-          },
-          {
-            "id": "front-left",
-            "position": [
-              -0.935663491487503,
-              0.49779149889945984,
-              1.247704952955246
-            ],
-            "radius": 0.49779149889945984
-          },
-          {
-            "id": "front-right",
-            "position": [
-              0.935663491487503,
-              0.49779149889945984,
-              1.247704952955246
-            ],
-            "radius": 0.49779149889945984
-          }
-        ],
-        "driverEyeGroundMeters": [
-          -0.396,
-          1.3,
-          -0.3
-        ],
-        "sourceUpAxis": "y",
-        "rigPolicy": "preserve-parts",
-        "collisionPolicy": "existing-road-vehicle-envelope",
-        "instancePolicy": {
-          "geometry": "shared",
-          "materials": "clone"
-        },
-        "loadPolicy": {
-          "bounded": true,
-          "timeoutMs": 2e4
-        },
-        "budgets": {
-          "bytes": 2417868,
-          "triangles": 82556,
-          "textureEdgePixels": 512,
-          "maxInstances": 4
-        }
-      },
-      {
-        "schemaVersion": 1,
         "id": "road-meridian-gt",
         "label": "Meridian GT",
         "url": "/app/assets/models/vehicles/racing-fleet/road-meridian-gt.glb",
@@ -778,6 +693,174 @@ var require_vehicle_garage_rules = __commonJS({
           "textureEdgePixels": 512,
           "maxInstances": 4
         }
+      },
+      {
+        "schemaVersion": 1,
+        "id": "road-apex-clubsport",
+        "label": "Apex ClubSport",
+        "url": "/app/assets/models/vehicles/racing-fleet/road-apex-clubsport.glb",
+        "roles": [
+          "road-vehicle-presentation"
+        ],
+        "vehicleVariantIds": [
+          "apex_clubsport"
+        ],
+        "license": "CC0-1.0",
+        "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-1990s-japanese-style-sports-coupe-ace64592",
+        "attribution": "Apex ClubSport: original model by Innerscene, CC0; World Explorer derivative.",
+        "sourceCredit": "Innerscene",
+        "dimensionsMeters": {
+          "width": 2.091599941253662,
+          "height": 1.2870001790579408,
+          "length": 4.493067741394043
+        },
+        "paintMaterialNames": [
+          "paint"
+        ],
+        "wheelLayout": [
+          {
+            "id": "front-right",
+            "position": [
+              0.7700000107288361,
+              0.32799999869894236,
+              1.27923384308815
+            ],
+            "radius": 0.3249999984400347
+          },
+          {
+            "id": "front-left",
+            "position": [
+              -0.7700000107288361,
+              0.32799999869894236,
+              1.27923384308815
+            ],
+            "radius": 0.3249999984400347
+          },
+          {
+            "id": "rear-right",
+            "position": [
+              0.7700000107288361,
+              0.32799999869894236,
+              -1.2507661879062653
+            ],
+            "radius": 0.3249999984400347
+          },
+          {
+            "id": "rear-left",
+            "position": [
+              -0.7700000107288361,
+              0.32799999869894236,
+              -1.2507661879062653
+            ],
+            "radius": 0.3249999984400347
+          }
+        ],
+        "driverEyeGroundMeters": [
+          0.4224,
+          1.01,
+          0.02
+        ],
+        "sourceUpAxis": "y",
+        "rigPolicy": "preserve-parts",
+        "collisionPolicy": "existing-road-vehicle-envelope",
+        "instancePolicy": {
+          "geometry": "shared",
+          "materials": "clone"
+        },
+        "loadPolicy": {
+          "bounded": true,
+          "timeoutMs": 2e4
+        },
+        "budgets": {
+          "bytes": 1755756,
+          "triangles": 58787,
+          "textureEdgePixels": 512,
+          "maxInstances": 4
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "id": "road-kestrel-rally",
+        "label": "Kestrel Rally",
+        "url": "/app/assets/models/vehicles/racing-fleet/road-kestrel-rally.glb",
+        "roles": [
+          "road-vehicle-presentation"
+        ],
+        "vehicleVariantIds": [
+          "kestrel_rally"
+        ],
+        "license": "CC0-1.0",
+        "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-hot-hatch-a60561a5",
+        "attribution": "Kestrel Rally: original model by Innerscene, CC0; World Explorer derivative.",
+        "sourceCredit": "Innerscene",
+        "dimensionsMeters": {
+          "width": 2.109799861907959,
+          "height": 1.5134999985750766,
+          "length": 4.111129320196808
+        },
+        "paintMaterialNames": [
+          "paint"
+        ],
+        "wheelLayout": [
+          {
+            "id": "front-right",
+            "position": [
+              0.7800000607967377,
+              0.31799997843336314,
+              1.2784291803836823
+            ],
+            "radius": 0.31499997817445546
+          },
+          {
+            "id": "front-left",
+            "position": [
+              -0.7799999415874481,
+              0.31799997843336314,
+              1.2784291803836823
+            ],
+            "radius": 0.31499997817445546
+          },
+          {
+            "id": "rear-right",
+            "position": [
+              0.7800000607967377,
+              0.31799997843336314,
+              -1.251570850610733
+            ],
+            "radius": 0.31499997817445546
+          },
+          {
+            "id": "rear-left",
+            "position": [
+              -0.7799999415874481,
+              0.31799997843336314,
+              -1.251570850610733
+            ],
+            "radius": 0.31499997817445546
+          }
+        ],
+        "driverEyeGroundMeters": [
+          0.4272,
+          1.12,
+          0.22
+        ],
+        "sourceUpAxis": "y",
+        "rigPolicy": "preserve-parts",
+        "collisionPolicy": "existing-road-vehicle-envelope",
+        "instancePolicy": {
+          "geometry": "shared",
+          "materials": "clone"
+        },
+        "loadPolicy": {
+          "bounded": true,
+          "timeoutMs": 2e4
+        },
+        "budgets": {
+          "bytes": 1926484,
+          "triangles": 64495,
+          "textureEdgePixels": 512,
+          "maxInstances": 4
+        }
       }
     ].map((record) => Object.freeze(record)));
     var ROAD_VEHICLE_DEFINITIONS2 = Object.freeze([
@@ -810,7 +893,8 @@ var require_vehicle_garage_rules = __commonJS({
       { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
       { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
       { id: "meridian_gt", assetId: "road-meridian-gt", bodyStyle: "sedan", category: "Grand touring", handlingLabel: "Front-engine grand tourer", massKg: 1580, seatCount: 2, weight: 0, color: 9053747, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.08, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.5, parkedEligible: false },
-      { id: "spectral_gt", assetId: "road-spectral-gt-rs", bodyStyle: "sedan", category: "Track sports", handlingLabel: "Track-focused grip", massKg: 1280, seatCount: 2, weight: 0, color: 1527433, topSpeedMph: 120, accelerationScale: 1.62, steeringScale: 1.17, gripScale: 1.26, brakeScale: 1.38, turningRadius: 5.2, parkedEligible: false }
+      { id: "apex_clubsport", assetId: "road-apex-clubsport", bodyStyle: "sedan", category: "Track sports", handlingLabel: "Club racing grip", massKg: 1240, seatCount: 2, weight: 0, color: 1527433, topSpeedMph: 120, accelerationScale: 1.62, steeringScale: 1.17, gripScale: 1.26, brakeScale: 1.38, turningRadius: 5.2, parkedEligible: false },
+      { id: "kestrel_rally", assetId: "road-kestrel-rally", bodyStyle: "compact", category: "Rally hatch", handlingLabel: "Agile rally setup", massKg: 1180, seatCount: 4, weight: 0, color: 12020769, topSpeedMph: 120, accelerationScale: 1.28, steeringScale: 1.22, gripScale: 1.13, brakeScale: 1.17, turningRadius: 4.7, parkedEligible: false }
     ].map((profile) => {
       const asset = [...EXPLORER_FLEET_ASSETS2, ...RACING_FLEET_ASSETS2].find((entry) => entry.id === profile.assetId);
       return Object.freeze({
@@ -869,7 +953,8 @@ var require_vehicle_garage_rules = __commonJS({
       golf_ii: 9e3,
       datsun_280z: 34e3,
       meridian_gt: 78e3,
-      spectral_gt: 125e3
+      apex_clubsport: 98e3,
+      kestrel_rally: 44e3
     };
     var PERSONAL_VEHICLES2 = Object.freeze([
       Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),
@@ -2662,91 +2747,6 @@ var EXPLORER_FLEET_ASSETS = Object.freeze([
 var RACING_FLEET_ASSETS = Object.freeze([
   {
     "schemaVersion": 1,
-    "id": "road-spectral-gt-rs",
-    "label": "Spectral GT RS",
-    "url": "/app/assets/models/vehicles/racing-fleet/road-spectral-gt-rs.glb",
-    "roles": [
-      "road-vehicle-presentation"
-    ],
-    "vehicleVariantIds": [
-      "spectral_gt"
-    ],
-    "license": "CC0-1.0",
-    "sourceUrl": "https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7",
-    "attribution": "Spectral GT RS: original model by JaronKBragg7337, CC0; World Explorer derivative.",
-    "sourceCredit": "JaronKBragg7337",
-    "dimensionsMeters": {
-      "width": 2.3285577297210693,
-      "height": 1.5486845970153809,
-      "length": 4.800000190734863
-    },
-    "paintMaterialNames": [
-      "Spectral Blue \u2014 Clearcoat",
-      "Midnight Blue \u2014 Shadow Panels"
-    ],
-    "wheelLayout": [
-      {
-        "id": "rear-left",
-        "position": [
-          -0.935663491487503,
-          0.49779149889945984,
-          -1.3795274794101715
-        ],
-        "radius": 0.49779149889945984
-      },
-      {
-        "id": "rear-right",
-        "position": [
-          0.935663491487503,
-          0.49779149889945984,
-          -1.3795274794101715
-        ],
-        "radius": 0.49779149889945984
-      },
-      {
-        "id": "front-left",
-        "position": [
-          -0.935663491487503,
-          0.49779149889945984,
-          1.247704952955246
-        ],
-        "radius": 0.49779149889945984
-      },
-      {
-        "id": "front-right",
-        "position": [
-          0.935663491487503,
-          0.49779149889945984,
-          1.247704952955246
-        ],
-        "radius": 0.49779149889945984
-      }
-    ],
-    "driverEyeGroundMeters": [
-      -0.396,
-      1.3,
-      -0.3
-    ],
-    "sourceUpAxis": "y",
-    "rigPolicy": "preserve-parts",
-    "collisionPolicy": "existing-road-vehicle-envelope",
-    "instancePolicy": {
-      "geometry": "shared",
-      "materials": "clone"
-    },
-    "loadPolicy": {
-      "bounded": true,
-      "timeoutMs": 2e4
-    },
-    "budgets": {
-      "bytes": 2417868,
-      "triangles": 82556,
-      "textureEdgePixels": 512,
-      "maxInstances": 4
-    }
-  },
-  {
-    "schemaVersion": 1,
     "id": "road-meridian-gt",
     "label": "Meridian GT",
     "url": "/app/assets/models/vehicles/racing-fleet/road-meridian-gt.glb",
@@ -2828,6 +2828,174 @@ var RACING_FLEET_ASSETS = Object.freeze([
       "textureEdgePixels": 512,
       "maxInstances": 4
     }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-apex-clubsport",
+    "label": "Apex ClubSport",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-apex-clubsport.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "apex_clubsport"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-1990s-japanese-style-sports-coupe-ace64592",
+    "attribution": "Apex ClubSport: original model by Innerscene, CC0; World Explorer derivative.",
+    "sourceCredit": "Innerscene",
+    "dimensionsMeters": {
+      "width": 2.091599941253662,
+      "height": 1.2870001790579408,
+      "length": 4.493067741394043
+    },
+    "paintMaterialNames": [
+      "paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.7700000107288361,
+          0.32799999869894236,
+          1.27923384308815
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7700000107288361,
+          0.32799999869894236,
+          1.27923384308815
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.7700000107288361,
+          0.32799999869894236,
+          -1.2507661879062653
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.7700000107288361,
+          0.32799999869894236,
+          -1.2507661879062653
+        ],
+        "radius": 0.3249999984400347
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.4224,
+      1.01,
+      0.02
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 1755756,
+      "triangles": 58787,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-kestrel-rally",
+    "label": "Kestrel Rally",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-kestrel-rally.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "kestrel_rally"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-hot-hatch-a60561a5",
+    "attribution": "Kestrel Rally: original model by Innerscene, CC0; World Explorer derivative.",
+    "sourceCredit": "Innerscene",
+    "dimensionsMeters": {
+      "width": 2.109799861907959,
+      "height": 1.5134999985750766,
+      "length": 4.111129320196808
+    },
+    "paintMaterialNames": [
+      "paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.7800000607967377,
+          0.31799997843336314,
+          1.2784291803836823
+        ],
+        "radius": 0.31499997817445546
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7799999415874481,
+          0.31799997843336314,
+          1.2784291803836823
+        ],
+        "radius": 0.31499997817445546
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.7800000607967377,
+          0.31799997843336314,
+          -1.251570850610733
+        ],
+        "radius": 0.31499997817445546
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.7799999415874481,
+          0.31799997843336314,
+          -1.251570850610733
+        ],
+        "radius": 0.31499997817445546
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.4272,
+      1.12,
+      0.22
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 1926484,
+      "triangles": 64495,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
   }
 ].map((record) => Object.freeze(record)));
 
@@ -2863,7 +3031,8 @@ var LICENSED_ROAD_PROFILES = Object.freeze([
   { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
   { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
   { id: "meridian_gt", assetId: "road-meridian-gt", bodyStyle: "sedan", category: "Grand touring", handlingLabel: "Front-engine grand tourer", massKg: 1580, seatCount: 2, weight: 0, color: 9053747, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.08, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.5, parkedEligible: false },
-  { id: "spectral_gt", assetId: "road-spectral-gt-rs", bodyStyle: "sedan", category: "Track sports", handlingLabel: "Track-focused grip", massKg: 1280, seatCount: 2, weight: 0, color: 1527433, topSpeedMph: 120, accelerationScale: 1.62, steeringScale: 1.17, gripScale: 1.26, brakeScale: 1.38, turningRadius: 5.2, parkedEligible: false }
+  { id: "apex_clubsport", assetId: "road-apex-clubsport", bodyStyle: "sedan", category: "Track sports", handlingLabel: "Club racing grip", massKg: 1240, seatCount: 2, weight: 0, color: 1527433, topSpeedMph: 120, accelerationScale: 1.62, steeringScale: 1.17, gripScale: 1.26, brakeScale: 1.38, turningRadius: 5.2, parkedEligible: false },
+  { id: "kestrel_rally", assetId: "road-kestrel-rally", bodyStyle: "compact", category: "Rally hatch", handlingLabel: "Agile rally setup", massKg: 1180, seatCount: 4, weight: 0, color: 12020769, topSpeedMph: 120, accelerationScale: 1.28, steeringScale: 1.22, gripScale: 1.13, brakeScale: 1.17, turningRadius: 4.7, parkedEligible: false }
 ].map((profile) => {
   const asset = [...EXPLORER_FLEET_ASSETS, ...RACING_FLEET_ASSETS].find((entry) => entry.id === profile.assetId);
   return Object.freeze({
@@ -3110,7 +3279,8 @@ var prices = {
   golf_ii: 9e3,
   datsun_280z: 34e3,
   meridian_gt: 78e3,
-  spectral_gt: 125e3
+  apex_clubsport: 98e3,
+  kestrel_rally: 44e3
 };
 var PERSONAL_VEHICLES = Object.freeze([
   Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),
