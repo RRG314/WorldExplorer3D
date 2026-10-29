@@ -5,6 +5,7 @@ import {createVrGazeControls} from './gaze-controls.js';
 import {createXrWorldViews} from './xr-world-views.js';
 import {createXrActionInput,mergeXrActions} from './xr-input.js';
 import {roadRideMustPause,roadRideMessage} from './road-ride.js';
+import {vrRaceStatus} from './race-status.js';
 
 // Use the current renderer's ArrayCamera and framebuffer interfaces directly.
 // r128's WebXRManager assumes metre-sized parallel eyes and can finish async
@@ -33,7 +34,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
     const next=vrMountEligibility(ctx),panel=ctx.screenLayout?.getPanelLayer?.();
     return phase!=='ending'&&phase!=='closed'&&ctx.gameStarted&&!nativeEnded&&world.isCurrent()&&presentation.isCurrent()&&!ctx.worldLoading&&!ctx.titleLaunchPending&&!ctx.arSessionActive&&!ctx.getLiveGpsSnapshot?.().active&&!ctx.showLargeMap&&!ctx.fishingGame?.open&&!ctx.blockBuildMode&&
       (phase!=='presenting'||panel===undefined||panel==='vr')&&
-      next.eligible&&next.control.mode===admission.control.mode&&next.control.occupancy===admission.control.occupancy&&next.control.frame===admission.control.frame&&next.body===originalBody&&next.hiddenBody===body&&next.worldUnitsPerMeter===units;
+      next.eligible&&next.control.mode===admission.control.mode&&next.control.occupancy===admission.control.occupancy&&next.control.frame===admission.control.frame&&next.body===originalBody&&next.hiddenBody===body&&next.worldUnitsPerMeter===units&&next.cameraMount===admission.cameraMount;
   };
   function pause(){userPaused=true;input.reset();controls.reset();ctx.setPauseReason?.('vr-user',true);ctx.clearControlInputState?.('vr-tracked-pause');}
   function recenter(){calibrated=false;tracking=false;pause();}
@@ -74,6 +75,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
     if(action==='exit'){stop();return;}
     if(action==='recenter'){recenter();return;}
     if(action==='toggle'){
+      if(tracking&&vrRaceStatus(ctx)?.resultsReady){stop('race-results');return;}
       if(!tracking)return;if(userPaused&&roadRideMustPause(ride))ride.takeManual();userPaused=!userPaused;input.reset();ctx.setPauseReason?.('vr-user',userPaused);ctx.clearControlInputState?.('vr-tracked-toggle');
       if(!userPaused&&ctx.hasPauseReason?.('manual_pause')){ctx.setPauseReason('manual_pause',false);target.document.getElementById('pauseScreen')?.classList.remove('show');}
     }
@@ -127,7 +129,8 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
     updateCamera(frame){
       if(!api.guard())return false;if(!tracking)return true;
       updateMount();if(body)body.visible=false;
-      controls.update({mountPosition:mount.position,mountQuaternion:mount.quaternion,camera:presentation.camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:roadRideMessage(ride,ctx.paused)});return true;
+      const race=vrRaceStatus(ctx);
+      controls.update({mountPosition:mount.position,mountQuaternion:mount.quaternion,camera:presentation.camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:race?.message||roadRideMessage(ride,ctx.paused),primaryLabel:race?.primaryLabel});return true;
     },
     render(){
       if(!api.guard()||!tracking)return false;
@@ -188,7 +191,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
         }
       })();return startPromise;
     },
-    snapshot:()=>({active:phase!=='closed',started:phase==='presenting',kind:'tracked',frame:admission.control.frame,worldUnitsPerMeter:units,phase,tracking,userPaused,calibrated,input:input.snapshot(),gaze:controls.snapshot?.(),ride:ride?.snapshot()||null,reason,
+    snapshot:()=>({active:phase!=='closed',started:phase==='presenting',kind:'tracked',frame:admission.control.frame,drivingView:admission.cameraMount?.kind||null,worldUnitsPerMeter:units,phase,tracking,userPaused,calibrated,input:input.snapshot(),gaze:controls.snapshot?.(),ride:ride?.snapshot()||null,reason,
       eyeSeparationWorld:arrayCamera.cameras.length===2?arrayCamera.cameras[0].position.distanceTo(arrayCamera.cameras[1].position):null})
   };
   scope.listen(world.signal,'abort',()=>stop('environment-changed'));

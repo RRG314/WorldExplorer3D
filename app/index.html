@@ -522,6 +522,7 @@ Continue ocean exploration beyond the dive site
 <div class="flowerChallengeHeader">
 <div class="flowerChallengeTitle">Rankings</div>
 <div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
+<button id="leaderboardCloseBtn" type="button" class="rankings-close" aria-label="Close Rankings">×</button>
 </div>
 <div class="flowerChallengeBody">
 <div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest Flower Sprint finishes. Player-reported results.</div>
@@ -534,7 +535,9 @@ Continue ocean exploration beyond the dive site
 <button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">◎ Community</button>
 <button id="leaderboardTabProperty" class="flowerLeaderboardTab" type="button">⌂ Property</button>
 <button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
+<button id="leaderboardTabRacing" class="flowerLeaderboardTab" type="button">⚑ Racing</button>
 </div>
+<div id="racingRecordFilters" class="racing-record-filters" hidden><label>Course<select id="racingRecordCourse"></select></label><label>Car setup<select id="racingRecordSetup"></select></label></div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
 <button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Start Flower Sprint</button>

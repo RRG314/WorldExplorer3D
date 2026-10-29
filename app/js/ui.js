@@ -337,13 +337,12 @@ function setupUI() {
       appCtx.showToast?.('Multiplayer is unavailable right now.');
     });
   });
-  document.getElementById('fCommunityBoard')?.addEventListener('click', async () => {
+  document.getElementById('fCommunityBoard')?.addEventListener('click', async event => {
+    event.stopPropagation();
     closeAllFloatMenus();
     try {
       await appCtx.ensureFlowerChallengeReady?.();
-      await appCtx.setChallengeLeaderboardView?.('explorer');
-      const panel = document.getElementById('flowerChallengePanel');
-      if (!panel?.classList.contains('open')) document.getElementById('flowerChallengeToggleBtn')?.click();
+      await appCtx.openLeaderboardView?.('explorer');
     } catch (error) {
       console.error('[community-board] Could not open the board.', error);
       appCtx.showToast?.('Rankings are unavailable right now.');

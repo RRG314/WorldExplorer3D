@@ -7,7 +7,7 @@ import {getLifecycleRegistrySnapshot} from '../app/js/runtime/lifecycle-scope.js
 const sandbox=vm.createContext({console});vm.runInContext(await readFile(new URL('../app/vendor/three/build/three.min.js',import.meta.url),'utf8'),sandbox);const THREE=sandbox.THREE;
 function fixture(permission=async()=>true,{ride=null,configure=()=>{}}={}){
   const target=new EventTarget();target.document=new EventTarget();target.document.hidden=false;target.document.getElementById=()=>null;target.screen={orientation:new EventTarget()};target.innerWidth=844;target.innerHeight=390;
-  const reasons=new Set(['unrelated-pause']),events=[],controller=new AbortController(),classes=new Set();let current=true,tracking=true,gaze,disposals=0;
+  const reasons=new Set(['unrelated-pause']),events=[],controller=new AbortController(),classes=new Set();let current=true,tracking=true,gaze,disposals=0,controlView=null;
   const ctx={gameStarted:true,scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),WORLD_UNITS_PER_METER:1/1.11,
     renderer:{domElement:{classList:{add:value=>classes.add(value),remove:value=>classes.delete(value)}}},carMesh:new THREE.Object3D(),car:{x:0,y:1,z:0,angle:0,speed:0},
     setPauseReason:(reason,active)=>active?reasons.add(reason):reasons.delete(reason),hasPauseReason:reason=>reasons.has(reason),clearControlInputState:reason=>events.push(reason),screenLayout:{setPanelLayer:(id,active)=>events.push([id,active])}};
@@ -16,8 +16,8 @@ function fixture(permission=async()=>true,{ride=null,configure=()=>{}}={}){
   const session=createPhoneVrSession({ctx,THREE,target,optics:{},ride,captureSession:()=>({signal:controller.signal,isCurrent:()=>current}),
     createStereo:()=>({render:()=>events.push('stereo-render'),dispose:()=>disposals++,snapshot:()=>({active:true})}),
     createTracking:()=>({enable:permission,dispose:()=>disposals++,recenter:()=>events.push('recenter'),snapshot:()=>({status:tracking?'active':'stale'}),read:out=>{out.identity();return tracking;}}),
-    createControls:options=>{gaze=options.onAction;return {dispose:()=>disposals++,reset(){},select(){},update:()=>events.push('gaze-update')};}});
-  return {session,ctx,target,reasons,events,classes,controller,gaze:action=>gaze(action),setCurrent:value=>current=value,setTracking:value=>tracking=value,disposals:()=>disposals};
+    createControls:options=>{gaze=options.onAction;return {dispose:()=>disposals++,reset(){},select(){},update:value=>{controlView=value;events.push('gaze-update');}};}});
+  return {session,ctx,target,reasons,events,classes,controller,gaze:action=>gaze(action),setCurrent:value=>current=value,setTracking:value=>tracking=value,disposals:()=>disposals,controlView:()=>controlView};
 }
 test('phone VR takes presentation only after permission and starts paused with independent head rotation',async()=>{
   const f=fixture(),before=JSON.stringify(f.ctx.car);assert.equal(f.ctx.vrPresentation,undefined);assert.equal(await f.session.start(),true);assert.equal(await f.session.start(),true);
@@ -68,4 +68,15 @@ test('ordinary map, Backpack and activity admission returns phone VR to its norm
   for(const change of [ctx=>ctx.showLargeMap=true,ctx=>ctx.fishingGame={open:true},ctx=>ctx.blockBuildMode=true,ctx=>ctx.gameStarted=false,ctx=>ctx.screenLayout.getPanelLayer=()=> 'backpack']){
     const f=fixture();await f.session.start();change(f.ctx);assert.equal(f.session.guard(),false);assert.equal(f.ctx.vrPresentation,null);assert.equal(f.disposals(),3);
   }
+});
+
+test('race progress is visible in phone VR and Results exits without releasing the result pause',async()=>{
+ const snapshot={phase:'running',startAtMs:4000,serverAtMs:9500,laps:1,players:[{uid:'you',position:1,progress:{lap:1,nextGate:2,elapsedMs:5500}}]};
+ const f=fixture(undefined,{configure:ctx=>ctx.roadRaceController={uid:'you',course:{gates:Array(10)},snapshot:()=>snapshot}});
+ await f.session.start();f.session.beforeInput();f.session.updateCamera({timestamp:1});assert.match(f.controlView().message,/Race.*0:05.5.*Gate 3\/10/);
+ snapshot.phase='complete';snapshot.players[0].progress.finished=true;f.reasons.add('racing-menu');f.session.updateCamera({timestamp:2});assert.equal(f.controlView().primaryLabel,'Results');
+ f.gaze('toggle');assert.equal(f.ctx.vrPresentation,null);assert.equal(f.reasons.has('racing-menu'),true);assert.equal(f.disposals(),3);
+});
+test('a new vehicle camera mount on the same driving host retires the old phone view',async()=>{
+ const f=fixture();await f.session.start();f.ctx.carMesh.userData.driverCameraMount={type:'DriverCameraMount',kind:'raised',eye:{x:0,y:1,z:0}};assert.equal(f.session.guard(),false);assert.equal(f.disposals(),3);
 });

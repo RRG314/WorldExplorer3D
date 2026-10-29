@@ -29,7 +29,7 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
   let hover=null,since=0,latched=false,disposed=false,lastLabel='Start';
   function reset(){hover=null;since=0;latched=false;reticle.material.color.copy(normalColor);reticle.scale.setScalar(units);}
   return Object.freeze({
-    update({mountPosition,mountQuaternion,camera,timestamp,paused,tracking,message=''}){
+    update({mountPosition,mountQuaternion,camera,timestamp,paused,tracking,message='',primaryLabel=null}){
       if(disposed)return;root.visible=true;reticle.visible=true;root.position.copy(mountPosition);root.quaternion.copy(mountQuaternion);root.updateMatrixWorld(true);
       // Ray requires a normalized world direction. Matrix decomposition can
       // leave a quaternion a few ulps off unit length; an unnormalized ray can
@@ -38,7 +38,7 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
       const hit=raycaster.intersectObjects(meshes,false)[0];
       point.copy(hit?.point||origin).addScaledVector(direction,hit?-.002:1.5*units);
       reticle.position.copy(point);reticle.quaternion.copy(orientation);
-      const label=!tracking?'Waiting for motion':paused?'Start':'Pause';if(label!==lastLabel){controls[0].label(label);lastLabel=label;}
+      const label=!tracking?'Waiting for motion':primaryLabel||(paused?'Start':'Pause');if(label!==lastLabel){controls[0].label(label);lastLabel=label;}
       caption.visible=!!message;
       if(message!==lastMessage){lastMessage=message;const draw=captionCanvas.getContext('2d');draw.clearRect(0,0,1024,128);draw.fillStyle=colors.surface;draw.fillRect(0,0,1024,128);draw.font=`600 ${38*textScale}px system-ui`;draw.fillStyle=colors.text;draw.textAlign='center';draw.textBaseline='middle';draw.fillText(String(message).slice(0,88),512,64,990);captionTexture.needsUpdate=true;}
       const next=tracking?hit?.object?.userData.action:null;

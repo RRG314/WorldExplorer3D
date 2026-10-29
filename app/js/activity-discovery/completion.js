@@ -3,9 +3,10 @@ import {ctx} from '../shared-context.js?v=55';
 // and the pending record keeps the same event identity across retries/reloads.
 const HISTORY='worldExplorer3D.activityCompletions.v1';
 const PENDING='worldExplorer3D.activityPendingCompletions.v1';
-export function createActivityCompletionStore({storage=()=>globalThis.localStorage,recordEvent,lookupEvents,now=Date.now,context=()=>({})}={}){
- let history=null,pending=null;const inFlight=new Map(),verified=new Set();
- const read=key=>{try{const p=JSON.parse(storage()?.getItem(key)||'{}');return p&&typeof p==='object'&&!Array.isArray(p)?Object.assign(Object.create(null),p):Object.create(null)}catch{return {}}};
+export function createActivityCompletionStore({storage=()=>globalThis.localStorage,recordEvent,lookupEvents,now=Date.now,context=()=>({}),eventNamespace=''}={}){
+ if(typeof eventNamespace!=='string'||eventNamespace.length>140||/[\u0000-\u001f\u007f]/.test(eventNamespace))throw TypeError('Invalid completion namespace');
+ let history=null,pending=null,readFailed=false;const inFlight=new Map(),verified=new Set();
+ const read=key=>{try{const p=JSON.parse(storage()?.getItem(key)||'{}');if(!p||typeof p!=='object'||Array.isArray(p))throw Error('Invalid completion cache');return Object.assign(Object.create(null),p)}catch{readFailed=true;return {}}};
  const load=()=>{history ||= read(HISTORY);pending ||= read(PENDING)};
  const write=(key,value)=>{try{if(!storage())return false;storage().setItem(key,JSON.stringify(value));return true}catch{return false}};
  const get=id=>{load();return history[id]?{...history[id]}:null};
@@ -27,8 +28,16 @@ export function createActivityCompletionStore({storage=()=>globalThis.localStora
   if(pending[id])return retry(id);
   if(Object.keys(pending).length>=20)return Promise.resolve(false);
   const previous=get(id)||{},count=Math.max(0,Number(previous.count)||0)+1,first=count===1,duration=Math.max(0,Number(durationMs)||0);
-  const completion={count,lastCompletedAt:now(),bestTimeMs:previous.bestTimeMs>0?Math.min(previous.bestTimeMs,duration):duration};
-  const event={...context(),occurredAt:now(),eventId:`event:activity-completed:${id}:${count}`,eventType:options.outcome==='failed'?'activity-ended':'activity-completed',sourceSystem:'games-and-activities',sourceId:id,pathId:'activity',name:String(activity.title||activity.name||'Activity complete').slice(0,120),detail:String(options.detail || (first?'First completion.':`Completed again in ${Math.max(1,Math.round(duration/1000))} seconds.`)).slice(0,500),activityId:id,localPosition:pose,metadata:{shared:activity.sourceType==='room_activity',outcome:options.outcome||'completed',...options.metadata},firstCompletion:first&&options.outcome!=='failed',points:first&&options.outcome!=='failed'?(options.pointsFirst??2):0,progressReason:first?'first-activity-completion':'activity-replay'};
+  // A supplied run identity survives cache loss without colliding with an
+  // earlier run's count. Pending retries retain this exact event identity.
+  const runId=options.completionId;
+  if(runId!==undefined&&(typeof runId!=='string'||!/^[A-Za-z0-9:_-]{1,64}$/.test(runId)))return Promise.resolve(false);
+  const eventId=`event:activity-completed:${eventNamespace?eventNamespace+':':''}${id}:${runId===undefined?count:'run:'+runId}`;
+  if(eventId.length>260)return Promise.resolve(false);
+  const newBest=!(previous.bestTimeMs>0)||duration<previous.bestTimeMs;
+  const completion={count,lastCompletedAt:now(),bestTimeMs:previous.bestTimeMs>0?Math.min(previous.bestTimeMs,duration):duration,
+   bestJournalEventId:newBest?eventId:previous.bestJournalEventId||null};
+  const event={...context(),occurredAt:now(),eventId,eventType:options.outcome==='failed'?'activity-ended':'activity-completed',sourceSystem:'games-and-activities',sourceId:id,pathId:'activity',name:String(activity.title||activity.name||'Activity complete').slice(0,120),detail:String(options.detail || (first?'First completion.':`Completed again in ${Math.max(1,Math.round(duration/1000))} seconds.`)).slice(0,500),activityId:id,localPosition:pose,metadata:{shared:activity.sourceType==='room_activity',outcome:options.outcome||'completed',...options.metadata},firstCompletion:first&&options.outcome!=='failed',points:first&&options.outcome!=='failed'?(options.pointsFirst??2):0,progressReason:first?'first-activity-completion':'activity-replay'};
   pending[id]={event,completion,durable:true};if(!write(PENDING,pending))pending[id].durable=false;
   return retry(id);
  }
@@ -36,7 +45,7 @@ export function createActivityCompletionStore({storage=()=>globalThis.localStora
   load();const row=history[id];if(!row?.journalEventId || typeof lookupEvents!=='function')return false;
   try{const events=await lookupEvents([row.journalEventId]);if(events?.some(e=>e.eventId===row.journalEventId)){verified.add(id);return true;}verified.delete(id);return false;}catch{verified.delete(id);return false;}
  }
- return {get,status,complete,retry,verify,canStart(id){load();return !pending[id]&&Object.keys(pending).length<20}};
+ return {get,status,complete,retry,verify,entries(){load();return Object.entries(history).map(([id,row])=>({...row,id}));},isReadable(){load();return !readFailed;},canStart(id){load();return !pending[id]&&Object.keys(pending).length<20}};
 }
 export function activityCompletionMessage(completion,status){
  if(status.status==='saving')return 'Activity complete. Saving to your Journal…';

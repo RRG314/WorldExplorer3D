@@ -12,7 +12,7 @@ const sandbox=vm.createContext({console});vm.runInContext(await readFile(new URL
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 function pose(x=0){const projection=new T.Matrix4().makePerspective(-.05,.05,.05,-.05,.05,100).toArray();return {transform:{matrix:new T.Matrix4().makeTranslation(x,1.6,0).toArray()},views:[-1,1].map(eye=>({eye,transform:{matrix:new T.Matrix4().makeTranslation(x+eye*.032,1.6,0).toArray()},projectionMatrix:projection}))};}
 function fixture({permission,compatibility,reference,delayedEnd=false,layerFailure=false,ride=null,configure=()=>{}}={}){
-  const target=new EventTarget(),abort=new AbortController(),native=new EventTarget(),ref=new EventTarget(),reasons=new Set(),events=[],frames=new Map();let next=0,flat=null,current=true,layerCount=0,draws=0,gaze,runEnd;
+  const target=new EventTarget(),abort=new AbortController(),native=new EventTarget(),ref=new EventTarget(),reasons=new Set(),events=[],frames=new Map();let next=0,flat=null,current=true,layerCount=0,draws=0,gaze,runEnd,controlView=null;
   target.document={hidden:false,getElementById:()=>null};target.isSecureContext=true;target.innerWidth=1280;target.innerHeight=720;
   native.visibilityState='visible';native.inputSources=[];native.renderState={};native.requestReferenceSpace=()=>reference?.promise||Promise.resolve(ref);
   native.updateRenderState=value=>Object.assign(native.renderState,value);native.requestAnimationFrame=callback=>{const id=++next;frames.set(id,callback);return id;};native.cancelAnimationFrame=id=>frames.delete(id);
@@ -37,8 +37,8 @@ function fixture({permission,compatibility,reference,delayedEnd=false,layerFailu
   ctx.acquireRuntimeFrameSource=options=>source.acquire(options);ctx.getRuntimeKernelSnapshot=()=>kernel.snapshot();ctx.renderLoop=()=>source.start();source.start();
   configure(ctx,kernel);
   const session=createTrackedVrSession({ctx,THREE:T,target,ride,captureSession:()=>({signal:abort.signal,isCurrent:()=>current}),
-    createControls:options=>{gaze=options.onAction;return {update(){},reset(){},select:()=>true,selectRay:()=>true,dispose:()=>events.push('controls-disposed')};}});
-  return {ctx,target,native,ref,session,source,events,errors,reasons,abort,end,gaze:action=>gaze(action),flat:()=>!!flat,layers:()=>layerCount,draws:()=>draws,bound:()=>bound,
+    createControls:options=>{gaze=options.onAction;return {update:value=>{controlView=value;},reset(){},select:()=>true,selectRay:()=>true,dispose:()=>events.push('controls-disposed')};}});
+  return {ctx,target,native,ref,session,source,events,errors,reasons,abort,end,gaze:action=>gaze(action),controlView:()=>controlView,flat:()=>!!flat,layers:()=>layerCount,draws:()=>draws,bound:()=>bound,
     setCurrent:value=>current=value,resolveEnd:()=>runEnd(),send:(value=pose(),time=0)=>{const [id,callback]=frames.entries().next().value;frames.delete(id);const frame={getViewerPose:()=>value};callback(time,frame);return frame;},
     cleanup:async()=>{await session.stop();source.dispose();}};
 }
@@ -112,4 +112,14 @@ test('ordinary map, Backpack and activity admission end tracked VR before adopti
   for(const change of [ctx=>ctx.showLargeMap=true,ctx=>ctx.fishingGame={open:true},ctx=>ctx.blockBuildMode=true,ctx=>ctx.gameStarted=false,ctx=>ctx.screenLayout.getPanelLayer=()=> 'backpack']){
     const f=fixture();await f.session.start();change(f.ctx);f.send();await f.session.stop();assert.equal(f.ctx.vrPresentation,null);assert.equal(f.flat(),true);f.source.dispose();
   }
+});
+
+test('race Results uses the existing headset controls and releases the compositor before flat results',async()=>{
+ const snapshot={phase:'complete',startAtMs:4000,serverAtMs:9500,laps:1,players:[{uid:'you',position:1,progress:{finished:true,elapsedMs:5500}}]};
+ const f=fixture({configure:ctx=>ctx.roadRaceController={uid:'you',course:{gates:Array(10)},snapshot:()=>snapshot}});
+ await f.session.start();f.reasons.add('racing-menu');f.send();assert.equal(f.controlView().primaryLabel,'Results');assert.match(f.controlView().message,/Finished.*0:05.5/);
+ f.gaze('toggle');await f.session.stop();assert.equal(f.flat(),true);assert.equal(f.ctx.vrPresentation,null);assert.equal(f.reasons.has('racing-menu'),true);f.source.dispose();
+});
+test('changing the vehicle view behind the same host invalidates tracked VR',async()=>{
+ const f=fixture();await f.session.start();f.ctx.carMesh.userData.driverCameraMount={type:'DriverCameraMount',kind:'raised',eye:{x:0,y:1,z:0}};f.send();await f.session.stop();assert.equal(f.flat(),true);f.source.dispose();
 });

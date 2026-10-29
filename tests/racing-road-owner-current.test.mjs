@@ -18,7 +18,7 @@ test('the existing physics frame exclusively consumes practice controls from gri
  assert.ok(h.c.car.engineRpm>0);controller.dispose();
 });
 test('world replacement and every incompatible controller reject road ownership before a pose write',()=>{
- for(const state of [{boatMode:{active:true},boatDeck:{active:true}},{boatMode:{active:true}},{planeMode:{active:true}},{spaceFlight:{active:true}},
+ for(const state of [{getLiveGpsSnapshot:()=>({active:true})},{boatMode:{active:true},boatDeck:{active:true}},{boatMode:{active:true}},{planeMode:{active:true}},{spaceFlight:{active:true}},
   {oceanMode:{active:true}},{onMoon:true},{activePlanetaryBodyId:'mars'},{Walk:{state:{mode:'walk'}},activeInterior:{id:'room'}}]){
   const h=setup();Object.assign(h.c,state);assert.equal(canOwnRoadRace(h.c),false);const before={...h.c.car};
   const run=createPracticeRaceController({context:h.c,course:h.course,profile:h.profile});assert.throws(()=>run.start(),/changed/);assert.deepEqual(h.c.car,before);run.dispose();

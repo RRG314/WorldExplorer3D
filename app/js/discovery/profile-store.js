@@ -163,6 +163,15 @@ function validateReceipt(item, receipt) {
     || !['trusted-server', 'server-receipt'].includes(receipt.authority)) throw Object.assign(new TypeError('Receipt does not match the local discovery.'), {status:422});
 }
 
+function eventPrefixPage(prefix, {after = '', limit = 64} = {}) {
+  if (typeof prefix !== 'string' || !prefix || prefix.length > 220 || /[\u0000-\u001f\uffff]/.test(prefix)
+      || typeof after !== 'string' || after.length > 260 || (after && !after.startsWith(prefix))) {
+    throw new TypeError('Expected a stable event prefix and matching cursor');
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 64) throw new TypeError('Expected a page of 1 to 64 events');
+  return {after, limit};
+}
+
 function requestPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -665,6 +674,31 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }finally{db.close();}
   }
 
+  // Use the existing event primary key, avoiding an upgrade or a scan of
+  // unrelated Journal history. Consumers may cancel between bounded pages.
+  async function listEventsByIdPrefix(prefix, page = {}) {
+    const {after, limit} = eventPrefixPage(prefix, page);
+    const rangeType = options.IDBKeyRange || globalThis.IDBKeyRange;
+    if (!rangeType?.bound) throw new Error('IndexedDB key ranges are unavailable.');
+    const db = await open();
+    try {
+      const transaction = db.transaction(['events'], 'readonly');
+      const range = rangeType.bound(after || prefix, prefix + '\uffff', !!after, false);
+      const rows = await new Promise((resolve, reject) => {
+        const rows = [], request = transaction.objectStore('events').openCursor(range);
+        request.onerror = () => reject(request.error || new Error('Journal events could not be read.'));
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor || rows.length >= limit) { resolve(rows); return; }
+          rows.push(cursor.value);
+          if (rows.length >= limit) resolve(rows); else cursor.continue();
+        };
+      });
+      await transactionPromise(transaction);
+      return {events: rows.map(clone), nextCursor: rows.length === limit ? rows.at(-1).eventId : null};
+    } finally { db.close(); }
+  }
+
   async function listEvents(limit = 500) {
     const db = await open();
     try {
@@ -1007,6 +1041,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     listCompanions,
     listEvents,
     getEventsById,
+    listEventsByIdPrefix,
     listFieldGuide,
     listItems,
     loadRuntimeBootstrap,
@@ -1206,6 +1241,12 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async listItems(limit = 200) { return [...items.values()].sort((a,b)=>compareJournalRows('items',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async listFieldGuide(limit = 500) { return [...guide.values()].sort((a,b)=>compareJournalRows('fieldGuide',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async getEventsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable event IDs');return ids.map(id=>events.get(id)).filter(Boolean).map(clone);},
+    async listEventsByIdPrefix(prefix, page = {}) {
+      const {after, limit} = eventPrefixPage(prefix, page);
+      const rows = [...events.keys()].filter(id => id.startsWith(prefix) && (!after || id > after))
+        .sort().slice(0, limit).map(id => clone(events.get(id)));
+      return {events: rows, nextCursor: rows.length === limit ? rows.at(-1).eventId : null};
+    },
     async listEvents(limit = 500) { return [...events.values()].sort((a,b)=>compareJournalRows('events',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async loadRuntimeBootstrap() {
       return {

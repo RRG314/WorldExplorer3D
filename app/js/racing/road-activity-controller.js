@@ -5,7 +5,7 @@ import {raceGridPose} from './course-rules.js';
 
 export function canOwnRoadRace(context) {
  const control=resolveControlState(context);
- return !context.worldLoading && !context.onMoon && !context.onMars && !context.activePlanetaryBodyId &&
+ return !context.worldLoading && !context.onMoon && !context.onMars && !context.activePlanetaryBodyId && !context.getLiveGpsSnapshot?.().active &&
   control.frame==='surface' && control.controller==='drive' && control.occupancy==='driver';
 }
 // A subordinate road controller: the existing physics frame supplies dt/actions.

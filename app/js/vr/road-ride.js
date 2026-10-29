@@ -18,7 +18,7 @@ export function roadRideMessage(ride,paused){
 function worldEligible(ctx){
   const control=resolveControlState(ctx);
   return ctx.gameStarted&&isEarthWorldUsable(ctx)&&ctx.getEnv?.()==='EARTH'&&!ctx.activeInterior&&!ctx.activeShipInterior&&!ctx.showLargeMap&&!ctx.fishingGame?.open&&!ctx.blockBuildMode&&control.frame==='surface'&&
-    ['drive','walk'].includes(control.mode)&&!['water','vessel-deck'].includes(control.occupancy)&&!ctx.arSessionActive&&!ctx.getLiveGpsSnapshot?.().active;
+    ['drive','walk'].includes(control.mode)&&!['water','vessel-deck'].includes(control.occupancy)&&!ctx.arSessionActive&&!ctx.roadRaceController&&!ctx.getLiveGpsSnapshot?.().active;
 }
 function sources(ctx){
   const runtime=ctx.livingWorldRuntime,publication=ctx.worldPublication,graph=runtime?.publication?.trafficGraph;

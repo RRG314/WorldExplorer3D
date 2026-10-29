@@ -109,6 +109,7 @@ function getLeaderboardStorageKey(challengeType) {
   if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
   if (type === 'property') return LOCAL_PROPERTY_LEADERBOARD_KEY;
   if (type === 'deflock') return LOCAL_DEFLOCK_LEADERBOARD_KEY;
+  if (type === 'racing') return null;
   return LOCAL_LEADERBOARD_KEY;
 }
 
@@ -119,6 +120,7 @@ function getLeaderboardCollection(challengeType) {
   if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
   if (type === 'property') return FIREBASE_PROPERTY_COLLECTION;
   if (type === 'deflock') return FIREBASE_DEFLOCK_COLLECTION;
+  if (type === 'racing') return null;
   return FIREBASE_COLLECTION;
 }
 
@@ -205,6 +207,10 @@ function toggleTitlePanel() {
 
 function closeTitlePanel() {
   setTitlePanelOpen(false);
+}
+function openLeaderboardView(type='flower') {
+  setupFlowerChallenge();setTitlePanelOpen(true);const result=setChallengeLeaderboardView(type);
+  ui.titlePanel?.querySelector('.flowerLeaderboardTab.active')?.focus({preventScroll:true});return result;
 }
 
 function setGameHud(message, elapsedMs = null) {
@@ -571,6 +577,10 @@ function setupFlowerChallenge() {
   ui.titleExplorerTabBtn = document.getElementById('leaderboardTabExplorer');
   ui.titlePropertyTabBtn = document.getElementById('leaderboardTabProperty');
   ui.titleDeFlockTabBtn = document.getElementById('leaderboardTabDeFlock');
+  ui.titleRacingTabBtn = document.getElementById('leaderboardTabRacing');
+  ui.racingFilters = document.getElementById('racingRecordFilters');
+  ui.racingCourse = document.getElementById('racingRecordCourse');
+  ui.racingSetup = document.getElementById('racingRecordSetup');
   ui.titleHint = document.getElementById('gameLeaderboardHint');
   ui.titleBadge = document.getElementById('gameLeaderboardBadge');
   ui.titleScope = document.getElementById('gameLeaderboardScope');
@@ -583,7 +593,11 @@ function setupFlowerChallenge() {
   ui.flowerActionChallenge = document.getElementById('flowerActionChallengeBtn');
   ui.flowerActionClose = document.getElementById('flowerActionCloseBtn');
 
+  document.getElementById('leaderboardCloseBtn')?.addEventListener('click',closeTitlePanel);
+  ui.titlePanel?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeTitlePanel();}});
+
   hydratePlayerName();
+  ui.titleRacingTabBtn?.addEventListener('click',()=>void setChallengeLeaderboardView('racing'));
   updateTitleSelectedLocation();
   bindTitleLocationWatchers();
   bindFlowerActionMenu();
@@ -678,6 +692,7 @@ function getFlowerChallengeBackendStatus() {
 }
 
 Object.assign(appCtx, {
+  openLeaderboardView,
   closeFlowerChallengeTitlePanel: closeTitlePanel,
   consumePendingFlowerChallengeStart,
   getFlowerChallengeBackendStatus,

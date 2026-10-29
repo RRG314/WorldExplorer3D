@@ -1,5 +1,6 @@
 import {raceClosureContains} from '../racing/closed-course.js';
 import {createPersonalVehicleRuntime} from '../transport/personal-vehicle-runtime.js';
+import {vehicleDriverCamera} from '../transport/vehicle-camera-mount.js';
 import {personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 import {consumePlayerProvision} from '../player/provisions.js';
 import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
@@ -1703,6 +1704,7 @@ function resetPlayerVehicleVisual(state) {
   appCtx.wheelMeshes = state.defaultWheelMeshes;
   if (appCtx.carMesh?.userData) {
     delete appCtx.carMesh.userData.activeUrbanVehicleId;
+    delete appCtx.carMesh.userData.driverCameraMount;
     appCtx.carMesh.userData.vehicleStyle = state.defaultVehicleStyle;
   }
   appCtx.car.vehicleVariantId = 'sedan';
@@ -1813,6 +1815,7 @@ function mountVehicleForDriving(state, vehicle) {
   vehicle.visual.root.rotation.set(0, 0, 0);
   syncCuratedVehicleGroundPivot(vehicle.visual.root);
   appCtx.carMesh.add(vehicle.visual.root);
+  appCtx.carMesh.userData.driverCameraMount=vehicleDriverCamera(vehicle.variant);
   vehicle.attachedToPlayer = true;
   vehicle.occupied = true;
   vehicle.driver = 'player';

@@ -19,7 +19,7 @@ test('the preview uses the directed compiled lane and admits only through the ex
   const ride=f.create(plan);assert.equal(ride.admit(),true);assert.equal(f.calls.length,1);assert.equal(f.calls[0].mode,'drive');assert.equal(f.calls[0].options.maxDistance,.25);ride.dispose();
 });
 test('unmapped fallback, wrong direction/version, tunnels, narrow or missing physical support cannot become a ride',()=>{
-  for(const change of [f=>f.edge.provenance='display-fallback',f=>f.edge.sourceDirection='reverse',f=>f.feature.transportGraphRef.graphId='old',f=>f.edge.structure.terrainMode='subgrade',
+  for(const change of [f=>f.ctx.roadRaceController={snapshot:()=>({phase:'running'})},f=>f.edge.provenance='display-fallback',f=>f.edge.sourceDirection='reverse',f=>f.feature.transportGraphRef.graphId='old',f=>f.edge.structure.terrainMode='subgrade',
     f=>f.feature.width=4,f=>f.ctx.roadContactIndex.sampleAt=()=>null,f=>f.ctx.transportDetail.hasReadyCoverageAt=()=>false,f=>f.ctx.sampleFeatureSurfaceY=(_feature,_x,z)=>z*.2]){
     const f=fixture();change(f);assert.equal(inspectLocalRoadRide(f.ctx),null);assert.equal(f.calls.length,0);
   }

@@ -1,6 +1,7 @@
 import {resolveControlState} from '../transport/control-state.js';
 import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import {applyDrivingCabinCamera} from '../hud/driving-cabin-camera.js';
+import {driverCameraMount} from '../transport/vehicle-camera-mount.js';
 import {getAviationCatalogEntry} from '../transport/aviation-catalog.js?v=5';
 import {aircraftForwardVector} from '../controls/traversal-control-policy.js?v=9';
 import {SPACE_CRAFT_IDENTITY} from '../space/craft-identity.js?v=1';
@@ -32,7 +33,7 @@ export function vrMountEligibility(ctx){
   if(![pose.x,pose.y,pose.z,pose.yaw].every(Number.isFinite))return {eligible:false,reason:'Your current travel mode is still preparing.'};
   if(control.mode==='drive'&&!ctx.carMesh)return {eligible:false,reason:'Your vehicle is still preparing.'};
   if(!Number.isFinite(units)||units<=0)return {eligible:false,reason:'The current world has no physical VR scale.'};
-  return {eligible:true,control,pose,body,hiddenBody,worldUnitsPerMeter:units};
+  return {eligible:true,control,pose,body,hiddenBody,worldUnitsPerMeter:units,cameraMount:control.mode==='drive'?driverCameraMount(body):null};
 }
 export function applyVrGameMount(THREE,ctx,camera,{horizonLock=true}={}){
   const admission=vrMountEligibility(ctx);if(!admission.eligible)throw new Error(admission.reason);

@@ -459,6 +459,7 @@
       "closeFlowerChallengeTitlePanel",
       "consumePendingFlowerChallengeStart",
       "getFlowerChallengeBackendStatus",
+      "openLeaderboardView",
       "refreshFlowerLeaderboard",
       "requestFlowerChallengeFromTitle",
       "setChallengeLeaderboardView",

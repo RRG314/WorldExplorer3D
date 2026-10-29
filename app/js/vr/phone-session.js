@@ -5,6 +5,7 @@ import {createPhoneHeadTracking} from './phone-head-tracking.js';
 import {createVrGazeControls} from './gaze-controls.js';
 import {applyVrGameMount,vrMountEligibility} from './game-mount.js';
 import {roadRideMustPause,roadRideMessage} from './road-ride.js';
+import {vrRaceStatus} from './race-status.js';
 
 export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,target=window,onExit=()=>{},createStereo=createPhoneStereo,createTracking=createPhoneHeadTracking,createControls=createVrGazeControls}){
   if(ctx.vrPresentation?.active)throw new Error('A VR view is already open.');
@@ -23,7 +24,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
     const next=vrMountEligibility(ctx),layer=ctx.screenLayout?.getPanelLayer?.();
     return active&&ctx.gameStarted&&world.isCurrent()&&presentation.isCurrent()&&!ctx.worldLoading&&!ctx.titleLaunchPending&&!ctx.arSessionActive&&!ctx.getLiveGpsSnapshot?.().active&&!ctx.showLargeMap&&!ctx.fishingGame?.open&&!ctx.blockBuildMode&&
       (!started||layer===undefined||layer==='vr')&&
-      next.eligible&&next.control.mode===admission.control.mode&&next.control.occupancy===admission.control.occupancy&&next.control.frame===admission.control.frame&&next.body===originalBody&&next.hiddenBody===body&&next.worldUnitsPerMeter===units;
+      next.eligible&&next.control.mode===admission.control.mode&&next.control.occupancy===admission.control.occupancy&&next.control.frame===admission.control.frame&&next.body===originalBody&&next.hiddenBody===body&&next.worldUnitsPerMeter===units&&next.cameraMount===admission.cameraMount;
   };
   const stop=(reason='user-exit')=>{
     if(!active)return false;active=false;scope.dispose(reason);
@@ -41,6 +42,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
       if(action==='exit'){stop();return;}
       if(action==='recenter'){tracker.recenter();controls.reset();return;}
       if(action==='toggle'){
+        if(vrRaceStatus(ctx)?.resultsReady){stop('race-results');return;}
         if(userPaused&&roadRideMustPause(ride))ride.takeManual();
         userPaused=!userPaused;ctx.setPauseReason?.('vr-user',userPaused);
         if(!userPaused&&ctx.hasPauseReason?.('manual_pause')){ctx.setPauseReason('manual_pause',false);target.document.getElementById('pauseScreen')?.classList.remove('show');}
@@ -64,7 +66,8 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
       applyVrGameMount(THREE,ctx,mount);mountPosition.copy(mount.position);mountQuaternion.copy(mount.quaternion);
       const camera=presentation.camera;camera.position.copy(mount.position);camera.quaternion.copy(mount.quaternion).multiply(head);camera.updateMatrixWorld(true);
       if(body)body.visible=false;
-      controls.update({mountPosition,mountQuaternion,camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:roadRideMessage(ride,ctx.paused)});return true;
+      const race=vrRaceStatus(ctx);
+      controls.update({mountPosition,mountQuaternion,camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:race?.message||roadRideMessage(ride,ctx.paused),primaryLabel:race?.primaryLabel});return true;
     },
     render(){if(!api.guard())return false;stereo.render(presentation.scene,presentation.camera);return true;},
     async start(){
@@ -77,7 +80,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
       presentation.renderer.domElement.classList.add('vrMainCanvas');scope.defer(()=>presentation.renderer.domElement.classList.remove('vrMainCanvas'));
       return true;
     },
-    snapshot:()=>({active,started,tracking,userPaused,kind:'phone',frame:admission.control.frame,worldUnitsPerMeter:units,stereo:stereo.snapshot(),sensor:tracker.snapshot(),ride:ride?.snapshot()||null})
+    snapshot:()=>({active,started,tracking,userPaused,kind:'phone',frame:admission.control.frame,drivingView:admission.cameraMount?.kind||null,worldUnitsPerMeter:units,stereo:stereo.snapshot(),sensor:tracker.snapshot(),ride:ride?.snapshot()||null})
   };
   scope.listen(world.signal,'abort',()=>stop('environment-changed'));
   scope.listen(target,'keydown',event=>{if(started&&event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();stop('escape');}},{capture:true});

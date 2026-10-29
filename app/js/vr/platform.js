@@ -5,6 +5,7 @@ import {parseCardboardViewerUrl,validatePhoneOptics} from './phone-optics.js';
 import {getScreenLayoutService} from '../ui/screen-layout.js?v=3';
 import {createTrackedVrSession} from './xr-session.js';
 import {inspectLocalRoadRide,createLocalRoadRide} from './road-ride.js';
+import {vrMountEligibility} from './game-mount.js';
 
 const STORAGE='we3d:vr-phone-optics:1';
 export function createVrPlatform(ctx,{target=window}={}){
@@ -13,7 +14,7 @@ export function createVrPlatform(ctx,{target=window}={}){
   let session=null,ride=null,previewRide=null,disposed=false;
   const dialog=doc.createElement('dialog');dialog.id='vrSetup';dialog.setAttribute('aria-labelledby','vrSetupTitle');
   dialog.innerHTML=`<form method="dialog"><button type="submit" class="vrClose" aria-label="Close VR setup">✕</button></form><p class="vrEyebrow">Optional · seated experience</p><h2 id="vrSetupTitle">Virtual reality</h2>
-    <p>Stay seated in a clear space. Start with a stationary view. Look slightly down at the in-world Start, Recenter and Exit buttons for a moment to select them. You can also tap a viewer trigger while looking at a button.</p>
+    <p>Stay seated in a clear space. Start with a stationary view. Look slightly down at the in-world Start, Recenter and Exit buttons for a moment to select them. You can also tap a viewer trigger while looking at a button.</p><p id="vrDrivingView" class="vrSmall" hidden></p>
     <section aria-labelledby="vrRoadRideTitle"><h3 id="vrRoadRideTitle">Optional guided road ride</h3><p>A short ride follows an existing lane in this loaded location and stops before its next junction. Preparation moves your car to the start. Look at Start inside VR to begin; steering or using a pedal returns to manual driving.</p><p id="vrRidePreview" class="vrSmall"></p><button id="vrPrepareRide" type="button" disabled>Prepare road ride</button><p id="vrRideStatus" role="status"></p></section>
     <section aria-labelledby="vrTrackedTitle"><h3 id="vrTrackedTitle">Tracked headset</h3><p>Use a headset browser with WebXR support. Head movement changes your view independently of the vehicle. You can select the in-world controls with a controller or pinch where supported.</p><p>With standard paired XR controllers: the left stick steers a car; the right trigger accelerates and the left trigger brakes. For aircraft, the left stick banks, the right stick pitches and the triggers change throttle. In Ocean, the left stick moves and turns; the right stick controls depth. In spacecraft flight, the left stick turns, the right stick pitches and the right/left triggers thrust/brake. Release the controls before starting.</p><button id="vrStartTracked" type="button" disabled>Enter headset VR</button><p id="vrTrackedStatus" class="vrSmall" role="status">Checking headset support…</p></section>
     <h3>Phone in a viewer</h3><p>Phone viewer mode provides stereo viewing and head rotation. It does not track your position. A gamepad or keyboard controls movement; looking around does not steer. Walking, cars, aircraft, Ocean exploration and spacecraft free flight have their own views. Finish launch or landing before entering spacecraft VR.</p>
@@ -59,7 +60,7 @@ export function createVrPlatform(ctx,{target=window}={}){
   });
   function exitHandler(initiated,reason){
     if(disposed||session!==initiated)return;emergency.hidden=true;
-    if(!['user-exit','touch-exit','escape','session-ended'].includes(reason))ctx.showToast?.(reason==='motion-unavailable'?'Motion access is unavailable. Your normal controls are ready.':'VR ended because the view or travel mode changed. Your normal controls are ready.');
+    if(!['user-exit','touch-exit','escape','session-ended','race-results','racing-menu'].includes(reason))ctx.showToast?.(reason==='motion-unavailable'?'Motion access is unavailable. Your normal controls are ready.':'VR ended because the view or travel mode changed. Your normal controls are ready.');
   }
   function begin(initiated,button,onAccepted){
     session=initiated;button.disabled=true;
@@ -103,6 +104,7 @@ export function createVrPlatform(ctx,{target=window}={}){
       if(layer&&layer!=='vr-setup'&&layer!=='controls'){ctx.showToast?.('Close the current panel before opening VR setup.');return false;}
       ctx.setPauseReason?.('vr-setup',true);ctx.screenLayout?.setPanelLayer?.('vr-setup',true);dialog.showModal();status(stored?'Check the saved calibration if your phone, viewer or orientation has changed.':'Measure your screen and match your viewer before entering.');
       ride?.dispose();ride=null;previewRide=inspectLocalRoadRide(ctx);byId('vrPrepareRide').textContent='Prepare road ride';byId('vrPrepareRide').disabled=!previewRide;byId('vrRideStatus').textContent='';byId('vrRidePreview').textContent=previewRide?previewRide.name+' · about '+Math.round(previewRide.length*previewRide.metersPerWorldUnit)+' metres.':'A suitable road ride is not available here. Manual viewing and driving remain available.';
+      const mount=vrMountEligibility(ctx).cameraMount;byId('vrDrivingView').hidden=!mount;byId('vrDrivingView').textContent=mount?.kind==='raised'?'This car uses a raised driving view. Its interior has no prepared camera position.':'This car uses its prepared cabin view.';
       const supported=target.isSecureContext&&target.navigator?.xr?.isSessionSupported?.('immersive-vr');
       void Promise.resolve(supported).then(available=>{if(disposed)return;byId('vrStartTracked').disabled=!available;byId('vrTrackedStatus').textContent=available?'Headset VR is available. Your browser will ask before entering.':'No tracked headset is available in this browser. Phone viewer mode is separate.';}).catch(()=>{if(!disposed)byId('vrTrackedStatus').textContent='Headset support could not be checked. Normal play and phone viewer mode remain available.';});return true;
     },

@@ -65,3 +65,16 @@ test('roof clearance preserves requested orbit heading and avoids a vertical cha
     assert.equal(point.y,roof.y);
   }
 });
+
+test('fleet driving views follow the prepared body envelope while the BMW keeps its authored cabin',async()=>{
+ const T=await import('three'),{applyDrivingCabinCamera}=await import('../app/js/hud/driving-cabin-camera.js'),{driverCameraMount,vehicleDriverCamera,BMW_DRIVER_CAMERA}=await import('../app/js/transport/vehicle-camera-mount.js');
+ const {VEHICLE_CATALOG,VEHICLE_ROOT_TO_GROUND_METERS}=await import('../app/js/engine/vehicle-catalog.js');
+ const body=new T.Group(),camera=new T.PerspectiveCamera();assert.equal(driverCameraMount(body),BMW_DRIVER_CAMERA);
+ for(const id of ['delorean','cadillac_coupe','cadillac_fleetwood','pickup','city_bus']){
+  const variant=VEHICLE_CATALOG.find(v=>v.id===id),mount=vehicleDriverCamera(variant);body.userData.driverCameraMount=mount;body.position.set(12,VEHICLE_ROOT_TO_GROUND_METERS,-8);body.rotation.y=.7;
+  const before=body.position.clone();applyDrivingCabinCamera(T,camera,body);const expected=body.localToWorld(new T.Vector3(mount.eye.x,mount.eye.y,mount.eye.z));
+  assert.ok(camera.position.distanceTo(expected)<1e-9);assert.ok(camera.position.y>variant.height);assert.deepEqual(body.position,before);assert.equal(mount.kind,'raised');assert.ok(Object.isFrozen(mount.eye));
+ }
+ delete body.userData.driverCameraMount;applyDrivingCabinCamera(T,camera,body);assert.equal(driverCameraMount(body),BMW_DRIVER_CAMERA);
+ assert.throws(()=>vehicleDriverCamera({height:NaN,length:4}),/envelope/);
+});

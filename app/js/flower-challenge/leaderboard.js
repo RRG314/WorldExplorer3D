@@ -42,6 +42,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   function getLeaderboardStorageKey(challengeType) {
     const type = normalizeChallengeType(challengeType);
+    if (type === 'racing') return null;
     if (type === 'painttown') return LOCAL_PAINT_LEADERBOARD_KEY;
     if (type === 'fishing') return LOCAL_FISHING_LEADERBOARD_KEY;
     if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
@@ -52,6 +53,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   function getLeaderboardCollection(challengeType) {
     const type = normalizeChallengeType(challengeType);
+    if (type === 'racing') return null;
     if (type === 'painttown') return FIREBASE_PAINT_COLLECTION;
     if (type === 'fishing') return FIREBASE_FISHING_COLLECTION;
     if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
@@ -183,6 +185,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   async function readRemoteLeaderboard(challengeType = 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
+    if (normalizedType === 'racing') return null;
     const ready = await ensureFirebase();
     if (!ready || !challengeState.firebase) return null;
 
@@ -211,6 +214,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   async function writeRemoteLeaderboard(challengeType, entry) {
     const normalizedType = normalizeChallengeType(challengeType);
+    if (normalizedType === 'racing') return false;
     const ready = await ensureFirebase();
     if (!ready || !challengeState.firebase) return false;
 
@@ -301,18 +305,24 @@ function createFlowerChallengeLeaderboardApi(context) {
     }
   }
 
-  let refreshSequence = 0;
+  let refreshSequence = 0,racingView=null;
   async function refreshFlowerLeaderboard(challengeType = challengeState.leaderboardView || 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
     const definition = getLeaderboardDefinition(normalizedType);
     const sequence = ++refreshSequence;
+    racingView?.clear();
     challengeState.leaderboardView = normalizedType;
+    if(ui.titlePanel)ui.titlePanel.dataset.leaderboardView=normalizedType;
     if (ui.titleFlowerTabBtn) ui.titleFlowerTabBtn.classList.toggle('active', normalizedType === 'flower');
     if (ui.titlePaintTabBtn) ui.titlePaintTabBtn.classList.toggle('active', normalizedType === 'painttown');
     if (ui.titleFishingTabBtn) ui.titleFishingTabBtn.classList.toggle('active', normalizedType === 'fishing');
     if (ui.titleExplorerTabBtn) ui.titleExplorerTabBtn.classList.toggle('active', normalizedType === 'explorer');
     if (ui.titlePropertyTabBtn) ui.titlePropertyTabBtn.classList.toggle('active', normalizedType === 'property');
     if (ui.titleDeFlockTabBtn) ui.titleDeFlockTabBtn.classList.toggle('active', normalizedType === 'deflock');
+    if (ui.titleRacingTabBtn) ui.titleRacingTabBtn.classList.toggle('active', normalizedType === 'racing');
+    if(ui.titlePanel?.classList.contains('open'))ui.titlePanel.querySelector('.flowerLeaderboardTab.active')?.scrollIntoView({block:'nearest',inline:'nearest'});
+    if (ui.racingFilters) ui.racingFilters.hidden=normalizedType!=='racing';
+    if (ui.titleNameInput) ui.titleNameInput.hidden=normalizedType==='racing';
     if (ui.titleStartBtn) {
       const flowerView = normalizedType === 'flower';
       ui.titleStartBtn.style.display = flowerView ? '' : 'none';
@@ -327,6 +337,21 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (ui.status) {
       ui.status.textContent = `Loading ${definition.label}…`;
       ui.status.classList.remove('error', 'ok');
+    }
+    if(normalizedType==='racing'){
+      renderLeaderboard([]);
+      if(ui.titleHint)ui.titleHint.textContent=definition.resultDisclosure;
+      const owner=getSignedInUser?.()?.uid||'',current=()=>sequence===refreshSequence&&(getSignedInUser?.()?.uid||'')===owner;
+      try{
+        const {createRacingTimesView}=await import('../racing/leaderboard.js');
+        if(!current())return null;
+        racingView ||= createRacingTimesView({appCtx,ui,getSignedInUser,limit:LEADERBOARD_LIMIT});
+        const result=await racingView.read(current);
+        if(!current()||!result)return null;
+        racingView.render(result);if(ui.status)ui.status.dataset.backend='Racing: Journal on this device';
+        return result.entries;
+      }catch{if(current()){racingView?.clear();if(ui.status)ui.status.textContent='Your saved racing times could not be read. Your Journal and garage are kept. Try Refresh.';}return null;}
+      finally{if(current()&&ui.titleRefreshBtn){ui.titleRefreshBtn.disabled=false;ui.titleRefreshBtn.removeAttribute('aria-busy');}}
     }
     const localEntries = normalizedType === 'explorer' || normalizedType === 'property'
       ? []
@@ -378,6 +403,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   function storeLocalResult(challengeType, entry) {
     const normalizedType = normalizeChallengeType(challengeType);
+    if (normalizedType === 'racing') return false;
     const current = readLocalLeaderboard(normalizedType);
     current.push(entry);
     writeLocalLeaderboard(
