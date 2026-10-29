@@ -1705,6 +1705,7 @@ function resetPlayerVehicleVisual(state) {
   if (appCtx.carMesh?.userData) {
     delete appCtx.carMesh.userData.activeUrbanVehicleId;
     delete appCtx.carMesh.userData.driverCameraMount;
+    delete appCtx.carMesh.userData.mountedVehicleVisualHost;
     appCtx.carMesh.userData.vehicleStyle = state.defaultVehicleStyle;
   }
   appCtx.car.vehicleVariantId = 'sedan';
@@ -1815,6 +1816,7 @@ function mountVehicleForDriving(state, vehicle) {
   vehicle.visual.root.rotation.set(0, 0, 0);
   syncCuratedVehicleGroundPivot(vehicle.visual.root);
   appCtx.carMesh.add(vehicle.visual.root);
+  appCtx.carMesh.userData.mountedVehicleVisualHost = vehicle.visual.root;
   appCtx.carMesh.userData.driverCameraMount=vehicleDriverCamera(vehicle.variant);
   vehicle.attachedToPlayer = true;
   vehicle.occupied = true;
