@@ -2203,6 +2203,21 @@ function racingReadHandler(operation){return functions.region('us-central1').run
 });}
 exports.getRacingService=racingReadHandler(async()=>require('./racing-api').racingServiceDescriptor(db));
 exports.getRacingRecords=racingReadHandler(async(uid,input)=>require('./racing-api').readRacingRecords({db,uid,boardId:input?.boardId,cursor:input?.cursor}));
+exports.getRacingCatalog=racingReadHandler(async(uid,input)=>require('./racing-publication').readRacingCatalog({db,uid,locationId:input?.locationId,cursor:input?.cursor}));
+exports.getMyRacingRoutes=racingReadHandler(async(uid)=>require('./racing-publication').readMyRacingRoutes({db,uid}));
+exports.commitRacingRoute=racingReadHandler(async(uid,input)=>{
+ if(Buffer.byteLength(JSON.stringify(input||{}))>128*1024)throw Object.assign(Error('race_route_too_large'),{status:413});
+ return require('./racing-publication').writeRacingRoute({db,admin,uid,input});
+});
+exports.reviewRacingRoutes=functions.region('us-central1').runWith({invoker:'public'}).https.onRequest(async(req,res)=>{
+ if(setCors(req,res))return;if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+ if(!await verifyAppCheck(req,res))return;const moderator=await requireModerator(req,res);if(!moderator)return;
+ res.set('Cache-Control','no-store');
+ try{const api=require('./racing-publication'),input=req.body||{};
+  const result=input.action==='list'?await api.listRacingReview({db,status:input.status,cursor:input.cursor}):await api.moderateRacingRoute({db,admin,moderatorUid:moderator.auth.uid,input});
+  return res.status(200).json(result);
+ }catch(error){return res.status(error.status||500).json({error:error.status?error.message:'Racing review could not be saved. Try again.'});}
+});
 
 exports.saveExplorerPlayerCondition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;

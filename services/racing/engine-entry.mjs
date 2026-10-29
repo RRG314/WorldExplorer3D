@@ -7,3 +7,5 @@ export {buildRaceRoadGraph,createRaceCourse,raceGridPose} from '../../app/js/rac
 export {raceCourseKey,raceDistrictFingerprint,restoreRaceCourse} from '../../app/js/racing/course-library.js';
 export {normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById} from '../../app/js/transport/vehicle-garage-rules.js';
 export {prepareExplorerCreditAward} from '../../functions/economy-authority.js';
+export {canonicalRaceDistrict,reconstructPublishedRace,rebaseRaceReference,assertRaceCourseInDistrict,racePublicationIdentity,readPublishedRaceCourse} from '../../app/js/racing/publication-rules.js';
+export {normalizeRaceRouteReference,raceCourseReference} from '../../app/js/racing/course-library.js';

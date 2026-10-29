@@ -52,7 +52,7 @@ The starter BMW first acquires its ordinary room lease through the existing pers
 Ordinary vehicle updates yield until the reservation releases or expires.
 
 The service reconstructs each approved course from a server-owned district and
-route reference. It never trusts client road geometry, poses, clocks, finish
+route reference. Private creator drafts are owner-only solo qualification; approved time trials also allow one driver. Competition still requires two humans. Publication revision/status and the active district are rechecked during admission, renewal and settlement. Private tests mint only a test receipt, not Credits, wins or public times. See [course publication](../../docs/racing-rnd/COURSE_PUBLICATION.md). It never trusts client road geometry, poses, clocks, finish
 claims, prices or car upgrades. Ordered controls drive the shared simulation.
 Car contact and boosts are off. Inputs older than 400 ms brake; a stale browser stops predicting, open-but-silent connections reconnect, and the server bounds dead peers with ping/pong on its existing service clock. Lobbies publish once per second; active races publish at twenty Hz. Disconnects have
 a ten-second grace. A departing host does not own or reset the race clock.

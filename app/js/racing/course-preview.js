@@ -10,8 +10,9 @@ export function raceDisciplineLabel(discipline) {
 export function createRaceRouteMap({roads=[],course,locationLabel='',creatorSegments=[],creatorPoints=[],onPoint}={}) {
  const points=roads.flatMap(road=>[road.a,road.b]);
  if(!points.length)return null;
- const minX=Math.min(...points.map(p=>p.x))-12,minZ=Math.min(...points.map(p=>p.z))-12,
-  width=Math.max(...points.map(p=>p.x))-minX+12,height=Math.max(...points.map(p=>p.z))-minZ+12;
+ // Leave space for the full start/finish labels at the edge of a route.
+ const padding=48,minX=Math.min(...points.map(p=>p.x))-padding,minZ=Math.min(...points.map(p=>p.z))-padding,
+  width=Math.max(...points.map(p=>p.x))-minX+padding,height=Math.max(...points.map(p=>p.z))-minZ+padding;
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
  svg.setAttribute('viewBox',`${minX} ${minZ} ${width} ${height}`);svg.setAttribute('role','img');
  svg.setAttribute('aria-label',`${locationLabel} roads${course?` · ${raceCourseDisplayName(course)}`:''}. Start and finish are marked.`);

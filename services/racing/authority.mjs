@@ -25,7 +25,7 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
  function broadcast(race,payload){for(const uid of race.roster.keys())send(connections.get(uid),payload);}
  function envelope(race){return {...(race.finalSnapshot||race.session.snapshot()),courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION,
   profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),
-  settlement:race.settlement,receipt:race.receipt||null};}
+  purpose:race.course.publication?.purpose||'competition',settlement:race.settlement,receipt:race.receipt||null};}
  function detach(client){if(connections.get(client.uid)!==client)return;connections.delete(client.uid);const race=client.race;
   if(race&&race.roster.has(client.uid))race.session.disconnect(client.uid,now());}
  async function join(client,command) {
@@ -41,7 +41,7 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
   if(race&&(race.courseId!==command.courseId||race.worldSeed!==command.worldSeed))throw Error('race_room_course_locked');
   if(!race){
    if(races.size>=maximumRaces)throw Error('race_service_full');
-   const course=await store.course(command.courseId);if(!course||await raceCourseKey(course)!==command.courseId)throw Error('race_course_unavailable');
+   const course=await store.course(command.courseId,client.uid);if(!course||await raceCourseKey(course)!==command.courseId)throw Error('race_course_unavailable');
    race={id:randomUUID(),roomCode:command.roomCode,worldSeed:command.worldSeed,courseId:command.courseId,course,
     roster:new Map(),session:null,settlement:'pending',leaseUntil:0,lastRenew:-Infinity,lastBroadcast:0,renewing:false,settling:false};
    created=true;
@@ -79,7 +79,8 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
   if(v.type==='start'){
    const state=race.session.snapshot();if(state.phase!=='lobby')throw Error('race_roster_locked');if(state.leaderUid!==client.uid)throw Error('race_leader_required');
    if(state.players.some(p=>!p.ready||p.disconnected))throw Error('race_not_ready');
-   if(race.roster.size<2)throw Error('race_needs_two_players');
+   const minimum=race.course.publication?.purpose==='qualification'||race.course.discipline==='time-trial'?1:2;
+   if(race.roster.size<minimum)throw Error('race_needs_two_players');
    if(race.starting)throw Error('race_roster_locked');race.starting=true;
    try{await store.renew({race,instanceId,nowMs:now(),starting:true});race.session.start(client.uid,now());}
    finally{race.starting=false;}

@@ -14,6 +14,14 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
  const room=code=>db.collection('rooms').doc(code);
  const lock=race=>room(race.roomCode).collection('racing').doc('current');
  const entity=(race,uid,id)=>room(race.roomCode).collection('urbanEntities').doc(entityKey(entityId(uid,id)));
+ async function requirePublication(tx,race,uid){
+  const p=race.course.publication;if(!p)return; // Injected controlled-course adapter only.
+  if(p.purpose==='qualification'&&uid&&uid!==p.ownerUid)fail('race_route_owner_required');
+  const [r,d,l]=await Promise.all([tx.get(db.collection('racingCourses').doc(race.courseId)),tx.get(db.collection('racingDistricts').doc(p.districtId)),
+   tx.get(db.collection('racingLocations').doc(digest(String(race.course.locationId))))]);
+  const current=value(r);
+  if(current?.revision!==p.revision||current.status!==p.status||value(d)?.status!=='approved'||value(l)?.districtId!==p.districtId)fail('race_course_changed');
+ }
  function requireSeat(race,uid,roomData,player,consent,nowMs){
   if(!roomData||roomData.world?.kind!=='earth'||roomData.world?.seed!==race.worldSeed)fail('race_room_world_changed');
   if(!player||player.uid!==uid||time(player.expiresAt)<=nowMs||time(player.lastSeenAt)>nowMs+5000||nowMs-time(player.lastSeenAt)>120000)fail('race_room_presence_expired');
@@ -30,6 +38,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    const [rs,ps,cs,ls,gs,es]=await Promise.all([tx.get(r),tx.get(r.collection('players').doc(uid)),tx.get(u.collection('consents').doc('community')),
     tx.get(lock(race)),tx.get(u.collection('gameplay').doc('vehicleUpgrades')),tx.get(carRef)]);
    const currentLock=value(ls),player=value(ps),car=value(es),progress=value(gs)||{};
+   await requirePublication(tx,race,uid);
    requireSeat(race,uid,value(rs),player,value(cs),nowMs);
    if(currentLock&&time(currentLock.expiresAt)>nowMs&&(currentLock.id!==race.id||currentLock.instanceId!==instanceId))fail('race_room_busy');
    // Blocking is symmetric, including private rooms. Reads precede all writes.
@@ -63,6 +72,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
  async function renew({race,instanceId,nowMs,starting=false}){
   return db.runTransaction(async tx=>{
    const r=room(race.roomCode),[rs,ls]=await Promise.all([tx.get(r),tx.get(lock(race))]);requireLock(value(ls),race,instanceId,nowMs);
+   await requirePublication(tx,race);
    const rows=[];
    for(const [uid,p]of race.roster){
     if(p.released)continue;
@@ -98,11 +108,23 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
   await db.runTransaction(async tx=>{const ref=lock(race),current=value(await tx.get(ref));if(current?.id===race.id&&current.instanceId===instanceId)tx.update(ref,{expiresAt:ts(nowMs)});});
  }
  async function settle({race,snapshot,instanceId,nowMs}){
-  if(snapshot.id!==race.id||snapshot.phase!=='complete'||snapshot.players.length<2||snapshot.players.some(p=>p.ai))fail('race_result_unverified');
+  const purpose=race.course.publication?.purpose||(race.course.discipline==='time-trial'?'time-trial':'competition'),qualification=purpose==='qualification';
+  if(snapshot.id!==race.id||snapshot.phase!=='complete'||snapshot.players.length<(purpose==='competition'?2:1)||snapshot.players.some(p=>p.ai)||
+   qualification&&(snapshot.players.length!==1||snapshot.players[0].uid!==race.course.publication.ownerUid))fail('race_result_unverified');
   const resultRef=db.collection('racingResults').doc(race.id),fingerprint=digest({snapshot,courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION});
   return db.runTransaction(async tx=>{
    const saved=value(await tx.get(resultRef));if(saved){if(saved.fingerprint!==fingerprint)fail('race_result_conflict');return saved.receipt;}
    requireLock(value(await tx.get(lock(race))),race,instanceId,nowMs);
+   await requirePublication(tx,race);
+   if(qualification){
+    const p=snapshot.players[0],finished=!!p.progress?.finished&&!p.dnf&&Number.isFinite(p.progress.elapsedMs)&&p.progress.elapsedMs>0;
+    const receipt={id:race.id,purpose,courseId:race.courseId,courseRevision:race.course.publication.revision,physicsVersion:RACE_PHYSICS_VERSION,
+     players:[{uid:p.uid,finished,timeMs:finished?p.progress.elapsedMs:null,credits:0}]};
+    if(finished)tx.update(db.collection('racingCourses').doc(race.courseId),{qualification:{resultId:race.id,revision:race.course.publication.revision,physicsVersion:RACE_PHYSICS_VERSION,timeMs:p.progress.elapsedMs,completedAt:ts(nowMs)}});
+    tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
+     profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),physicsVersion:RACE_PHYSICS_VERSION,createdAt:ts(nowMs)});
+    return receipt;
+   }
    const rows=[],dayKey=new Date(nowMs).toISOString().slice(0,10),finishers=snapshot.players.filter(p=>!p.dnf&&p.progress?.finished).length;
    for(const p of snapshot.players){
     const profile=race.roster.get(p.uid).profile,configuration=raceCompetitiveRecordConfiguration(profile,{slot:p.slot,participants:race.course.participants}),boardId=digest({courseId:race.courseId,...configuration});
@@ -110,7 +132,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
     const walletRef=user(p.uid).collection('economy').doc('wallet');
     const [previous,progress,wallet]=await Promise.all([tx.get(entry),tx.get(career),tx.get(walletRef)]);rows.push({p,configuration,boardId,board,entry,career,walletRef,wallet:value(wallet)||{},previous:value(previous),progress:value(progress)||{}});
    }
-   const receipt={id:race.id,courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION,players:[]};
+   const receipt={id:race.id,purpose,courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION,players:[]};
    for(const row of rows){const {p,configuration,boardId,board,entry,career,previous,progress}=row;
     const finished=p.progress?.finished&&!p.dnf,eligible=finished&&Number.isFinite(p.progress.elapsedMs)&&p.progress.elapsedMs>0;
     let credits=0;
@@ -125,23 +147,23 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
      }
      tx.set(board,{courseId:race.courseId,courseName:race.course.name,configuration,updatedAt:ts(nowMs)},{merge:true});
      const rewarded=progress.dayKey===dayKey?Number(progress.rewardedFinishes)||0:0;
-     if(finishers>=2&&rewarded<3){const next=prepareExplorerCreditAward(row.wallet,{amount:p.position===1?250:150,nowMs,timestampFromMs:ts});
+     if(purpose==='competition'&&finishers>=2&&rewarded<3){const next=prepareExplorerCreditAward(row.wallet,{amount:p.position===1?250:150,nowMs,timestampFromMs:ts});
       credits=next.credits-prepareExplorerCreditAward(row.wallet,{amount:0,nowMs,timestampFromMs:ts}).credits;tx.set(row.walletRef,next);}
      // One immutable receipt atomically owns rankings, reputation and the
      // existing Explorer wallet credit. At most three paid finishes per day.
-     tx.set(career,{...progress,finishes:(progress.finishes||0)+1,wins:(progress.wins||0)+(p.position===1?1:0),
+     tx.set(career,{...progress,finishes:(progress.finishes||0)+1,wins:(progress.wins||0)+(purpose==='competition'&&p.position===1?1:0),
       cleanFinishes:(progress.cleanFinishes||0)+(!p.barrierContacts&&!p.progress.penaltyMs?1:0),dayKey,rewardedFinishes:rewarded+(credits>0?1:0),
       lastResultId:race.id,updatedAt:ts(nowMs)});
     }
     receipt.players.push({uid:p.uid,boardId,finished:eligible,timeMs:eligible?p.progress.elapsedMs:null,credits});
    }
-   tx.create(resultRef,{fingerprint,receipt,snapshot,courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
+   tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
     profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),physicsVersion:RACE_PHYSICS_VERSION,createdAt:ts(nowMs)});
    return receipt;
   });
  }
  async function result(id,uid){const saved=value(await db.collection('racingResults').doc(id).get());if(!saved?.snapshot?.players.some(p=>p.uid===uid))return null;
-  const course=await loadCourse(saved.courseId);if(!course)return null;
+  const course=saved.course||await loadCourse(saved.courseId,uid);if(!course)return null;
   return {...saved,course,snapshot:{...saved.snapshot,profiles:saved.profiles,courseId:saved.courseId,physicsVersion:saved.physicsVersion,settlement:'saved',receipt:saved.receipt}};
  }
  return {course:loadCourse,admit,renew,release,releaseParticipant,settle,result};
