@@ -1,4 +1,4 @@
-import {createRaceProgress,advanceRaceProgress,raceGridPose}from'./course-rules.js';
+import {createRaceProgress,advanceRaceProgress,raceGridPose,prepareRaceCourseGeometry}from'./course-rules.js';
 import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle}from'./vehicle-controller.js';
 import {raceAiActions}from'./ai-controller.js';
 import {raceMaximumDurationMs} from './session-limits.js';
@@ -20,7 +20,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
  const allowedDurationMs=raceMaximumDurationMs(course);
  maximumDurationMs??=allowedDurationMs;
  if(!Number.isFinite(maximumDurationMs)||maximumDurationMs<=0||maximumDurationMs>allowedDurationMs)throw Error('invalid_race_duration');
- course=structuredClone(course);
+ course=prepareRaceCourseGeometry(structuredClone(course));
  const players=new Map();let phase='lobby',leaderUid=creatorUid,startAtMs=null,tick=0,lastNow=createdAtMs,completedAtMs=null,reason='',outcomeEmitted=false;
  const activeHumans=()=>[...players.values()].filter(p=>!p.ai&&!p.left);
  function participant(uid){const p=players.get(uid);if(!p)throw Error('race_not_joined');return p;}

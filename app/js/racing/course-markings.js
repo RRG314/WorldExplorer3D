@@ -1,10 +1,10 @@
-import {sampleRaceSegmentY} from './course-rules.js';
+import {sampleRaceSegmentY,raceSegmentAtDistance} from './course-rules.js';
 
 // Original race paint, derived from the qualified deck. It adds presentation
 // only: no parallel road mesh, collider, height authority or per-frame work.
 export function raceCourseSurfacePoint(course,distanceMeters,lateralMeters=0,liftMeters=0) {
  const distance=Math.max(0,Math.min(course.lengthMeters,distanceMeters));
- const segment=course.segments.find(s=>s.startMeters+s.lengthMeters>=distance)||course.segments.at(-1);
+ const segment=raceSegmentAtDistance(course,distance);
  const t=(distance-segment.startMeters)/segment.lengthMeters,forward=segment.forward,unit=course.metersPerUnit;
  return {x:segment.a.x+(segment.b.x-segment.a.x)*t+forward.z*lateralMeters/unit,
   y:sampleRaceSegmentY(segment,t,lateralMeters)+liftMeters/unit,

@@ -1,12 +1,12 @@
 import {earthDrivingSteeringProfile}from'../controls/traversal-control-policy.js?v=9';
 import {carSpeedToMph}from'../physics/vehicle-speed-units.js?v=2';
-import {projectRacePosition,sampleRaceSegmentY}from'./course-rules.js';
+import {projectRacePosition,sampleRaceSegmentY,raceSegmentAtDistance}from'./course-rules.js';
 import {raceVehicleGroundPose,raceVehicleSpeedMetersPerSecond}from'./vehicle-controller.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const wrap=v=>Math.atan2(Math.sin(v),Math.cos(v));
 export function pointOnRaceCourse(course,distanceMeters){
  const distance=course.discipline==='circuit'?((distanceMeters%course.lengthMeters)+course.lengthMeters)%course.lengthMeters:clamp(distanceMeters,0,course.lengthMeters);
- const segment=course.segments.find(s=>s.startMeters+s.lengthMeters>=distance)||course.segments.at(-1),t=clamp((distance-segment.startMeters)/segment.lengthMeters,0,1);
+ const segment=raceSegmentAtDistance(course,distance),t=clamp((distance-segment.startMeters)/segment.lengthMeters,0,1);
  return {x:segment.a.x+(segment.b.x-segment.a.x)*t,y:sampleRaceSegmentY(segment,t),z:segment.a.z+(segment.b.z-segment.a.z)*t,segment};
 }
 

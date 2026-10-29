@@ -1104,6 +1104,63 @@ var direction = (a, b) => {
   return { x: (b.x - a.x) / n, z: (b.z - a.z) / n };
 };
 var clean = (s) => String(s || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 80);
+var spatialIndexes = /* @__PURE__ */ new WeakMap();
+function prepareRaceCourseGeometry(course) {
+  for (const segment of course.segments) {
+    Object.freeze(segment.a);
+    Object.freeze(segment.b);
+    Object.freeze(segment.forward);
+    if (segment.heightSamples) {
+      segment.heightSamples.forEach(Object.freeze);
+      Object.freeze(segment.heightSamples);
+    }
+    Object.freeze(segment);
+  }
+  Object.freeze(course.segments);
+  return course;
+}
+function raceSpatialIndex(segments) {
+  if (segments.length < 32 || !Object.isFrozen(segments)) return null;
+  let tree = spatialIndexes.get(segments);
+  if (tree) return tree;
+  if (segments.some((s) => !Object.isFrozen(s) || !Object.isFrozen(s.a) || !Object.isFrozen(s.b))) return null;
+  function build(indices) {
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, minMeters = Infinity, maxMeters = -Infinity;
+    for (const index of indices) {
+      const s = segments[index];
+      minX = Math.min(minX, s.a.x, s.b.x);
+      minZ = Math.min(minZ, s.a.z, s.b.z);
+      maxX = Math.max(maxX, s.a.x, s.b.x);
+      maxZ = Math.max(maxZ, s.a.z, s.b.z);
+      minMeters = Math.min(minMeters, s.startMeters);
+      maxMeters = Math.max(maxMeters, s.startMeters + s.lengthMeters);
+    }
+    const node = { minX, minZ, maxX, maxZ, minMeters, maxMeters };
+    if (indices.length <= 6) {
+      node.indices = indices.sort((a, b) => a - b);
+      return node;
+    }
+    const axis = maxX - minX >= maxZ - minZ ? "x" : "z";
+    indices.sort((a, b) => segments[a].a[axis] + segments[a].b[axis] - segments[b].a[axis] - segments[b].b[axis] || a - b);
+    const middle = indices.length >> 1;
+    node.left = build(indices.slice(0, middle));
+    node.right = build(indices.slice(middle));
+    return node;
+  }
+  tree = build(segments.map((_, index) => index));
+  spatialIndexes.set(segments, tree);
+  return tree;
+}
+function raceSegmentAtDistance(course, distanceMeters) {
+  const segments = course.segments;
+  let low = 0, high = segments.length - 1;
+  while (low < high) {
+    const middle = low + high >> 1, s = segments[middle];
+    if (s.startMeters + s.lengthMeters >= distanceMeters) high = middle;
+    else low = middle + 1;
+  }
+  return segments[low];
+}
 function sampleRaceSegmentY(segment, t, lateralMeters = 0) {
   const samples = segment.heightSamples;
   if (!samples?.length) return segment.a.y + (segment.b.y - segment.a.y) * t;
@@ -1288,26 +1345,48 @@ function createRaceCourse(graph, path, settings = {}) {
   const last = segments.at(-1);
   course.gates.push({ ...last.b, forward: last.forward, halfWidthMeters: last.widthMeters * 0.5, distanceMeters: lengthMeters });
   if (!course.locationId || !course.anchor || !Number.isFinite(course.anchor.lat) || Math.abs(course.anchor.lat) > 85 || !Number.isFinite(course.anchor.lon) || Math.abs(course.anchor.lon) > 180) throw Error("invalid_race_location");
-  return course;
+  return prepareRaceCourseGeometry(course);
 }
 function projectRacePosition(course, pose, { minimumMeters = -Infinity, maximumMeters = Infinity } = {}) {
   let nearest = null;
-  for (let index = 0; index < course.segments.length; index++) {
+  function sample(index) {
     const s = course.segments[index], dx = s.b.x - s.a.x, dz = s.b.z - s.a.z, l2 = dx * dx + dz * dz;
-    if (s.startMeters > maximumMeters || s.startMeters + s.lengthMeters < minimumMeters) continue;
+    if (s.startMeters > maximumMeters || s.startMeters + s.lengthMeters < minimumMeters) return;
     const lower = Math.max(0, (minimumMeters - s.startMeters) / s.lengthMeters), upper = Math.min(1, (maximumMeters - s.startMeters) / s.lengthMeters);
     const t = Math.max(lower, Math.min(upper, ((pose.x - s.a.x) * dx + (pose.z - s.a.z) * dz) / l2));
     const x = s.a.x + dx * t, z = s.a.z + dz * t, lateral = ((pose.x - x) * s.forward.z - (pose.z - z) * s.forward.x) * course.metersPerUnit, y = sampleRaceSegmentY(s, t, lateral);
     const error = Math.hypot(pose.x - x, pose.z - z) * course.metersPerUnit, vertical = Math.abs(pose.y - y) * course.metersPerUnit;
-    if (vertical > 2.5) continue;
-    if (!nearest || error < nearest.error) nearest = { index, t, x, y, z, lateralMeters: lateral, error, vertical, distanceMeters: s.startMeters + s.lengthMeters * t, widthMeters: s.widthMeters };
+    if (vertical > 2.5) return;
+    if (!nearest || error < nearest.error || error === nearest.error && index < nearest.index) nearest = { index, t, x, y, z, lateralMeters: lateral, error, vertical, distanceMeters: s.startMeters + s.lengthMeters * t, widthMeters: s.widthMeters };
   }
+  const tree = raceSpatialIndex(course.segments);
+  if (!tree) {
+    for (let index = 0; index < course.segments.length; index++) sample(index);
+    return nearest;
+  }
+  const bound = (node) => Math.hypot(Math.max(node.minX - pose.x, 0, pose.x - node.maxX), Math.max(node.minZ - pose.z, 0, pose.z - node.maxZ)) * course.metersPerUnit;
+  function visit(node, lower) {
+    if (node.minMeters > maximumMeters || node.maxMeters < minimumMeters || nearest && lower > nearest.error + 1e-9) return;
+    if (node.indices) {
+      for (const index of node.indices) sample(index);
+      return;
+    }
+    const left = bound(node.left), right = bound(node.right);
+    if (left <= right) {
+      visit(node.left, left);
+      visit(node.right, right);
+    } else {
+      visit(node.right, right);
+      visit(node.left, left);
+    }
+  }
+  visit(tree, bound(tree));
   return nearest;
 }
 function raceGridPose(course, index = 0) {
   if (!Number.isInteger(index) || index < 0 || index >= course.participants) throw Error("invalid_race_grid_slot");
   const distanceMeters = course.vehicleEnvelope.lengthMeters / 2 + 1 + (Math.ceil(course.participants / 2) - 1 - Math.floor(index / 2)) * 8;
-  const s = course.segments.find((segment) => segment.startMeters + segment.lengthMeters >= distanceMeters) || course.segments.at(-1);
+  const s = raceSegmentAtDistance(course, distanceMeters);
   const forward = s.forward, along = (distanceMeters - s.startMeters) / course.metersPerUnit;
   const lateral = (course.participants === 1 ? 0 : index % 2 === 0 ? -1.4 : 1.4) / course.metersPerUnit;
   return {
@@ -2883,7 +2962,7 @@ var clamp2 = (v, a, b) => Math.max(a, Math.min(b, v));
 var wrap = (v) => Math.atan2(Math.sin(v), Math.cos(v));
 function pointOnRaceCourse(course, distanceMeters) {
   const distance2 = course.discipline === "circuit" ? (distanceMeters % course.lengthMeters + course.lengthMeters) % course.lengthMeters : clamp2(distanceMeters, 0, course.lengthMeters);
-  const segment = course.segments.find((s) => s.startMeters + s.lengthMeters >= distance2) || course.segments.at(-1), t = clamp2((distance2 - segment.startMeters) / segment.lengthMeters, 0, 1);
+  const segment = raceSegmentAtDistance(course, distance2), t = clamp2((distance2 - segment.startMeters) / segment.lengthMeters, 0, 1);
   return { x: segment.a.x + (segment.b.x - segment.a.x) * t, y: sampleRaceSegmentY(segment, t), z: segment.a.z + (segment.b.z - segment.a.z) * t, segment };
 }
 function raceAiActions(course, car, progress, profile, { difficulty = 0.65 } = {}) {
@@ -2948,7 +3027,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
   const allowedDurationMs = raceMaximumDurationMs(course);
   maximumDurationMs ??= allowedDurationMs;
   if (!Number.isFinite(maximumDurationMs) || maximumDurationMs <= 0 || maximumDurationMs > allowedDurationMs) throw Error("invalid_race_duration");
-  course = structuredClone(course);
+  course = prepareRaceCourseGeometry(structuredClone(course));
   const players = /* @__PURE__ */ new Map();
   let phase = "lobby", leaderUid = creatorUid, startAtMs = null, tick = 0, lastNow = createdAtMs, completedAtMs = null, reason = "", outcomeEmitted = false;
   const activeHumans = () => [...players.values()].filter((p) => !p.ai && !p.left);

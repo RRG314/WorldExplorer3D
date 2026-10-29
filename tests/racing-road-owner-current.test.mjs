@@ -48,7 +48,7 @@ test('a rejected oversized race actor releases its preparation scope',async()=>{
  assert.equal(getLifecycleRegistrySnapshot().activeScopeCount,before);
 });
 test('race handoff carries input smoothing and drift state, and initializes graded wheel contact before countdown',()=>{
- const h=setup();h.course.segments[0].b.y=20;h.course.points[1].y=20;h.course.gates.forEach(g=>g.y=3+17*g.distanceMeters/h.course.lengthMeters);
+ const h=setup();h.course=structuredClone(h.course);h.course.segments[0].b.y=20;h.course.points[1].y=20;h.course.gates.forEach(g=>g.y=3+17*g.distanceMeters/h.course.lengthMeters);
  h.c.car._driveDirection=-1;h.c.car.throttleSm=1;h.c.car.isDrifting=true;h.c.car.boost=true;
  const run=createPracticeRaceController({context:h.c,course:h.course,profile:h.profile});h.c.roadRaceController=run;run.start();
  const initial=run.snapshot().players[0].vehicleState;assert.ok(Math.abs(initial.terrainPitch)>.01);assert.ok(initial.engineRpm>=800);

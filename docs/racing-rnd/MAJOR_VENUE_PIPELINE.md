@@ -128,3 +128,22 @@ track presentation/markings/pits/barriers/landmarks, complete lap and release
 integration. The catalogue must remain unreleased until those pass. Other venue
 packs, high-bank dynamics, longer geographic route admission, oval and rally rules
 remain required by the unchanged full finish goal.
+
+## Long-course query cost
+
+Course construction and the existing session's owned clone freeze their segment
+geometry. An automatically released weak spatial index accelerates projection
+onto those same immutable segments. It stores no alternate heights, roads,
+actor poses, persistence or scheduler. Vertical-deck filtering, distance windows,
+source-order tie breaking and contact sampling retain the exhaustive calculation.
+Mutable diagnostic fixtures use the exhaustive path, avoiding stale cached bounds.
+Distance-based AI, grid and paint lookup uses binary search over source order.
+The index is absent from serialized courses and record fingerprints.
+
+Focused differential checks compare thousands of banked, stacked-deck, distant
+and windowed queries with the exhaustive path. An actual-source Silverstone
+accelerated simulation reproduced the previous complete 230-gate BMW lap and
+entire terminal vehicle/timing state exactly, including zero barrier contacts.
+Its single controlled CPU run took about 0.44 seconds versus the retained prior
+2.74 seconds. This measures numeric simulation only; it is not browser FPS,
+mobile, real-time networking or finished-venue acceptance.
