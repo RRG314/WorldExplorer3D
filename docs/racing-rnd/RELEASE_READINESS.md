@@ -4,6 +4,21 @@ Updated October 29, 2026. **Full racing is not release-ready.** No production de
 
 ## Implemented and evidenced
 
+- The additional BMW M3 E92 race car uses Neubi's CC0 racing exterior, four
+  wheel assemblies and an original prepared cabin with live speed/RPM/gear
+  instruments. It uses the existing garage, condition, upgrades and race vehicle
+  profile, with no ambient traffic allocation. Authoritative acquisition and
+  controlled held-input acceleration/braking passed; exterior/cabin review and
+  display texture release passed after fixing the loader content revision,
+  placeholder shading and driver-facing display layout. This is component
+  evidence; actual world custody and the final coordinated release remain to
+  be checked. The cabin is an interpretation, with the shared 120 mph class
+  limit, not a factory cockpit or GT3 homologation claim.
+- Mounted car bodies and cabin/VR eyes now share the same ground pivot used
+  by traffic. Transformed geometry and banked component views passed without
+  changing the existing camera owner or near-clip lifecycle. Optional banked
+  pavement forces remain behind explicit course admission; no unfinished major
+  venue becomes selectable merely by raising a surface limit.
 - Actual held-key Silverstone driving reproduced fixed-tick pose repeats and
   double advances independently of pulsed automation, barriers or camera-mode
   changes. Practice now samples adjacent accepted session frames for the body,
