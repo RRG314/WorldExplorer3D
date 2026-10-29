@@ -585,6 +585,7 @@ function setupFlowerChallenge() {
   ui.titleDeFlockTabBtn = document.getElementById('leaderboardTabDeFlock');
   ui.titleRacingTabBtn = document.getElementById('leaderboardTabRacing');
   ui.racingFilters = document.getElementById('racingRecordFilters');
+  ui.racingSource = document.getElementById('racingRecordSource');
   ui.racingCourse = document.getElementById('racingRecordCourse');
   ui.racingSetup = document.getElementById('racingRecordSetup');
   ui.titleHint = document.getElementById('gameLeaderboardHint');

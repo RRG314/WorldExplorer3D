@@ -5,19 +5,23 @@ import {collectRaceDistrict,recommendRaceCourses} from './world-course-source.js
 import {createRaceCourse,shortestRacePath} from './course-rules.js';
 import {raceDistrictFingerprint,raceCourseReference,restoreRaceCourse,raceCourseKey} from './course-library.js';
 import {createRaceVehicleProfile} from './vehicle-controller.js';
-import {createPracticeRaceController} from './road-activity-controller.js';
+import {createPracticeRaceController,canOwnRoadRace} from './road-activity-controller.js';
 import {prepareRacePresentation} from './presentation.js';
 import {listStoredActivities,saveStoredActivity} from '../activity-discovery/library.js?v=3';
 import {createActivityCompletionStore} from '../activity-discovery/completion.js';
 import {personalVehicleById,personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 import {getCurrentUser} from '../../../js/auth-ui.js?v=56';
 import {getCurrentRoom} from '../multiplayer/rooms.js?v=67';
-import {racePracticeRecordKey,RACE_PHYSICS_VERSION,raceRecordConfiguration} from './record-rules.js';
+import {racePracticeRecordKey,RACE_PHYSICS_VERSION,raceRecordConfiguration,raceCompetitiveRecordConfiguration} from './record-rules.js';
 import {racingPracticeStorage} from './practice-storage.js';
-import {racingCollectionSummary,racePracticeFeedback,racePracticeMetadata} from './driver-progress.js';
+import {racingCollectionSummary,racePracticeFeedback,racePracticeMetadata,raceOnlineMetadata} from './driver-progress.js';
 import {carSpeedToMph} from '../physics/vehicle-speed-units.js?v=2';
 import {createRaceLocationPreview} from './location-preview.js';
 import {createRaceRouteMap,raceCourseDisplayName,raceDisciplineLabel} from './course-preview.js';
+import {createRaceConnection} from './network-client.js';
+import {createNetworkRaceController,raceNetworkProfile} from './network-controller.js';
+import {racingServiceOptions} from './service-client.js';
+import {releaseRoadRaceMotion} from '../physics/road-race-delegate.js';
 const formatTime=ms=>Number.isFinite(ms)?`${Math.floor(ms/60000)}:${((ms%60000)/1000).toFixed(2).padStart(5,'0')}`:'—';
 const messages={no_qualified_racing_roads:'No supported racing district is ready here. Continue loading nearby roads or choose another destination.',
  no_qualified_race_route:'These roads do not yet form a safe race route. Choose another location or create a route on the map.',race_route_length:'Use a connected route between 200 m and 8 km.',
@@ -28,6 +32,7 @@ const messages={no_qualified_racing_roads:'No supported racing district is ready
  race_world_changed:'The location changed. Open Racing again in the current world.',activity_library_save_failed:'This device could not save the route. Free some storage and retry.'};
 const message=error=>messages[error?.message]||'This race could not complete. Your garage and exploration progress are safe. Try again.';
 export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{},chooseDestination=()=>{}}={}) {
+ let online=null,onlineCourse=null,onlineRoster='',onlineVisualRevision=0,onlinePreparing=false,lastResultUid='',lastUiFresh=true;
  let routeDiagnostics=null;
  let dialog=null,hud=null,loadScope=null,loadPublication=null,raceScope=null,controller=null,presentation=null,district=null,graph=null,fingerprint='',events=[],selected=0;
  let bestRead=null,bestReadOwner='',bestReadRevision=0;
@@ -74,22 +79,27 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    <details data-race-driver><summary>Your cars &amp; driving skill</summary><p data-race-collection></p><p data-race-skill></p>
    <p>Manage cars and upgrades in My garage. Finish routes to build Ground Vehicles skill; repeated runs earn less XP. Skill rank does not change race handling.</p></details>
    <details><summary>Practice rules</summary><p>AI cars can pass through you. Boosts are off. Results save to your Journal; practice does not pay Credits or enter online rankings.</p></details></div>
+   <section class="racing-online" aria-labelledby="racingOnlineHeading"><h3 id="racingOnlineHeading">Race with your room</h3><p data-race-online-help>Join a multiplayer room at this location, then drive your own car to the start shown on the route map. Online races use approved routes and shared timing.</p><ol data-race-online-roster></ol><button type="button" data-race-online-join>Join room race</button></section>
    </section></div><footer class="racing-start-bar"><button class="racing-primary" type="button" data-race-start disabled>Start practice</button>
-   <p class="racing-note">Private practice · results saved in your Journal</p></footer><section data-race-results hidden aria-labelledby="racingResultHeading"><h3 id="racingResultHeading" tabindex="-1">Race results</h3><ol data-race-order></ol><p data-race-save-state role="status"></p>
+   <p class="racing-note">Private practice · results saved in your Journal</p><div class="racing-lobby-actions" data-race-lobby-actions hidden><button class="racing-primary" type="button" data-race-online-ready hidden>Ready</button><button type="button" data-race-online-start hidden>Start race</button><button type="button" data-race-online-leave hidden aria-label="Leave race lobby">Leave</button></div></footer><section data-race-results hidden aria-labelledby="racingResultHeading"><h3 id="racingResultHeading" tabindex="-1">Race results</h3><ol data-race-order></ol><p data-race-save-state role="status"></p>
    <p data-race-feedback></p></section><footer class="racing-result-actions" data-race-result-actions hidden><button type="button" data-race-retry-save hidden>Retry Journal save</button><button type="button" data-race-again>Race again</button><button type="button" data-race-times>My times</button><button type="button" data-race-explore>Return to exploration</button></footer>`;
   document.body.append(dialog);
   hud=document.createElement('section');hud.id='roadRaceHud';hud.className='road-race-hud';hud.hidden=true;hud.setAttribute('aria-label','Race progress');
   hud.innerHTML='<p data-race-phase aria-live="polite"></p><strong data-race-clock></strong><span data-race-progress></span><span data-race-speed></span><div class="road-race-actions"><button type="button" data-race-leave>Leave race</button><button type="button" data-race-vr>VR view</button></div>';document.body.append(hud);
   dialog.querySelector('[data-race-close]').onclick=()=>dialog.close();
   dialog.addEventListener('keydown',event=>{if(event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();dialog.close();}});
-  dialog.addEventListener('close',()=>{releaseLocationPreview();if(busy&&!controller){loadScope?.dispose('menu_closed');if(raceScope)stop('menu_closed');busy=false;}if(lastResult&&controller)stop('results_closed');c.setPauseReason?.('racing-menu',false);c.clearControlInputState?.('racing-menu-closed');if(controller)requestWorldFocus();else returnFocus?.focus?.({preventScroll:true});});
+  dialog.addEventListener('close',()=>{releaseLocationPreview();if(online&&!controller)stop('lobby_closed');if(busy&&!controller){loadScope?.dispose('menu_closed');if(raceScope)stop('menu_closed');busy=false;}if(lastResult&&controller)stop('results_closed');c.setPauseReason?.('racing-menu',false);c.clearControlInputState?.('racing-menu-closed');if(controller)requestWorldFocus();else returnFocus?.focus?.({preventScroll:true});});
   for(const button of dialog.querySelectorAll('[data-race-preview]'))button.onclick=()=>showPreview(button.dataset.racePreview);
   el('[data-race-creator]').addEventListener('toggle',()=>{if(el('[data-race-creator]').open)showPreview('map');});
   el('[data-race-destination]').onclick=()=>{stop('destination');dialog.close();chooseDestination();};
   el('[data-race-garage]').onclick=()=>{if(controller){status('Leave the race before changing your car.');return;}dialog.close();c.openVehicleGarage?.();};
   el('[data-race-refresh]').onclick=()=>void qualify();
-  el('[data-race-events]').onclick=event=>{const button=event.target.closest('[data-event-index]');if(button&&!busy){selected=Number(button.dataset.eventIndex);customCourse=null;render();}};
+  el('[data-race-events]').onclick=event=>{const button=event.target.closest('[data-event-index]');if(button&&!busy&&!online){selected=Number(button.dataset.eventIndex);customCourse=null;render();}};
   el('[data-race-start]').onclick=()=>void begin(customCourse||events[selected]);
+  el('[data-race-online-join]').onclick=()=>void joinOnline(customCourse||events[selected]);
+  el('[data-race-online-ready]').onclick=()=>{const state=online?.snapshot(),me=state?.players.find(p=>p.uid===getCurrentUser()?.uid);online?.send({type:'ready',ready:!me?.ready});};
+  el('[data-race-online-start]').onclick=()=>online?.send({type:'start'});
+  el('[data-race-online-leave]').onclick=()=>{stop('left_lobby');renderOnline();status('Left the race lobby.');};
   el('[data-race-add]').onclick=()=>addJunction(Number(el('[data-race-node]').value));
   el('[data-race-undo]').onclick=()=>{creatorNodes.pop();rebuildCreator();};el('[data-race-reset]').onclick=()=>{creatorNodes=[];rebuildCreator();};
   el('[data-race-test]').onclick=()=>{try{const course=buildCustom();customCourse=course;render();void begin(course);}catch(error){status(message(error));}};
@@ -97,13 +107,13 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   hud.querySelector('[data-race-leave]').onclick=()=>{stop('left_race');void open();};
   hud.querySelector('[data-race-vr]').onclick=()=>{void c.openVrSettings?.().catch(error=>c.showToast?.(error.message||'VR setup could not open.'));};
   el('[data-race-explore]').onclick=()=>{stop('return_to_exploration');dialog.close();requestWorldFocus();};
-  el('[data-race-again]').onclick=()=>void begin(lastResultCourse||customCourse||events[selected]);
+  el('[data-race-again]').onclick=()=>{if(!resultSaved){el('[data-race-save-state]').textContent='Retry the Journal save before starting another race.';return;}if(lastResult?.receipt){stop('next_online_race');lastResult=null;void open();}else void begin(lastResultCourse||customCourse||events[selected]);};
   el('[data-race-retry-save]').onclick=()=>void persistResult();
   el('[data-race-times]').onclick=async event=>{
    event.stopPropagation();
    if(!resultSaved){el('[data-race-save-state]').textContent='Save this result before opening your times.';return;}
-   stop('view_times');dialog.close();
-   try{await c.ensureFlowerChallengeReady?.();await c.openLeaderboardView?.('racing');}
+   const verified=!!lastResult?.receipt;stop('view_times');dialog.close();
+   try{await c.ensureFlowerChallengeReady?.();await c.openLeaderboardView?.('racing');if(verified){const source=document.getElementById('racingRecordSource');if(source){source.value='online';source.dispatchEvent(new Event('change'));}}}
    catch{c.showToast?.('Your racing times could not open. They are kept in your Journal.');}
   };
  }
@@ -196,7 +206,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   const facts=el('[data-race-facts]');facts.replaceChildren();if(course)for(const [label,value]of[['Distance',`${(course.lengthMeters/1000).toFixed(2)} km`],['Laps',course.laps],['Event',raceDisciplineLabel(course.discipline)]]){const group=document.createElement('div'),term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;group.append(term,detail);facts.append(group);}
   const vehicle=personalVehicleById(c.car?.personalVehicleId||'bmw_e34');el('[data-race-detail]').textContent=course?`Car · ${vehicle?.label||'Personal vehicle'}`:'';
   if(!el('[data-race-image]').hidden){el('[data-race-image]').alt=`Current in-game view of ${district?.locationLabel||'this location'}`;el('[data-race-image-caption]').textContent=`Current view · ${district?.locationLabel||'this location'}`;}
-  el('[data-race-start]').disabled=busy||!course;el('[data-race-rivals]').disabled=course?.discipline==='time-trial';map(course);
+  el('[data-race-start]').disabled=busy||!!online||!course;el('[data-race-rivals]').disabled=course?.discipline==='time-trial';map(course);renderOnline();
   el('[data-race-results]').hidden=!lastResult;el('[data-race-result-actions]').hidden=!lastResult;el('[data-race-creator]').hidden=!graph;
   el('[data-race-record]').textContent='';
   if(course){const owner=getCurrentUser()?.uid||'';el('[data-race-record]').textContent='Reading personal best…';try{void Promise.all([racePracticeRecordKey(course,currentVehicleProfile()),journalRecords(owner)]).then(([id,bests])=>{
@@ -247,6 +257,12 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    if(!current())throw Error('race_world_changed');
    const run=createPracticeRaceController({context:c,course,profile,rivals,label:'You',uid,onComplete:result=>complete(result),isAdmitted:current});
    scope.defer(()=>{run.stop('race_scope_closed');if(c.roadRaceController===run)c.roadRaceController=null;},'road-controller');
+   adoptRun(run,prepared,scope,current);
+   update(0);
+  }catch(error){if(raceScope===scope){stop('race_start_failed');status(error.message==='race_live_gps_active'?'Stop Live GPS before racing.':error.message==='practice_leave_room_first'?'Leave the shared exploration room before starting private practice.':error.message==='stop_before_racing'?'Stop your car before entering a race.':error.message==='race_previous_result_unsaved'?'Retry saving your previous race result before starting another run.':message(error));}}
+  finally {busy=false;}
+ }
+ function adoptRun(run,prepared,scope,current){
    run.start();controller=run;c.roadRaceController=run;presentation=prepared;prepared.mount();
    // A VR finish stays in the headset until Results/Exit returns presentation.
    // The existing kernel can present its native result UI even while simulation
@@ -254,55 +270,125 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    scope.defer(c.registerRuntimeSystem?.({id:'racing.result-presentation',owner:'racing',phase:'presentation',critical:false,
     enabled:()=>current()&&!!lastResult&&!c.vrPresentation?.active&&!dialog.open,
     update:()=>{if(current()&&lastResult&&!c.vrPresentation?.active)showResults();}}),'result-presentation');
-   const population=c.livingWorldRuntime?.population;population?.setRaceClosure(course);scope.defer(()=>population?.setRaceClosure(null),'civilian-course');
-   scope.defer(c.setUrbanRaceClosure?.(course),'urban-course');
+   const population=c.livingWorldRuntime?.population;population?.setRaceClosure(run.course);scope.defer(()=>population?.setRaceClosure(null),'civilian-course');
+   scope.defer(c.setUrbanRaceClosure?.(run.course),'urban-course');
    c.screenLayout?.setActivityLayer('racing',true);
    scope.defer(()=>{if(c.screenLayout?.snapshot().activityLayer==='racing')c.screenLayout.setActivityLayer('racing',false);},'racing-screen-layer');
    lastResult=null;lastResultCourse=null;resultSaved=false;el('[data-race-results]').hidden=true;el('[data-race-result-actions]').hidden=true;dialog.dataset.raceView='events';status('');dialog.close();hud.hidden=false;c.clearControlInputState?.('race_countdown');requestWorldFocus();
-   update(0);
-  }catch(error){if(raceScope===scope){stop('race_start_failed');status(error.message==='race_live_gps_active'?'Stop Live GPS before racing.':error.message==='practice_leave_room_first'?'Leave the shared exploration room before starting private practice.':error.message==='stop_before_racing'?'Stop your car before entering a race.':error.message==='race_previous_result_unsaved'?'Retry saving your previous race result before starting another run.':message(error));}}
-  finally {busy=false;}
+ }
+ const onlineMessages={race_move_to_start:'Drive your car to the start on the route map, then join again.',race_course_unavailable:'This route has not been approved for online racing. Practice is available.',
+  race_signed_account_required:'Sign in with an account before joining an online race.',race_personal_car_lease_required:'Enter your personal car in this room before joining the race.',race_room_busy:'Another race is using this room. Wait for it to finish.',
+  race_vehicle_needs_repair:'Repair your car to at least 30% condition before racing.',vehicle_condition_save_required:'Your car could not be saved. Open the garage and try again.',
+  race_not_ready:'Every driver must be ready before the race starts.',race_needs_two_players:'At least two drivers must join and be ready.',race_vehicle_setup_changed:'Your car setup changed. Leave and rejoin the race lobby.',
+  race_reconnect_expired:'The connection could not be restored. Return to exploration and rejoin.',race_roster_locked:'The race has started. Wait for the next race.',race_community_consent_required:'Agree to the community rules before racing online.'};
+ function onlineMessage(reason){return onlineMessages[reason]||'Online racing is unavailable right now. Your car and progress are kept. You can leave the lobby and try again.';}
+ function renderOnline(){
+  if(!dialog)return;const state=online?.snapshot(),me=state?.players.find(p=>p.uid===getCurrentUser()?.uid),inLobby=!!online;
+  if(!lastResult)dialog.dataset.raceView=inLobby?'lobby':'events';
+  el('[data-race-lobby-actions]').hidden=!inLobby;
+  for(const button of el('[data-race-events]').children)button.disabled=inLobby;
+  el('[data-race-online-join]').hidden=inLobby;el('[data-race-online-join]').disabled=busy||!(customCourse||events[selected])||!getCurrentRoom();
+  for(const name of ['ready','start','leave'])el(`[data-race-online-${name}]`).hidden=!inLobby;
+  el('[data-race-online-ready]').disabled=onlinePreparing||!me||state.phase!=='lobby';el('[data-race-online-ready]').textContent=me?.ready?'Not ready':'Ready';
+  el('[data-race-online-start]').hidden=!inLobby||state?.leaderUid!==getCurrentUser()?.uid;
+  el('[data-race-online-start]').disabled=onlinePreparing||!state||state.phase!=='lobby'||state.players.length<2||state.players.some(p=>!p.ready||p.disconnected);
+  el('[data-race-online-roster]').replaceChildren(...(state?.players||[]).map(p=>{const li=document.createElement('li');li.textContent=`${p.label} · ${personalVehicleById(p.vehicleId)?.label||'Car'} · ${p.disconnected?'Reconnecting':p.ready?'Ready':'Preparing'}`;return li;}));
+  el('[data-race-online-help]').textContent=inLobby?onlinePreparing?'Loading drivers’ cars…':'Car contact and boosts are off. The room leader starts once everyone is ready.':
+   getCurrentRoom()?'Drive your personal car to the start on the route map, then join. Approved routes use shared timing and online results.':'Join a multiplayer room at this location to race together.';
+ }
+ async function joinOnline(course){
+  if(busy||online||!course)return;const room=getCurrentRoom(),owner=getCurrentUser()?.uid;if(!room||!owner||getCurrentUser()?.isAnonymous){status(onlineMessage('race_signed_account_required'));return;}
+  stop('race_replaced');const scope=createLifecycleScope('racing-online'),session=captureEnvironmentSession(),publication=c.worldPublication,request=new AbortController();raceScope=scope;
+  const current=()=>scope.isActive()&&session.isCurrent()&&c.worldPublication===publication&&getCurrentUser()?.uid===owner&&getCurrentRoom()?.code===room.code&&getCurrentRoom()?.world?.seed===room.world?.seed;
+  scope.defer(()=>request.abort(),'connection-preparation');scope.listen(session.signal,'abort',()=>stop('world_changed'));busy=true;status('Connecting to your room’s race…');
+  try{
+   if(c.getLiveGpsSnapshot?.().active||resolveControlState(c).frame!=='surface')throw Error('race_world_changed');
+   if(!c.car?.personalVehicleId||!canUseOnlineCar())throw Error('race_personal_car_lease_required');
+   const lease=await c.selectPersonalVehicle?.(c.car.personalVehicleId,{intent:'ensure-room-lease'});
+   if(!current())throw Error('race_world_changed');if(!lease?.ok)throw Error(lease?.reason||'race_personal_car_lease_required');
+   const options=await racingServiceOptions(owner,request.signal),courseId=await raceCourseKey(course);if(!current())throw Error('race_world_changed');
+   const connection=createRaceConnection({...options,uid:owner,join:{roomCode:room.code,worldSeed:room.world.seed,courseId,vehicleId:c.car.personalVehicleId},isCurrent:current,
+    onError:reason=>{if(current()){if(!online?.snapshot()){stop('race_join_rejected');renderOnline();}else if(['race_reconnect_expired','race_account_changed','race_session_replaced','invalid_race_snapshot'].includes(reason)){stop(reason);c.clearControlInputState?.('race-ended');c.showToast?.(onlineMessage(reason));}status(onlineMessage(reason));}},onConnection:state=>{if(current()){if(state==='reconnecting')status('Reconnecting to the same race…');if(state==='connected')status(`Room ${room.code} · shared timing`);}},
+    onSnapshot:(state,serverCourse)=>{if(!current())return;void acceptOnlineSnapshot(state,serverCourse,scope,current,owner).catch(error=>{if(current()){stop('race_start_failed');status(onlineMessage(error.message));renderOnline();}});}
+   });
+   online=connection;onlineCourse=course;onlineRoster='';scope.defer(()=>connection.stop(),'network-connection');
+   scope.defer(c.registerRuntimeSystem?.({id:'racing.network',owner:'racing',phase:'presentation',critical:false,enabled:()=>online===connection,
+    update:()=>connection.pump()}),'network-pump');
+   await connection.connect();renderOnline();
+  }catch(error){if(raceScope===scope){stop('race_join_failed');status(onlineMessage(error.message));renderOnline();}}
+  finally{busy=false;if(dialog)renderOnline();}
+ }
+ function canUseOnlineCar(){return canOwnRoadRace(c)&&Math.abs(c.car.speed||0)<=4;}
+ async function acceptOnlineSnapshot(state,serverCourse,scope,current,owner){
+  if(state.phase==='cancelled'){stop(state.reason);c.clearControlInputState?.('race-ended');c.showToast?.(onlineMessage(state.reason));status(onlineMessage(state.reason));renderOnline();return;}
+  const connection=online;if(!connection)return;
+  if(serverCourse&&await raceCourseKey(serverCourse)!==await raceCourseKey(onlineCourse))throw Error('race_course_wrong_world');
+  if(!current())return;
+  const signature=state.players.map(p=>`${p.uid}:${p.vehicleId}`).join('|');
+  if(signature!==onlineRoster){
+   const revision=++onlineVisualRevision;onlineRoster=signature;onlinePreparing=true;renderOnline();
+   const rivals=state.players.filter(p=>p.uid!==owner).map(p=>({uid:p.uid,label:p.label,profile:raceNetworkProfile(state.profiles[p.uid])}));
+   const pending=new AbortController();scope.defer(()=>pending.abort(),'online-model-preparation');let prepared;
+   try{prepared=await prepareRacePresentation(THREE,c,onlineCourse,rivals,{signal:pending.signal,current:()=>current()&&revision===onlineVisualRevision});}
+   catch(error){if(!current()||revision!==onlineVisualRevision)return;throw error;}
+   if(!current()||revision!==onlineVisualRevision){prepared.dispose();return;}
+   presentation?.dispose();presentation=prepared;scope.defer(()=>prepared.dispose(),'online-visuals');onlinePreparing=false;
+  }
+  renderOnline();
+  if(!controller&&!onlinePreparing&&['countdown','running'].includes(state.phase)){
+   if(!current())return;
+   const run=createNetworkRaceController({context:c,course:onlineCourse,connection,uid:owner,isAdmitted:current,onComplete:result=>complete(result)});
+   scope.defer(()=>{run.stop();if(c.roadRaceController===run)c.roadRaceController=null;},'online-road-controller');
+   adoptRun(run,presentation,scope,current);
+  }
  }
  function showResults(){if(!lastResult)return;if(!dialog.open)dialog.showModal();renderResults();el('#racingResultHeading').focus({preventScroll:true});}
- function complete(result) {lastResult=result;lastResultCourse=controller.course;lastResultProfile=controller.profile;lastResultOwner=getCurrentUser()?.uid||'';resultSaved=false;presentation?.update(result,controller.uid,0);status('');hud.hidden=true;c.setPauseReason?.('racing-menu',true);renderResults();if(!c.vrPresentation?.active)showResults();void persistResult();}
+ function complete(result) {lastResult=result;lastResultCourse=controller.course;lastResultProfile=controller.profile;lastResultUid=controller.uid;lastResultOwner=getCurrentUser()?.uid||'';
+  const verified=result.receipt?.players.find(p=>p.uid===lastResultUid);if(verified)recordId='race-online-'+verified.boardId.slice(0,32);
+  resultSaved=false;presentation?.update(result,controller.uid,0);status('');hud.hidden=true;c.setPauseReason?.('racing-menu',true);renderResults();if(!c.vrPresentation?.active)showResults();void persistResult();}
  function renderResults() {
   if(!lastResult)return;dialog.dataset.raceView='results';el('[data-race-heading]').textContent='Race results';el('#racingResultHeading').textContent=lastResult.courseName;el('[data-race-results]').hidden=false;el('[data-race-result-actions]').hidden=false;const list=el('[data-race-order]');list.replaceChildren();
-  for(const player of lastResult.players){const li=document.createElement('li');li.textContent=`${player.label} · ${player.dnf?'Did not finish':formatTime(player.progress?.elapsedMs)}${player.ai?' · AI rival':''}`;list.append(li);}
-  const player=lastResult.players.find(p=>!p.ai),feedback=racePracticeFeedback(player);
+  for(const player of lastResult.players){const li=document.createElement('li');li.value=player.position;li.textContent=`${player.label} · ${player.dnf?'Did not finish':formatTime(player.progress?.elapsedMs)}${player.ai?' · AI rival':''}`;list.append(li);}
+  const player=lastResult.players.find(p=>p.uid===lastResultUid),feedback=racePracticeFeedback(player);
   el('[data-race-feedback]').textContent=feedback.finished?`${personalVehicleById(player.vehicleId)?.label||'Your car'} · ${feedback.clean?'Clean finish: no course barrier contacts or timing penalties.':'Finish recorded. Aim to avoid course barriers on your next run.'}${feedback.consistent?' Three or more laps within 5%: consistent driving.':''}`:'Finish the complete route to record a driving practice result.';
-  el('[data-race-save-state]').textContent=resultSaved?'Practice record saved in your Journal.':'Device practice result. Your Journal save needs to finish.';el('[data-race-retry-save]').hidden=resultSaved||saving;
+  const verified=!!lastResult.receipt,award=lastResult.receipt?.players.find(p=>p.uid===lastResultUid)?.credits||0;
+  el('[data-race-again]').textContent=verified?'Choose next race':'Race again';el('[data-race-times]').textContent=verified?'Shared times':'My times';
+  el('[data-race-save-state]').textContent=verified?`Online result saved${award?` · ${award} Credits`:' '}. ${resultSaved?'Journal saved.':'Saving your Journal…'}`:resultSaved?'Practice record saved in your Journal.':'Device practice result. Your Journal save needs to finish.';el('[data-race-retry-save]').hidden=resultSaved||saving;
  }
  async function persistResult() {
   if(!lastResult||saving)return;
   if((getCurrentUser()?.uid||'')!==lastResultOwner){el('[data-race-save-state]').textContent='Sign back into the account that ran this race to save its result.';el('[data-race-retry-save]').hidden=false;return;}
-  saving=true;const result=lastResult,player=result.players.find(p=>!p.ai),id=recordId,course=lastResultCourse;
+  saving=true;const result=lastResult,player=result.players.find(p=>p.uid===lastResultUid),id=recordId,course=lastResultCourse;
   el('[data-race-save-state]').textContent='Saving your practice record in the Journal…';el('[data-race-retry-save]').hidden=true;
   try {if(!player?.progress?.finished){resultSaved=true;el('[data-race-save-state]').textContent='Run ended without a finishing time. Your exploration progress is preserved.';return;}
-   const metadata=racePracticeMetadata(result,player,{courseId:await raceCourseKey(course),recordKey:id,physicsVersion:RACE_PHYSICS_VERSION});
-   metadata.racingOwnerUid=lastResultOwner;metadata.raceConfiguration=raceRecordConfiguration(lastResultProfile);
+   const metadata=(result.receipt?raceOnlineMetadata:racePracticeMetadata)(result,player,{courseId:await raceCourseKey(course),recordKey:id,physicsVersion:RACE_PHYSICS_VERSION});
+   metadata.racingOwnerUid=lastResultOwner;metadata.raceConfiguration=result.receipt?raceCompetitiveRecordConfiguration(lastResultProfile,{slot:player.slot,participants:course.participants}):raceRecordConfiguration(lastResultProfile);
    if(lastResult!==result)return;
    if((getCurrentUser()?.uid||'')!==lastResultOwner)throw Error('race_account_changed');
    const saved=await currentRecords().complete({id,title:course.name,sourceType:'creator'},player.progress.elapsedMs,player.pose,
-    {pointsFirst:0,completionId:result.id,detail:`Practice road race · ${course.locationLabel} · ${formatTime(player.progress.elapsedMs)} · ${personalVehicleById(player.vehicleId)?.label||'Personal car'}${metadata.cleanFinish?' · Clean finish':''}`,metadata});
-   if(lastResult!==result)return;resultSaved=saved;el('[data-race-save-state]').textContent=saved?'Practice record saved in your Journal.':'The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=saved;if(saved){bestRead=null;bestReadRevision++;void refreshDriver();}
+    {pointsFirst:0,completionId:result.id,detail:`${result.receipt?'Online':'Practice'} road race · ${course.locationLabel} · ${formatTime(player.progress.elapsedMs)} · ${personalVehicleById(player.vehicleId)?.label||'Personal car'}${metadata.cleanFinish?' · Clean finish':''}`,metadata});
+   if(lastResult!==result)return;resultSaved=saved;renderResults();if(!saved)el('[data-race-save-state]').textContent='The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=saved;if(saved){bestRead=null;bestReadRevision++;void refreshDriver();}
   }catch(error){if(lastResult===result){el('[data-race-save-state]').textContent=error.message==='race_account_changed'?'Sign back into the account that ran this race to save its result.':'The result needs a Journal save. Retry before starting another run.';el('[data-race-retry-save]').hidden=false;}}
   finally{saving=false;}
  }
  function update(dt) {
+  if(online&&!c.registerRuntimeSystem)online.pump();
   if(!controller)return;if(!controller.isCurrent()){stop('race_vehicle_or_world_changed');return;}
   const snapshot=controller.snapshot();presentation?.update(snapshot,controller.uid,dt);
-  if(snapshot.serverAtMs-lastUiAt<100&&snapshot.phase==='running')return;lastUiAt=snapshot.serverAtMs;
+  const fresh=!online||online.connected()&&online.isFresh(),changed=fresh!==lastUiFresh;lastUiFresh=fresh;
+  if(snapshot.serverAtMs-lastUiAt<100&&snapshot.phase==='running'&&!changed)return;lastUiAt=snapshot.serverAtMs;
   const player=snapshot.players.find(p=>p.uid===controller.uid),left=Math.max(0,(snapshot.startAtMs||0)-snapshot.serverAtMs);
-  hud.querySelector('[data-race-phase]').textContent=snapshot.phase==='countdown'?`Ready · ${Math.max(1,Math.ceil(left/1000))}`:player?.progress?.finished?'Finished · waiting for rivals':`${player?.position||1} / ${snapshot.players.length}`;
+  hud.querySelector('[data-race-phase]').textContent=online&&(!online.connected()||!online.isFresh())?'Reconnecting…':snapshot.phase==='countdown'?`Ready · ${Math.max(1,Math.ceil(left/1000))}`:player?.progress?.finished?'Finished · waiting for rivals':`${player?.position||1} / ${snapshot.players.length}`;
   hud.querySelector('[data-race-clock]').textContent=formatTime(player?.progress?.elapsedMs??Math.max(0,snapshot.serverAtMs-(snapshot.startAtMs||0)));
   hud.querySelector('[data-race-progress]').textContent=`Lap ${player?.progress?.lap||1}/${controller.course.laps} · Gate ${Math.min((player?.progress?.nextGate||0)+1,controller.course.gates.length)}/${controller.course.gates.length}`;
   hud.querySelector('[data-race-speed]').textContent=`${Math.round(Math.abs(carSpeedToMph(player?.speed||0)))} MPH · Condition ${Math.round((player?.condition??1)*100)}%`;
   if(snapshot.phase==='cancelled') {stop(snapshot.reason);c.showToast?.('Race ended. Normal exploration is available.');}
  }
  function stop(reason='racing_closed') {
+  releaseRoadRaceMotion(c,controller);
   if(controller&&c.roadRaceController===controller)c.roadRaceController=null;
-  controller?.stop(reason);controller=null;presentation=null;raceScope?.dispose(reason);raceScope=null;if(hud)hud.hidden=true;
-  lastUiAt=-Infinity;
+  controller?.stop(reason);controller=null;presentation=null;raceScope?.dispose(reason);raceScope=null;online?.stop(reason);online=null;onlineCourse=null;onlineRoster='';onlineVisualRevision++;onlinePreparing=false;if(hud)hud.hidden=true;
+  lastUiAt=-Infinity;lastUiFresh=true;
  }
  function stopAll(reason) {
   openRevision++;bestRead=null;bestReadRevision++;

@@ -3442,6 +3442,7 @@ function startUrbanSandboxRuntime(options = {}) {
     mount(vehicle){state.vehicles.push(vehicle);mountVehicleForDriving(state,vehicle);},
     releaseCurrent(){
       void state.personalVehicles.checkpoint(true);
+      state.roomAuthorityRuntime.releaseDefaultDriverLease();
       const previous=state.activeVehicle;if(!previous)return;
       state.roomAuthorityRuntime.releasePreparedVehicle(previous);
       if(previous.serviceEquipmentActive)setActiveServiceEquipment(state,false);
@@ -3467,7 +3468,7 @@ function startUrbanSandboxRuntime(options = {}) {
     const nextUid=String(user?.uid||'');
     if(!activeWorldMatches(state)||nextUid===playerOwnerUid)return;
     state.personalVehicles.cancelSelection();
-    if(state.activeVehicle?.personalVehicleId)releaseUrbanVehicleForTravel('drive');
+    if(state.activeVehicle?.personalVehicleId||state.defaultRoomVehicle)releaseUrbanVehicleForTravel('drive');
     state.stopWalletSubscription?.();
     Object.assign(state,connectUrbanPlayerServices(equipment,backpackStore));
     playerOwnerUid=nextUid;state.personalVehicles.rebindOwner(nextUid);
@@ -3547,8 +3548,10 @@ function startUrbanSandboxRuntime(options = {}) {
 // resolve the current runtime at invocation instead of capturing an old world.
 function releaseUrbanVehicleForTravel(targetMode) {
   const state=activeRuntime;
-  if(!state?.activeVehicle)return true;
+  if(!state)return true;
   if(state.transition)return false;
+  state.roomAuthorityRuntime.releaseDefaultDriverLease();
+  if(!state.activeVehicle)return true;
   const vehicle=state.activeVehicle;
   state.roomAuthorityRuntime.releasePreparedVehicle(vehicle);
   if(vehicle.serviceEquipmentActive)setActiveServiceEquipment(state,false);
@@ -3574,7 +3577,7 @@ Object.assign(appCtx, {
   getVehicleGarage:()=>activePersonalVehicleRuntime()?.snapshot(),
   getVehicleGarageHomes:()=>activePersonalVehicleRuntime()?.homes()||[],
   changeVehicleGarage:command=>activePersonalVehicleRuntime()?.change(command),
-  selectPersonalVehicle:id=>activePersonalVehicleRuntime()?.selectAndDrive(id),
+  selectPersonalVehicle:(id,options)=>options?.intent==='ensure-room-lease'?activePersonalVehicleRuntime()?.ensureRoomVehicleLease(id):activePersonalVehicleRuntime()?.selectAndDrive(id),
   enterUrbanVehicleByIdForSupport: vehicleId => activeRuntime ? beginEnter(activeRuntime, activeRuntime.vehicles.find(vehicle => vehicle.id === vehicleId)) : false,
   exitUrbanVehicleForSupport: () => activeRuntime ? beginExit(activeRuntime) : false,
   toggleUrbanEquipment: force => activeRuntime ? toggleEquipment(activeRuntime, force) : false,

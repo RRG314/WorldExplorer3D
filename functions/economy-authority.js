@@ -237,6 +237,7 @@ async function settleVehicleGarageAction({runTransaction,walletRef,progressRef,r
     const prior=snapshotData(receipt);
     if(prior){if(prior.fingerprint!==fingerprint)throw Error('vehicle_request_conflict');return {...prior.result,duplicate:true};}
     const progress=snapshotData(saved)||{},wallet=walletData(snapshotData(balance)||{});
+    if(input.action!=='initialize'&&(progress.raceReservation?.expiresAt?.toMillis?.()||0)>nowMs)throw Error('vehicle_in_race');
     const change=input.action==='initialize'?{garage:normalizeVehicleGarage(progress.garage),cost:0}:
       prepareVehicleGarageChange(progress.garage,input,{now:nowMs,ownsHome:id=>id===input.homeId&&snapshotData(property)?.ownerUid===uid});
     if(change.cost>wallet.credits)throw Error('not_enough_credits');
@@ -250,3 +251,14 @@ async function settleVehicleGarageAction({runTransaction,walletRef,progressRef,r
   });
 }
 module.exports.settleVehicleGarageAction=settleVehicleGarageAction;
+
+// Shared wallet normalization and bounded crediting for server-owned outcomes.
+// The caller owns the receipt and eligibility transaction; clients cannot call
+// this helper through the commerce request surface.
+function prepareExplorerCreditAward(raw,{amount,nowMs,timestampFromMs}) {
+  if(!Number.isSafeInteger(amount)||amount<0||amount>1000)throw Error('invalid_credit_award');
+  const wallet=walletData(raw),credit=Math.min(amount,MAX_CREDITS-wallet.credits);
+  return {...wallet,credits:wallet.credits+credit,lifetimeEarned:Math.min(MAX_CREDITS,wallet.lifetimeEarned+credit),
+    revision:wallet.revision+1,updatedAt:timestampFromMs(nowMs)};
+}
+module.exports.prepareExplorerCreditAward=prepareExplorerCreditAward;

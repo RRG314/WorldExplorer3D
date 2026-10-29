@@ -92,8 +92,28 @@ export function createPersonalVehicleRuntime(options) {
       if(prepared&&!adopted){if(claimed)state.roomAuthorityRuntime.releasePreparedVehicle(prepared);options.dispose(prepared);}
     }
   }
+  async function ensureRoomVehicleLease(id){
+    const definition=personalVehicleById(id),control=resolveControlState(c),session=captureEnvironmentSession(),departureVehicle=state.activeVehicle;
+    const valid=()=>current()&&session.isCurrent()&&c.car.personalVehicleId===id&&state.activeVehicle===departureVehicle&&resolveControlState(c).controller==='drive'&&Math.abs(Number(c.car.speed||0))<=4;
+    if(!uid||pending||!definition||!snapshot().vehicles[id]||c.car.personalVehicleId!==id||control.frame!=='surface'||control.controller!=='drive'||control.occupancy!=='driver'||c.onMoon||c.onMars||c.activePlanetaryBodyId||c.worldLoading||state.transition||Math.abs(Number(c.car.speed||0))>4)
+      return {ok:false,reason:'leave_current_vehicle_or_interior'};
+    const initialized=await change({action:'initialize',vehicleId:id});if(!initialized?.ok||!valid())return {ok:false,reason:'world_changed'};
+    await checkpoint(true);if(!valid())return {ok:false,reason:'world_changed'};
+    if(!Number.isFinite(c.car.condition)||snapshot().vehicles[id].condition>c.car.condition+.0001)return {ok:false,reason:'vehicle_condition_save_required'};
+    const vehicle=departureVehicle||{id:`personal:${uid}:${id}`,personalVehicleId:id,attachedToPlayer:true,label:definition.label,style:definition.category,
+      x:c.car.x,y:c.car.y,z:c.car.z,yaw:c.car.angle};
+    if(!departureVehicle&&!definition.defaultVisual)return {ok:false,reason:'vehicle_changed'};
+    const claim=departureVehicle?await state.roomAuthorityRuntime.claimPreparedVehicle(vehicle):await state.roomAuthorityRuntime.ensureDefaultDriverLease(vehicle);
+    if(!valid()){
+      if(claim?.accepted){if(departureVehicle)state.roomAuthorityRuntime.releasePreparedVehicle(vehicle);else state.roomAuthorityRuntime.releaseDefaultDriverLease({x:vehicle.x,y:vehicle.y,z:vehicle.z,yaw:vehicle.yaw});}
+      return {ok:false,reason:'world_changed'};
+    }
+    if(!claim?.accepted)return {ok:false,reason:claim?.reason||'room_vehicle_unavailable'};
+    if(departureVehicle)state.roomAuthorityRuntime.adoptPreparedVehicle(vehicle);
+    return {ok:true,vehicleId:id};
+  }
   scope.defer(()=>{serial++;pending?.abort();},'prepared-vehicle');
-  return Object.freeze({snapshot,homes,change,selectAndDrive,checkpoint,
+  return Object.freeze({snapshot,homes,change,selectAndDrive,ensureRoomVehicleLease,checkpoint,
     rebindOwner(nextUid){serial++;pending?.abort();uid=String(nextUid||'');lastCondition=null;starterHydrated=false;},
     cancelSelection(){serial++;pending?.abort();},
     update(dt){

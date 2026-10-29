@@ -2,6 +2,7 @@ import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import {vehicleWheelRig} from '../transport/vehicle-wheel-motion.js';
+import {prepareE34Model} from '../engine/curated-player-car.js';
 
 const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   compact: 'traffic-compact-hatchback-v1',
@@ -137,7 +138,8 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
       if(host.userData.curatedTrafficVehicleLoadGeneration===generation)host.userData.curatedTrafficVehicleLoadStarted = false;
       return false;
     }
-    const visual = prepareTrafficVisual(THREE, instance, options);
+    const visual = instance.record.id==='vehicle-bmw-525i-e34'
+      ?prepareE34Model(THREE,instance.root,instance.record):prepareTrafficVisual(THREE, instance, options);
     host.add(visual);
     host.userData.curatedTrafficAssetId = instance.record.id;
     host.userData.curatedTrafficVehicleLoadFailed = false;

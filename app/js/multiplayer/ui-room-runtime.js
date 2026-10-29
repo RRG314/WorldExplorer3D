@@ -377,6 +377,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       getCamera: () => appCtx.camera,
       getViewportHeight: () => appCtx.renderer?.domElement?.clientHeight || globalThis.innerHeight,
       getSelfUid: () => state.authUser?.uid || state.entitlement.uid || "",
+      getRoadRaceController:()=>appCtx.roadRaceController,
       getLocalFrame: () => helpers.readPoseSnapshot?.()?.frame || null
     });
     state.ghostManager.setVisible(state.ghostsEnabled);

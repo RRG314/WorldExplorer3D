@@ -5,6 +5,7 @@ import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import {carSpeedToWorldUnitsPerSecond} from '../physics/vehicle-speed-units.js?v=2';
 import {buildRacePaint,raceCourseSurfacePoint} from './course-markings.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
+import {personalVehicleById} from '../transport/vehicle-garage-rules.js';
 // Practice rivals are ghosts. A finished ghost leaves presentation, and a
 // passing ghost must not put an opaque body around the active cabin/VR eye.
 // Timing and actor motion continue to belong to the race session.
@@ -16,7 +17,7 @@ export function raceGhostVisible(player,variant,{immersive=false,eye}={}) {
  return Math.abs(dx*box.sx+dz*box.sz)>=box.width||Math.abs(dx*box.fx+dz*box.fz)>=box.length;
 }
 export async function prepareRacePresentation(THREE,context,course,rivals,{signal,current}) {
- const root=new THREE.Group();root.name='Scoped mapped road race';const visuals=[];let disposed=false;
+ const root=new THREE.Group();root.name='Scoped mapped road race';const visuals=[],byUid=new Map();let disposed=false;
  const material=new THREE.MeshBasicMaterial({color:0xb7f568,transparent:true,opacity:.8,depthWrite:false});
  const pole=new THREE.BoxGeometry(.16,2.8,.16),gates=[];
  for(let i=0;i<3;i++) {
@@ -34,7 +35,8 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
    if(!current()||signal.aborted)throw Error('race_world_changed');
    const profile=rivals[i].profile,visual=createUrbanVehicleVisual(THREE,{id:`rival:${i}`,variant:profile.variant,condition:profile.conditionValue});
    visuals.push(visual);
-   const ready=await attachCuratedTrafficVehicle(THREE,visual.root,{variantId:profile.variant.id,color:[0xd05f39,0x6c9ed3,0xb4a080][i],signal,isCurrent:current});
+   byUid.set(rivals[i].uid||`rival:${i}`,{visual,profile});
+   const ready=await attachCuratedTrafficVehicle(THREE,visual.root,{variantId:profile.variant.id,assetId:personalVehicleById(profile.vehicleId)?.assetId||undefined,color:[0xd05f39,0x6c9ed3,0xb4a080][i],signal,isCurrent:current});
    if(!ready||!current())throw Error('race_rival_model_unavailable');
    root.add(visual.root);
   }
@@ -48,10 +50,10 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
      for(const mesh of host.children){const lateral=mesh.userData.side*(gate.halfWidthMeters-.2);mesh.position.x=lateral/course.metersPerUnit;
       mesh.position.y=1.4+raceCourseSurfacePoint(course,gate.distanceMeters,lateral).y-gate.y;}
     }
-    for(const p of snapshot.players)if(p.ai&&p.pose) {
-     const visual=visuals[p.slot-1];if(!visual)continue;const state=p.vehicleState;
+    for(const p of snapshot.players)if(p.uid!==uid&&p.pose) {
+     const entry=byUid.get(p.uid),visual=entry?.visual;if(!visual)continue;const state=p.vehicleState;
      const immersive=!!context.vrPresentation?.active||context.camMode===1||context.camera?.userData?.vehicleClearanceMode==='clearance-first-person';
-     visual.root.visible=raceGhostVisible(p,rivals[p.slot-1].profile.variant,{immersive,eye:context.camera?.position});
+     visual.root.visible=raceGhostVisible(p,entry.profile.variant,{immersive,eye:context.camera?.position});
      visual.root.position.set(p.pose.x,state?.y??p.pose.y+1.2,p.pose.z);
      visual.root.rotation.set(state?.terrainPitch||0,p.pose.yaw,state?.terrainRoll||0,'YXZ');
      syncCuratedVehicleGroundPivot(visual.root);

@@ -26,3 +26,11 @@ in-memory service. Prototype a bounded single-authority room lease with explicit
 interruption/reconnect behavior and durable results; capacity beyond that needs
 a separately measured architecture. Verify Firebase sessions including revocation
 using the [existing Admin Auth contract](https://firebase.google.com/docs/auth/admin/manage-sessions).
+
+## Implemented room authority
+
+The prototype boundary is now implemented in `services/racing/`: portable engine bundle, bounded transport, session owner and Firestore custody/result adapter. The existing personal-car and room owners also cover the starter BMW without replacing its authored mesh. Ordinary heartbeats yield during the race and resume afterward; ordinary presence does not draw a duplicate delayed race car.
+
+The existing Rankings UI reads committed server boards separately from Journal practice. Class identity includes course, car, upgrades, starting condition, grip, grid row/length and physics version. Personal classes have a paged server-owned read projection. A single immutable result/lease-fenced transaction owns boards, reputation counters and bounded existing-wallet awards. Connection recovery can retrieve an already committed result; a pre-commit instance loss cancels rather than fabricating continuation or payment.
+
+Real Auth/Firestore emulators, actual socket transport and two isolated browser accounts passed the controlled road flow, Journal/Rankings return, ordinary starter-custody resumption and targeted failure boundaries. The production entry point requires real App Check and revoked-token checks; the controlled adapter is not its live-service verification. Staging deployment, approved geographic course publication and measured latency/capacity remain before competitive release. See the service README and current release ledger; earlier proposal text is historical design context.

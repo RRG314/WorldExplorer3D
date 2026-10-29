@@ -88,7 +88,7 @@ function basePracticeXp(event = {}, context = {}) {
 function repetitionKeyForEvent(event = {}) {
   // Upgrading/changing a car separates lap records, but does not reset the
   // existing character's diminishing practice rewards for the same course.
-  if (event.metadata?.racingPracticeVersion === 1 && /^road-race-[a-f0-9]{32}$/.test(event.metadata.courseId)) {
+  if ((event.metadata?.racingPracticeVersion === 1 || event.metadata?.raceVerified===true&&typeof event.metadata.serverResultId==='string') && /^road-race-[a-f0-9]{32}$/.test(event.metadata.courseId)) {
     return `road-racing|${event.metadata.courseId}|${boundedText(event.regionId || event.worldIdentity, 120)}`;
   }
   const activity = boundedText(event.activityId || event.eventType, 80);

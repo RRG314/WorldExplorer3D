@@ -221,6 +221,8 @@ async function claimUrbanVehicleLease(options = {}) {
   return runTransaction(async (transaction) => {
     const snapshot = await transaction.get(entityRef);
     const current = snapshotData(snapshot);
+    if(current?.raceCustody&&timestampMillis(current.raceCustody.expiresAt,0)>nowMs)
+      return Object.freeze({accepted:false,reason:'vehicle_in_race'});
     let personal=null;
     if(entityId.startsWith('personal:')){
       const [,ownerUid,vehicleId]=entityId.split(':');
@@ -272,6 +274,8 @@ async function updateUrbanVehicleLease(options = {}) {
     const snapshot = await transaction.get(entityRef);
     const current = snapshotData(snapshot);
     if (!current || current.kind !== 'vehicle') return Object.freeze({ accepted: false, reason: 'missing' });
+    if(current.raceCustody&&timestampMillis(current.raceCustody.expiresAt,0)>nowMs)
+      return Object.freeze({accepted:false,reason:'vehicle_in_race'});
     const leaseExpiresMs = timestampMillis(current.leaseExpiresAt, 0);
     if (current.leaseOwnerUid !== uid || leaseExpiresMs <= nowMs) return Object.freeze({ accepted: false, reason: 'not_owner' });
     const nextPose = normalizePose(input?.pose || current.pose);

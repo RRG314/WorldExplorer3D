@@ -24,7 +24,7 @@ test('room vehicle lease state clears expired and missing ownership', () => {
 });
 
 
-function leaseHarness(updateVehicle = async () => ({ accepted: true })) {
+function leaseHarness(updateVehicle = async () => ({ accepted: true }),isSuspended=()=>false) {
   const vehicle = { id: 'car', attachedToPlayer: false };
   const authority = { updateVehicle };
   let lease = { authority, vehicle };
@@ -32,6 +32,7 @@ function leaseHarness(updateVehicle = async () => ({ accepted: true })) {
   const rejected = [], errors = [];
   let sequence = 0;
   const heartbeat = createVehicleLeaseHeartbeat({
+    isSuspended,
     getLease: () => lease, vehiclePose: () => ({ x: 2, y: 3, z: 4 }),
     onRejected: (...args) => rejected.push(args), onError: error => errors.push(error),
     setInterval: callback => { timers.set(++sequence, callback); return sequence; },
@@ -41,6 +42,14 @@ function leaseHarness(updateVehicle = async () => ({ accepted: true })) {
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
+
+test('race custody suspends ordinary writes and resumes the same heartbeat without ejecting the driver',async()=>{
+ let suspended=false,calls=0,inRace=true;
+ const h=leaseHarness(async()=>{calls++;return inRace?{accepted:false,reason:'vehicle_in_race'}:{accepted:true};},()=>suspended);
+ h.heartbeat.start();await settle();assert.equal(calls,1);assert.equal(h.rejected.length,0);assert.equal(h.timers.size,1);
+ suspended=true;await h.heartbeat.tick();assert.equal(calls,1);
+ suspended=false;inRace=false;await h.heartbeat.tick();assert.equal(calls,2);assert.equal(h.timers.size,1);assert.equal(h.rejected.length,0);h.heartbeat.stop();
+});
 
 test('room lease renews during entry without any animation frames and stops after exit', async () => {
   const calls = [];

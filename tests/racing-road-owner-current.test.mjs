@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createPracticeRaceController,canOwnRoadRace} from '../app/js/racing/road-activity-controller.js';
-import {advanceRoadRaceFrame} from '../app/js/physics/road-race-delegate.js';
+import {advanceRoadRaceFrame,releaseRoadRaceMotion} from '../app/js/physics/road-race-delegate.js';
 import {buildRaceRoadGraph,createRaceCourse} from '../app/js/racing/course-rules.js';
 import {createRaceVehicleProfile} from '../app/js/racing/vehicle-controller.js';
 import {raceDistrictFingerprint,raceCourseReference,restoreRaceCourse} from '../app/js/racing/course-library.js';
@@ -8,6 +8,13 @@ function setup(){const roads=[{sourceId:'mapped',a:{x:0,y:3,z:0},b:{x:0,y:3,z:30
  const graph=buildRaceRoadGraph(roads),course=createRaceCourse(graph,['mapped:forward'],{locationId:'test',locationLabel:'Test',anchor:{lat:43,lon:7},participants:1});
  const c={worldPublication:{requestId:'one'},car:{x:1,y:4.2,z:2,personalVehicleId:'bmw_e34'},Walk:{state:{mode:'drive'}},activateSurfaceActivity(mode,pose){this.car={...this.car,x:pose.x,y:pose.y+1.2,z:pose.z,angle:pose.yaw};return true;}};
  return {c,course,roads,graph,profile:createRaceVehicleProfile('bmw_e34')};}
+test('leaving an admitted road race stops momentum without relocating or touching a replacement actor',()=>{
+ const h=setup(),run=createPracticeRaceController({context:h.c,course:h.course,profile:h.profile});h.c.roadRaceController=run;run.start();
+ h.c.car.speed=12;h.c.car.vFwd=12;h.c.car.throttleSm=1;const pose={x:h.c.car.x,y:h.c.car.y,z:h.c.car.z,angle:h.c.car.angle};
+ assert.equal(releaseRoadRaceMotion(h.c,run),true);assert.equal(h.c.car.speed,0);assert.equal(h.c.car.vFwd,0);assert.equal(h.c.car.throttleSm,0);
+ assert.deepEqual({x:h.c.car.x,y:h.c.car.y,z:h.c.car.z,angle:h.c.car.angle},pose);
+ h.c.worldPublication={requestId:'other'};h.c.car.speed=8;const before={...h.c.car};assert.equal(releaseRoadRaceMotion(h.c,run),false);assert.deepEqual(h.c.car,before);run.dispose();
+});
 test('the existing physics frame exclusively consumes practice controls from grid to finish',()=>{
  const h=setup();let complete;const controller=createPracticeRaceController({context:h.c,course:h.course,profile:h.profile,onComplete:s=>complete=s});
  h.c.roadRaceController=controller;controller.start();const grid=h.c.car.z;

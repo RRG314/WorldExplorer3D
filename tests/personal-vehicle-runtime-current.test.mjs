@@ -17,6 +17,8 @@ function harness(){
  }},vehicleUpgradeStore:{garageSnapshot:()=>garage,hydrateGarage:next=>{garage=next;}},roomAuthorityRuntime:{
    claimPreparedVehicle:async()=>({accepted:true,state:{pose:{x:10,y:3,z:12,yaw:1}}}),
    releasePreparedVehicle:()=>events.push('releaseLease'),adoptPreparedVehicle:()=>events.push('adoptLease')}};
+ state.roomAuthorityRuntime.ensureDefaultDriverLease=async vehicle=>{events.push(['defaultLease',vehicle.id]);return {accepted:true};};
+ state.roomAuthorityRuntime.releaseDefaultDriverLease=()=>events.push('releaseDefaultLease');
  const options={context,state,isCurrent:()=>current,
   prepare:()=>new Promise(resolve=>{stagedResolve=resolve;events.push('prepare');}),
   applyPublishedPose:(v,p)=>{v.pose=p;events.push('roomPose');},
@@ -34,6 +36,21 @@ function harness(){
   delayedSave:()=>saveResolve={},completeSave:()=>saveResolve.resolve({ok:true,garage})};
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+test('the current starter obtains ordinary room custody without spawning or replacing its model',async()=>{
+ const h=harness();h.uid('owner');h.runtime.rebindOwner('owner');h.context.Walk.state.mode='drive';Object.assign(h.car,{personalVehicleId:'bmw_e34',x:5,y:2,z:7,angle:.4});
+ const pose={x:h.car.x,y:h.car.y,z:h.car.z};const result=await h.runtime.ensureRoomVehicleLease('bmw_e34');
+ assert.equal(result.ok,true);assert.ok(h.events.some(e=>Array.isArray(e)&&e[0]==='defaultLease'&&e[1]==='personal:owner:bmw_e34'));
+ assert.ok(!h.events.some(e=>['prepare','releaseOld','mode','spawn','mount'].includes(e)));assert.deepEqual({x:h.car.x,y:h.car.y,z:h.car.z},pose);
+ for(const patch of [{planeMode:{active:true}},{oceanMode:{active:true}},{boatMode:{active:true}},{spaceFlight:{active:true}}]){
+  Object.assign(h.context,patch);assert.equal((await h.runtime.ensureRoomVehicleLease('bmw_e34')).ok,false);for(const key of Object.keys(patch))delete h.context[key];
+ }
+ h.context.Walk.state.mode='walk';assert.equal((await h.runtime.ensureRoomVehicleLease('bmw_e34')).ok,false);
+});
+test('failed condition synchronization cannot turn a damaged starter into a healthier online car',async()=>{
+ const h=harness();h.uid('owner');h.runtime.rebindOwner('owner');h.context.Walk.state.mode='drive';Object.assign(h.car,{personalVehicleId:'bmw_e34',condition:.3,x:5,y:2,z:7});
+ const result=await h.runtime.ensureRoomVehicleLease('bmw_e34');assert.equal(result.ok,false);assert.equal(result.reason,'vehicle_condition_save_required');
+ assert.ok(!h.events.some(e=>Array.isArray(e)&&e[0]==='defaultLease'));assert.equal(h.car.condition,.3);
+});
 test('selected car stages before releasing old controls and adopts the room-published pose',async()=>{
  const h=harness(),pending=h.runtime.selectAndDrive('delorean');assert.deepEqual(h.events,['prepare']);
  h.resolve();const result=await pending;assert.equal(result.ok,true);assert.equal(result.assetId,personalVehicleById('delorean').assetId);

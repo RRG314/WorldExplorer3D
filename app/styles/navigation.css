@@ -226,7 +226,15 @@
 .racing-hub .racing-primary {width:100%;background:var(--wx-action);color:var(--wx-action-text);font-weight:700;margin:0;}
 .racing-hub .racing-primary:hover {background:var(--wx-action-hover);}
 .racing-start-bar .racing-note {font-size:11px;margin:6px 0 0;}
+.racing-lobby-actions {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.racing-lobby-actions[hidden] {display:none;}
+.racing-lobby-actions button {padding:10px 6px;}
+.racing-hub[data-race-view="lobby"] :is([data-race-start],.racing-note,.racing-setup-controls,.racing-extra) {display:none;}
+.racing-hub[data-race-view="lobby"] .racing-setup {display:none;}
+.racing-hub[data-race-view="lobby"] .racing-layout {grid-template-columns:1fr;}
+.racing-online {border-top:1px solid var(--wx-line-soft);margin-top:12px;}
 .racing-hub[data-race-view="results"] {height:auto;max-height:90dvh;}
+.racing-hub[data-race-view="results"][open] {height:fit-content;}
 .racing-hub[data-race-view="results"] :is(.racing-layout,.racing-toolbar,.racing-start-bar,[data-race-status]) {display:none;}
 .racing-hub [data-race-results] {border-top:1px solid var(--wx-line-soft);padding-top:16px;overflow:auto;min-height:0;}
 .racing-hub ol {padding-left:24px;line-height:2;}

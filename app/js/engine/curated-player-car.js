@@ -160,4 +160,4 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
   return loadPromise;
 }
 
-export { attachCuratedPlayerCar };
+export { attachCuratedPlayerCar, prepareE34Model };

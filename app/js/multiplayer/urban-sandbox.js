@@ -7,6 +7,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { initFirebase } from '../../../js/firebase-init.js?v=58';
+import {personalVehicleById} from '../transport/vehicle-garage-rules.js';
 import {
   claimUrbanVehicle,
   commitUrbanCivicEvent,
@@ -118,12 +119,13 @@ function createUrbanRoomAuthority(options = {}) {
   );
 
   function vehicleInput(vehicle, pose) {
+    const personal=personalVehicleById(vehicle.personalVehicleId);
     return {
       roomCode,
       worldSeed,
       entityId: vehicle.id,
-      label: vehicle.variant?.label || vehicle.label || 'Vehicle',
-      style: vehicle.variant?.bodyStyle || vehicle.style || 'sedan',
+      label: personal?.label || vehicle.variant?.label || vehicle.label || 'Vehicle',
+      style: personal?.category || vehicle.variant?.bodyStyle || vehicle.style || 'sedan',
       color: vehicle.color,
       pose
     };

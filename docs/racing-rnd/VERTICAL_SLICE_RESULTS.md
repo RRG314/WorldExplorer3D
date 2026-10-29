@@ -2,21 +2,22 @@
 
 Evidence date: October 28, 2026. Baseline `7da846f`; current working-source improvements are distinguished from unimplemented racing. No production deployment or purchase.
 
-The complete racing vertical slice is NOT implemented or accepted yet. The current package repairs the shared ordinary-vehicle foundation and provides career proposals. A model gallery,garage UI or working single-player countdown is not the requested full racing game.
+The single-player city slice is implemented and has retained actual gameplay evidence. The authenticated multiplayer slice is implemented and has controlled real-network/database/browser evidence. Full product release still requires approved geographic publication, the selected career, major venues, operational and performance acceptance.
 
-| Required step | Status/dependency |
+| Required step | Current evidence |
 |---|---|
-| Main-menu Racing,real-city choice | Interface proposal;gameplay adapter pending |
-| Owned/starter vehicle | Shared garage implementation under focused verification |
-| Valid route,grid,countdown | Race-grade validation and authoritative session pending |
-| Improved handling/checkpoints/laps | Existing controller retained;race-rule integration pending |
-| Credible AI | Controller-driven opponent prototype pending |
-| Finish/personal record/existing board | Versioned result adapters pending;unverified records must remain labelled |
-| Custom route save/test | Editor/course validator pending |
-| Second authenticated player,authoritative result | Low-latency transport and authority proof pending |
-| Return without progress loss | Ordinary vehicle/world ownership repaired;race-session restoration still pending |
+| Open Racing and choose a real city | Actual frozen Monaco hub and normal destination flow |
+| Owned/starter vehicle | Shared garage/selection and current ordinary room custody; no alternate car inventory |
+| Qualified route, grid, countdown | Actual city practice; shared server clock in controlled two-account racing |
+| Handling/checkpoints/laps | Existing road delegate and portable vehicle/timing rules; real keyboard completion |
+| AI rivals | Two actual models using the same controller; retained city finish evidence |
+| Finish, Journal and personal times | Actual city + real IndexedDB; retries/account guards/cache-loss recovery |
+| Shared times and awards | Auth/Firestore emulators and actual socket/browser flow; immutable receipt and existing-wallet transaction |
+| Custom route save/test | Actual city route creation, finish and retained draft; server publication/moderation still pending |
+| Second authenticated player | Two accounts completed through WebSockets; latest browser also uses actual personal/room owners. Geographic and App Check seams controlled |
+| Return to ordinary exploration | Actual city practice return; controlled online return and resumed starter-car lease |
 
-No backend competitive race,reward,track publication or AI result is described as passed. Follow the owner progression checkpoint before final career integration,then replace each pending row only with actual evidence from the exact source/build.
+The new service is not deployed. Controlled completion does not certify a full major venue, a live competitive service or all physical input devices. Current release requirements are in `RELEASE_READINESS.md` and `FINISH_GOAL.md`.
 
 ## Shared foundation verification update
 

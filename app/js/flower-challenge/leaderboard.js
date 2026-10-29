@@ -348,7 +348,7 @@ function createFlowerChallengeLeaderboardApi(context) {
         racingView ||= createRacingTimesView({appCtx,ui,getSignedInUser,limit:LEADERBOARD_LIMIT});
         const result=await racingView.read(current);
         if(!current()||!result)return null;
-        racingView.render(result);if(ui.status)ui.status.dataset.backend='Racing: Journal on this device';
+        racingView.render(result);if(ui.status)ui.status.dataset.backend=ui.racingSource?.value==='online'?'Racing: server results':'Racing: Journal on this device';
         return result.entries;
       }catch{if(current()){racingView?.clear();if(ui.status)ui.status.textContent='Your saved racing times could not be read. Your Journal and garage are kept. Try Refresh.';}return null;}
       finally{if(current()&&ui.titleRefreshBtn){ui.titleRefreshBtn.disabled=false;ui.titleRefreshBtn.removeAttribute('aria-busy');}}

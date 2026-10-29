@@ -2191,6 +2191,19 @@ exports.commitExplorerVehicleAction = functions.region('us-central1').runWith({ 
   }
 });
 
+function racingReadHandler(operation){return functions.region('us-central1').runWith({invoker:'public'}).https.onRequest(async(req,res)=>{
+ if(setCors(req,res))return;
+ if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+ const auth=await verifyAuth(req,res);if(!auth)return;
+ if(!await verifyAppCheck(req,res))return;
+ if(auth.firebase?.sign_in_provider==='anonymous')return res.status(403).json({error:'Sign in with an account to use online racing.'});
+ try{await require('./community-consent').requireCommunityConsent(db,auth.uid);
+  res.set('Cache-Control','no-store');return res.status(200).json(await operation(auth.uid,req.body));
+ }catch(error){return res.status(error.status||500).json({error:error.status?error.message:'Racing could not be read. Try again.'});}
+});}
+exports.getRacingService=racingReadHandler(async()=>require('./racing-api').racingServiceDescriptor(db));
+exports.getRacingRecords=racingReadHandler(async(uid,input)=>require('./racing-api').readRacingRecords({db,uid,boardId:input?.boardId,cursor:input?.cursor}));
+
 exports.saveExplorerPlayerCondition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });

@@ -53,12 +53,33 @@ export async function readRacingPracticeBests({ownerUid='',storage=globalThis.lo
 }
 
 export function createRacingTimesView({appCtx,ui,getSignedInUser,limit=10}) {
- let result=null,courseId='',setupId='';
+ let result=null,courseId='',setupId='',source='practice',paintRevision=0,readSequence=0,readCurrent=()=>true;
+ const practiceHint=ui.titleHint?.textContent||'Practice results on this device; these are not verified online times.';
  const doc=ui.titleList.ownerDocument,course=ui.racingCourse,setup=ui.racingSetup;
  const text=(tag,value,className)=>{const node=doc.createElement(tag);node.textContent=value;if(className)node.className=className;return node;};
- function clear(){result=null;ui.titleList.replaceChildren();course?.replaceChildren();setup?.replaceChildren();}
+ function clear(){paintRevision++;readSequence++;result=null;ui.titleList.replaceChildren();course?.replaceChildren();setup?.replaceChildren();}
+ async function paintOnline(){
+  const revision=++paintRevision,owner=result?.ownerUid,entry=result?.entries.find(e=>e.id===setupId);
+  ui.titleList.replaceChildren(text('li',entry?'Loading shared times…':'Finish an online race to add a course and car class.','flowerLeaderboardEmpty'));
+  if(!entry)return;
+  if(ui.titleHint)ui.titleHint.textContent='Server-timed races with the same course, car, upgrades, starting condition, grid row and physics version.';
+  if(ui.titleScope)ui.titleScope.textContent='Online races • Same car setup';
+  try{const {readOnlineRacingRecords}=await import('./service-client.js'),response=await readOnlineRacingRecords({ownerUid:owner,boardId:entry.id});
+   if(revision!==paintRevision||source!=='online'||getSignedInUser?.()?.uid!==owner||!readCurrent())return;
+   let rank=0;
+   ui.titleList.replaceChildren(...response.entries.slice(0,limit).map((row,index)=>{const li=text('li','','flowerLeaderboardItem');
+    if(!index||row.timeMs!==response.entries[index-1].timeMs)rank=index+1;
+    li.append(text('span',String(rank),'flowerLeaderboardRank'),text('span',row.player,'flowerLeaderboardPlayer'),text('span',`${(row.timeMs/1000).toFixed(2)}s`,'flowerLeaderboardTime'),text('span',entry.vehicleLabel,'flowerLeaderboardLoc'));return li;}));
+   if(!response.entries.length)ui.titleList.append(text('li','No shared results for this setup yet.','flowerLeaderboardEmpty'));
+   if(ui.status)ui.status.textContent='Server-verified times · Fastest first · Blocked players omitted';
+  }catch{if(revision===paintRevision&&source==='online'&&getSignedInUser?.()?.uid===owner&&readCurrent())ui.titleList.replaceChildren(text('li','Shared times could not load. Try Refresh. Your results are kept.','flowerLeaderboardEmpty'));}
+ }
  function paint(){
   if(!result||(getSignedInUser?.()?.uid||'')!==result.ownerUid){clear();return;}
+  if(ui.titleBadge)ui.titleBadge.textContent=source==='online'?'Online racing':'My racing times';
+  if(ui.titleScope)ui.titleScope.textContent=source==='online'?'Online races • Same car setup':'This device • Practice';
+  if(ui.titleHint)ui.titleHint.textContent=source==='online'?'Server-timed races with the same course, car, upgrades, starting condition, grid row and physics version.':practiceHint;
+  if(source==='online'){void paintOnline();return;}paintRevision++;
   const entries=result.entries.filter(e=>e.courseId===courseId&&(setupId==='all'||e.id===setupId));
   ui.titleList.replaceChildren(...entries.slice(0,limit).map(entry=>{
    const li=doc.createElement('li');li.className='flowerLeaderboardItem';
@@ -70,23 +91,38 @@ export function createRacingTimesView({appCtx,ui,getSignedInUser,limit=10}) {
  }
  function setSetups(){
   const rows=result.entries.filter(e=>e.courseId===courseId);
-  if(!rows.some(e=>e.id===setupId))setupId='all';
-  if(setup){setup.replaceChildren(new Option('All my car setups','all'),...rows.map(e=>new Option(`${e.vehicleLabel} · ${e.condition===null?'saved':e.condition+'%'} · ${e.setupId}`,e.id)));setup.value=setupId;setup.disabled=!rows.length;}
+  if(!rows.some(e=>e.id===setupId))setupId=source==='online'?rows[0]?.id||'':'all';
+  if(setup){setup.replaceChildren(...(source==='online'?[]:[new Option('All my car setups','all')]),...rows.map(e=>new Option(`${e.vehicleLabel} · ${e.condition===null?'saved':e.condition+'%'}${source==='online'&&Number.isInteger(e.gridRow)?` · Row ${e.gridRow+1}`:''} · ${e.setupId}`,e.id)));setup.value=setupId;setup.disabled=!rows.length;}
   paint();
  }
  if(course)course.onchange=()=>{courseId=course.value;setupId='all';setSetups();};
  if(setup)setup.onchange=()=>{setupId=setup.value;paint();};
- return {clear,async read(isCurrent){
+ async function read(isCurrent){
+  readCurrent=isCurrent;const request=++readSequence,expected=source,current=()=>request===readSequence&&source===expected&&isCurrent();
   const ownerUid=getSignedInUser?.()?.uid||'';
+  if(source==='online'){
+   if(!ownerUid)throw Error('race_signed_account_required');
+   const {readOnlineRacingRecords}=await import('./service-client.js'),entries=[];let cursor='';
+   do{const response=await readOnlineRacingRecords({ownerUid,...(cursor?{cursor}:{})});if(!current())return null;
+    if(!Array.isArray(response.entries)||response.entries.length>32||response.entries.some(e=>!/^([a-f0-9]{64})$/.test(e.id)||e.id<=cursor)||response.nextCursor&&(response.nextCursor<=cursor||response.nextCursor!==response.entries.at(-1)?.id))throw Error('invalid_race_board_page');
+    entries.push(...response.entries);cursor=response.nextCursor||'';
+   }while(cursor);
+   return {ownerUid,entries:entries.map(r=>({id:r.id,courseId:r.courseId,courseName:r.courseName,vehicleLabel:personalVehicleById(r.configuration.vehicleId)?.label||'Car',
+    timeMs:r.timeMs,condition:Math.round(r.configuration.condition*100),gridRow:r.configuration.gridRow,setupId:r.id.slice(-6),location:r.location}))};
+  }
   let store=appCtx.discoveryProfileStore;
   if(!store?.listEventsByIdPrefix){const {createIndexedDbDiscoveryProfileStore}=await import('../discovery/profile-store.js?v=5');store=createIndexedDbDiscoveryProfileStore();}
   return readRacingPracticeBests({ownerUid,lookupEvents:appCtx.getExplorerEventsById||store.getEventsById?.bind(store),
-   listEventsByIdPrefix:store.listEventsByIdPrefix.bind(store),isCurrent:()=>isCurrent()&&(getSignedInUser?.()?.uid||'')===ownerUid});
- },render(next){
+   listEventsByIdPrefix:store.listEventsByIdPrefix.bind(store),isCurrent:()=>current()&&(getSignedInUser?.()?.uid||'')===ownerUid});
+ }
+ if(ui.racingSource)ui.racingSource.onchange=()=>{source=ui.racingSource.value==='online'?'online':'practice';clear();const expected=source;
+  void read(readCurrent).then(next=>{if(source===expected&&next)render(next);}).catch(()=>{if(source===expected){ui.titleList.replaceChildren(text('li',source==='online'?'Online results could not load. Sign in and try Refresh.':'Practice times could not load. Try Refresh.','flowerLeaderboardEmpty'));}});};
+ function render(next){
   result=next;if(!result||(getSignedInUser?.()?.uid||'')!==result.ownerUid){clear();return;}
   const courses=[...new Map(result.entries.map(e=>[e.courseId,e])).values()];
   if(!courses.some(e=>e.courseId===courseId))courseId=courses[0]?.courseId||'';
   if(course){course.replaceChildren(...courses.map(e=>new Option(e.courseName,e.courseId)));course.value=courseId;course.disabled=!courses.length;}
   setSetups();
- }};
+ }
+ return {clear,read,render};
 }

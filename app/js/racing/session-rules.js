@@ -26,12 +26,12 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   if(!handling||handling.width>envelope.widthMeters||handling.length>envelope.lengthMeters||handling.height>envelope.heightMeters)throw Error('race_vehicle_exceeds_course_envelope');
   const p={uid,label:String(label||'Explorer').slice(0,40),profile,ai:ai===true,difficulty:Math.max(0,Math.min(1,Number(difficulty)||.65)),ready:ai===true,
    slot:players.size,car:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false};
-  players.set(uid,p);return snapshot();
+  players.set(uid,p);for(const other of players.values())if(!other.ai)other.ready=false;return snapshot();
  }
  function setReady(uid,ready){lobby();const p=participant(uid);if(p.ai)throw Error('race_rival_control_forbidden');p.ready=ready===true;return snapshot();}
  function start(uid,nowMs){
   lobby();if(uid!==leaderUid)throw Error('race_leader_required');
-  if(players.size<1||!activeHumans().length||[...players.values()].some(p=>!p.ready))throw Error('race_not_ready');
+  if(players.size<1||!activeHumans().length||[...players.values()].some(p=>!p.ready||p.disconnectedAt!==null))throw Error('race_not_ready');
   if(!Number.isFinite(nowMs)||nowMs<lastNow)throw Error('invalid_race_clock');
   startAtMs=nowMs+4000;lastNow=nowMs;phase='countdown';
   for(const p of players.values()){p.car=createRaceVehicleState(raceGridPose(course,p.slot),p.profile);stepRaceVehicle(course,p.car,NEUTRAL,1/60,p.profile);p.progress=createRaceProgress(raceVehicleGroundPose(p.car),startAtMs);}
@@ -46,7 +46,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   if(p.queue.length>=32)throw Error('race_controls_rate_limited');
   p.lastSequence=sequence;p.queue.push({actions:normalized,at:receivedAtMs});return true;
  }
- function disconnect(uid,nowMs){const p=participant(uid);if(p.ai)return;p.disconnectedAt=nowMs;p.queue=[];p.actions=NEUTRAL;}
+ function disconnect(uid,nowMs){const p=participant(uid);if(p.ai)return;p.disconnectedAt=nowMs;if(phase==='lobby')p.ready=false;p.queue=[];p.actions=NEUTRAL;}
  function reconnect(uid,nowMs){const p=participant(uid);if(p.progress?.finished)return snapshot();if(p.left||p.dnf||p.disconnectedAt!==null&&nowMs-p.disconnectedAt>10000)throw Error('race_reconnect_expired');p.disconnectedAt=null;p.queue=[];p.actions=NEUTRAL;return snapshot();}
  function leave(uid,nowMs){
   const p=participant(uid);if(phase==='lobby'){players.delete(uid);for(const [index,row]of [...players.values()].entries())row.slot=index;if(uid===leaderUid)leaderUid=activeHumans()[0]?.uid||'';if(!activeHumans().length){phase='cancelled';reason='race_empty';}}
@@ -85,14 +85,16 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
  function snapshot(){
   const ordered=[...players.values()].sort((a,b)=>a.dnf-b.dnf||(a.progress?.finished&&b.progress?.finished?a.progress.elapsedMs-b.progress.elapsedMs:a.progress?.finished?-1:b.progress?.finished?1:
    (b.progress?.lap||1)-(a.progress?.lap||1)||(b.progress?.nextGate||0)-(a.progress?.nextGate||0)));
+  let previousPosition=0;
   return {id,phase,reason,courseName:course.name,discipline:course.discipline,laps:course.laps,creatorUid,leaderUid,createdAtMs,startAtMs,
    serverAtMs:lastNow,simulationAtMs:startAtMs===null?null:startAtMs+tick*STEP_MS,completedAtMs,
-   players:ordered.map((p,index)=>({uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
-    disconnected:p.disconnectedAt!==null,dnf:p.dnf,position:index+1,lastInputSequence:p.lastSequence,pose:p.car?raceVehicleGroundPose(p.car):null,
+   players:ordered.map((p,index)=>{const previous=ordered[index-1],tied=!p.dnf&&p.progress?.finished&&previous?.progress?.finished&&p.progress.elapsedMs===previous.progress.elapsedMs;
+    const position=tied?previousPosition:index+1;previousPosition=position;return {uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
+    disconnected:p.disconnectedAt!==null,dnf:p.dnf,position,lastInputSequence:p.lastSequence,pose:p.car?raceVehicleGroundPose(p.car):null,
     speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,barrierContacts:p.car?.barrierContacts??0,
     vehicleState:snapshotRaceVehicle(p.car),
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
-     bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null}))};
+     bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null};})};
  }
  return Object.freeze({add,setReady,start,control,advance,disconnect,reconnect,leave,snapshot,
   cancel(cancelReason='race_cancelled'){if(phase==='complete')return snapshot();phase='cancelled';reason=cancelReason;return snapshot();}});

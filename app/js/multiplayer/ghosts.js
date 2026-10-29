@@ -358,7 +358,13 @@ function createGhostManager(scene, options = {}) {
 
     const nowEpochMs = Date.now();
 
+    const race=options.getRoadRaceController?.();
+    const racePlayers=race?.isNetworkRace&&race.isCurrent?.()?race.snapshot()?.players:null;
     for (const entry of entries.values()) {
+      // The race renderer owns these same room players at network cadence.
+      // Keep presence data current for normal exploration, without drawing a
+      // second delayed car over the authoritative racing presentation.
+      entry.holder.visible=!racePlayers?.some(player=>player.uid===entry.uid);
       // Predict from the last network pose and smooth toward that target.
       const extrapolateSec = clamp((nowEpochMs - entry.lastPoseAtMs) / 1000, 0, MAX_EXTRAPOLATE_SECONDS);
       const predictedX = entry.target.x + entry.velocity.x * extrapolateSec;
