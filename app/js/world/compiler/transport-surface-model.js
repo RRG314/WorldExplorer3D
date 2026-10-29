@@ -3,6 +3,7 @@ import { sampleSortedProfileAtDistance } from '../../structure-semantics/profile
 import {tunnelObstructionMaximumY, tunnelRoofHalfWidth} from './tunnel-envelope.js';
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
+import {validateReviewedDeckProfile,sampleReviewedDeckProfile} from './reviewed-deck-profile.js';
 import {
   polylineDistances,
   sampleProfileAtDistance
@@ -230,6 +231,7 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     options.sampleStep,
     exactGraphNodeDistances,
     (feature.ordinaryStreetAnchors||[]).map(a=>a.distance).concat(
+      (Array.isArray(feature.surfaceSurveyEvidence?.deckProfile?.samples)?feature.surfaceSurveyEvidence.deckProfile.samples:[]).map(p=>p.t*total),
       (feature.tunnelObstructionLimits || []).flatMap(limit => [limit.start, limit.end])),
     allocate
   );
@@ -294,9 +296,11 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const terrainEnvelope = allocate(Float32Array, sampleCount);
   const mode = semantics?.terrainMode || 'at_grade';
   const surfaceSurvey=feature.surfaceSurveyEvidence||null;
-  if(surfaceSurvey&&(surfaceSurvey.version!==1||mode!=='at_grade'||engineeredApproach||
+  const reviewedDeck=validateReviewedDeckProfile(surfaceSurvey,mode,total,maximumGrade);
+  if(surfaceSurvey&&(surfaceSurvey.version!==1||(mode!=='at_grade'&&(!reviewedDeck||!semantics.isBridge))||
     surfaceSurvey.sourceFeatureId!==String(feature.sourceFeatureId)||!surfaceSurvey.groundArtifactId||
     !/^[a-f0-9]{64}$/.test(surfaceSurvey.groundContentSha256)||!(surfaceSurvey.maximumCrossfall>0&&surfaceSurvey.maximumCrossfall<=.7)))throw Error('invalid_reviewed_road_surface');
+  if(reviewedDeck&&reviewedDeck.reconstructedWidthMeters+.02<compiledWidth*(Number(feature.metersPerWorldUnit)||1))throw Error('reviewed_deck_width_unavailable');
   const minimumStructureSurfaceY = Number(feature.minimumStructureSurfaceY);
   const maximumAtGradeCut = Math.max(
     0,
@@ -378,8 +382,8 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     groundHeights[index] = groundY;
     leftGround[index] = leftY;
     rightGround[index] = rightY;
-    offsets[index] = offset;
-    centerInitial[index] = centerY;
+    offsets[index] = reviewedDeck?sampleReviewedDeckProfile(reviewedDeck,progress).centerY-groundY:offset;
+    centerInitial[index] = reviewedDeck?sampleReviewedDeckProfile(reviewedDeck,progress).centerY+surfaceBias:centerY;
     terrainEnvelope[index] = atGradeReferenceY + surfaceBias;
     centerLowerBounds[index] = atGrade
       ? groundY + surfaceBias - maximumAtGradeCut
@@ -404,7 +408,7 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const hasTransitionAnchors =
     Array.isArray(feature?.structureTransitionAnchors) &&
     feature.structureTransitionAnchors.length > 0;
-  if (!hasTransitionAnchors && mode !== 'at_grade') {
+  if (!reviewedDeck && !hasTransitionAnchors && mode !== 'at_grade') {
     let structuralShift = 0;
     for (let index = 0; index < centerInitial.length; index += 1) {
       const controllingGround = mode === 'elevated'
@@ -424,7 +428,9 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     }
   }
 
-  let centerHeights = mode === 'at_grade'
+  let centerHeights = reviewedDeck
+    ? allocate(Float32Array,centerInitial)
+    : mode === 'at_grade'
     ? smoothSignedCutFillProfile(
         terrainEnvelope,
         centerLowerBounds,
@@ -474,7 +480,7 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     // Re-pinning nodes after it runs can recreate an infeasible one-sample
     // cliff on short OSM fragments, so no later writer may overwrite it.
   }
-  if (mode !== 'at_grade') {
+  if (!reviewedDeck && mode !== 'at_grade') {
     centerHeights = applyEndpointTieIns(
       feature,
       centerHeights,
@@ -564,7 +570,18 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   rightHeights.set(centerHeights);
   if(surfaceSurvey){
     for(let index=0;index<sampleCount;index++){
-      const leftDelta=leftGround[index]-groundHeights[index],rightDelta=rightGround[index]-groundHeights[index];
+      let leftDelta=leftGround[index]-groundHeights[index],rightDelta=rightGround[index]-groundHeights[index];
+      if(reviewedDeck){const crossfall=sampleReviewedDeckProfile(reviewedDeck,sampleDistances[index]/total).crossfall;leftDelta=crossfall*halfWidth;rightDelta=-leftDelta;}
+      else if(engineeredApproach){
+        // A direct reviewed deck join transfers its crossfall into the same
+        // approach profile, tapering back to the accepted ground cross-section.
+        for(const anchor of graphApproachAnchors){
+          if(!Number.isFinite(anchor.reviewedDeckCrossfall))continue;
+          const influence=Math.max(0,1-Math.abs(sampleDistances[index]-anchor.distance)/24);
+          leftDelta=leftDelta*(1-influence)+anchor.reviewedDeckCrossfall*halfWidth*influence;
+          rightDelta=rightDelta*(1-influence)-anchor.reviewedDeckCrossfall*halfWidth*influence;
+        }
+      }
       if(Math.max(Math.abs(leftDelta),Math.abs(rightDelta))/halfWidth>surfaceSurvey.maximumCrossfall)throw Error('reviewed_road_surface_crossfall_exceeded');
       leftHeights[index]+=leftDelta;rightHeights[index]+=rightDelta;
     }
@@ -582,13 +599,15 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     sourceFeatureId: String(feature.sourceFeatureId || feature.id || ''),
     terrainMode: mode,
     engineeredApproach,
-    surveyedSurface:surfaceSurvey?Object.freeze({...surfaceSurvey}):null,
+    surveyedSurface:surfaceSurvey?Object.freeze({...surfaceSurvey,...(reviewedDeck?{deckProfile:reviewedDeck}:{})}):null,
     verticalGroup: String(semantics?.verticalGroup || `${mode}:0`),
     width: halfWidth * 2,
     surfaceBias,
     maximumGrade,
     approachMaximumGrade,
-    endpointPolicy: engineeredApproach
+    endpointPolicy: reviewedDeck
+      ? 'reviewed_deck_profile'
+      : engineeredApproach
       ? 'graph_owned_integrated_approach'
       : mode === 'at_grade'
         ? 'compiled_centerline_terrain_fit'

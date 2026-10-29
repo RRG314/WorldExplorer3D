@@ -14,7 +14,10 @@ test('packed model buffers preserve all profiles, metadata and independent field
     };
     const ground = (x, z) => 15 + .02 * x + .04 * z + Math.sin(x * .09 + trial) * .5;
     const actual = current(feature, ground), expected = reference(feature, ground);
-    assert.deepEqual(actual, expected);
+    // The retained pre-packing reference predates the explicit optional source
+    // survey descriptor. Ordinary profiles have no such evidence; all numeric
+    // buffers and the remaining metadata still match the reference exactly.
+    assert.deepEqual(actual, {...expected,surveyedSurface:null});
     const fields = ['distances','pathDistances','groundHeights','offsets','leftGround','rightGround','centerHeights','leftHeights','rightHeights'];
     const before = Object.fromEntries(fields.map(key => [key, Array.from(actual[key])]));
     actual.groundHeights[0] += 10;
