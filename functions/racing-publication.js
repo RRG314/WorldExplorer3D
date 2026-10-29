@@ -41,9 +41,10 @@ async function writeRacingRoute({db,admin,uid,input,nowMs=Date.now()}){
   const ref=db.collection('racingCourses').doc(id),projection=db.collection('users').doc(uid).collection('racingRoutes').doc(id);
   const status=await db.runTransaction(async tx=>{
    const previous=data(await tx.get(ref)),owned=await tx.get(db.collection('users').doc(uid).collection('racingRoutes').limit(41));
-   if(!previous&&owned.size>=40)fail('race_route_library_full',409);
-   if(previous&&previous.ownerUid!==uid)fail('race_route_already_exists',409);
-   if(previous&&previous.revision===revision)return previous.status;
+   const archived=previous?.ownerUid===null&&previous.status==='withdrawn'&&!previous.curation;
+   if((!previous||archived)&&owned.size>=40)fail('race_route_library_full',409);
+   if(previous&&previous.ownerUid!==uid&&!archived)fail('race_route_already_exists',409);
+   if(previous&&previous.revision===revision&&!archived)return previous.status;
    if(previous&&['review_required','approved'].includes(previous.status))fail('race_withdraw_before_editing',409);
    const next={ownerUid:uid,status:'draft',districtId:input.districtId,reference,revision,qualification:null,reviewNote:'',updatedAt:timestamp(admin,nowMs)};
    tx.set(ref,next);tx.set(projection,{districtId:input.districtId,status:'draft',revision});return 'draft';
@@ -85,12 +86,43 @@ async function moderateRacingRoute({db,admin,moderatorUid,input,nowMs=Date.now()
  return db.runTransaction(async tx=>{
   const r=data(await tx.get(ref));if(!r||r.revision!==input.revision)fail('race_route_changed',409);
   if(r.status==='approved'&&input.decision==='rejected'){}else if(r.status!=='review_required')fail('race_review_not_pending',409);
-  const d=data(await tx.get(db.collection('racingDistricts').doc(r.districtId))),pointer=d&&data(await tx.get(db.collection('racingLocations').doc(locationKey(d.facts.locationId))));
+  const d=data(await tx.get(db.collection('racingDistricts').doc(r.districtId))),pointer=d?.facts&&data(await tx.get(db.collection('racingLocations').doc(locationKey(d.facts.locationId))));
   if(input.decision==='approved'&&(d?.status!=='approved'||pointer?.districtId!==r.districtId||r.qualification?.revision!==r.revision||r.qualification.physicsVersion!==RACE_PHYSICS_VERSION))fail('race_test_route_first',409);
   tx.update(ref,{status:input.decision,reviewNote:note,reviewerUid:moderatorUid,reviewedAt:timestamp(admin,nowMs),updatedAt:timestamp(admin,nowMs)});
-  tx.set(db.collection('users').doc(r.ownerUid).collection('racingRoutes').doc(id),{districtId:r.districtId,status:input.decision,revision:r.revision});
+  if(r.ownerUid)tx.set(db.collection('users').doc(r.ownerUid).collection('racingRoutes').doc(id),{districtId:r.districtId,status:input.decision,revision:r.revision});
   tx.create(db.collection('adminActivity').doc(),{action:'racing_route_review',targetId:id,revision:r.revision,decision:input.decision,note,adminUid:moderatorUid,createdAt:timestamp(admin,nowMs)});
   return {id,revision:r.revision,status:input.decision};
+ });
+}
+// Trusted operator command, deliberately not exposed by a player HTTP endpoint.
+// A platform starter course retains its tested content after the temporary
+// authoring account is removed. Ordinary creator routes keep their own owner.
+async function adoptCuratedRacingRoute({db,admin,id,ownerUid,revision,note,approve=false,nowMs=Date.now()}){
+ courseId(id);if(typeof ownerUid!=='string'||!ownerUid||ownerUid.length>128||ownerUid.includes('/')||!/^[a-f0-9]{64}$/.test(revision||''))fail('race_invalid_curation');
+ const reviewNote=clean(note).slice(0,400);if(reviewNote.length<3)fail('race_curation_note_required');
+ return db.runTransaction(async tx=>{
+  const ref=db.collection('racingCourses').doc(id),r=data(await tx.get(ref));
+  if(!r||r.revision!==revision||r.status!=='approved')fail('race_curated_route_not_approved',409);
+  if(hash({districtId:r.districtId,reference:normalizeRaceRouteReference(r.reference)})!==revision)fail('race_course_changed',409);
+  if(r.ownerUid===null&&r.curation?.revision===revision)return {id,revision,curated:true,alreadyCurated:true};
+  if(r.ownerUid!==ownerUid)fail('race_route_owner_changed',409);
+  const d=data(await tx.get(db.collection('racingDistricts').doc(r.districtId))),pointer=d?.facts&&data(await tx.get(db.collection('racingLocations').doc(locationKey(d.facts.locationId))));
+  if(d?.status!=='approved'||!d.facts||await raceDistrictFingerprint(d.facts)!==`race-district:${r.districtId}`||pointer?.districtId!==r.districtId)fail('race_district_unavailable',409);
+  if(await raceCourseKey(await reconstructPublishedRace(r.reference,d.facts))!==id)fail('race_course_changed',409);
+  const q=r.qualification;if(q?.revision!==revision||q.physicsVersion!==RACE_PHYSICS_VERSION||!q.resultId)fail('race_test_route_first',409);
+  const [result,closing]=await Promise.all([tx.get(db.collection('racingResults').doc(q.resultId)),tx.get(db.collection('captureAccountDeletions').doc(ownerUid))]);
+  const evidence=data(result),finish=evidence?.receipt?.players?.find(p=>p.uid===ownerUid&&p.finished);
+  if(closing.exists)fail('race_account_closed',409);
+  if(evidence?.receipt?.purpose!=='qualification'||evidence.receipt.courseId!==id||evidence.receipt.courseRevision!==revision||evidence.receipt.physicsVersion!==RACE_PHYSICS_VERSION||
+    !/^[a-f0-9]{64}$/.test(evidence.fingerprint||'')||!finish||!Number.isFinite(finish.timeMs)||!(finish.timeMs>0)||finish.timeMs!==q.timeMs)fail('race_test_route_first',409);
+  if(!approve)return {id,revision,curated:false,dryRun:true,qualificationMs:finish.timeMs};
+  const curation={version:1,revision,physicsVersion:RACE_PHYSICS_VERSION,resultId:q.resultId,resultFingerprint:evidence.fingerprint,qualificationMs:finish.timeMs,note:reviewNote,adoptedAt:timestamp(admin,nowMs)};
+  tx.update(ref,{ownerUid:null,curation,updatedAt:timestamp(admin,nowMs)});
+  tx.delete(db.collection('users').doc(ownerUid).collection('racingRoutes').doc(id));
+  // No author UID is needed in permanent content provenance. The private
+  // operator log supplies audit identity; this receipt describes the content.
+  tx.create(ref.collection('curation').doc(revision),curation);
+  return {id,revision,curated:true,alreadyCurated:false};
  });
 }
 async function readMyRacingRoutes({db,uid}){
@@ -101,4 +133,4 @@ async function readMyRacingRoutes({db,uid}){
    reviewNote:r.reviewNote||'',tested:r.qualification?.revision===r.revision&&r.qualification?.physicsVersion===RACE_PHYSICS_VERSION});
  }return {items};
 }
-module.exports={locationKey,approvedDistrict,loadPublishedCourse,readRacingCatalog,writeRacingRoute,listRacingReview,moderateRacingRoute,readMyRacingRoutes};
+module.exports={locationKey,approvedDistrict,loadPublishedCourse,readRacingCatalog,writeRacingRoute,listRacingReview,moderateRacingRoute,readMyRacingRoutes,adoptCuratedRacingRoute};

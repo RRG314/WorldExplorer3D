@@ -46,6 +46,7 @@ async function main(){
   const ref=db.collection('racingDistricts').doc(prepared.id),old=await tx.get(ref);
   if(old.exists&&JSON.stringify(old.data().facts)!==JSON.stringify(prepared.record.facts))throw Error('Immutable district identity conflict.');
   if(!old.exists)tx.create(ref,{...prepared.record,reviewedAt:Timestamp.now()});
+  else if(old.data().status!=='approved')tx.update(ref,{status:'approved',credits:prepared.record.credits,reviewedAt:Timestamp.now()});
   tx.set(db.collection('racingLocations').doc(prepared.locationKey),{districtId:prepared.id,locationId:prepared.record.facts.locationId,updatedAt:Timestamp.now()});
  });console.log(JSON.stringify({approved:true,project,districtId:prepared.id,roads:prepared.record.facts.roads.length}));}
  finally{await db.terminate();}
