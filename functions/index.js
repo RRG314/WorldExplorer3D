@@ -2191,7 +2191,7 @@ exports.commitExplorerVehicleAction = functions.region('us-central1').runWith({ 
   }
 });
 
-function racingReadHandler(operation){return functions.region('us-central1').runWith({invoker:'public'}).https.onRequest(async(req,res)=>{
+function racingAccountHandler(operation){return functions.region('us-central1').runWith({invoker:'public'}).https.onRequest(async(req,res)=>{
  if(setCors(req,res))return;
  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
  const auth=await verifyAuth(req,res);if(!auth)return;
@@ -2201,11 +2201,26 @@ function racingReadHandler(operation){return functions.region('us-central1').run
   res.set('Cache-Control','no-store');return res.status(200).json(await operation(auth.uid,req.body));
  }catch(error){return res.status(error.status||500).json({error:error.status?error.message:'Racing could not be read. Try again.'});}
 });}
-exports.getRacingService=racingReadHandler(async()=>require('./racing-api').racingServiceDescriptor(db));
-exports.getRacingRecords=racingReadHandler(async(uid,input)=>require('./racing-api').readRacingRecords({db,uid,boardId:input?.boardId,cursor:input?.cursor}));
-exports.getRacingCatalog=racingReadHandler(async(uid,input)=>require('./racing-publication').readRacingCatalog({db,uid,locationId:input?.locationId,cursor:input?.cursor}));
-exports.getMyRacingRoutes=racingReadHandler(async(uid)=>require('./racing-publication').readMyRacingRoutes({db,uid}));
-exports.commitRacingRoute=racingReadHandler(async(uid,input)=>{
+exports.getRacingService=racingAccountHandler(async()=>require('./racing-api').racingServiceDescriptor(db));
+exports.getRacingCareer=racingAccountHandler(async(uid,input)=>{
+ const api=require('./racing-career');
+ return input?.view==='history'?api.readRacingCareerHistory({db,uid,kind:input.kind,cursor:input.cursor}):api.readRacingCareer({db,uid,roomCode:input?.roomCode});
+});
+exports.commitRacingCareer=racingAccountHandler(async(uid,input)=>{
+ const user=await admin.auth().getUser(uid);return require('./racing-career').commitRacingCareer({db,uid,input,label:user.displayName||'Explorer'});
+});
+exports.cleanupRacingDeletedAccount=functions.region('us-central1').runWith({failurePolicy:true}).auth.user().onDelete(async user=>{
+ const job=db.collection('captureAccountDeletions').doc(user.uid);
+ await db.runTransaction(async tx=>{if(!(await tx.get(job)).exists)tx.create(job,{status:'auth-deleted',updatedAt:admin.firestore.Timestamp.now()});});
+ await require('./racing-account-cleanup').cleanupRacingAccount({db,uid:user.uid});
+});
+exports.projectRacingCareer=functions.region('us-central1').runWith({failurePolicy:true}).firestore.document('racingResults/{resultId}').onCreate(async snapshot=>{
+ await require('./racing-career').projectRacingCareerResult({db,id:snapshot.id});
+});
+exports.getRacingRecords=racingAccountHandler(async(uid,input)=>require('./racing-api').readRacingRecords({db,uid,boardId:input?.boardId,cursor:input?.cursor}));
+exports.getRacingCatalog=racingAccountHandler(async(uid,input)=>require('./racing-publication').readRacingCatalog({db,uid,locationId:input?.locationId,cursor:input?.cursor}));
+exports.getMyRacingRoutes=racingAccountHandler(async(uid)=>require('./racing-publication').readMyRacingRoutes({db,uid}));
+exports.commitRacingRoute=racingAccountHandler(async(uid,input)=>{
  if(Buffer.byteLength(JSON.stringify(input||{}))>128*1024)throw Object.assign(Error('race_route_too_large'),{status:413});
  return require('./racing-publication').writeRacingRoute({db,admin,uid,input});
 });

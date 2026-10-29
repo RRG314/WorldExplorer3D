@@ -1,7 +1,7 @@
 import {Timestamp} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
 import {createRaceVehicleProfile,normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById,
- raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,RACE_PHYSICS_VERSION,prepareExplorerCreditAward} from './generated/engine.mjs';
+ raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,RACE_PHYSICS_VERSION,prepareExplorerCreditAward,racingCareerContext} from './generated/engine.mjs';
 import {digest} from './authority.mjs';
 const time=v=>v?.toMillis?.()??0;
 const entityId=(uid,id)=>`personal:${uid}:${id}`;
@@ -35,8 +35,9 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
   if(!personalVehicleById(vehicleId))fail('race_vehicle_unknown');
   return db.runTransaction(async tx=>{
    const r=room(race.roomCode),u=user(uid),carRef=entity(race,uid,vehicleId);
-   const [rs,ps,cs,ls,gs,es]=await Promise.all([tx.get(r),tx.get(r.collection('players').doc(uid)),tx.get(u.collection('consents').doc('community')),
-    tx.get(lock(race)),tx.get(u.collection('gameplay').doc('vehicleUpgrades')),tx.get(carRef)]);
+   const [rs,ps,cs,ls,gs,es,career,closing]=await Promise.all([tx.get(r),tx.get(r.collection('players').doc(uid)),tx.get(u.collection('consents').doc('community')),
+    tx.get(lock(race)),tx.get(u.collection('gameplay').doc('vehicleUpgrades')),tx.get(carRef),tx.get(u.collection('racing').doc('career')),tx.get(db.collection('captureAccountDeletions').doc(uid))]);
+   if(closing.exists)fail('race_account_closed');
    const currentLock=value(ls),player=value(ps),car=value(es),progress=value(gs)||{};
    await requirePublication(tx,race,uid);
    requireSeat(race,uid,value(rs),player,value(cs),nowMs);
@@ -66,7 +67,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    tx.set(lock(race),{id:race.id,instanceId,courseId:race.courseId,worldSeed:race.worldSeed,expiresAt,updatedAt:ts(nowMs)});
    tx.update(carRef,{raceCustody:{id:race.id,instanceId,expiresAt},leaseExpiresAt:expiresAt});
    tx.set(u.collection('gameplay').doc('vehicleUpgrades'),{raceReservation:{id:race.id,instanceId,expiresAt}},{merge:true});
-   return {label:String(player.displayName||'Explorer').slice(0,40),profile,leaseUntil:until};
+   return {label:String(player.displayName||'Explorer').slice(0,40),profile,leaseUntil:until,careerContext:racingCareerContext(value(career)||{},nowMs)};
   });
  }
  async function renew({race,instanceId,nowMs,starting=false}){
@@ -76,7 +77,8 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    const rows=[];
    for(const [uid,p]of race.roster){
     if(p.released)continue;
-    const [ps,cs,es]=await Promise.all([tx.get(r.collection('players').doc(uid)),tx.get(user(uid).collection('consents').doc('community')),tx.get(entity(race,uid,p.vehicleId))]);
+    const [ps,cs,es,closing]=await Promise.all([tx.get(r.collection('players').doc(uid)),tx.get(user(uid).collection('consents').doc('community')),tx.get(entity(race,uid,p.vehicleId)),tx.get(db.collection('captureAccountDeletions').doc(uid))]);
+    if(closing.exists)fail('race_account_closed');
     requireSeat(race,uid,value(rs),value(ps),value(cs),nowMs);const car=value(es);
     if(car?.raceCustody?.id!==race.id||car.raceCustody.instanceId!==instanceId)fail('race_vehicle_custody_ended');
     for(const otherUid of race.roster.keys())if(otherUid!==uid){const a=await tx.get(user(uid).collection('blockedPlayers').doc(otherUid));if(a.exists)fail('race_roster_unavailable');}
@@ -118,15 +120,17 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    await requirePublication(tx,race);
    if(qualification){
     const p=snapshot.players[0],finished=!!p.progress?.finished&&!p.dnf&&Number.isFinite(p.progress.elapsedMs)&&p.progress.elapsedMs>0;
+    if((await tx.get(db.collection('captureAccountDeletions').doc(p.uid))).exists)fail('race_account_closed');
     const receipt={id:race.id,purpose,courseId:race.courseId,courseRevision:race.course.publication.revision,physicsVersion:RACE_PHYSICS_VERSION,
      players:[{uid:p.uid,finished,timeMs:finished?p.progress.elapsedMs:null,credits:0}]};
     if(finished)tx.update(db.collection('racingCourses').doc(race.courseId),{qualification:{resultId:race.id,revision:race.course.publication.revision,physicsVersion:RACE_PHYSICS_VERSION,timeMs:p.progress.elapsedMs,completedAt:ts(nowMs)}});
-    tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
+    tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
      profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),physicsVersion:RACE_PHYSICS_VERSION,createdAt:ts(nowMs)});
     return receipt;
    }
    const rows=[],dayKey=new Date(nowMs).toISOString().slice(0,10),finishers=snapshot.players.filter(p=>!p.dnf&&p.progress?.finished).length;
    for(const p of snapshot.players){
+    if((await tx.get(db.collection('captureAccountDeletions').doc(p.uid))).exists)fail('race_account_closed');
     const profile=race.roster.get(p.uid).profile,configuration=raceCompetitiveRecordConfiguration(profile,{slot:p.slot,participants:race.course.participants}),boardId=digest({courseId:race.courseId,...configuration});
     const board=db.collection('racingBoards').doc(boardId),entry=board.collection('entries').doc(p.uid),career=user(p.uid).collection('racing').doc('career');
     const walletRef=user(p.uid).collection('economy').doc('wallet');
@@ -157,7 +161,8 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
     }
     receipt.players.push({uid:p.uid,boardId,finished:eligible,timeMs:eligible?p.progress.elapsedMs:null,credits});
    }
-   tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
+   tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
+    careerContexts:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,p.careerContext||racingCareerContext({},nowMs)])),
     profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),physicsVersion:RACE_PHYSICS_VERSION,createdAt:ts(nowMs)});
    return receipt;
   });

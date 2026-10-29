@@ -23,3 +23,6 @@ export function readRacingCatalog({ownerUid,locationId,cursor,signal}){return po
 export function commitRacingRoute(ownerUid,input,signal){return postProtectedFunction('commitRacingRoute',input,{expectedUserId:ownerUid,signal,timeoutMs:15000});}
 export function reviewRacingRoutes(ownerUid,input,signal){return postProtectedFunction('reviewRacingRoutes',input,{expectedUserId:ownerUid,signal,timeoutMs:15000});}
 export function readMyRacingRoutes(ownerUid,signal){return postProtectedFunction('getMyRacingRoutes',{}, {expectedUserId:ownerUid,signal,timeoutMs:15000});}
+
+export function readRacingCareer(ownerUid,input={},signal){return postProtectedFunction('getRacingCareer',input,{expectedUserId:ownerUid,signal,timeoutMs:15000});}
+export function commitRacingCareer(ownerUid,input,signal){return postProtectedFunction('commitRacingCareer',input,{expectedUserId:ownerUid,signal,timeoutMs:15000});}

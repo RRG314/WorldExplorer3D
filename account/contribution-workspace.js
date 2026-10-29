@@ -5,6 +5,11 @@ function update(){
   const url=new URL(location.href),section=url.searchParams.get('section')||'overview',content=url.searchParams.get('content')==='racing'?'racing':'buildings',user=getCurrentUser(),key=`${user?.uid||''}:${section}:${content}`;
   if(key===mounted)return;generation++;dispose();dispose=()=>{};mounted=key;
   if(!user||user.isAnonymous)return;
+  if(section==='social'){
+   const host=document.querySelector('[data-account-racing-host]'),token=generation;if(!host)return;host.textContent='Loading racing progress…';
+   const current=()=>generation===token&&getCurrentUser()?.uid===user.uid;
+   void import('../app/js/racing/career-workspace.js').then(({mountRacingCareer})=>{if(current()){const view=mountRacingCareer(host,{ownerUid:user.uid,isCurrent:current});dispose=()=>view.dispose();}}).catch(()=>{if(current())host.textContent='Racing progress could not open. Try returning to this tab.';});return;
+  }
   if(!['review','contributions'].includes(section))return;
   const host=document.querySelector(`[data-account-view="${section}"] [data-contribution-workspace]`);if(!host)return;
   const token=generation,nav=document.createElement('nav');nav.setAttribute('aria-label',section==='review'?'Review category':'Contribution category');

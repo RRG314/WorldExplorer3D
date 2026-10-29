@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {randomUUID,createHash} from 'node:crypto';
+const require=createRequire(new URL('../../services/racing/package.json',import.meta.url));
+const {initializeApp,deleteApp}=require('firebase-admin/app');
+const {getFirestore,Timestamp}=require('firebase-admin/firestore');
+const cjs=createRequire(import.meta.url),career=cjs('../../functions/racing-career.js'),cleanup=cjs('../../functions/racing-account-cleanup.js');
+const {RACE_PHYSICS_VERSION,RACING_CAREER_LIMITS:L}=cjs('../../functions/generated/racing-engine.cjs');
+const projectId=process.env.GCLOUD_PROJECT;
+if(!/^demo-/.test(projectId||'')||!/^127\.0\.0\.1:\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST||''))throw Error('An isolated demo Firestore emulator is required.');
+const app=initializeApp({projectId}),db=getFirestore(app),prefix='career-command-'+randomUUID(),uids=[0,1,2].map(i=>prefix+'-'+i),owned=new Set();
+const sha=v=>createHash('sha256').update(v).digest('hex'),board=sha(prefix),course='road-race-'+sha(prefix).slice(0,32),now=Date.now();let checks=0;
+const own=path=>{owned.add(path);return db.doc(path);};
+const put=(path,data)=>own(path).set(data);
+const cmd=(index,input,at=now)=>career.commitRacingCareer({db,uid:uids[index],label:'Driver '+index,input,nowMs:at});
+const expect=async(fn,message)=>assert.rejects(fn,e=>e.message===message);
+const check=(name)=>{checks++;console.log(JSON.stringify({passed:name}));};
+try{
+ for(const uid of uids){own('users/'+uid);await put(`users/${uid}/consents/community`,{version:'community-2026-10-24'});await put(`users/${uid}/racing/career/boards/${board}`,{boardId:board});}
+ for(const a of uids)for(const b of uids)if(a!==b)await put(`users/${a}/friends/${b}`,{displayName:'Driver'});
+ await put('racingCourses/'+course,{status:'approved'});await put('racingBoards/'+board,{courseId:course,courseName:'Command fixture',configuration:{physicsVersion:RACE_PHYSICS_VERSION}});
+ const makeRival=(index,target=1,requestId=randomUUID())=>{own('racingRivals/'+sha(JSON.stringify([uids[index],requestId])).slice(0,32));return {action:'create-rival',requestId,targetUid:uids[target],boardId:board};};
+ const input=makeRival(0),rival=await cmd(0,input);own('racingRivals/'+rival.id);
+ assert.equal((await cmd(0,input)).id,rival.id);
+ await expect(()=>cmd(0,{...input,targetUid:uids[2]}),'racing_request_changed');check('exact retry is idempotent and changed payload is rejected');
+ // A new request UUID must not turn one pair/class finish into several wins.
+ await expect(()=>cmd(0,makeRival(0)),'racing_challenge_exists');
+ await expect(()=>cmd(1,makeRival(1,0)),'racing_challenge_exists');check('same-direction and reverse pending duplicates are rejected');
+ await cmd(1,{action:'respond-invite',id:rival.inviteId,accept:true});
+ await expect(()=>cmd(1,makeRival(1,0)),'racing_challenge_exists');check('accepted challenge still excludes a second pair/class challenge');
+ await cmd(0,{action:'cancel-rival',id:rival.id});
+ const restarted=await cmd(1,makeRival(1,0));own('racingRivals/'+restarted.id);assert.notEqual(restarted.id,rival.id);check('cancelled challenge permits a deliberate new challenge');
+ await cmd(0,{action:'respond-invite',id:restarted.inviteId,accept:false});
+ const blocked=own(`users/${uids[2]}/blockedPlayers/${uids[0]}`);await blocked.set({});await expect(()=>cmd(0,makeRival(0,2)),'racing_player_unavailable');await blocked.delete();check('recipient-side blocking denies an invitation');
+ const reserved=own(`users/${uids[0]}/gameplay/vehicleUpgrades`);await reserved.set({raceReservation:{expiresAt:Timestamp.fromMillis(now+10000)}});await expect(()=>cmd(0,makeRival(0,2)),'racing_leave_race_first');await reserved.delete();check('admitted race custody excludes commitment changes');
+ const crewInput={action:'create-crew',requestId:randomUUID(),name:'Command crew'},crew=await cmd(0,crewInput);own('racingCrews/'+crew.id);
+ const invitation=await cmd(0,{action:'invite-crew',targetUid:uids[1]});await cmd(1,{action:'respond-invite',id:invitation.id,accept:true});
+ const late=await cmd(0,{action:'invite-crew',targetUid:uids[2]});await expect(()=>cmd(2,{action:'respond-invite',id:late.id,accept:true},now+L.durationMs+1),'racing_invite_expired');check('expired invitation cannot join a crew');
+ const series=await cmd(0,{action:'create-series',requestId:randomUUID(),name:'One stage',boardIds:[board]});own('racingSeries/'+series.id);
+ for(const i of [0,1])await cmd(i,{action:'join-series',id:series.id});
+ await expect(()=>cmd(0,{action:'close-series',id:series.id}),'racing_series_still_open');
+ await cmd(0,{action:'leave-crew'});const s=(await db.doc('racingSeries/'+series.id).get()).data();assert.equal(s.creatorUid,uids[1]);assert.equal(s.entries.find(e=>e.uid===uids[0]).withdrawn,true);assert.equal((await db.doc('racingCrews/'+crew.id).get()).data().ownerUid,uids[1]);check('leaving transfers leadership and withdraws unfinished entries');
+ await expect(()=>cmd(1,{action:'close-series',id:series.id},now+L.durationMs+1),'racing_series_finalizing');
+ await career.readRacingCareer({db,uid:uids[1],nowMs:now+L.durationMs+L.finalizationGraceMs+1});assert.equal((await db.doc('racingSeries/'+series.id).get()).data().status,'closed');assert.equal((await db.doc(`users/${uids[1]}/racing/career`).get()).data().seriesWins,0);check('expiry permits in-flight grace then closes an incomplete series without a win');
+ const entry=own(`racingBoards/${board}/entries/${uids[1]}`);await entry.set({uid:uids[1]});const other=own(`commandFixtures/${prefix}/entries/${uids[1]}`);await other.set({uid:uids[1],retained:true});
+ const closing=own('captureAccountDeletions/'+uids[1]);await closing.set({status:'deleting'});
+ await cleanup.cleanupRacingAccount({db,uid:uids[1]});await cleanup.cleanupRacingAccount({db,uid:uids[1]});assert.equal((await entry.get()).exists,false);assert.equal((await other.get()).exists,true);assert.equal((await db.doc('racingCrews/'+crew.id).get()).data().memberUids.includes(uids[1]),false);
+ await expect(()=>career.readRacingCareer({db,uid:uids[1]}),'racing_account_closing');await expect(()=>cmd(1,{action:'create-crew',requestId:randomUUID(),name:'No return'}),'racing_account_closing');check('cleanup retries are safe, preserve unrelated entries, and cannot recreate a closing account');
+ console.log(JSON.stringify({ok:true,checks,scope:'Actual isolated Firestore transactions. Command/privacy/lifecycle checks; no race, Auth transport or gameplay claim.'}));
+}finally{for(const path of [...owned].sort((a,b)=>b.length-a.length))await db.recursiveDelete(db.doc(path));await deleteApp(app);}

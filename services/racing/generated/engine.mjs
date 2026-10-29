@@ -2861,6 +2861,9 @@ function raceAiActions(course, car, progress, profile, { difficulty = 0.65 } = {
   return { steer, throttle: difference > 0.2 ? clamp2(difference * 0.6, 0.12, 1) : 0, reverse: 0, brake: 0, serviceBrake: difference < -0.35 ? clamp2(-difference * 0.3, 0, 1) : 0 };
 }
 
+// app/js/racing/session-limits.js
+var RACE_MAXIMUM_DURATION_MS = 6e5;
+
 // app/js/racing/session-rules.js
 var STEP_MS = 1e3 / 60;
 var NEUTRAL = Object.freeze({ steer: 0, throttle: 0, reverse: 0, brake: 0, serviceBrake: 1 });
@@ -2875,7 +2878,7 @@ function normalizeRaceActions(value) {
   }
   return result;
 }
-function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDurationMs = 6e5, onComplete = () => {
+function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDurationMs = RACE_MAXIMUM_DURATION_MS, onComplete = () => {
 } }) {
   if (!id || !course || !creatorUid || !Number.isFinite(createdAtMs)) throw Error("invalid_race_session");
   course = structuredClone(course);
@@ -3297,12 +3300,59 @@ async function readPublishedRaceCourse({ read, id, uid }) {
     purpose: record.status === "approved" ? course.discipline === "time-trial" ? "time-trial" : "competition" : "qualification"
   } };
 }
+
+// app/js/racing/career-rules.js
+var RACING_CAREER_LIMITS = Object.freeze({ crewMembers: 8, crewInvites: 16, rivals: 8, series: 4, stages: 5, durationMs: 7 * 864e5, finalizationGraceMs: RACE_MAXIMUM_DURATION_MS + 3e4 });
+function racingCareerContext(value = {}, capturedAtMs) {
+  const ids = (list, max) => [...new Set((Array.isArray(list) ? list : []).filter((id) => typeof id === "string" && /^[a-f0-9]{32}$/.test(id)))].slice(0, max);
+  return { rivalIds: ids(value.openRivalIds, RACING_CAREER_LIMITS.rivals), seriesIds: ids(value.openSeriesIds, RACING_CAREER_LIMITS.series), capturedAtMs };
+}
+function verifiedCareerFinish(result, uid) {
+  if (!result || result.snapshot?.phase !== "complete" || !["competition", "time-trial"].includes(result.receipt?.purpose) || result.receipt.id !== result.snapshot.id) return null;
+  const receipt = result.receipt.players?.find((p) => p.uid === uid), player = result.snapshot.players?.find((p) => p.uid === uid), start = result.snapshot.startAtMs;
+  if (!receipt?.finished || !player?.progress?.finished || player.dnf || player.ai || !Number.isFinite(start) || !Number.isFinite(receipt.timeMs) || receipt.timeMs <= 0 || receipt.timeMs !== player.progress.elapsedMs || !/^[a-f0-9]{64}$/.test(receipt.boardId)) return null;
+  const penalty = player.progress.penaltyMs || 0;
+  if (!Number.isFinite(penalty) || penalty < 0 || penalty > receipt.timeMs) return null;
+  return {
+    runId: result.receipt.id,
+    uid,
+    boardId: receipt.boardId,
+    timeMs: receipt.timeMs,
+    startAtMs: start,
+    finishAtMs: start + receipt.timeMs - penalty,
+    clean: !player.barrierContacts && !penalty
+  };
+}
+function careerFinishEligible(finish, { boardId, joinedAtMs, expiresAtMs, leftAtMs } = {}) {
+  return !!finish && finish.boardId === boardId && Number.isFinite(joinedAtMs) && Number.isFinite(expiresAtMs) && finish.startAtMs >= joinedAtMs && finish.finishAtMs <= expiresAtMs && (!Number.isFinite(leftAtMs) || finish.finishAtMs <= leftAtMs);
+}
+function racingSeriesStandings(series) {
+  const stages = series.stages || [], rows = (series.entries || []).map((entry) => {
+    const times = stages.map((s) => entry.bests?.[s.boardId]?.timeMs), completed = times.filter((t) => Number.isFinite(t) && t > 0).length;
+    return { uid: entry.uid, label: entry.label, withdrawn: entry.withdrawn === true, completed, totalMs: times.reduce((sum, t) => sum + (Number.isFinite(t) && t > 0 ? t : 0), 0), finished: completed === stages.length && stages.length > 0 };
+  }).sort((a, b) => Number(a.withdrawn) - Number(b.withdrawn) || b.completed - a.completed || a.totalMs - b.totalMs || a.uid.localeCompare(b.uid));
+  let position = 0;
+  return rows.map((row, i) => {
+    const previous = rows[i - 1], tie = previous && row.withdrawn === previous.withdrawn && row.completed === previous.completed && row.totalMs === previous.totalMs;
+    position = tie ? position : i + 1;
+    return { ...row, position };
+  });
+}
+function racingRivalOutcome(challenge) {
+  if (challenge.status !== "active" || challenge.players?.length !== 2) return null;
+  const rows = challenge.players.map((uid) => ({ uid, best: challenge.bests?.[uid] }));
+  if (rows.some((p) => !Number.isFinite(p.best?.timeMs) || p.best.timeMs <= 0)) return null;
+  const fastest = Math.min(...rows.map((p) => p.best.timeMs));
+  return { winners: rows.filter((p) => p.best.timeMs === fastest).map((p) => p.uid), tie: rows[0].best.timeMs === rows[1].best.timeMs };
+}
 var export_prepareExplorerCreditAward = import_economy_authority.prepareExplorerCreditAward;
 export {
   RACE_PHYSICS_VERSION,
+  RACING_CAREER_LIMITS,
   assertRaceCourseInDistrict,
   buildRaceRoadGraph,
   canonicalRaceDistrict,
+  careerFinishEligible,
   createRaceCourse,
   createRaceSession,
   createRaceVehicleProfile,
@@ -3319,8 +3369,12 @@ export {
   raceGridPose,
   racePublicationIdentity,
   raceRecordConfiguration,
+  racingCareerContext,
+  racingRivalOutcome,
+  racingSeriesStandings,
   readPublishedRaceCourse,
   rebaseRaceReference,
   reconstructPublishedRace,
-  restoreRaceCourse
+  restoreRaceCourse,
+  verifiedCareerFinish
 };

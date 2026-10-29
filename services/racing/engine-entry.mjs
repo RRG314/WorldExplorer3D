@@ -9,3 +9,4 @@ export {normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById} from
 export {prepareExplorerCreditAward} from '../../functions/economy-authority.js';
 export {canonicalRaceDistrict,reconstructPublishedRace,rebaseRaceReference,assertRaceCourseInDistrict,racePublicationIdentity,readPublishedRaceCourse} from '../../app/js/racing/publication-rules.js';
 export {normalizeRaceRouteReference,raceCourseReference} from '../../app/js/racing/course-library.js';
+export {RACING_CAREER_LIMITS,racingCareerContext,verifiedCareerFinish,careerFinishEligible,racingSeriesStandings,racingRivalOutcome} from '../../app/js/racing/career-rules.js';

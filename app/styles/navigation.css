@@ -187,11 +187,11 @@
 .racing-hub label {display:block;font-size:13px;margin:12px 0;}
 .racing-hub select,.racing-hub input {display:block;width:100%;margin-top:6px;}
 .racing-layout {display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2.7fr);align-items:start;gap:28px;flex:1;min-height:0;overflow:auto;padding:4px 5px 16px 2px;}
-.racing-layout nav {display:flex;flex-direction:column;gap:0;max-height:65dvh;overflow:auto;border-top:1px solid var(--wx-line-soft);}
-.racing-layout nav button {text-align:left;flex-shrink:0;border:0;border-bottom:1px solid var(--wx-line-soft);border-radius:0;background:transparent;padding:16px 12px 16px 16px;min-height:78px;}
-.racing-layout nav button[aria-pressed=true] {background:var(--wx-selected);box-shadow:inset 3px 0 var(--wx-action);}
-.racing-layout nav strong {font-size:15px;font-weight:600;}
-.racing-layout nav span {display:block;font-size:12px;margin-top:7px;color:var(--wx-muted);font-variant-numeric:tabular-nums;}
+.racing-layout [data-race-events] {display:flex;flex-direction:column;gap:0;max-height:65dvh;overflow:auto;border-top:1px solid var(--wx-line-soft);}
+.racing-layout [data-race-events] button {text-align:left;flex-shrink:0;border:0;border-bottom:1px solid var(--wx-line-soft);border-radius:0;background:transparent;padding:16px 12px 16px 16px;min-height:78px;}
+.racing-layout [data-race-events] button[aria-pressed=true] {background:var(--wx-selected);box-shadow:inset 3px 0 var(--wx-action);}
+.racing-layout [data-race-events] strong {font-size:15px;font-weight:600;}
+.racing-layout [data-race-events] span {display:block;font-size:12px;margin-top:7px;color:var(--wx-muted);font-variant-numeric:tabular-nums;}
 .racing-event-detail {min-width:0;}
 .racing-setup {min-width:0;}
 .racing-setup-controls {margin-top:18px;}
@@ -275,15 +275,15 @@ body.activity-racing-open :is(#hudBox,#hudMap,#hudUtilities,#floatMenuContainer,
  .racing-hub header h2 {font-size:30px;}
  .racing-layout {grid-template-columns:1fr;gap:12px;}
  .racing-setup,.racing-event-detail {display:contents;}
- .racing-layout nav {order:1;}
+ .racing-layout [data-race-events] {order:1;}
  .racing-summary {order:2;}
  .racing-preview-panel {order:3;}
  .racing-setup-controls {order:4;margin-top:0;}
  .racing-setup-controls .racing-options {grid-template-columns:1fr 1fr;gap:12px;}
  .racing-extra {order:5;}
- .racing-layout nav {flex-direction:row;max-height:none;min-height:82px;}
- .racing-layout nav button {box-sizing:border-box;width:auto;min-width:150px;flex:1 0 150px;min-height:78px;}
- .racing-layout nav button[aria-pressed=true] {box-shadow:inset 0 -3px var(--wx-action);}
+ .racing-layout [data-race-events] {flex-direction:row;max-height:none;min-height:82px;}
+ .racing-layout [data-race-events] button {box-sizing:border-box;width:auto;min-width:150px;flex:1 0 150px;min-height:78px;}
+ .racing-layout [data-race-events] button[aria-pressed=true] {box-shadow:inset 0 -3px var(--wx-action);}
  .racing-course-view,.racing-map {min-height:190px;}
  .racing-location-view {height:210px;}
  .racing-map svg {height:186px;}
@@ -301,10 +301,15 @@ body.activity-racing-open :is(#hudBox,#hudMap,#hudUtilities,#floatMenuContainer,
  .racing-hub [data-race-status] {font-size:12px;min-height:18px;margin:2px 0;}
  .racing-layout {grid-template-columns:180px minmax(0,1fr);gap:16px;}
  .racing-setup,.racing-event-detail {display:block;}
- .racing-layout nav {flex-direction:column;max-height:55dvh;}
- .racing-layout nav button {width:auto;flex:0 0 auto;}
+ .racing-layout [data-race-events] {flex-direction:column;max-height:55dvh;}
+ .racing-layout [data-race-events] button {width:auto;flex:0 0 auto;}
  .racing-start-bar .racing-note {display:none;}
  .racing-start-bar {padding-top:6px;}
  .racing-hub[data-race-view="results"] {height:auto;}
  .road-race-hud {top:calc(env(safe-area-inset-top,0px) + 10px);}
 }
+
+.racing-hub[data-race-view="career"] :is(.racing-layout,.racing-toolbar,.racing-start-bar,[data-race-status]) {display:none;}
+.racing-career-view {flex:1;min-height:0;overflow:auto;padding:4px 5px 16px 2px;}
+.racing-career-actions {flex:none;padding-top:10px;border-top:1px solid var(--wx-line-soft);}
+.racing-career-view[hidden],.racing-career-actions[hidden] {display:none;}

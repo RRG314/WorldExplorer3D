@@ -1,6 +1,8 @@
 import {createRaceProgress,advanceRaceProgress,raceGridPose}from'./course-rules.js';
 import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle}from'./vehicle-controller.js';
 import {raceAiActions}from'./ai-controller.js';
+import {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
+export {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
 const STEP_MS=1000/60,NEUTRAL=Object.freeze({steer:0,throttle:0,reverse:0,brake:0,serviceBrake:1});
 const ACTIONS=new Set(['steer','throttle','reverse','brake','serviceBrake']);
 export function normalizeRaceActions(value){
@@ -13,7 +15,7 @@ export function normalizeRaceActions(value){
 // canonical courses and durable reward transactions are supplied by the existing
 // application/backend. Browser practice uses the same rules without verified
 // rewards. No timer, database, renderer, global room registry or wallet here.
-export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurationMs=600000,onComplete=()=>{}}){
+export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurationMs=RACE_MAXIMUM_DURATION_MS,onComplete=()=>{}}){
  if(!id||!course||!creatorUid||!Number.isFinite(createdAtMs))throw Error('invalid_race_session');
  course=structuredClone(course);
  const players=new Map();let phase='lobby',leaderUid=creatorUid,startAtMs=null,tick=0,lastNow=createdAtMs,completedAtMs=null,reason='',outcomeEmitted=false;
