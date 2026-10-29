@@ -1,5 +1,6 @@
 // Independently reusable mapped facts. This validator does not make a venue
 // playable: the world must still publish and collision-qualify its full surface.
+import {RACE_MINIMUM_SPAN_METERS} from './course-rules.js';
 const geographic=p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&Math.abs(p.lat)<=85&&Math.abs(p.lon)<=180;
 export function geographicVenueDistance(a,b){
  const r=Math.PI/180,lat1=a.lat*r,lat2=b.lat*r,dlat=lat2-lat1,dlon=(b.lon-a.lon)*r;
@@ -22,11 +23,11 @@ export function compileMappedVenueLayout(source){
  const ordered=[],seen=new Set();let lengthMeters=0,previous=null;
  for(const id of source.layout.wayIds){
   const way=ways.get(id);
-  if(!way||seen.has(id)||way.tags.oneway==='-1'||way.tags.oneway==='reverse'||way.tags.raceway==='pit_lane')throw Error('venue_layout_way_invalid');
+  if(!way||seen.has(id)||way.tags.oneway==='-1'||way.tags.oneway==='reverse'||['pit_lane','pitlane'].includes(way.tags.raceway))throw Error('venue_layout_way_invalid');
   if(previous!==null&&previous!==way.nodes[0])throw Error('venue_layout_disconnected');
   seen.add(id);
   way.geometry.forEach((point,index)=>{
-   if(index){const length=geographicVenueDistance(way.geometry[index-1],point);if(length<.1||length>1000)throw Error('venue_segment_invalid');lengthMeters+=length;}
+   if(index){const length=geographicVenueDistance(way.geometry[index-1],point);if(length<RACE_MINIMUM_SPAN_METERS||length>1000)throw Error('venue_segment_invalid');lengthMeters+=length;}
    if(!ordered.length||index>0)ordered.push({...point,nodeId:way.nodes[index],wayId:id});
   });
   previous=way.nodes.at(-1);

@@ -1045,8 +1045,8 @@ var require_economy_authority = __commonJS({
 
 // app/js/racing/course-rules.js
 var RACE_COURSE_VERSION = 1;
-var RACE_MAX_ROUTE_EDGES = 1024;
-var RACE_MINIMUM_SPAN_METERS = 0.5;
+var RACE_MAX_ROUTE_EDGES = 2048;
+var RACE_MINIMUM_SPAN_METERS = 0.01;
 var RACE_DISCIPLINES = Object.freeze(["sprint", "circuit", "time-trial"]);
 var finitePoint = (p) => p && ["x", "y", "z"].every((k) => Number.isFinite(p[k]));
 var distance = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);

@@ -36,3 +36,26 @@ The mapped centreline is 5,880.623 m. World Explorer's existing local coordinate
 metric produces a 5,870.386 m route. Neither is stretched to the published
 reference. The game's Hamilton Straight timing line and results are independent
 of official circuit or championship records.
+
+## Full Nordschleife geographic source, October 29, 2026
+
+- Road geometry, topology, tags and source-way versions: © OpenStreetMap
+  contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
+  [Attribution](https://www.openstreetmap.org/copyright).
+- The adapted database is `nordschleife/source.json`. Its source member retains
+  the finite query, provider endpoint, data timestamp and raw-response digest.
+  Reproduce it with `scripts/racing/build-venue-source.mjs` and
+  `config/racing-venues/nordschleife-layout.json`. Mapper account metadata is
+  omitted. Its database licence is independent of the source-code licence.
+- The full connected loop comprises 53 source ways and 1,067 original spans,
+  including T13 and five mapped bridge ways. The two-dimensional geodesic
+  centreline measures 20,746.161 m; the [venue's reference length](https://www.nuerburgring.de/info/nuerburgring/race-tracks/nordschleife)
+  is 20,832 m. No stretching, official record certification, venue artwork,
+  sponsor graphics or endorsement is included.
+- A seven-metre conservative authored usable corridor refers to the minimum
+  retained mapped width, not an independent pavement-edge or bank survey.
+  Original varying widths, surfaces and bridge/layer tags remain intact.
+- This is a geographic source, not a released playable venue. Full ground,
+  banking, vertically separated crossings, timing-line placement, presentation
+  and gameplay acceptance remain required before runtime adoption. It does not
+  substitute for the tourist, GP or combined endurance layouts.

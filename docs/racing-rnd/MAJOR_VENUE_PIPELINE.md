@@ -68,9 +68,10 @@ integration. This is not rendered-world or completed-venue acceptance.
 The Racing panel builds the full ordered GP path after the existing world surface
 qualification. Missing spans reject the event instead of falling back to the
 shorter National circuit. The old two-metre minimum discarded five real mapped
-spans, including a roughly 0.6 m Chapel link. Bounded spans down to 0.5 m now keep
-that topology; self-collapsed graph edges are rejected. A shared 1,024-edge route
-bound accommodates the GP's 506 spans. City distance, width, deck, tunnel,
+spans, including a roughly 0.6 m Chapel link. Source-node spans down to centimetres
+retain topology above the approved snapshot's millimetre coordinate precision;
+self-collapsed graph edges are rejected. A shared 2,048-edge route bound
+accommodates the GP's 506 spans and the Nordschleife's 1,067. City distance, width, deck, tunnel,
 building, water, control and timing admission rules still apply.
 
 Session allowance now comes from one shared course policy: ten minutes minimum,
@@ -112,6 +113,30 @@ metadata/status fence rather than downloading a full survey every five seconds.
 `firestore.indexes.json`: the chunks are read by manifest identity, never queried
 by their geometry. Deploy this supporting configuration with the coordinated
 backend candidate. No public client write or read permission is added.
+
+## Full Nordschleife source
+
+`config/racing-venues/nordschleife-layout.json` and the adapted
+`app/assets/racing/nordschleife/source.json` retain the complete connected loop:
+53 ordered ways, 1,067 original spans, T13 and five mapped bridge ways. Source
+versions, geometry, varying widths and structure tags are retained; mapper
+account metadata is omitted. The mapped two-dimensional geodesic centreline is
+20,746.161 m against the venue's 20,832 m reference. Both values and the difference
+remain explicit. Elevation and timing-line reconciliation must precede playable
+acceptance; the source is not stretched to the reference length.
+
+One real 0.452 m span was lost by the earlier half-metre graph threshold. The
+graph and source validator now share a centimetre threshold above canonical
+millimetre precision, with the existing collapsed-node check retained. A bounded
+2,048-span reference can carry the full loop. Ordinary eight-kilometre route
+admission remains unchanged: this source is not added to the runtime adoption
+registry until complete accepted ground, banking, crossings and venue gameplay
+are supported. Both OSM `pitlane` and `pit_lane` tags reject a main-course layout.
+
+Reproduce the adapted source with the same source builder and this configuration,
+using its hash-matching captured raw response. The ODbL attribution and recipe
+are in `app/assets/racing/ATTRIBUTION.md`. No official map or venue artwork is
+included; factual source intake does not certify a finished playable venue.
 
 ## Reproduction
 
