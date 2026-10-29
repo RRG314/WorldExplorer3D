@@ -16,6 +16,9 @@ import {mkdir, readdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 const recipes = [
+ {key:'porsche_carrera_4s',inputDirectory:'prepared-porsche-carrera-v2',prepared:true,id:'road-porsche-911-carrera-4s',variantId:'porsche_carrera_4s',license:'CC-BY-SA-4.0',licenseUrl:'https://creativecommons.org/licenses/by-sa/4.0/',attribution:'Porsche 911 Carrera 4S by Karol Miklas',sourceCredit:'Karol Miklas (https://sketchfab.com/karolmiklas)',
+  sourceFiles:{'scene.glb':'e29ad7b1a9edb022a8c73063365726fe296addce578295d36df66d25ad9f2eca','license.txt':'807197ef352fd72292e5a0f30b7edadc93d5c916a747f902ec87795ae8201d1a','intake.json':'c74dfc44e7a8854fda8cbf4e071da4bb1d6ab02f38398d09a6892b4ae43af84e'},
+  archiveSha256:'57731111fbb0d6958df64454e9ba51939fefd39ab48e55f423a0bb2d76918454'},
  {key:'bmw_m3_e92_race',inputDirectory:'prepared-bmw-race-v3',prepared:true,id:'road-bmw-m3-e92-race',variantId:'bmw_m3_e92_race',
   sourceFiles:{'scene.glb':'aa5c50cb16fc31893bec817bc3c9dd332de791e83c65acf74089a2a6ee472da8','license.txt':'cbe923e24e81ab0e0b782f185e910bd4f027ebb9ab3272a9ca02c92e32e328ea','intake.json':'9061b94f0f60fdf6eee22a8dddfc2fc84fb98b68ab3a8891974ddfb5fd5cd715'},
   archiveSha256:'e2193befa1da6a7394b3eadee3704727290a1c2520108fe909827c6052e0417f'},
@@ -57,7 +60,7 @@ for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includ
   for(const [file,expected]of Object.entries(recipe.sourceFiles))if(hash(await readFile(path.join(directory,file)))!==expected)throw Error('Unreviewed source file: '+file);
   if(recipe.prepared){
     const intake=JSON.parse(await readFile(path.join(directory,'intake.json'),'utf8'));
-    if(intake.archiveSha256!==recipe.archiveSha256||intake.license!=='CC0-1.0')throw Error('Unreviewed prepared racing source');
+    if(intake.archiveSha256!==recipe.archiveSha256||intake.license!==(recipe.license||'CC0-1.0'))throw Error('Unreviewed prepared racing source');
     const doc=await io.read(path.join(directory,'scene.glb')),root=doc.getRoot();
     if(root.listAnimations().length||root.listSkins().length)throw Error('Prepared racing source must remain rigid');
     const sourceTriangles=triangleCount(doc),bounds=getBounds(root.listScenes()[0]);
@@ -68,7 +71,7 @@ for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includ
     if(root.listNodes().filter(n=>n.getExtras().transportPart==='wheel-spin').length!==4||root.listNodes().filter(n=>n.getExtras().vehicleInstrumentDisplay).length!==1)throw Error('Prepared wheel/cockpit rig changed');
     const sourceLicense=await readFile(path.join(directory,'license.txt'));
     await writeFile(path.join(outputDir,filename),bytes);await writeFile(path.join(outputDir,recipe.id+'-LICENSE.txt'),sourceLicense);
-    const record={id:recipe.id,label:intake.label,variantId:recipe.variantId,sourceUrl:intake.sourceUrl,attribution:'BMW M3 racing exterior by Neubi',sourceCredit:'Neubi (https://blendswap.com/profile/1050)',license:intake.license,licenseUrl:'https://creativecommons.org/publicdomain/zero/1.0/',filename,sourceArchiveSha256:intake.archiveSha256,sourceBlendSha256:intake.blendSha256,sha256:hash(bytes),bytes:bytes.length,sourceTriangles,triangles,materials:root.listMaterials().length,textureEdgePixels:512,dimensionsMeters:{width:bounds.max[0]-bounds.min[0],height:bounds.max[1]-bounds.min[1],length:intake.lengthMeters},driverEyeGroundMeters:intake.driverEyeGroundMeters,paintMaterialNames:['Race_Paint'],wheelLayout:intake.wheelLayout,modifications:intake.modifications};
+    const record={id:recipe.id,label:intake.label,variantId:recipe.variantId,sourceUrl:intake.sourceUrl,attribution:recipe.attribution||'BMW M3 racing exterior by Neubi',sourceCredit:recipe.sourceCredit||'Neubi (https://blendswap.com/profile/1050)',license:intake.license,licenseUrl:recipe.licenseUrl||'https://creativecommons.org/publicdomain/zero/1.0/',filename,sourceArchiveSha256:intake.archiveSha256,sourceBlendSha256:intake.blendSha256,sha256:hash(bytes),bytes:bytes.length,sourceTriangles,triangles,materials:root.listMaterials().length,textureEdgePixels:512,dimensionsMeters:{width:bounds.max[0]-bounds.min[0],height:bounds.max[1]-bounds.min[1],length:intake.lengthMeters},driverEyeGroundMeters:intake.driverEyeGroundMeters,paintMaterialNames:intake.paintMaterialNames||['Race_Paint'],wheelLayout:intake.wheelLayout,modifications:intake.modifications};
     records.push(record);console.log(JSON.stringify({id:record.id,bytes:record.bytes,triangles,materials:record.materials,wheels:record.wheelLayout.length}));continue;
   }
   const input=path.join(directory,'scene.gltf');

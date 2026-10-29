@@ -167,5 +167,89 @@ export const RACING_FLEET_ASSETS = Object.freeze([
       "textureEdgePixels": 512,
       "maxInstances": 4
     }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-porsche-911-carrera-4s",
+    "label": "Porsche 911 Carrera 4S",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-porsche-911-carrera-4s.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "porsche_carrera_4s"
+    ],
+    "license": "CC-BY-SA-4.0",
+    "sourceUrl": "https://sketchfab.com/3d-models/free-porsche-911-carrera-4s-d01b254483794de3819786d93e0e1ebf",
+    "attribution": "Porsche 911 Carrera 4S by Karol Miklas",
+    "sourceCredit": "Karol Miklas (https://sketchfab.com/karolmiklas)",
+    "dimensionsMeters": {
+      "width": 1.999070167541504,
+      "height": 1.2717047929763794,
+      "length": 4.435
+    },
+    "paintMaterialNames": [
+      "paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "rear-right",
+        "position": [
+          0.7599073946475983,
+          0.3324559108007179,
+          -1.2608085870742798
+        ],
+        "radius": 0.3324499949228539
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.7611260116100311,
+          0.3324559108007179,
+          -1.260556697845459
+        ],
+        "radius": 0.3324499949228539
+      },
+      {
+        "id": "front-right",
+        "position": [
+          0.7489397823810577,
+          0.3324500024318695,
+          1.210951954126358
+        ],
+        "radius": 0.3324500024318695
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7582807838916779,
+          0.3324500024318695,
+          1.212295264005661
+        ],
+        "radius": 0.3324500024318695
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.33,
+      1.055,
+      -0.08
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 3153476,
+      "triangles": 73197,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
   }
 ].map(record => Object.freeze(record)));

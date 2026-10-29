@@ -2,11 +2,15 @@
 // accepted telemetry; this module has no timer, input or simulation authority.
 export function createVehicleInstruments(THREE, root) {
   const materials = new Set();
+  const styles = new Set();
   root.traverse(object => {
     if (object.userData?.vehicleInstrumentDisplay !== true) return;
+    styles.add(object.userData.vehicleInstrumentStyle || 'digital');
     for (const material of [object.material].flat()) if (material) materials.add(material);
   });
   if (!materials.size) return null;
+  if(styles.size!==1||![...styles].every(style=>['digital','five-dial'].includes(style)))throw Error('invalid_vehicle_instrument_style');
+  const style = [...styles][0];
   const canvas = document.createElement('canvas');
   canvas.width = 512; canvas.height = 256;
   const context = canvas.getContext('2d');
@@ -34,6 +38,11 @@ export function createVehicleInstruments(THREE, root) {
     const value = `${speed}/${rpm}/${gear}/${redline}`;
     if (value === last) return false;
     last = value;
+    if(style==='five-dial'){
+      drawFiveDialInstruments(context,speed,rpm,gear,redline);
+      texture.needsUpdate=true;
+      return true;
+    }
     context.fillStyle = '#071015'; context.fillRect(0,0,512,256);
     for(let i=0;i<20;i++) {
       const active = rpm / redline >= (i+1)/20;
@@ -60,4 +69,43 @@ export function createVehicleInstruments(THREE, root) {
     }
     texture.dispose();
   }});
+}
+
+function drawFiveDialInstruments(context,speed,rpm,gear,redline) {
+  context.fillStyle='#080d12';context.fillRect(0,0,512,256);
+  function dial(cx,cy,r,label,maximum,value,steps) {
+    context.beginPath();context.arc(cx,cy,r,0,Math.PI*2);
+    context.fillStyle='#10161d';context.fill();context.lineWidth=1.5;
+    context.strokeStyle='#77848b';context.stroke();
+    const start=Math.PI*.75,sweep=Math.PI*1.5;
+    for(let i=0;i<=steps*5;i++){
+      const angle=start+sweep*i/(steps*5),major=i%5===0;
+      const outside=r*.88,inside=r*(major ? .72 : .80);
+      context.beginPath();context.moveTo(cx+Math.cos(angle)*inside,cy+Math.sin(angle)*inside);
+      context.lineTo(cx+Math.cos(angle)*outside,cy+Math.sin(angle)*outside);
+      context.strokeStyle=label==='RPM ×1000'&&i/(steps*5)*maximum>=redline?'#ed5849':'#c5d2da';
+      context.lineWidth=major?1.6:.8;context.stroke();
+      if(major&&value!=null){
+        context.fillStyle='#d8e4eb';context.textAlign='center';context.font=`${Math.round(r*.17)}px sans-serif`;
+        const number=maximum>=1000?i/(steps*5)*maximum/1000:i/(steps*5)*maximum;
+        context.fillText(String(Math.round(number)),cx+Math.cos(angle)*r*.56,cy+Math.sin(angle)*r*.56+r*.06);
+      }
+    }
+    context.textAlign='center';context.fillStyle='#c3d1da';context.font=`bold ${Math.round(r*.17)}px sans-serif`;
+    context.fillText(label,cx,cy+r*.27);
+    if(value==null){context.font=`${Math.round(r*.4)}px sans-serif`;context.fillText('—',cx,cy+r*.02);return;}
+    const angle=start+sweep*Math.max(0,Math.min(1,value/maximum));
+    context.beginPath();context.moveTo(cx-Math.cos(angle)*r*.12,cy-Math.sin(angle)*r*.12);
+    context.lineTo(cx+Math.cos(angle)*r*.69,cy+Math.sin(angle)*r*.69);
+    context.strokeStyle='#fc7157';context.lineWidth=2.2;context.stroke();
+    context.beginPath();context.arc(cx,cy,r*.065,0,Math.PI*2);context.fillStyle='#b6c5cf';context.fill();
+  }
+  dial(42,142,36,'TEMP',120,null,6);
+  dial(130,136,50,'MPH',180,speed,9);
+  dial(256,118,68,'RPM ×1000',9000,rpm,9);
+  dial(382,136,50,'OIL',5,null,5);
+  dial(470,142,36,'FUEL',1,null,4);
+  context.textAlign='center';context.fillStyle='#e6f3f6';context.font='bold 17px monospace';
+  context.fillText(String(speed),130,171);
+  context.font='bold 18px monospace';context.fillText(`G ${gear}`,256,164);
 }

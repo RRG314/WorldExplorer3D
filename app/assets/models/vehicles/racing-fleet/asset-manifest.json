@@ -141,10 +141,81 @@
         }
       ],
       "modifications": "Original racing exterior; uniform metric normalization; prepared PBR materials without source reference/logo maps; four rigid wheel assemblies and fixed calipers; original racing-cabin interpretation with seat, harness, safety cage, dashboard, controls and telemetry screen. No source gameplay code or factory-cockpit/homologation claim."
+    },
+    {
+      "id": "road-porsche-911-carrera-4s",
+      "label": "Porsche 911 Carrera 4S",
+      "variantId": "porsche_carrera_4s",
+      "sourceUrl": "https://sketchfab.com/3d-models/free-porsche-911-carrera-4s-d01b254483794de3819786d93e0e1ebf",
+      "attribution": "Porsche 911 Carrera 4S by Karol Miklas",
+      "sourceCredit": "Karol Miklas (https://sketchfab.com/karolmiklas)",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "filename": "road-porsche-911-carrera-4s.glb",
+      "sourceArchiveSha256": "57731111fbb0d6958df64454e9ba51939fefd39ab48e55f423a0bb2d76918454",
+      "sha256": "dd5641a9c71ac4aeb2ddc8e55de9f7059cce36b2cd49fc1d4314354bf178d92f",
+      "bytes": 3153476,
+      "sourceTriangles": 73197,
+      "triangles": 73197,
+      "materials": 19,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 1.999070167541504,
+        "height": 1.2717047929763794,
+        "length": 4.435
+      },
+      "driverEyeGroundMeters": [
+        0.33,
+        1.055,
+        -0.08
+      ],
+      "paintMaterialNames": [
+        "paint"
+      ],
+      "wheelLayout": [
+        {
+          "id": "rear-right",
+          "position": [
+            0.7599073946475983,
+            0.3324559108007179,
+            -1.2608085870742798
+          ],
+          "radius": 0.3324499949228539
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.7611260116100311,
+            0.3324559108007179,
+            -1.260556697845459
+          ],
+          "radius": 0.3324499949228539
+        },
+        {
+          "id": "front-right",
+          "position": [
+            0.7489397823810577,
+            0.3324500024318695,
+            1.210951954126358
+          ],
+          "radius": 0.3324500024318695
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.7582807838916779,
+            0.3324500024318695,
+            1.212295264005661
+          ],
+          "radius": 0.3324500024318695
+        }
+      ],
+      "modifications": "Original Carrera 4S exterior; showroom floor removed; duplicate coat replaced by PBR clearcoat; uniform metric normalization; 512px maps; bounded simplification; front wheels restored from 20 degree showcase pose to a straight common axle; four rigid wheel assemblies and fixed calipers. No source simulation or GT3 identity. Original interpreted four-seat Carrera cabin with leather surfaces, a five-dial instrument cluster, steering/selector/console controls and headliner. Speed, RPM and gear use shared accepted telemetry; auxiliary readings remain unavailable. Not an exact factory cockpit."
     }
   ],
   "licenseUrls": [
     "https://creativecommons.org/licenses/by/4.0/",
-    "https://creativecommons.org/publicdomain/zero/1.0/"
+    "https://creativecommons.org/publicdomain/zero/1.0/",
+    "https://creativecommons.org/licenses/by-sa/4.0/"
   ]
 }

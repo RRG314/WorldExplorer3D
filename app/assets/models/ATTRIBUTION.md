@@ -354,3 +354,25 @@ The coupe author does not specify an exact model year. The long Fleetwood Brough
 - Source archive/blend hashes, modifications, runtime checksum and budgets are
   recorded in `vehicles/racing-fleet/asset-manifest.json`. Preparation uses
   `scripts/prepare-bmw-m3-race-blend.py` followed by the shared fleet asset script.
+
+## Porsche 911 Carrera 4S
+
+This work is based on [(FREE) Porsche 911 Carrera 4S](https://sketchfab.com/3d-models/free-porsche-911-carrera-4s-d01b254483794de3819786d93e0e1ebf)
+by [Karol Miklas](https://sketchfab.com/karolmiklas), licensed under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+The complete modified model retains that same licence, with the original notice
+beside `vehicles/racing-fleet/road-porsche-911-carrera-4s.glb`.
+
+The source exterior is uniformly normalized to a 4.435 m presentation envelope.
+The showroom floor is removed, duplicate coat geometry is replaced by a PBR
+clearcoat, maps are bounded to 512 px, and the front wheel showcase pose is
+straightened before adding four wheel assemblies and fixed calipers. An original
+interpreted four-seat driving cabin adds leather surfaces, controls, headliner
+and a five-dial cluster. Speed, RPM and gear use shared driving telemetry;
+auxiliary sensor readings remain unavailable. This is a Carrera 4S road car
+usable in the game's races, with the shared 120 mph class cap, rather than a
+factory-interior or GT3 homologation claim.
+
+Source archive/runtime checksums, modifications and budgets accompany the shared
+fleet manifest. Offline preparation uses `prepare-porsche-carrera-exterior.mjs`,
+`prepare-porsche-carrera-cabin.py`, and the shared fleet asset script.

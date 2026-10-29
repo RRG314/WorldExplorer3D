@@ -23,6 +23,7 @@ const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   datsun_280z: 'road-datsun-280z',
   bmw_m3_e46: 'road-bmw-m3-e46',
   bmw_m3_e92_race: 'road-bmw-m3-e92-race',
+  porsche_carrera_4s: 'road-porsche-911-carrera-4s',
 });
 
 const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';

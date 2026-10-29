@@ -104,3 +104,47 @@ test('the real E92 racing car shares authoritative acquisition and the service v
  assert.equal(profile.handling.assetId,'road-bmw-m3-e92-race');assert.equal(profile.conditionValue,.8);
  assert.equal(require('../functions/generated/vehicle-garage-rules.cjs').personalVehicleById(garage.selectedId).price,130000);
 });
+
+test('the Porsche derivative keeps its share-alike identity, rigid wheels, content revision and prepared cabin',async()=>{
+ const {readFile}=await import('node:fs/promises'),{createHash}=await import('node:crypto');
+ const {RACING_FLEET_ASSETS}=await import('../app/js/assets/racing-fleet-assets.js');
+ const {vehicleDefinitionById,PARKED_VEHICLE_CATALOG}=await import('../app/js/engine/vehicle-catalog.js');
+ const {getModelAsset}=await import('../app/js/assets/model-asset-catalog.js');
+ const {modelAssetRequestUrl}=await import('../app/js/assets/model-asset-url.js');
+ const {vehicleDriverCamera}=await import('../app/js/transport/vehicle-camera-mount.js');
+ const asset=RACING_FLEET_ASSETS.find(a=>a.id==='road-porsche-911-carrera-4s'),car=vehicleDefinitionById('porsche_carrera_4s');
+ const manifest=JSON.parse(await readFile(new URL('../app/assets/models/vehicles/racing-fleet/asset-manifest.json',import.meta.url))),record=manifest.assets.find(a=>a.id===asset.id);
+ const bytes=await readFile(new URL('..'+asset.url,import.meta.url));
+ assert.equal(createHash('sha256').update(bytes).digest('hex'),record.sha256);
+ assert.equal(record.sourceArchiveSha256,'57731111fbb0d6958df64454e9ba51939fefd39ab48e55f423a0bb2d76918454');
+ assert.equal(record.license,'CC-BY-SA-4.0');assert.match(record.sourceCredit,/Karol Miklas/);
+ assert.equal(modelAssetRequestUrl(getModelAsset(asset.id)),asset.url+'?revision='+record.sha256.slice(0,16));
+ const licence=await readFile(new URL('../app/assets/models/vehicles/racing-fleet/road-porsche-911-carrera-4s-LICENSE.txt',import.meta.url),'utf8');
+ assert.match(licence,/Modified versions must have the same license/);assert.match(licence,/Commercial use is allowed/);
+ const json=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
+ assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-spin').length,4);
+ assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-caliper').length,4);
+ assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-steering'&&n.extras.front).length,2);
+ const screen=json.nodes.find(n=>n.extras?.vehicleInstrumentDisplay===true);assert.equal(screen.extras.vehicleInstrumentStyle,'five-dial');
+ assert.ok(!json.materials.some(m=>['coat','Material'].includes(m.name)));
+ assert.equal(json.animations?.length||0,0);assert.equal(json.skins?.length||0,0);
+ assert.ok(!json.buffers.some(b=>b.uri));assert.ok(!(json.images||[]).some(i=>i.uri));
+ assert.equal(bytes.length,asset.budgets.bytes);assert.ok(record.triangles<=110000&&bytes.length<=7000000);
+ assert.ok(asset.wheelLayout.every(w=>Math.abs(w.position[1]-w.radius)<.003));
+ assert.equal(car.assetId,asset.id);assert.equal(car.length,4.435);assert.equal(car.seatCount,4);
+ assert.ok(!PARKED_VEHICLE_CATALOG.includes(car));assert.equal(vehicleDriverCamera(car).kind,'cabin');
+});
+
+test('the Porsche shares authoritative garage acquisition and the service race profile',async()=>{
+ const rows=new Map([['wallet',{credits:170000,currencyVersion:2}]]),runTransaction=fn=>fn({get:async key=>({exists:rows.has(key),data:()=>rows.get(key)}),set:(key,value)=>rows.set(key,structuredClone(value))});
+ const args={runTransaction,walletRef:'wallet',progressRef:'progress',receiptRef:'receipt',uid:'driver',timestampFromMs:n=>n,nowMs:1000,
+  input:{action:'buy',vehicleId:'porsche_carrera_4s',expectedRevision:0,requestId:'carrera:buy',price:1}};
+ const bought=await settleVehicleGarageAction(args);assert.equal(bought.credits,85000);
+ assert.equal((await settleVehicleGarageAction(args)).duplicate,true);assert.equal(rows.get('wallet').credits,85000);
+ const {prepareVehicleGarageChange}=await import('../app/js/transport/vehicle-garage-rules.js');
+ const garage=prepareVehicleGarageChange(bought.garage,{action:'select',vehicleId:'porsche_carrera_4s',expectedRevision:bought.garage.revision}).garage;
+ assert.equal(garage.selectedId,'porsche_carrera_4s');
+ const engine=require('../functions/generated/racing-engine.cjs');
+ assert.equal(engine.createRaceVehicleProfile(garage.selectedId,{condition:.7,levels:{engine:1}}).handling.assetId,'road-porsche-911-carrera-4s');
+ assert.equal(require('../functions/generated/vehicle-garage-rules.cjs').personalVehicleById(garage.selectedId).price,85000);
+});

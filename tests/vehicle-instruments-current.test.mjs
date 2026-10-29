@@ -28,3 +28,20 @@ test('cockpit telemetry uses accepted speed, RPM and direction, updates on chang
   assert.equal(material.emissiveIntensity,.45);assert.equal(material.toneMapped,true);
  } finally {if(originalDocument===undefined)delete globalThis.document;else globalThis.document=originalDocument;}
 });
+
+test('the five-dial cabin reads accepted speed, RPM and gear without inventing auxiliary telemetry',()=>{
+ const originalDocument=globalThis.document,text=[],segments=[];
+ const context={fillRect(){},fillText(value){text.push(value);},beginPath(){},arc(){},fill(){},stroke(){},moveTo(){},lineTo(x,y){segments.push([x,y]);}};
+ globalThis.document={createElement:()=>({getContext:()=>context})};
+ try{
+  const root=new THREE.Group(),material=new THREE.MeshStandardMaterial(),screen=new THREE.Mesh(new THREE.PlaneGeometry(),material);
+  screen.userData.vehicleInstrumentDisplay=true;screen.userData.vehicleInstrumentStyle='five-dial';root.add(screen);
+  const instrument=createVehicleInstruments(THREE,root);text.length=0;segments.length=0;
+  assert.equal(instrument.update(71.7,6351,4,8000),true);
+  assert.ok(text.includes('72')&&text.includes('RPM ×1000')&&text.includes('G 4'));
+  assert.equal(text.filter(t=>t==='—').length,3);
+  const first=segments.map(p=>p.slice());text.length=0;segments.length=0;
+  assert.equal(instrument.update(100,7800,5,8000),true);assert.notDeepEqual(segments,first);
+  assert.ok(text.includes('100')&&text.includes('G 5'));instrument.dispose();
+ }finally{if(originalDocument===undefined)delete globalThis.document;else globalThis.document=originalDocument;}
+});
