@@ -1,4 +1,5 @@
 import {publishedRoadSourceTopology} from './road-source-topology.js';
+import {reviewedDeckSurveyInWorld} from './reviewed-deck-world-profile.js';
 import {roadSourceSurvey,reviewedRoadTransportRecord} from './road-source-survey.js';
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {roadDimensionsFromSource} from './road-units.js';
@@ -88,7 +89,8 @@ export async function buildRoadGeometryPass(options = {}) {
       subtype: type
     });
     const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
-    const survey=roadSourceSurvey(way);
+    const survey=reviewedDeckSurveyInWorld(roadSourceSurvey(way),pts,{geoToWorld:(lat,lon)=>appCtx.geoToWorld(lat,lon),
+      heightToWorld:meters=>meters*appCtx.WORLD_UNITS_PER_METER*appCtx.TERRAIN_Y_EXAGGERATION});
     const sourceRecord = normalizeTransportSource({
       sourceId: sourceFeatureId,
       id: way.id,
