@@ -9,5 +9,6 @@ export {raceCourseKey,raceDistrictFingerprint,restoreRaceCourse} from '../../app
 export {normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById} from '../../app/js/transport/vehicle-garage-rules.js';
 export {prepareExplorerCreditAward} from '../../functions/economy-authority.js';
 export {canonicalRaceDistrict,reconstructPublishedRace,rebaseRaceReference,assertRaceCourseInDistrict,racePublicationIdentity,readPublishedRaceCourse} from '../../app/js/racing/publication-rules.js';
+export {prepareRaceDistrictStorage,readRaceDistrictFacts,raceDistrictChunkPath,RACE_DISTRICT_STORAGE_LIMITS} from '../../app/js/racing/district-storage.js';
 export {normalizeRaceRouteReference,raceCourseReference} from '../../app/js/racing/course-library.js';
 export {RACING_CAREER_LIMITS,racingCareerContext,verifiedCareerFinish,careerFinishEligible,racingSeriesStandings,racingRivalOutcome} from '../../app/js/racing/career-rules.js';

@@ -1,6 +1,6 @@
 'use strict';
 const {createHash}=require('node:crypto');
-const {normalizeRaceRouteReference,raceDistrictFingerprint,reconstructPublishedRace,raceCourseKey,readPublishedRaceCourse,RACE_PHYSICS_VERSION}=require('./generated/racing-engine.cjs');
+const {normalizeRaceRouteReference,raceDistrictFingerprint,reconstructPublishedRace,raceCourseKey,readPublishedRaceCourse,readRaceDistrictFacts,raceDistrictChunkPath,RACE_PHYSICS_VERSION}=require('./generated/racing-engine.cjs');
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
 const data=s=>s.exists?s.data():null;
@@ -8,10 +8,20 @@ const clean=s=>String(s||'').replace(/[\u0000-\u001f\u007f]/g,'').trim();
 const courseId=id=>{if(!/^road-race-[a-f0-9]{32}$/.test(id||''))fail('race_invalid_course');return id;};
 const locationKey=id=>hash(String(id));
 const timestamp=(admin,now)=>admin.firestore.Timestamp.fromMillis(Math.floor(now));
+async function hydrateDistrict(db,id,record,get=ref=>ref.get()){
+ if(!record)return null;
+ const facts=await readRaceDistrictFacts(record,async index=>{
+  const path=raceDistrictChunkPath(id,index),split=path.lastIndexOf('/');
+  return data(await get(db.collection(path.slice(0,split)).doc(path.slice(split+1))));
+ });
+ return {...record,facts};
+}
 async function approvedDistrict(db,id){
  if(!/^[a-f0-9]{64}$/.test(id||''))fail('race_invalid_district');
- const record=data(await db.collection('racingDistricts').doc(id).get());
- if(record?.status!=='approved'||!record.facts||await raceDistrictFingerprint(record.facts)!==`race-district:${id}`)fail('race_district_unavailable',409);
+ const raw=data(await db.collection('racingDistricts').doc(id).get());
+ if(raw?.status!=='approved')fail('race_district_unavailable',409);
+ const record=await hydrateDistrict(db,id,raw);
+ if(!record.facts||await raceDistrictFingerprint(record.facts)!==`race-district:${id}`)fail('race_district_unavailable',409);
  const pointer=data(await db.collection('racingLocations').doc(locationKey(record.facts.locationId)).get());
  if(pointer?.districtId!==id)fail('race_roads_changed_requalify_route',409);return record;
 }
@@ -71,9 +81,10 @@ async function writeRacingRoute({db,admin,uid,input,nowMs=Date.now()}){
 async function listRacingReview({db,status='review_required',cursor}){
  if(!['review_required','approved','rejected'].includes(status)||cursor!==undefined&&!/^road-race-[a-f0-9]{32}$/.test(cursor))fail('race_invalid_review_filter');
  let q=db.collection('racingCourses').where('status','==',status).orderBy('__name__');if(cursor)q=q.startAfter(cursor);
- const rows=await q.limit(21).get(),items=[];
+ const rows=await q.limit(21).get(),items=[],districts=new Map();
  for(const s of rows.docs.slice(0,20)){
-  const r=s.data(),d=data(await db.collection('racingDistricts').doc(r.districtId).get());
+  const r=s.data();if(!districts.has(r.districtId))districts.set(r.districtId,hydrateDistrict(db,r.districtId,data(await db.collection('racingDistricts').doc(r.districtId).get())));
+  const d=await districts.get(r.districtId);
   if(!d?.facts)continue;const course=await reconstructPublishedRace(r.reference,d.facts);
   items.push({id:s.id,revision:r.revision,status:r.status,ownerUid:r.ownerUid,course,credits:d.credits,reviewNote:r.reviewNote||'',qualification:r.qualification||null});
  }
@@ -86,8 +97,9 @@ async function moderateRacingRoute({db,admin,moderatorUid,input,nowMs=Date.now()
  return db.runTransaction(async tx=>{
   const r=data(await tx.get(ref));if(!r||r.revision!==input.revision)fail('race_route_changed',409);
   if(r.status==='approved'&&input.decision==='rejected'){}else if(r.status!=='review_required')fail('race_review_not_pending',409);
-  const d=data(await tx.get(db.collection('racingDistricts').doc(r.districtId))),pointer=d?.facts&&data(await tx.get(db.collection('racingLocations').doc(locationKey(d.facts.locationId))));
-  if(input.decision==='approved'&&(d?.status!=='approved'||pointer?.districtId!==r.districtId||r.qualification?.revision!==r.revision||r.qualification.physicsVersion!==RACE_PHYSICS_VERSION))fail('race_test_route_first',409);
+  const d=input.decision==='approved'?await hydrateDistrict(db,r.districtId,data(await tx.get(db.collection('racingDistricts').doc(r.districtId))),ref=>tx.get(ref)):null;
+  const pointer=d?.facts&&data(await tx.get(db.collection('racingLocations').doc(locationKey(d.facts.locationId))));
+  if(input.decision==='approved'&&(d?.status!=='approved'||!d.facts||await raceDistrictFingerprint(d.facts)!==`race-district:${r.districtId}`||pointer?.districtId!==r.districtId||r.qualification?.revision!==r.revision||r.qualification.physicsVersion!==RACE_PHYSICS_VERSION))fail('race_test_route_first',409);
   tx.update(ref,{status:input.decision,reviewNote:note,reviewerUid:moderatorUid,reviewedAt:timestamp(admin,nowMs),updatedAt:timestamp(admin,nowMs)});
   if(r.ownerUid)tx.set(db.collection('users').doc(r.ownerUid).collection('racingRoutes').doc(id),{districtId:r.districtId,status:input.decision,revision:r.revision});
   tx.create(db.collection('adminActivity').doc(),{action:'racing_route_review',targetId:id,revision:r.revision,decision:input.decision,note,adminUid:moderatorUid,createdAt:timestamp(admin,nowMs)});
@@ -106,7 +118,7 @@ async function adoptCuratedRacingRoute({db,admin,id,ownerUid,revision,note,appro
   if(hash({districtId:r.districtId,reference:normalizeRaceRouteReference(r.reference)})!==revision)fail('race_course_changed',409);
   if(r.ownerUid===null&&r.curation?.revision===revision)return {id,revision,curated:true,alreadyCurated:true};
   if(r.ownerUid!==ownerUid)fail('race_route_owner_changed',409);
-  const d=data(await tx.get(db.collection('racingDistricts').doc(r.districtId))),pointer=d?.facts&&data(await tx.get(db.collection('racingLocations').doc(locationKey(d.facts.locationId))));
+  const d=await hydrateDistrict(db,r.districtId,data(await tx.get(db.collection('racingDistricts').doc(r.districtId))),ref=>tx.get(ref)),pointer=d?.facts&&data(await tx.get(db.collection('racingLocations').doc(locationKey(d.facts.locationId))));
   if(d?.status!=='approved'||!d.facts||await raceDistrictFingerprint(d.facts)!==`race-district:${r.districtId}`||pointer?.districtId!==r.districtId)fail('race_district_unavailable',409);
   if(await raceCourseKey(await reconstructPublishedRace(r.reference,d.facts))!==id)fail('race_course_changed',409);
   const q=r.qualification;if(q?.revision!==revision||q.physicsVersion!==RACE_PHYSICS_VERSION||!q.resultId)fail('race_test_route_first',409);
@@ -126,9 +138,10 @@ async function adoptCuratedRacingRoute({db,admin,id,ownerUid,revision,note,appro
  });
 }
 async function readMyRacingRoutes({db,uid}){
- const rows=await db.collection('users').doc(uid).collection('racingRoutes').limit(40).get(),items=[];
+ const rows=await db.collection('users').doc(uid).collection('racingRoutes').limit(40).get(),items=[],districts=new Map();
  for(const row of rows.docs){const r=data(await db.collection('racingCourses').doc(row.id).get());if(!r||r.ownerUid!==uid)continue;
-  const d=data(await db.collection('racingDistricts').doc(r.districtId).get());if(!d?.facts)continue;
+  if(!districts.has(r.districtId))districts.set(r.districtId,hydrateDistrict(db,r.districtId,data(await db.collection('racingDistricts').doc(r.districtId).get())));
+  const d=await districts.get(r.districtId);if(!d?.facts)continue;
   items.push({id:row.id,revision:r.revision,status:r.status,name:r.reference.name,locationLabel:d.facts.locationLabel,anchor:d.facts.anchor,
    reviewNote:r.reviewNote||'',tested:r.qualification?.revision===r.revision&&r.qualification?.physicsVersion===RACE_PHYSICS_VERSION});
  }return {items};

@@ -64,6 +64,36 @@ same absolute bound, and career finalization grace uses that shared maximum.
 Clock-stall and reconnect fences remain separate. This does not itself admit
 longer geographic routes or clear the remaining long-course publication limits.
 
+## Qualified road snapshot publication
+
+The existing district publisher supports inline snapshots up to 750 KiB and
+larger snapshots up to 4 MiB using at most twelve 384 KiB road chunks below the
+same `racingDistricts` document. This stays below Firestore's [1 MiB document
+limit](https://firebase.google.com/docs/firestore/quotas). There is no separate
+venue database, client geometry authority or background connection.
+
+The parent owns a manifest with canonical road counts, sizes and per-chunk
+SHA-256 digests. The operator command owns a cloned, validated handoff and commits
+the parent, every child and the current-location pointer in one transaction.
+Failed commits publish none; orphaned children or damaged existing snapshots
+require inspection instead of being overwritten. Retrying or reapproving identical
+content does not rewrite immutable children or change its identity. Descriptive
+facts also remain immutable even when the physics fingerprint would be unchanged.
+
+Service reconstruction, catalogues, creator/moderator readers and curated adoption
+share the same verified decoder. Missing, malformed or changed chunks cannot
+return partial qualified geometry. Canonical schema construction makes digest
+verification independent of Firestore map-property ordering. Inline V1 reads keep
+their existing fingerprints. Moderator rejection can still withdraw a course
+whose source is unavailable. Per-request district deduplication avoids re-reading
+the same survey for every row; vehicle custody renewal keeps its existing cheap
+metadata/status fence rather than downloading a full survey every five seconds.
+
+`racingRoadChunks.roads` has a single-field index exemption in
+`firestore.indexes.json`: the chunks are read by manifest identity, never queried
+by their geometry. Deploy this supporting configuration with the coordinated
+backend candidate. No public client write or read permission is added.
+
 ## Reproduction
 
 Captured source inputs belong outside Git; store the raw EA rasters and pinned
@@ -96,5 +126,5 @@ lap, visual acceptance, mobile measurement or a finished major-track pack.
 Remaining for Silverstone: actual rendered-world qualification and driving,
 track presentation/markings/pits/barriers/landmarks, complete lap and release
 integration. The catalogue must remain unreleased until those pass. Other venue
-packs, high-bank dynamics, long-course/chunked publication, oval and rally rules
+packs, high-bank dynamics, longer geographic route admission, oval and rally rules
 remain required by the unchanged full finish goal.

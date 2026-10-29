@@ -223,6 +223,11 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "racingRoadChunks",
+      "fieldPath": "roads",
+      "indexes": []
+    },
+    {
       "collectionGroup": "appTesterConfirmations",
       "fieldPath": "expiresAt",
       "ttl": true,

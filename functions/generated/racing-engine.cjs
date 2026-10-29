@@ -1051,6 +1051,7 @@ var require_economy_authority = __commonJS({
 // services/racing/engine-entry.mjs
 var engine_entry_exports = {};
 __export(engine_entry_exports, {
+  RACE_DISTRICT_STORAGE_LIMITS: () => RACE_DISTRICT_STORAGE_LIMITS,
   RACE_MAXIMUM_DURATION_MS: () => RACE_MAXIMUM_DURATION_MS,
   RACE_PHYSICS_VERSION: () => RACE_PHYSICS_VERSION,
   RACING_CAREER_LIMITS: () => RACING_CAREER_LIMITS,
@@ -1067,9 +1068,11 @@ __export(engine_entry_exports, {
   personalVehicleById: () => personalVehicleById,
   personalVehicleIdentity: () => personalVehicleIdentity,
   prepareExplorerCreditAward: () => import_economy_authority.prepareExplorerCreditAward,
+  prepareRaceDistrictStorage: () => prepareRaceDistrictStorage,
   raceCompetitiveRecordConfiguration: () => raceCompetitiveRecordConfiguration,
   raceCourseKey: () => raceCourseKey,
   raceCourseReference: () => raceCourseReference,
+  raceDistrictChunkPath: () => raceDistrictChunkPath,
   raceDistrictFingerprint: () => raceDistrictFingerprint,
   raceGridPose: () => raceGridPose,
   raceMaximumDurationMs: () => raceMaximumDurationMs,
@@ -1080,6 +1083,7 @@ __export(engine_entry_exports, {
   racingRivalOutcome: () => racingRivalOutcome,
   racingSeriesStandings: () => racingSeriesStandings,
   readPublishedRaceCourse: () => readPublishedRaceCourse,
+  readRaceDistrictFacts: () => readRaceDistrictFacts,
   rebaseRaceReference: () => rebaseRaceReference,
   reconstructPublishedRace: () => reconstructPublishedRace,
   restoreRaceCourse: () => restoreRaceCourse,
@@ -3214,8 +3218,8 @@ async function raceDistrictFingerprint(district) {
       span: r.heightSampleSpanMeters
     }))
   });
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return "race-district:" + Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, "0")).join("");
+  const hash2 = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return "race-district:" + Array.from(new Uint8Array(hash2), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 function raceCourseReference(course, districtFingerprint) {
   return normalizeRaceRouteReference({
@@ -3249,8 +3253,8 @@ async function raceCourseKey(course) {
     laps: course.laps,
     segments: course.segments
   }));
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return "road-race-" + Array.from(new Uint8Array(hash).slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
+  const hash2 = await crypto.subtle.digest("SHA-256", data);
+  return "road-race-" + Array.from(new Uint8Array(hash2).slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // app/js/racing/record-rules.js
@@ -3275,7 +3279,7 @@ function raceCompetitiveRecordConfiguration(profile, { slot, participants }) {
 // services/racing/engine-entry.mjs
 var import_economy_authority = __toESM(require_economy_authority(), 1);
 
-// app/js/racing/publication-rules.js
+// app/js/racing/district-facts.js
 var fail = () => {
   throw Error("race_invalid_district");
 };
@@ -3317,6 +3321,76 @@ function canonicalRaceDistrict(raw) {
   if (graph.edges.length < roads.length) fail();
   return facts;
 }
+
+// app/js/racing/district-storage.js
+var utf8 = new TextEncoder();
+var RACE_DISTRICT_STORAGE_LIMITS = Object.freeze({ inlineBytes: 750 * 1024, chunkBytes: 384 * 1024, totalBytes: 4 * 1024 * 1024, chunks: 12, roads: 5e3 });
+var size = (value) => utf8.encode(JSON.stringify(value)).byteLength;
+var hash = async (value) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", utf8.encode(JSON.stringify(value)))), (b) => b.toString(16).padStart(2, "0")).join("");
+var fail2 = () => {
+  throw Error("race_district_storage_unavailable");
+};
+function raceDistrictChunkPath(id, index) {
+  if (!/^[a-f0-9]{64}$/.test(id || "") || !Number.isInteger(index) || index < 0 || index >= RACE_DISTRICT_STORAGE_LIMITS.chunks) fail2();
+  return `racingDistricts/${id}/racingRoadChunks/${String(index).padStart(4, "0")}`;
+}
+async function prepareRaceDistrictStorage(input) {
+  const facts = canonicalRaceDistrict(input), bytes = size(facts), limits = RACE_DISTRICT_STORAGE_LIMITS;
+  if (bytes > limits.totalBytes) throw Error("race_district_storage_capacity");
+  if (bytes <= limits.inlineBytes) return { fields: { facts }, chunks: [], facts };
+  const { roads, ...header } = facts, groups = [];
+  let group = [], used = 2;
+  for (const road of roads) {
+    const added = size(road) + (group.length ? 1 : 0);
+    if (added + 2 > limits.chunkBytes) throw Error("race_district_road_exceeds_chunk");
+    if (used + added > limits.chunkBytes) {
+      groups.push(group);
+      group = [];
+      used = 2;
+    }
+    group.push(road);
+    used += size(road) + (group.length > 1 ? 1 : 0);
+  }
+  if (group.length) groups.push(group);
+  if (groups.length > limits.chunks) throw Error("race_district_storage_capacity");
+  const chunks = [], descriptors = [];
+  for (let index = 0; index < groups.length; index++) {
+    const rows = groups[index], contentSha256 = await hash(rows), bytes2 = size(rows);
+    descriptors.push({ index, roadCount: rows.length, bytes: bytes2, contentSha256 });
+    chunks.push({ index, record: { type: "RaceDistrictRoadChunk", version: 1, index, roads: rows } });
+  }
+  return { facts, fields: { factsManifest: { type: "RaceDistrictRoadManifest", version: 1, header, roadCount: roads.length, bytes, chunks: descriptors } }, chunks };
+}
+async function readRaceDistrictFacts(record, readChunk) {
+  if (!record) return null;
+  if (record.facts) {
+    if (record.factsManifest) fail2();
+    return record.facts;
+  }
+  const manifest = record.factsManifest, limits = RACE_DISTRICT_STORAGE_LIMITS;
+  if (manifest?.type !== "RaceDistrictRoadManifest" || manifest.version !== 1 || !manifest.header || !Number.isInteger(manifest.roadCount) || manifest.roadCount < 1 || manifest.roadCount > limits.roads || !Number.isInteger(manifest.bytes) || manifest.bytes <= limits.inlineBytes || manifest.bytes > limits.totalBytes || !Array.isArray(manifest.chunks) || !manifest.chunks.length || manifest.chunks.length > limits.chunks || typeof readChunk !== "function") fail2();
+  let expectedCount = 0, totalBytes = 0;
+  for (let index = 0; index < manifest.chunks.length; index++) {
+    const chunk = manifest.chunks[index];
+    if (chunk.index !== index || !Number.isInteger(chunk.roadCount) || chunk.roadCount < 1 || chunk.roadCount > limits.roads || !Number.isInteger(chunk.bytes) || chunk.bytes < 2 || chunk.bytes > limits.chunkBytes || !/^[a-f0-9]{64}$/.test(chunk.contentSha256 || "")) fail2();
+    expectedCount += chunk.roadCount;
+    totalBytes += chunk.bytes;
+  }
+  if (expectedCount !== manifest.roadCount || totalBytes > limits.totalBytes) fail2();
+  const roads = [];
+  for (const descriptor of manifest.chunks) {
+    const chunk = await readChunk(descriptor.index);
+    if (chunk?.type !== "RaceDistrictRoadChunk" || chunk.version !== 1 || chunk.index !== descriptor.index || !Array.isArray(chunk.roads) || chunk.roads.length !== descriptor.roadCount) fail2();
+    const normalized = canonicalRaceDistrict({ ...manifest.header, roads: chunk.roads }).roads;
+    if (size(normalized) !== descriptor.bytes || await hash(normalized) !== descriptor.contentSha256) fail2();
+    roads.push(...normalized);
+  }
+  const facts = canonicalRaceDistrict({ ...manifest.header, roads });
+  if (size(facts) !== manifest.bytes) fail2();
+  return facts;
+}
+
+// app/js/racing/publication-rules.js
 async function reconstructPublishedRace(reference, facts) {
   const fingerprint = await raceDistrictFingerprint(facts), graph = buildRaceRoadGraph(facts.roads, { metersPerUnit: facts.metersPerUnit });
   return restoreRaceCourse(normalizeRaceRouteReference(reference), facts, graph, fingerprint);
@@ -3356,10 +3430,12 @@ async function readPublishedRaceCourse({ read, id, uid }) {
   const record = await read(`racingCourses/${id}`);
   if (!record || record.status !== "approved" && !(record.ownerUid === uid && ["draft", "rejected"].includes(record.status))) return null;
   const district = await read(`racingDistricts/${record.districtId}`);
-  if (district?.status !== "approved" || !district.facts || await raceDistrictFingerprint(district.facts) !== `race-district:${record.districtId}`) throw Error("race_district_unavailable");
-  const pointer = await read(`racingLocations/${await raceLocationKey(district.facts.locationId)}`);
+  if (district?.status !== "approved") throw Error("race_district_unavailable");
+  const facts = await readRaceDistrictFacts(district, (index) => read(raceDistrictChunkPath(record.districtId, index)));
+  if (!facts || await raceDistrictFingerprint(facts) !== `race-district:${record.districtId}`) throw Error("race_district_unavailable");
+  const pointer = await read(`racingLocations/${await raceLocationKey(facts.locationId)}`);
   if (pointer?.districtId !== record.districtId) throw Error("race_roads_changed_requalify_route");
-  const course = await reconstructPublishedRace(record.reference, district.facts);
+  const course = await reconstructPublishedRace(record.reference, facts);
   if (await raceCourseKey(course) !== id) throw Error("race_course_changed");
   return { ...course, publication: {
     status: record.status,
@@ -3416,6 +3492,7 @@ function racingRivalOutcome(challenge) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  RACE_DISTRICT_STORAGE_LIMITS,
   RACE_MAXIMUM_DURATION_MS,
   RACE_PHYSICS_VERSION,
   RACING_CAREER_LIMITS,
@@ -3432,9 +3509,11 @@ function racingRivalOutcome(challenge) {
   personalVehicleById,
   personalVehicleIdentity,
   prepareExplorerCreditAward,
+  prepareRaceDistrictStorage,
   raceCompetitiveRecordConfiguration,
   raceCourseKey,
   raceCourseReference,
+  raceDistrictChunkPath,
   raceDistrictFingerprint,
   raceGridPose,
   raceMaximumDurationMs,
@@ -3445,6 +3524,7 @@ function racingRivalOutcome(challenge) {
   racingRivalOutcome,
   racingSeriesStandings,
   readPublishedRaceCourse,
+  readRaceDistrictFacts,
   rebaseRaceReference,
   reconstructPublishedRace,
   restoreRaceCourse,
