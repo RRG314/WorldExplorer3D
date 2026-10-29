@@ -1,8 +1,9 @@
 import { normalizePublishedRoadIndices } from './terrain/published-road-integrity.js';
 
-export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8}={}) {
+export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8,
+  vertexColors=false,side,depthWrite=true}={},T=globalThis.THREE) {
   // Roads use -2. Paint must stay ahead of their depth bias at grazing angles.
-  return new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,
+  return new T.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,vertexColors,side:side??T.FrontSide,depthWrite,
     polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6});
 }
 

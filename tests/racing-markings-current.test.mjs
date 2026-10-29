@@ -16,6 +16,9 @@ test('the bundled renderer detaches race presentation and releases every owned g
  try {
  const c=course(),context={scene:new THREE.Scene()},view=await prepareRacePresentation(THREE,context,c,[],{signal:new AbortController().signal,current:()=>true});
  view.mount();assert.equal(view.root.parent,context.scene);const geometries=new Set(),materials=new Set(),released=new Set();
+ const paint=view.root.children.find(o=>o.name==='Surveyed finish and full-chassis grid paint');
+ assert.ok(paint.material.polygonOffsetFactor<=-6,'paint uses the shared bias ahead of the -2 road surface');
+ assert.equal(paint.material.vertexColors,true);assert.equal(paint.material.depthWrite,false);
  view.root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
  for(const resource of [...geometries,...materials])resource.addEventListener('dispose',()=>{assert.ok(!released.has(resource));released.add(resource);});
  assert.ok(geometries.size>3);assert.ok(materials.size>3);view.dispose();view.dispose();

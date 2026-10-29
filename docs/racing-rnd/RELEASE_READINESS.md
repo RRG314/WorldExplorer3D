@@ -4,6 +4,23 @@ Updated October 29, 2026. **Full racing is not release-ready.** No production de
 
 ## Implemented and evidenced
 
+- Actual held-key Silverstone driving reproduced fixed-tick pose repeats and
+  double advances independently of pulsed automation, barriers or camera-mode
+  changes. Practice now samples adjacent accepted session frames for the body,
+  chase/cabin views and rivals, while keeping authority and finish states exact.
+  Repaired straight acceleration/braking samples had no repeated moving body
+  poses; ordinary steering and walking return also passed. Physical-device
+  smoothness and adverse network prediction remain separate evidence boundaries.
+- Frozen `fe5e928d` completed the full 5.87 km Silverstone GP through all 230
+  ordered gates in 4:54.35, with zero barrier contacts or timing penalties. The
+  real-model AI finished in 4:42.98. Actual Results, Journal-save feedback and
+  walking return were inspected. The driver used continuous Chromium touch
+  steering with keyboard pedals and controlled grid setup; it was scripted,
+  not a human or physical-phone test. One moving 60-second desktop-host sample
+  at a landscape phone viewport measured 59.95 FPS, p95 18.6 ms, p99 18.7 ms,
+  worst 35.1 ms and no frame over 250 ms. No page/console or cleanup errors
+  occurred. This is full-lap evidence, not a completed detailed venue pack.
+
 - Optional rivals and crews now use persistent invitations, one open pair/class challenge, eight-member crews, one-to-five-stage opt-in series, accepted-result standings and paged history. Existing wallet awards remain unchanged. The same view is available in Racing and Account. Actual isolated Auth/Firestore/socket/browser driving completed the shared sprint and both solo stages, saved both Journals, completed the rival and finalized tied series standings. Command/privacy/deletion and UI retry checks passed separately; controlled roads, prior-class read fixtures and App Check are test seams. See `CAREER.md`.
 - The staging authority and seven narrow endpoints are deployed and passed live TLS/Auth/Google-signed debug App Check, protected API and revocation checks. A current Monaco city district was approved for the controlled live journey; temporary staging enablement and QA cleanup are recorded separately. The career service revision, four narrow endpoints/consumers and cleanup indexes are deployed. Live protected crew/invitation/history reads, result-create delivery and Auth-deletion cleanup passed. An optional-field cleanup failure was repaired and rechecked in isolation. This is not real-city racing or hardware acceptance.
 

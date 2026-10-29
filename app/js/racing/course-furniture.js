@@ -56,9 +56,12 @@ export function prepareRaceFurniture(T,context,course) {
  const wall=keep(new T.MeshStandardMaterial({color:0xc2c1b6,map:context.concreteDiffuse||null,normalMap:context.concreteNormal||null,normalScale:new T.Vector2(.12,.12),roughnessMap:context.concreteRoughness||null,roughness:.95,side:T.DoubleSide}));
  const metal=keep(new T.MeshStandardMaterial({color:0x76818a,metalness:.72,roughness:.58}));
  const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const ctx=canvas.getContext('2d');
- ctx.strokeStyle='#d3d7d7';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,32);ctx.lineTo(32,0);ctx.lineTo(64,32);ctx.lineTo(32,64);ctx.closePath();ctx.stroke();
+ ctx.strokeStyle='#a8b1b4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,32);ctx.lineTo(32,0);ctx.lineTo(64,32);ctx.lineTo(32,64);ctx.closePath();ctx.stroke();
  const chain=new T.CanvasTexture(canvas);chain.wrapS=chain.wrapT=T.RepeatWrapping;chain.anisotropy=4;textures.push(chain);
- const fence=keep(new T.MeshStandardMaterial({color:0xa3adb1,map:chain,alphaTest:.4,side:T.DoubleSide,metalness:.6,roughness:.6}));
+ // Preserve filtered wire coverage in the distance. A hard alpha cutout turns
+ // mipmapped chain links into bright, flickering dots at normal chase angles.
+ const fence=keep(new T.MeshStandardMaterial({color:0x7c878a,map:chain,transparent:true,opacity:.72,depthWrite:false,
+  side:T.DoubleSide,metalness:.35,roughness:.75}));
  const postGeometry=keep(new T.BoxGeometry(.065/unit,1.7/unit,.065/unit)),matrix=new T.Matrix4();
  for(const chunk of data.chunks) {
   const group=new T.Group();group.name='Race perimeter '+chunk.key;
