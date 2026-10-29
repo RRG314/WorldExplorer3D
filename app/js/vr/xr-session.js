@@ -196,7 +196,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
   };
   scope.listen(world.signal,'abort',()=>stop('environment-changed'));
   scope.listen(target,'pagehide',()=>stop('page-hidden'));
-  scope.listen(target,'keydown',event=>{if(event.code==='Escape')stop('escape');},{capture:true});
+  scope.listen(target,'keydown',event=>{if(phase!=='closed'&&event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();stop('escape');}},{capture:true});
   scope.listen(target,'blur',()=>{if(phase==='presenting')pause();});
   return Object.freeze(api);
 }

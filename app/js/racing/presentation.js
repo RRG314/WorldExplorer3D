@@ -1,9 +1,20 @@
+import {vehicleFootprint} from '../engine/vehicle-footprint.js';
 import {createUrbanVehicleVisual} from '../urban-sandbox/vehicle-visuals.js?v=12';
 import {attachCuratedTrafficVehicle,syncCuratedVehicleGroundPivot} from '../urban-sandbox/curated-traffic-vehicle.js?v=5';
 import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import {carSpeedToWorldUnitsPerSecond} from '../physics/vehicle-speed-units.js?v=2';
 import {buildRacePaint,raceCourseSurfacePoint} from './course-markings.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
+// Practice rivals are ghosts. A finished ghost leaves presentation, and a
+// passing ghost must not put an opaque body around the active cabin/VR eye.
+// Timing and actor motion continue to belong to the race session.
+export function raceGhostVisible(player,variant,{immersive=false,eye}={}) {
+ if(player.dnf||player.progress?.finished)return false;
+ if(!immersive||!eye||!player.pose)return true;
+ const box=vehicleFootprint(player.pose,variant,.2),dx=eye.x-box.x,dz=eye.z-box.z;
+ if(eye.y<box.y-.2||eye.y>box.y+box.height+.2)return true;
+ return Math.abs(dx*box.sx+dz*box.sz)>=box.width||Math.abs(dx*box.fx+dz*box.fz)>=box.length;
+}
 export async function prepareRacePresentation(THREE,context,course,rivals,{signal,current}) {
  const root=new THREE.Group();root.name='Scoped mapped road race';const visuals=[];let disposed=false;
  const material=new THREE.MeshBasicMaterial({color:0xb7f568,transparent:true,opacity:.8,depthWrite:false});
@@ -39,6 +50,8 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
     }
     for(const p of snapshot.players)if(p.ai&&p.pose) {
      const visual=visuals[p.slot-1];if(!visual)continue;const state=p.vehicleState;
+     const immersive=!!context.vrPresentation?.active||context.camMode===1||context.camera?.userData?.vehicleClearanceMode==='clearance-first-person';
+     visual.root.visible=raceGhostVisible(p,rivals[p.slot-1].profile.variant,{immersive,eye:context.camera?.position});
      visual.root.position.set(p.pose.x,state?.y??p.pose.y+1.2,p.pose.z);
      visual.root.rotation.set(state?.terrainPitch||0,p.pose.yaw,state?.terrainRoll||0,'YXZ');
      syncCuratedVehicleGroundPivot(visual.root);

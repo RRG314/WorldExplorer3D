@@ -15,7 +15,8 @@ test('the existing physics frame exclusively consumes practice controls from gri
  assert.equal(h.c.car.z,grid,'countdown cannot launch early');
  for(let i=0;i<3000&&!complete;i++)advanceRoadRaceFrame(h.c,1/60,{throttle:1});
  assert.equal(complete.phase,'complete');assert.ok(complete.players[0].progress.finished);assert.ok(h.c.car.z>290);
- assert.ok(h.c.car.engineRpm>0);controller.dispose();
+ assert.ok(h.c.car.engineRpm>0);assert.equal(h.c.car.speed,0);assert.equal(h.c.car.vFwd,0);assert.equal(h.c.car.vLat,0);assert.equal(h.c.car.throttleSm,0);
+ assert.ok(complete.players[0].speed>0,'result retains the actual crossing speed');assert.equal(h.c.car.z,complete.players[0].pose.z);controller.dispose();
 });
 test('world replacement and every incompatible controller reject road ownership before a pose write',()=>{
  for(const state of [{getLiveGpsSnapshot:()=>({active:true})},{boatMode:{active:true},boatDeck:{active:true}},{boatMode:{active:true}},{planeMode:{active:true}},{spaceFlight:{active:true}},

@@ -227,7 +227,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   if(busy||!course)return;if(lastResult&&!resultSaved){el('[data-race-save-state]').textContent='Save your previous result before starting another run.';el('[data-race-retry-save]').hidden=false;return;}busy=true;status('Preparing your car and rivals…');
   stop('race_replaced');const scope=createLifecycleScope('racing-run'),session=captureEnvironmentSession(),request=new AbortController(),publication=c.worldPublication;
   raceScope=scope;scope.defer(()=>request.abort(),'preparation');scope.listen(session.signal,'abort',()=>stop('world_changed'));
-  const uid=getCurrentUser()?.uid||'practice-player',current=()=>scope.isActive()&&session.isCurrent()&&publication===c.worldPublication&&(getCurrentUser()?.uid||'practice-player')===uid;
+  const ownerUid=getCurrentUser()?.uid||'',uid=ownerUid||'practice-player',current=()=>scope.isActive()&&session.isCurrent()&&publication===c.worldPublication&&(getCurrentUser()?.uid||'')===ownerUid;
   try {
    if(getCurrentRoom())throw Error('practice_leave_room_first');
    if(c.getLiveGpsSnapshot?.().active)throw Error('race_live_gps_active');
@@ -264,7 +264,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   finally {busy=false;}
  }
  function showResults(){if(!lastResult)return;if(!dialog.open)dialog.showModal();renderResults();el('#racingResultHeading').focus({preventScroll:true});}
- function complete(result) {lastResult=result;lastResultCourse=controller.course;lastResultProfile=controller.profile;lastResultOwner=getCurrentUser()?.uid||'';resultSaved=false;status('');hud.hidden=true;c.setPauseReason?.('racing-menu',true);renderResults();if(!c.vrPresentation?.active)showResults();void persistResult();}
+ function complete(result) {lastResult=result;lastResultCourse=controller.course;lastResultProfile=controller.profile;lastResultOwner=getCurrentUser()?.uid||'';resultSaved=false;presentation?.update(result,controller.uid,0);status('');hud.hidden=true;c.setPauseReason?.('racing-menu',true);renderResults();if(!c.vrPresentation?.active)showResults();void persistResult();}
  function renderResults() {
   if(!lastResult)return;dialog.dataset.raceView='results';el('[data-race-heading]').textContent='Race results';el('#racingResultHeading').textContent=lastResult.courseName;el('[data-race-results]').hidden=false;el('[data-race-result-actions]').hidden=false;const list=el('[data-race-order]');list.replaceChildren();
   for(const player of lastResult.players){const li=document.createElement('li');li.textContent=`${player.label} · ${player.dnf?'Did not finish':formatTime(player.progress?.elapsedMs)}${player.ai?' · AI rival':''}`;list.append(li);}

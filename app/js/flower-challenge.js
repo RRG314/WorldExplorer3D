@@ -190,6 +190,12 @@ function setTitleStatus(message, tone = 'info') {
 function setTitlePanelOpen(open) {
   if (!ui.titlePanel) return;
   const shouldOpen = !!open;
+  const changed = ui.titlePanel.classList.contains('open') !== shouldOpen;
+  // Reviewing a board cannot leave the local actor coasting behind it. The
+  // existing pause/layout owners retain other panels' and activities' reasons.
+  appCtx.setPauseReason?.('rankings', shouldOpen && appCtx.gameStarted === true);
+  appCtx.screenLayout?.setPanelLayer('rankings', shouldOpen && appCtx.gameStarted === true);
+  if(changed)appCtx.clearControlInputState?.(shouldOpen?'rankings-open':'rankings-close');
   ui.titlePanel.classList.toggle('open', shouldOpen);
   if (ui.titleToggleBtn) {
     ui.titleToggleBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');

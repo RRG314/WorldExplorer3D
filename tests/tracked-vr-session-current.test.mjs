@@ -123,3 +123,10 @@ test('race Results uses the existing headset controls and releases the composito
 test('changing the vehicle view behind the same host invalidates tracked VR',async()=>{
  const f=fixture();await f.session.start();f.ctx.carMesh.userData.driverCameraMount={type:'DriverCameraMount',kind:'raised',eye:{x:0,y:1,z:0}};f.send();await f.session.stop();assert.equal(f.flat(),true);f.source.dispose();
 });
+
+test('Escape ends tracked VR once and cannot reach ordinary pause input',async()=>{
+ const f=fixture();await f.session.start();f.send();let ordinaryPause=0;
+ f.target.addEventListener('keydown',()=>ordinaryPause++);
+ const event=new Event('keydown',{cancelable:true});Object.defineProperty(event,'code',{value:'Escape'});f.target.dispatchEvent(event);
+ await f.session.stop();assert.equal(event.defaultPrevented,true);assert.equal(ordinaryPause,0);assert.equal(f.session.active,false);assert.equal(f.source.snapshot().active,false);assert.equal(f.reasons.size,0);f.source.dispose();
+});

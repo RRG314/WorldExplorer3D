@@ -17,7 +17,10 @@ replaces Start. Selecting it ends the VR presentation, then the existing kernel'
 presentation phase opens ordinary results while the race remains paused. No hidden
 HTML modal intercepts the viewer trigger. Normal Exit also returns to those results.
 Opening the Racing menu first releases VR; world, actor and car-view replacement
-invalidate the captured view.
+invalidate the captured view. Escape is consumed by the tracked view and cannot
+also toggle the ordinary pause menu. Finished practice ghosts leave presentation;
+a passing ghost containing the cabin/VR eye is hidden while it intersects that
+view. The race session still owns their timing and progress.
 
 The BMW retains its authored driver eye. Other fleet bodies currently use an
 explicit raised view derived from their normalized envelope. This avoids placing
@@ -28,7 +31,9 @@ driving and VR. A new immutable mount accompanies each successful car adoption.
 ## Personal times
 
 **Rankings → Racing**, or **My times** from results, reads accepted practice events
-from the existing Journal. Filters select a course and car setup. Course, vehicle,
+from the existing Journal. The panel owns its pause and layout reasons while a
+world is active; closing it releases only those reasons. Filters select a course
+and car setup. Course, vehicle,
 upgrades, starting condition, grip and physics version remain part of the record
 identity. Rows are personal bests, not ranks across unlike setups.
 
@@ -45,6 +50,24 @@ Practice never writes a public leaderboard, pays Credits or becomes a verified
 competition result. The existing generic leaderboard writers explicitly reject the
 racing type. Server timing, durable online awards and public racing rankings remain
 separate release requirements.
+
+## Finish handoff
+
+A completed player's exact crossing snapshot remains the result evidence. The
+road controller returns a stationary final frame through the existing physics
+delegate, without changing the finish pose or timing. This makes replay possible
+and avoids carrying race velocity into ordinary traffic after reviewing results.
+The timed dynamics and practice physics version are unchanged.
+
+## Platform boundaries
+
+Android uses the existing Android Browser Helper/TWA launcher and approved HTTPS
+origin. Apple’s current SwiftUI Portal opens the web game with
+`UIApplication.shared.open`; it is not an embedded native racing engine. No native
+permission, dependency, package identity or launch-origin change is needed for
+these web UI/presentation changes. Completed practice history remains in the web
+Journal for the current browser profile and origin. These are source integration
+facts, not evidence of a new Google Play or Apple distribution acceptance.
 
 ## Verification boundaries
 
