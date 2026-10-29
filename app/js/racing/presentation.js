@@ -2,7 +2,7 @@ import {vehicleFootprint} from '../engine/vehicle-footprint.js';
 import {createUrbanVehicleVisual} from '../urban-sandbox/vehicle-visuals.js?v=12';
 import {attachCuratedTrafficVehicle,syncCuratedVehicleGroundPivot} from '../urban-sandbox/curated-traffic-vehicle.js?v=5';
 import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
-import {carSpeedToWorldUnitsPerSecond} from '../physics/vehicle-speed-units.js?v=2';
+import {carSpeedToWorldUnitsPerSecond,carSpeedToMph} from '../physics/vehicle-speed-units.js?v=2';
 import {buildRacePaint,raceCourseSurfacePoint} from './course-markings.js';
 import {prepareRaceFurniture} from './course-furniture.js';
 import {createRoadMarkingMaterial} from '../road-render.js?v=4';
@@ -63,6 +63,8 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
      visual.root.position.set(p.pose.x,state?.y??p.pose.y+1.2,p.pose.z);
      visual.root.rotation.set(state?.terrainPitch||0,p.pose.yaw,state?.terrainRoll||0,'YXZ');
      syncCuratedVehicleGroundPivot(visual.root);
+     visual.root.userData.curatedTrafficVehicleAttachment?.visual?.userData.instruments?.update(
+      carSpeedToMph(p.speed),state?.engineRpm,state?.driveGear,state?.engineRedlineRpm,state?.vFwd<0);
      updateVehicleWheels(visual.wheels,carSpeedToWorldUnitsPerSecond(p.speed,course.metersPerUnit)*dt,state?.steerAngle||0);
      visual.setCondition(p.condition);visual.updateDamageVisual(snapshot.serverAtMs/1000);
     }

@@ -4,6 +4,7 @@ import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6'
 import {vehicleWheelRig} from '../transport/vehicle-wheel-motion.js';
 import {prepareE34Model} from '../engine/curated-player-car.js?v=7';
 import {syncVehicleGroundPivot as syncCuratedVehicleGroundPivot} from '../engine/vehicle-ground-pivot.js';
+import {createVehicleInstruments} from '../transport/vehicle-instruments.js';
 
 const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   compact: 'traffic-compact-hatchback-v1',
@@ -21,6 +22,7 @@ const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   golf_ii: 'road-volkswagen-golf-ii',
   datsun_280z: 'road-datsun-280z',
   bmw_m3_e46: 'road-bmw-m3-e46',
+  bmw_m3_e92_race: 'road-bmw-m3-e92-race',
 });
 
 const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';
@@ -102,6 +104,7 @@ function disposeCuratedTrafficVehicle(host) {
   const attachment = host?.userData?.curatedTrafficVehicleAttachment;
   if (!attachment) return false;
   const assetId = attachment.instance.record.id;
+  attachment.visual.userData.instruments?.dispose();
   detachSceneObject(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedTrafficVehicleAttachment;
@@ -130,6 +133,7 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     }
     const visual = instance.record.id==='vehicle-bmw-525i-e34'
       ?prepareE34Model(THREE,instance.root,instance.record):prepareTrafficVisual(THREE, instance, options);
+    visual.userData.instruments = createVehicleInstruments(THREE, visual);
     host.add(visual);
     host.userData.curatedTrafficAssetId = instance.record.id;
     host.userData.curatedTrafficVehicleLoadFailed = false;

@@ -1,5 +1,5 @@
 import {advanceRoadRaceFrame} from './physics/road-race-delegate.js';
-import {syncVehicleGroundPivot} from './engine/vehicle-ground-pivot.js';
+import {syncVehicleGroundPivot,vehicleGroundVisual} from './engine/vehicle-ground-pivot.js';
 import {PLANETARY_ROVER_CONFIG} from './physics/vehicle-config.js?v=1';
 import { resolvePlanetaryVehicleObstacle } from './physics/planetary-obstacle-response.js';
 import {updateVehicleWheels} from './transport/vehicle-wheel-motion.js';
@@ -451,6 +451,8 @@ function presentRoadVehicle(dt,steerAngle,carY=appCtx.car.y) {
     isPlanetarySurface() ? 0 : Number(appCtx.car.terrainRoll || 0)
   );
   syncVehicleGroundPivot(appCtx.carMesh);
+  vehicleGroundVisual(appCtx.carMesh)?.userData.instruments?.update(carSpeedToMph(appCtx.car.speed),
+    appCtx.car.engineRpm,appCtx.car.driveGear,appCtx.car.engineRedlineRpm,appCtx.car.vFwd<0);
 
   const wheelSpeed = isPlanetarySurface()
     ? appCtx.car.speed

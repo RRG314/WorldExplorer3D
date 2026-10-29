@@ -14,7 +14,7 @@ export const RACING_FLEET_ASSETS = Object.freeze([
     "license": "CC-BY-4.0",
     "sourceUrl": "https://sketchfab.com/3d-models/bmw-m3-e46-f1b00ff37d504629b10031da32bc7497",
     "attribution": "BMW M3 E46 by MMC Works",
-    "sourceCredit": "Márcio Meireles (https://sketchfab.com/marciomeireles)",
+    "sourceCredit": "M\u00e1rcio Meireles (https://sketchfab.com/marciomeireles)",
     "dimensionsMeters": {
       "width": 1.9006898684883853,
       "height": 1.3690595307716498,
@@ -80,6 +80,90 @@ export const RACING_FLEET_ASSETS = Object.freeze([
     "budgets": {
       "bytes": 3049196,
       "triangles": 101109,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-bmw-m3-e92-race",
+    "label": "BMW M3 E92 race car",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-bmw-m3-e92-race.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "bmw_m3_e92_race"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://blendswap.com/blend/3697",
+    "attribution": "BMW M3 racing exterior by Neubi",
+    "sourceCredit": "Neubi (https://blendswap.com/profile/1050)",
+    "dimensionsMeters": {
+      "width": 1.921459138393402,
+      "height": 1.2318495512008667,
+      "length": 4.634
+    },
+    "paintMaterialNames": [
+      "Race_Paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.7949231863021851,
+          0.313029408454895,
+          1.3881207704544067
+        ],
+        "radius": 0.313029408454895
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7949246168136597,
+          0.31302958726882935,
+          1.3881196975708008
+        ],
+        "radius": 0.313029408454895
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.796084463596344,
+          0.3247285485267639,
+          -1.2729437351226807
+        ],
+        "radius": 0.3229954242706299
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.7960859537124634,
+          0.3247283697128296,
+          -1.2729429006576538
+        ],
+        "radius": 0.3229954242706299
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.34,
+      1.025,
+      0.02
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 20000
+    },
+    "budgets": {
+      "bytes": 2553772,
+      "triangles": 95434,
       "textureEdgePixels": 512,
       "maxInstances": 4
     }

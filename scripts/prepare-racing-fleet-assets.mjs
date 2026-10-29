@@ -1,5 +1,7 @@
 // Reproducible, offline derivatives. Download the credited glTF archives through
 // Sketchfab, extract each into SOURCE/<key>, and pass an EMPTY output directory.
+// The pinned Blender M3 derivative is prepared first with
+// prepare-bmw-m3-race-blend.py into SOURCE/prepared-bmw-race-v2.
 // Originals, credentials and marketplace archives never enter the web bundle.
 import {NodeIO} from '@gltf-transform/core';
 import {ALL_EXTENSIONS} from '@gltf-transform/extensions';
@@ -12,6 +14,9 @@ import {mkdir, readdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 const recipes = [
+ {key:'bmw_m3_e92_race',inputDirectory:'prepared-bmw-race-v2',prepared:true,id:'road-bmw-m3-e92-race',variantId:'bmw_m3_e92_race',
+  sourceFiles:{'scene.glb':'4414dbc45237ecea77a2df5dc8de93d0ed13f7ee932d2f46290b1752717cd492','license.txt':'cbe923e24e81ab0e0b782f185e910bd4f027ebb9ab3272a9ca02c92e32e328ea','intake.json':'9061b94f0f60fdf6eee22a8dddfc2fc84fb98b68ab3a8891974ddfb5fd5cd715'},
+  archiveSha256:'e2193befa1da6a7394b3eadee3704727290a1c2520108fe909827c6052e0417f'},
  {key:'bmw_m3_e46',variantId:'bmw_m3_e46',id:'road-bmw-m3-e46',label:'BMW M3 E46',uid:'f1b00ff37d504629b10031da32bc7497',author:'MMC Works',
   sourceFiles:{"scene.gltf":"6cd48944f7eb61aa439381eb38c2c8ac8229cff838e10d704e7704dac94b0106","license.txt":"236e6653004f033efca5a17d0603bfdaa731d9ff7a4d492bd6136d52e80a644e","scene.bin":"841850ea9c9be48ef2a7e830911ae33241761ec91bad5048ac63cf7348c211e4","textures/Car_Paint_-_All_Colors_metallicRoughness.png":"a6f2970c6b6ae7cd640768a9157ebbab4a892db2de7a9cddbcce12b2cede5439","textures/Alu_ext_metallicRoughness.png":"2aae3903aee43fd900d3c9eb70b6b5ae56ec5d1ddb28aced5bb91842dd0a44c1","textures/MetalStainlessSteelBrushedElongated005_2K.003_baseColor.jpeg":"ad91ea288f3df444b42a22eb8088083b461539ce62b8b1abe465e8c157cc133d","textures/MetalStainlessSteelBrushedElongated005_2K.003_metallicRoughness.png":"30ca3583f4b148b819f2782038208e76e63883b98642ca9e29db92b3a91ad7fb","textures/MetalStainlessSteelBrushedElongated005_2K.003_normal.png":"a4a00f76926ca9887481718e672c400d310c7f11e95f3f363f45175a3379f5ee","textures/MetalStainlessSteelBrushedElongated005_2K.001_normal.png":"a4a00f76926ca9887481718e672c400d310c7f11e95f3f363f45175a3379f5ee","textures/MetalStainlessSteelBrushedElongated005_2K_metallicRoughness.png":"30ca3583f4b148b819f2782038208e76e63883b98642ca9e29db92b3a91ad7fb"},
   archiveSha256:'646b76b04853df219522d73162bb3108e5d85f00729fd460ce05120ed1c9d054',length:4.493,yaw:0,ratio:.12,
@@ -46,8 +51,25 @@ function simplifySolidModifierSeams(doc) {
   }
 }
 for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includes(r.key))) {
-  const input=path.join(sourceDir,recipe.key,'scene.gltf');
-  for(const [file,expected]of Object.entries(recipe.sourceFiles))if(hash(await readFile(path.join(sourceDir,recipe.key,file)))!==expected)throw Error('Unreviewed source file: '+file);
+  const directory=path.join(sourceDir,recipe.inputDirectory||recipe.key);
+  for(const [file,expected]of Object.entries(recipe.sourceFiles))if(hash(await readFile(path.join(directory,file)))!==expected)throw Error('Unreviewed source file: '+file);
+  if(recipe.prepared){
+    const intake=JSON.parse(await readFile(path.join(directory,'intake.json'),'utf8'));
+    if(intake.archiveSha256!==recipe.archiveSha256||intake.license!=='CC0-1.0')throw Error('Unreviewed prepared racing source');
+    const doc=await io.read(path.join(directory,'scene.glb')),root=doc.getRoot();
+    if(root.listAnimations().length||root.listSkins().length)throw Error('Prepared racing source must remain rigid');
+    const sourceTriangles=triangleCount(doc),bounds=getBounds(root.listScenes()[0]);
+    const preserved=node=>{for(let p=node;p;p=p.getParentNode())if(p.getExtras().transportPart||p.getExtras().vehicleInstrumentDisplay)return true;return false;};
+    await doc.transform(dedup(),join({filter:node=>!preserved(node)}),prune());
+    const bytes=await io.writeBinary(doc),triangles=triangleCount(doc),filename=recipe.id+'.glb';
+    if(bytes.length>7_000_000||triangles>110_000||Math.abs(bounds.min[1])>.00001||Math.abs(bounds.max[2]-bounds.min[2]-intake.lengthMeters)>.00001)throw Error('Prepared racing model exceeds envelope/budget');
+    if(root.listNodes().filter(n=>n.getExtras().transportPart==='wheel-spin').length!==4||root.listNodes().filter(n=>n.getExtras().vehicleInstrumentDisplay).length!==1)throw Error('Prepared wheel/cockpit rig changed');
+    const sourceLicense=await readFile(path.join(directory,'license.txt'));
+    await writeFile(path.join(outputDir,filename),bytes);await writeFile(path.join(outputDir,recipe.id+'-LICENSE.txt'),sourceLicense);
+    const record={id:recipe.id,label:intake.label,variantId:recipe.variantId,sourceUrl:intake.sourceUrl,attribution:'BMW M3 racing exterior by Neubi',sourceCredit:'Neubi (https://blendswap.com/profile/1050)',license:intake.license,licenseUrl:'https://creativecommons.org/publicdomain/zero/1.0/',filename,sourceArchiveSha256:intake.archiveSha256,sourceBlendSha256:intake.blendSha256,sha256:hash(bytes),bytes:bytes.length,sourceTriangles,triangles,materials:root.listMaterials().length,textureEdgePixels:512,dimensionsMeters:{width:bounds.max[0]-bounds.min[0],height:bounds.max[1]-bounds.min[1],length:intake.lengthMeters},driverEyeGroundMeters:intake.driverEyeGroundMeters,paintMaterialNames:['Race_Paint'],wheelLayout:intake.wheelLayout,modifications:intake.modifications};
+    records.push(record);console.log(JSON.stringify({id:record.id,bytes:record.bytes,triangles,materials:record.materials,wheels:record.wheelLayout.length}));continue;
+  }
+  const input=path.join(directory,'scene.gltf');
   const doc=await io.read(input), root=doc.getRoot(), scene=root.listScenes()[0];
   if(root.listSkins().length||root.listAnimations().length)throw Error(`${recipe.key}: animated source needs a separate reviewed recipe.`);
   const intake=JSON.parse(await readFile(path.join(sourceDir,recipe.key,'intake.json'),'utf8'));
@@ -138,6 +160,6 @@ for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includ
   const record={id:recipe.id,label:recipe.label,variantId:recipe.variantId||null,sourceUrl:sourceLicense.match(/\* source:\s*(https:\/\/\S+)/)?.[1],attribution:`${recipe.label} by ${recipe.author}`,sourceCredit:sourceLicense.match(/\* author:\s*([^\n]+)/)?.[1],license:'CC-BY-4.0',filename,sourceArchiveSha256:intake.archiveSha256,sha256:hash(bytes),bytes:bytes.length,sourceTriangles,triangles:triangleCount(doc),materials:root.listMaterials().length,textureEdgePixels:512,dimensionsMeters:{width:recipe.dimensions[0],height:recipe.dimensions[1],length:recipe.dimensions[2]},driverEyeGroundMeters:recipe.eye,paintMaterialNames:recipe.paint||[],wheelLayout,aircraft:recipe.aircraft===true,modifications:'Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel pivots. Adjusted paint/trim roughness and selected body colors. Front wheel assemblies straightened from the original 20 degree showcase pose; four runtime wheel pivots. No gameplay simulation imported.'};
   records.push(record);console.log(JSON.stringify({id:record.id,bytes:record.bytes,triangles:record.triangles,materials:record.materials,wheels:wheelLayout.length}));
 }
-await writeFile(path.join(outputDir,'asset-manifest.json'),JSON.stringify({schemaVersion:1,licenseUrl:'https://creativecommons.org/licenses/by/4.0/',assets:records},null,2)+'\n');
+await writeFile(path.join(outputDir,'asset-manifest.json'),JSON.stringify({schemaVersion:1,licenseUrls:[...new Set(records.map(r=>r.licenseUrl||'https://creativecommons.org/licenses/by/4.0/'))],assets:records},null,2)+'\n');
 const catalog=records.map(r=>({schemaVersion:1,id:r.id,label:r.label,url:`/app/assets/models/vehicles/racing-fleet/${r.filename}`,roles:['road-vehicle-presentation'],vehicleVariantIds:r.variantId?[r.variantId]:[],license:r.license,sourceUrl:r.sourceUrl,attribution:r.attribution,sourceCredit:r.sourceCredit,dimensionsMeters:r.dimensionsMeters,paintMaterialNames:r.paintMaterialNames,wheelLayout:r.wheelLayout,driverEyeGroundMeters:r.driverEyeGroundMeters,sourceUpAxis:'y',rigPolicy:'preserve-parts',collisionPolicy:'existing-road-vehicle-envelope',instancePolicy:{geometry:'shared',materials:'clone'},loadPolicy:{bounded:true,timeoutMs:20000},budgets:{bytes:r.bytes,triangles:r.triangles,textureEdgePixels:r.textureEdgePixels,maxInstances:4}}));
 await writeFile(path.join(outputDir,'racing-fleet-assets.js'),'// Generated by scripts/prepare-racing-fleet-assets.mjs. Source rights and hashes: bundled asset-manifest.json.\nexport const RACING_FLEET_ASSETS = Object.freeze('+JSON.stringify(catalog,null,2)+'.map(record => Object.freeze(record)));\n');

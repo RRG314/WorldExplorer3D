@@ -666,6 +666,90 @@ var RACING_FLEET_ASSETS = Object.freeze([
       "textureEdgePixels": 512,
       "maxInstances": 4
     }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-bmw-m3-e92-race",
+    "label": "BMW M3 E92 race car",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-bmw-m3-e92-race.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "bmw_m3_e92_race"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://blendswap.com/blend/3697",
+    "attribution": "BMW M3 racing exterior by Neubi",
+    "sourceCredit": "Neubi (https://blendswap.com/profile/1050)",
+    "dimensionsMeters": {
+      "width": 1.921459138393402,
+      "height": 1.2318495512008667,
+      "length": 4.634
+    },
+    "paintMaterialNames": [
+      "Race_Paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.7949231863021851,
+          0.313029408454895,
+          1.3881207704544067
+        ],
+        "radius": 0.313029408454895
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7949246168136597,
+          0.31302958726882935,
+          1.3881196975708008
+        ],
+        "radius": 0.313029408454895
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.796084463596344,
+          0.3247285485267639,
+          -1.2729437351226807
+        ],
+        "radius": 0.3229954242706299
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.7960859537124634,
+          0.3247283697128296,
+          -1.2729429006576538
+        ],
+        "radius": 0.3229954242706299
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.34,
+      1.025,
+      0.02
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 2553772,
+      "triangles": 95434,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
   }
 ].map((record) => Object.freeze(record)));
 
@@ -699,7 +783,8 @@ var LICENSED_ROAD_PROFILES = Object.freeze([
   { id: "cadillac_fleetwood", assetId: "road-cadillac-fleetwood-brougham", bodyStyle: "sedan", handlingLabel: "Luxury touring sedan", massKg: 1930, seatCount: 6, weight: 20, color: 7022133, topSpeedMph: 105, accelerationScale: 0.83, steeringScale: 0.8, gripScale: 1.02, brakeScale: 0.96, turningRadius: 6.4 },
   { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
   { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
-  { id: "bmw_m3_e46", assetId: "road-bmw-m3-e46", bodyStyle: "sedan", category: "Performance coupe", handlingLabel: "M3 sports coupe", massKg: 1495, seatCount: 4, weight: 0, color: 2250384, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.12, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.2, parkedEligible: false }
+  { id: "bmw_m3_e46", assetId: "road-bmw-m3-e46", bodyStyle: "sedan", category: "Performance coupe", handlingLabel: "M3 sports coupe", massKg: 1495, seatCount: 4, weight: 0, color: 2250384, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.12, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.2, parkedEligible: false },
+  { id: "bmw_m3_e92_race", assetId: "road-bmw-m3-e92-race", bodyStyle: "sedan", category: "GT racing coupe", handlingLabel: "M3 racing chassis", massKg: 1150, seatCount: 1, weight: 0, color: 13226972, topSpeedMph: 120, accelerationScale: 1.8, steeringScale: 1.18, gripScale: 1.42, brakeScale: 1.48, turningRadius: 5.1, parkedEligible: false }
 ].map((profile) => {
   const asset = [...EXPLORER_FLEET_ASSETS, ...RACING_FLEET_ASSETS].find((entry) => entry.id === profile.assetId);
   return Object.freeze({
@@ -759,7 +844,8 @@ var prices = {
   cadillac_fleetwood: 26e3,
   golf_ii: 9e3,
   datsun_280z: 34e3,
-  bmw_m3_e46: 54e3
+  bmw_m3_e46: 54e3,
+  bmw_m3_e92_race: 13e4
 };
 var PERSONAL_VEHICLES = Object.freeze([
   Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),

@@ -338,3 +338,19 @@ The coupe author does not specify an exact model year. The long Fleetwood Brough
   wheel pose and four steering/spin pivots. Original interior is retained.
 - Rights notice and source/derivative hashes accompany the GLB in
   `vehicles/racing-fleet/`. No source simulation is imported.
+
+## BMW M3 E92 race car
+
+- Exterior: [Bmw M3 Gt3](https://blendswap.com/blend/3697) by
+  [Neubi](https://blendswap.com/profile/1050), [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+  The original archive's CC0 notice accompanies the derivative.
+- The authored E92 racing exterior is uniformly normalized to a 4.634 m
+  presentation envelope. Source scene scripts, reference maps and logo images
+  are excluded. PBR finishes and four wheel assemblies use the shared renderer.
+- The prepared racing cabin is an original interpretation with a bucket seat,
+  harness, safety cage, controls and working telemetry display. It does not claim
+  to reproduce a specific factory cockpit or GT3 homologation. Handling uses the
+  game's shared road controller and current 120 mph class limit.
+- Source archive/blend hashes, modifications, runtime checksum and budgets are
+  recorded in `vehicles/racing-fleet/asset-manifest.json`. Preparation uses
+  `scripts/prepare-bmw-m3-race-blend.py` followed by the shared fleet asset script.
