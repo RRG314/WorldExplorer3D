@@ -36,14 +36,18 @@ async function main(){
  const {requireAuth}=cli('./lib/requireAuth'),auth=cli('./lib/auth'),{getAccessToken}=cli('./lib/apiv2');
  const account=auth.getGlobalDefaultAccount();if(!account)throw Error('Sign in with the Firebase CLI first.');
  await requireAuth({project,account:account.user.email});
- const admin=createRequire(new URL('../../functions/package.json',import.meta.url))('firebase-admin');
- const app=admin.initializeApp({projectId:project,credential:{getAccessToken:async()=>({access_token:await getAccessToken(),expires_in:300})}}),db=app.firestore();
+ // Firestore's Admin wrapper requires certificate/default credentials. Use
+ // the supported OAuth client instead of presenting CLI tokens as a custom
+ // Admin credential. Refresh remains owned by the already signed-in CLI.
+ const runtime=createRequire(new URL('../../functions/package.json',import.meta.url)),{Firestore,Timestamp}=runtime('@google-cloud/firestore'),{OAuth2Client}=runtime('google-auth-library');
+ const oauth=new OAuth2Client({quotaProjectId:project});oauth.refreshHandler=async()=>({access_token:await getAccessToken(),expiry_date:Date.now()+3600000});
+ const db=new Firestore({projectId:project,authClient:oauth});
  try{await db.runTransaction(async tx=>{
   const ref=db.collection('racingDistricts').doc(prepared.id),old=await tx.get(ref);
   if(old.exists&&JSON.stringify(old.data().facts)!==JSON.stringify(prepared.record.facts))throw Error('Immutable district identity conflict.');
-  if(!old.exists)tx.create(ref,{...prepared.record,reviewedAt:admin.firestore.Timestamp.now()});
-  tx.set(db.collection('racingLocations').doc(prepared.locationKey),{districtId:prepared.id,locationId:prepared.record.facts.locationId,updatedAt:admin.firestore.Timestamp.now()});
+  if(!old.exists)tx.create(ref,{...prepared.record,reviewedAt:Timestamp.now()});
+  tx.set(db.collection('racingLocations').doc(prepared.locationKey),{districtId:prepared.id,locationId:prepared.record.facts.locationId,updatedAt:Timestamp.now()});
  });console.log(JSON.stringify({approved:true,project,districtId:prepared.id,roads:prepared.record.facts.roads.length}));}
- finally{await app.delete();}
+ finally{await db.terminate();}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)await main();
