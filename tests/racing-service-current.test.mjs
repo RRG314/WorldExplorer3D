@@ -64,7 +64,23 @@ test('two concurrent admissions publish one authority, finish on server controls
   f.authority.tick();await turn();final=f.messages.get('one').at(-1)?.snapshot;if(final?.settlement==='saved')break;
  }
  assert.equal(final.phase,'complete');assert.equal(final.players.length,2);assert.ok(final.players.every(p=>p.progress.finished));assert.equal(final.settlement,'saved');assert.equal(final.receipt.id,final.id);
- f.authority.tick();await turn();assert.equal(f.counts().settles,1);await f.authority.close();
+ // Network packets already sent before a crossing can arrive before or after
+ // the saved receipt. They cannot write the actor or replace result feedback.
+ const saved=JSON.stringify(final);
+ await f.command(a,{type:'control',sequence:10000,actions:{throttle:1}});
+ f.authority.tick();await turn();assert.equal(f.counts().settles,1);assert.equal(f.authority.snapshot().races,0);
+ await f.command(a,{type:'control',sequence:10001,actions:{throttle:1}});
+ assert.equal(JSON.stringify(f.messages.get('one').at(-1).snapshot),saved);
+ await assert.rejects(f.command(a,{type:'control',sequence:10002,actions:{throttle:2}}),/invalid_race_controls/);
+ await assert.rejects(f.command(a,{type:'finish',elapsedMs:1}),/invalid_race_message/);
+ await f.command(b,{type:'leave'});await f.join(b);
+ assert.equal(f.messages.get('two').at(-1).snapshot.phase,'lobby');
+ assert.notEqual(f.messages.get('two').at(-1).snapshot.id,final.id);
+ const nextMessages=f.messages.get('two').length;
+ await f.command(a,{type:'leave'});f.authority.detach(a);
+ assert.equal(f.messages.get('two').length,nextMessages,'An old finish must not broadcast into a replacement lobby');
+ assert.equal(f.authority.snapshot().connections,1);
+ await f.authority.close();assert.equal(f.authority.snapshot().connections,0);
 });
 test('host departure keeps the server clock and the other driver; reconnect replaces only the old socket',async()=>{
  const f=fixture(),a=f.client('one'),b=f.client('two');await f.join(a);await f.join(b);await f.command(a,{type:'ready',ready:true});await f.command(b,{type:'ready',ready:true});await f.command(a,{type:'start'});

@@ -40,7 +40,14 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   return snapshot();
  }
  function control(uid,sequence,actions,receivedAtMs){
-  if(!['countdown','running'].includes(phase))throw Error('race_not_running');const p=participant(uid);
+  const p=participant(uid);
+  // A valid packet sent before the crossing can arrive after it. The terminal
+  // actor/result is immutable; acknowledge that input by doing no work.
+  if(!p.ai&&!p.left&&(phase==='complete'||p.progress?.finished)){
+   if(!Number.isSafeInteger(sequence)||sequence<0||!Number.isFinite(receivedAtMs))throw Error('obsolete_race_controls');
+   normalizeRaceActions(actions);return false;
+  }
+  if(!['countdown','running'].includes(phase))throw Error('race_not_running');
   if(p.ai||p.left||p.dnf||p.progress?.finished)throw Error('race_controls_unavailable');
   if(!Number.isSafeInteger(sequence)||sequence<=p.lastSequence||!Number.isFinite(receivedAtMs)||receivedAtMs<lastNow-1000)throw Error('obsolete_race_controls');
   const normalized=normalizeRaceActions(actions);

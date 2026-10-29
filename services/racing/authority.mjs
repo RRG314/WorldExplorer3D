@@ -22,12 +22,13 @@ export function readCommand(raw) {
 export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomUUID(),maximumRaces=8}) {
  const races=new Map(),connections=new Map(),joinFlights=new Map();let closed=false;
  const send=(client,payload)=>client?.send(payload);
- function broadcast(race,payload){for(const uid of race.roster.keys())send(connections.get(uid),payload);}
+ function broadcast(race,payload){for(const uid of race.roster.keys()){const client=connections.get(uid);if(client?.race===race)send(client,payload);}}
  function envelope(race){return {...(race.finalSnapshot||race.session.snapshot()),courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION,
   profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),
   purpose:race.course.publication?.purpose||'competition',settlement:race.settlement,receipt:race.receipt||null};}
  function detach(client){if(connections.get(client.uid)!==client)return;connections.delete(client.uid);const race=client.race;
-  if(race&&race.roster.has(client.uid))race.session.disconnect(client.uid,now());}
+  client.race=null;
+  if(race&&!race.finalSnapshot&&race.roster.has(client.uid))race.session.disconnect(client.uid,now());}
  async function join(client,command) {
   if(closed||client.isOpen?.()===false)throw Error('race_service_stopping');
   if(client.race)throw Error('race_leave_first');
@@ -114,11 +115,14 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
    if(at-race.lastBroadcast>=(state.phase==='lobby'?1000:50)||state.phase==='cancelled') {race.lastBroadcast=at;broadcast(race,{type:'snapshot',snapshot:envelope(race)});}
    if(state.phase==='cancelled'||state.phase==='complete'&&(race.settlement==='saved'||at-state.completedAtMs>30000)){
     if(state.phase==='complete'&&race.settlement!=='saved')broadcast(race,{type:'snapshot',snapshot:{...envelope(race),phase:'cancelled',reason:'race_result_save_failed'}});
-    for(const uid of race.roster.keys()){const c=connections.get(uid);if(c?.race===race)c.race=null;}
+    // Retain a completed session on its existing sockets until leave/close.
+    // Its final snapshot is immutable and consumes late in-flight controls;
+    // no active room lease or admission slot is retained.
+    if(state.phase!=='complete'||race.settlement!=='saved')for(const uid of race.roster.keys()){const c=connections.get(uid);if(c?.race===race)c.race=null;}
     races.delete(race.roomCode);void store.release({race,instanceId,nowMs:at}).catch(()=>{});
    }
   }
  }
- async function close(){closed=true;for(const race of races.values()){race.session.cancel('race_service_stopping');broadcast(race,{type:'snapshot',snapshot:envelope(race)});await store.release({race,instanceId,nowMs:now()});}races.clear();}
+ async function close(){closed=true;for(const race of races.values()){race.session.cancel('race_service_stopping');broadcast(race,{type:'snapshot',snapshot:envelope(race)});await store.release({race,instanceId,nowMs:now()});}races.clear();for(const client of connections.values())client.race=null;connections.clear();}
  return Object.freeze({command,tick,detach,close,snapshot:()=>({races:races.size,connections:connections.size,instanceId})});
 }

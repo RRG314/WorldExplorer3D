@@ -92,3 +92,21 @@ complete playable packs. It needs rights-cleared geographic content, discipline
 rules and actual complete venue acceptance. A final coordinated artifact and
 its changed distribution paths remain required. Absent Apple and VR hardware
 are disclosed limitations, not repeated approval questions.
+
+## Terminal network input
+
+A later first-party curation qualification retained two `race_not_running` replies
+from controls sent just before the crossing. A completed session now validates
+and consumes those late controls without changing its actor, queue, clock or
+receipt. Existing sockets retain only their immutable completed-session context
+until Leave/close; active room leases and race slots are released as before.
+Broadcasts require the socket's current race association, so leaving an old result
+cannot publish its snapshot into a replacement lobby. Disconnect and service
+shutdown release that context. Invalid controls and forged finish messages remain
+rejected. There is no new scheduler or result store.
+
+The focused case failed before the terminal handoff repair; an additional
+replacement-lobby assertion reproduced the routing boundary. Six selected service
+cases then passed, covering terminal input/receipt immutability, replay, old
+socket isolation, host/reconnect behaviour, failed-acknowledgement retry and the
+socket gateway. No accepted city race or performance minute was repeated.

@@ -49,3 +49,28 @@ Ten focused source transaction cases cover these boundaries. They are not live
 cloud, completed-course gameplay or major-venue acceptance. The initial failing
 case exposed missing canonical metadata verification; it is fixed. A later fake
 database adapter failure was corrected without changing the release criteria.
+
+## Staging operational acceptance
+
+The Monaco city sprint completed a fresh 45.676 s server qualification using
+real staging Auth/App Check/TLS and the already browser-validated geographic
+facts. The protected route and reviewer APIs accepted it. The operator CLI dry
+run and adoption passed, then ordinary Auth deletion anonymized the temporary
+author. The course remained approved, tested and readable by another signed-in
+account, and an adoption retry did not recreate the deleted projection. Both
+temporary accounts, moderator claims and the private room were removed. The
+curated geographic/course content remains; public service discovery is disabled
+until the coordinated release. This is protocol/service acceptance, not another
+city renderer or a major-track pack.
+
+The same run verified a renewed live room pose exactly matches the stationary
+authoritative chassis root and slope. A setup failure omitted the controlled
+room's code; the existing rules correctly refused presence. A later observer
+read the pre-renew pose too early. The driver now waits for an acknowledged
+publication after the server start time. Neither failure required a product
+admission bypass. The accepted qualification was not replayed for later cleanup.
+
+Two valid in-flight control packets arrived after the finish and were reported
+as `race_not_running`. They did not change the saved result. The focused terminal
+input/authority correction is described in `SHARED_RACE_ACCEPTANCE.md`; this run
+is not labelled error-free. Failed evidence is retained privately.

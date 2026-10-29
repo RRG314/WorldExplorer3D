@@ -2949,8 +2949,13 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     return snapshot();
   }
   function control(uid, sequence, actions, receivedAtMs) {
-    if (!["countdown", "running"].includes(phase)) throw Error("race_not_running");
     const p = participant(uid);
+    if (!p.ai && !p.left && (phase === "complete" || p.progress?.finished)) {
+      if (!Number.isSafeInteger(sequence) || sequence < 0 || !Number.isFinite(receivedAtMs)) throw Error("obsolete_race_controls");
+      normalizeRaceActions(actions);
+      return false;
+    }
+    if (!["countdown", "running"].includes(phase)) throw Error("race_not_running");
     if (p.ai || p.left || p.dnf || p.progress?.finished) throw Error("race_controls_unavailable");
     if (!Number.isSafeInteger(sequence) || sequence <= p.lastSequence || !Number.isFinite(receivedAtMs) || receivedAtMs < lastNow - 1e3) throw Error("obsolete_race_controls");
     const normalized = normalizeRaceActions(actions);
