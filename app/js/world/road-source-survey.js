@@ -7,3 +7,18 @@ export function annotateRoadSourceSurvey(way,evidence){
  return way;
 }
 export function roadSourceSurvey(way){return way?.[surveyKey]||null;}
+
+// The usable race corridor and the mapped pavement are different facts. Most
+// reviewed packs author a conservative pavement width; a pack with explicit
+// mapped widths can retain those widths while admitting a narrower corridor.
+export function reviewedRoadTransportRecord(record,survey){
+ if(!survey)return record;
+ const policy=survey.pavementWidthPolicy||'usable-corridor';
+ if(!['usable-corridor','mapped'].includes(policy)||!(survey.usableWidthMeters>=6&&survey.usableWidthMeters<=30))throw Error('invalid_reviewed_road_width');
+ let crossSection;
+ if(policy==='mapped'){
+  if(!String(record.crossSection?.widthSource).startsWith('source:width')||survey.usableWidthMeters>record.crossSection.widthMeters)throw Error('reviewed_road_mapped_width_unavailable');
+  crossSection=record.crossSection;
+ }else crossSection=Object.freeze({...record.crossSection,widthMeters:survey.usableWidthMeters,widthSource:'reviewed-venue-usable-corridor'});
+ return Object.freeze({...record,crossSection,provenance:Object.freeze({...record.provenance,reviewedVenue:survey.venueId})});
+}

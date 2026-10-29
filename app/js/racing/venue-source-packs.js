@@ -1,6 +1,7 @@
 import {compileMappedVenueLayout,geographicVenueDistance} from './venue-layout.js';
 import {annotateRoadSourceSurvey} from '../world/road-source-survey.js';
 import {sha256Text} from '../terrain/ground-artifact.js?v=4';
+import {parseMeters} from '../world/compiler/transport-source-normalizer.js?v=4';
 
 // A reviewed source package is not a playable-catalogue flag. Admission still
 // requires the existing world publication and racing surface qualification.
@@ -20,10 +21,18 @@ export function racingVenueGroundRequirements(descriptor){
   !required.some(item=>item.artifactId===descriptor.groundArtifactId&&item.contentSha256===descriptor.groundContentSha256))throw Error('venue_ground_group_invalid');
  return Object.freeze(required.map(item=>Object.freeze({artifactId:item.artifactId,contentSha256:item.contentSha256})));
 }
+function maximumPavementWidth(source,layout,descriptor){
+ const usable=source.layout.usableWidthMeters,policy=descriptor.pavementWidthPolicy||'usable-corridor';
+ if(!['usable-corridor','mapped'].includes(policy))throw Error('venue_pavement_width_policy_invalid');
+ if(policy==='usable-corridor')return usable;
+ const widths=layout.wayIds.map(id=>parseMeters(layout.ways.get(id).tags.width));
+ if(widths.some(width=>!Number.isFinite(width)||width<usable||width>24))throw Error('venue_mapped_pavement_width_invalid');
+ return Math.max(...widths);
+}
 export function createRacingVenueGroundPlan(descriptor,source){
  const layout=compileMappedVenueLayout(source),requiredArtifacts=racingVenueGroundRequirements(descriptor),coverageProbes=[];
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
- const halfWidth=source.layout.usableWidthMeters*.5+2,metersPerDegree=6371008.8*Math.PI/180;
+ const halfWidth=maximumPavementWidth(source,layout,descriptor)*.5+2,metersPerDegree=6371008.8*Math.PI/180;
  for(let index=1;index<layout.points.length;index++){
   const a=layout.points[index-1],b=layout.points[index],length=geographicVenueDistance(a,b),steps=Math.max(1,Math.ceil(length/2));
   const east=(b.lon-a.lon)*Math.cos((a.lat+b.lat)*Math.PI/360)*metersPerDegree,north=(b.lat-a.lat)*metersPerDegree;
@@ -46,6 +55,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  }))throw Error('venue_ground_not_ready');
  const layout=compileMappedVenueLayout(source);
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
+ maximumPavementWidth(source,layout,descriptor);
  const original=Array.isArray(data?.elements)?data.elements:[],existingNodes=new Map(original.filter(e=>e.type==='node').map(e=>[e.id,e]));
  const sourceWays=new Map(source.ways.map(w=>[w.id,w])),layoutWays=new Set(layout.wayIds),bounds=source.source?.coverage;
  if(!bounds||!['south','north','west','east'].every(k=>Number.isFinite(bounds[k]))||bounds.south>=bounds.north||bounds.west>=bounds.east)throw Error('venue_source_coverage_invalid');
@@ -71,6 +81,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  for(const raw of source.ways){
   const sourceFeatureId=`osm:way:${raw.id}`,way={type:'way',id:raw.id,version:raw.version,nodes:[...raw.nodes],tags:{...raw.tags,_sourceFeatureId:sourceFeatureId,_sourceCompleteness:'lossless',...(!layoutWays.has(raw.id)?{_regionalContext:'fixed-location'}:{})}};
   if(layoutWays.has(raw.id))annotateRoadSourceSurvey(way,{version:1,venueId:descriptor.id,sourceFeatureId,
+   ...(descriptor.pavementWidthPolicy==='mapped'?{pavementWidthPolicy:'mapped'}:{}),
    usableWidthMeters:source.layout.usableWidthMeters,maximumCrossfall:descriptor.maximumCrossfall,
    groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required});
   elements.set(`way:${raw.id}`,way);

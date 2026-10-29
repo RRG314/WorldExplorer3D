@@ -148,6 +148,14 @@ account metadata is omitted. The mapped two-dimensional geodesic centreline is
 remain explicit. Elevation and timing-line reconciliation must precede playable
 acceptance; the source is not stretched to the reference length.
 
+Reviewed preparation can explicitly retain mapped pavement widths separately
+from its narrower usable race corridor. The existing road-source owner rejects
+missing mapped widths or a corridor wider than that pavement, and preserves the
+source's width provenance. Ground preparation probes the maximum mapped pavement
+plus a two-metre margin on each side. The retained four-part Nord ground passes
+all 35,970 probes with its 7–12 m source widths; this does not certify its bridge
+decks or admit the unfinished venue. Silverstone keeps its authored 12 m corridor.
+
 One real 0.452 m span was lost by the earlier half-metre graph threshold. The
 graph and source validator now share a centimetre threshold above canonical
 millimetre precision, with the existing collapsed-node check retained. A bounded
