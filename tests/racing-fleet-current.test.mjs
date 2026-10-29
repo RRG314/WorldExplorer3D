@@ -73,6 +73,15 @@ test('the E92 racing derivative retains its CC0 source, four wheel assemblies an
  assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-caliper').length,4);
  assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-steering'&&n.extras.front).length,2);
  assert.equal(json.nodes.filter(n=>n.extras?.vehicleInstrumentDisplay===true).length,1);
+ const {NodeIO}=await import('@gltf-transform/core'),{ALL_EXTENSIONS}=await import('@gltf-transform/extensions');
+ const doc=await new NodeIO().registerExtensions(ALL_EXTENSIONS).readBinary(new Uint8Array(bytes));
+ const screen=doc.getRoot().listNodes().find(n=>n.getExtras().vehicleInstrumentDisplay).getMesh().listPrimitives()[0];
+ const positions=screen.getAttribute('POSITION'),uv=screen.getAttribute('TEXCOORD_0');
+ for(let i=0;i<positions.getCount();i++){
+  const [x,y]=positions.getElement(i,[]),[u]=uv.getElement(i,[]);
+  assert.ok(y>.90&&y<1.02,'display remains above the steering rim');
+  assert.equal(u,x>.34?0:1,'seat looking forward reads text left to right');
+ }
  assert.equal(json.animations?.length||0,0);assert.equal(json.skins?.length||0,0);
  assert.ok(!json.buffers.some(b=>b.uri));assert.ok(!(json.images||[]).some(i=>i.uri));
  assert.equal(bytes.length,asset.budgets.bytes);assert.ok(record.triangles<=110000&&bytes.length<=7000000);

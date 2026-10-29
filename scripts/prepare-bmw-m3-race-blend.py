@@ -229,7 +229,7 @@ for side in [-1, 1]:
 box('Harness buckle', (seat_x, .48, -.20), (.058, .027, .065), metal, .009)
 
 box('Dashboard upper padded rail', (0, .80, .77), (1.39, .14, .32), carbon, .035)
-box('Driver binnacle', (seat_x, .82, .63), (.34, .16, .10), dark_metal, .022)
+box('Driver binnacle', (seat_x, .96, .63), (.34, .16, .10), dark_metal, .022)
 display = material('Driver_Display', (1, 1, 1), .75)
 image = bpy.data.images.new('Original racing display base', width=8, height=8)
 image.pixels = [.008, .014, .018, 1] * 64
@@ -240,10 +240,11 @@ display.node_tree.links.new(tex.outputs['Color'], shader.inputs['Base Color'])
 display.node_tree.links.new(tex.outputs['Color'], shader.inputs['Emission Color'])
 shader.inputs['Emission Strength'].default_value = .45
 panel = surface('Driver telemetry display',
-                [(seat_x-.142,.763,.573),(seat_x-.142,.877,.573),
-                 (seat_x+.142,.877,.573),(seat_x+.142,.763,.573)], [(0,1,2,3)], display)
+                [(seat_x-.142,.903,.573),(seat_x-.142,1.017,.573),
+                 (seat_x+.142,1.017,.573),(seat_x+.142,.903,.573)], [(0,1,2,3)], display)
 uv = panel.data.uv_layers.new()
-for loop, value in zip(panel.data.loops, [(0,0),(0,1),(1,1),(1,0)]):
+# Viewed forward from the seat, positive vehicle X appears on screen left.
+for loop, value in zip(panel.data.loops, [(1,0),(1,1),(0,1),(0,0)]):
     uv.data[loop.index].uv = value
 panel['vehicleInstrumentDisplay'] = True
 
@@ -251,7 +252,10 @@ steering_at = (.34, .76, .40)
 bpy.ops.mesh.primitive_torus_add(major_segments=48, minor_segments=8, major_radius=.155,
                                 minor_radius=.017, location=xyz(steering_at),
                                 rotation=(math.pi/2+.16,0,0))
-register(bpy.context.object, rubber).name = 'Race steering wheel rim'
+rim = register(bpy.context.object, rubber)
+rim.name = 'Race steering wheel rim'
+for polygon in rim.data.polygons:
+    polygon.use_smooth = True
 box('Steering wheel boss', steering_at, (.082,.082,.04), carbon, .013)
 for angle in [0, 2.1, 4.2]:
     tube('Steering wheel spoke', steering_at,

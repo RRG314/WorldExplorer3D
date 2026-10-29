@@ -162,7 +162,7 @@ export const RACING_FLEET_ASSETS = Object.freeze([
       "timeoutMs": 20000
     },
     "budgets": {
-      "bytes": 2553772,
+      "bytes": 2527488,
       "triangles": 95434,
       "textureEdgePixels": 512,
       "maxInstances": 4
