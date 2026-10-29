@@ -59,6 +59,9 @@ test('the E92 racing derivative retains its CC0 source, four wheel assemblies an
  const manifest=JSON.parse(await readFile(new URL('../app/assets/models/vehicles/racing-fleet/asset-manifest.json',import.meta.url))),record=manifest.assets.find(a=>a.id===asset.id);
  const bytes=await readFile(new URL('..'+asset.url,import.meta.url));
  assert.equal(createHash('sha256').update(bytes).digest('hex'),record.sha256);
+ const {getModelAsset}=await import('../app/js/assets/model-asset-catalog.js');
+ const {modelAssetRequestUrl}=await import('../app/js/assets/model-asset-url.js');
+ assert.equal(modelAssetRequestUrl(getModelAsset(asset.id)),asset.url+'?revision='+record.sha256.slice(0,16));
  assert.equal(record.sourceArchiveSha256,'e2193befa1da6a7394b3eadee3704727290a1c2520108fe909827c6052e0417f');
  assert.equal(record.sourceBlendSha256,'d13417a226c00ddfd1b14711431f66cbe98d588412e1c74ca77d91f6f829a143');
  assert.equal(record.license,'CC0-1.0');assert.equal(record.sourceUrl,'https://blendswap.com/blend/3697');

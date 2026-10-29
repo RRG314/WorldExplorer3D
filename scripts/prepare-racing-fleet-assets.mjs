@@ -3,6 +3,8 @@
 // The pinned Blender M3 derivative is prepared first with
 // prepare-bmw-m3-race-blend.py into SOURCE/prepared-bmw-race-v2.
 // Originals, credentials and marketplace archives never enter the web bundle.
+// After installing reviewed records/GLBs, run update-model-asset-revisions.mjs
+// so the shared bounded loader receives the exact bundled content identity.
 import {NodeIO} from '@gltf-transform/core';
 import {ALL_EXTENSIONS} from '@gltf-transform/extensions';
 import {compactPrimitive, dedup, flatten, getBounds, join, prune, simplify, transformMesh, weld} from '@gltf-transform/functions';
