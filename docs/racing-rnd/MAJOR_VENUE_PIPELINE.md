@@ -89,6 +89,24 @@ same absolute bound, and career finalization grace uses that shared maximum.
 Clock-stall and reconnect fences remain separate. This does not itself admit
 longer geographic routes or clear the remaining long-course publication limits.
 
+## Shared road and event presentation
+
+Road batches share a bundled 1K CC0 Asphalt Track diffuse/normal/roughness set
+through the existing engine texture owner. Its two-metre physical tile replaces
+the procedural fallback images in place; published materials keep their borrowed
+texture identities. The source manifest records publisher hashes and attribution.
+Timed-out late images dispose without replacing an already-published fallback.
+
+The scoped racing presentation adds original temporary World Explorer equipment:
+white pavement-edge paint, concrete safety barriers, mesh fencing, distance
+boards before route bends and a start/finish gantry. Bases follow qualified
+segment height/crossfall; the inner barrier foot meets the controller's existing
+20 cm clearance. Equipment uses bounded static batches and distance visibility,
+and disposes with the race while borrowing shared concrete maps. These fixtures
+are game event equipment, not surveyed permanent venue objects or official
+braking references. They do not certify kerbs, runoff, pits, grandstands,
+landmarks, complete discipline rules or a finished major venue.
+
 ## Qualified road snapshot publication
 
 The existing district publisher supports inline snapshots up to 750 KiB and

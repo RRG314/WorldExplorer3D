@@ -27,11 +27,13 @@ function createTerrainMaterialCacheApi(deps = {}) {
     });
 
     materials.roadMainMaterial.map = appCtx.asphaltTex || null;
-    // The procedural map already contains dark asphalt albedo. Multiplying it
+    // The map already contains dark asphalt albedo. Multiplying it
     // by a second charcoal tint made paved streets almost black in daylight.
     materials.roadMainMaterial.color.setHex(appCtx.asphaltTex ? 0xffffff : 0x303236);
     materials.roadMainMaterial.normalMap = appCtx.asphaltNormal || null;
     materials.roadMainMaterial.roughnessMap = appCtx.asphaltRoughness || null;
+    materials.roadMainMaterial.metalness = 0;
+    materials.roadMainMaterial.roughness = 1;
     materials.roadMainMaterial.normalScale?.set(0.18, 0.18);
     materials.roadMainMaterial.needsUpdate = true;
 

@@ -20,6 +20,7 @@ import {signedPolygonAreaXZ} from '../world/world-geometry.js?v=3';
 
 const EARTH_TEXTURE_ROOT = 'assets/textures/earth';
 export const LOCAL_PBR_ASSET_IDS = Object.freeze({
+  asphalt: 'asphalt_track',
   grass: 'grass_001',
   pavement: 'brushed_concrete',
   concrete: 'concrete',
@@ -277,7 +278,7 @@ export function createBuildingGroundPatch(ctx, pts, avgElevation, options = {}) 
   return resultMeshes.length === 1 ? resultMeshes[0] : resultMeshes;
 }
 
-function loadPbrTextureSet(name, urls, onLoaded, fallbackFns) {
+export function loadPbrTextureSet(name, urls, onLoaded, fallbackFns) {
   const loader = new THREE.TextureLoader();
   let loadedCount = 0;
   let resolved = false;
@@ -318,6 +319,9 @@ function loadPbrTextureSet(name, urls, onLoaded, fallbackFns) {
     loader.load(
       url,
       (tex) => {
+        // A timed-out load no longer owns publication. Retire its late texture
+        // instead of retaining an unreferenced image or changing a fallback.
+        if (resolved) { tex.dispose(); return; }
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         if (encoding) tex.encoding = encoding;
         textures[key] = tex;
@@ -404,6 +408,23 @@ function initPbrTextures(ctx, maxAniso) {
     return true;
   };
   const emptyFallback = () => ({ diff: null, nor: null, rough: null });
+
+  loadPbrTextureSet('asphalt', localPbrUrls(LOCAL_PBR_ASSET_IDS.asphalt), (diff, nor, rough) => {
+    // Published road batches already borrow these application-owned textures.
+    // Replace their images in place so loaded roads and future batches agree,
+    // without another material cache or re-uploading the road geometry.
+    for (const [target,source] of [[state.asphaltTex,diff],[state.asphaltNormal,nor],[state.asphaltRoughness,rough]]) {
+      if (!target || target === source) continue;
+      target.image = source.image;
+      target.encoding = source.encoding;
+      // Road UVs repeat every four metres; the captured material covers two.
+      target.repeat.set(2,2);
+      target.needsUpdate = true;
+      source.dispose();
+    }
+    tuneSet([state.asphaltTex,state.asphaltNormal,state.asphaltRoughness]);
+    state.pbrTexturesLoaded.asphalt = true;
+  }, () => ({diff:state.asphaltTex,nor:state.asphaltNormal,rough:state.asphaltRoughness}));
 
   loadPbrTextureSet('grass', localPbrUrls(LOCAL_PBR_ASSET_IDS.grass), (diff, nor, rough, fromPrimary) => {
     state.grassDiffuse = diff;

@@ -42,6 +42,7 @@
 
 The diffuse, OpenGL normal, and roughness maps under `earth/` are resized local copies of CC0 materials:
 
+- `asphalt_track_*`: Asphalt Track by Dimitrios Savva, Poly Haven, CC0. Unmodified 1024 px diffuse, OpenGL normal and roughness maps; 2 m source width. [Asset](https://polyhaven.com/a/asphalt_track), [licence](https://polyhaven.com/license).
 - `grass_001_*`: ambientCG Grass 001. Source: https://ambientcg.com/view?id=Grass001
 - `forest_ground_04_*`: Forest Ground 04. Source: https://polyhaven.com/a/forest_ground_04
 - `sand_01_*`: Sand 01. Source: https://polyhaven.com/a/sand_01

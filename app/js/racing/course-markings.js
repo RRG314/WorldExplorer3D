@@ -25,6 +25,12 @@ export function buildRacePaint(course) {
   }
   rectangles.push({start:a,end:b,left,right});
  }
+ // White event boundaries remain inside the admitted pavement. They are
+ // flat paint on its accepted surface, not invented raised kerb geometry.
+ for(const segment of course.segments)for(const side of [-1,1]) {
+  const edge=side*(segment.widthMeters/2-.32);
+  rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,edge-.06,edge+.06,.88);
+ }
  const last=course.segments.at(-1),width=Math.min(16,last.widthMeters-.4),columns=Math.max(2,Math.ceil(width/.6));
  for(let row=0;row<2;row++)for(let col=0;col<columns;col++){
   const left=-width/2+col*width/columns;

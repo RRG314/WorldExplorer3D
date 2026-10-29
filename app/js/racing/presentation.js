@@ -4,6 +4,7 @@ import {attachCuratedTrafficVehicle,syncCuratedVehicleGroundPivot} from '../urba
 import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import {carSpeedToWorldUnitsPerSecond} from '../physics/vehicle-speed-units.js?v=2';
 import {buildRacePaint,raceCourseSurfacePoint} from './course-markings.js';
+import {prepareRaceFurniture} from './course-furniture.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {personalVehicleById} from '../transport/vehicle-garage-rules.js';
 // Practice rivals are ghosts. A finished ghost leaves presentation, and a
@@ -17,7 +18,7 @@ export function raceGhostVisible(player,variant,{immersive=false,eye}={}) {
  return Math.abs(dx*box.sx+dz*box.sz)>=box.width||Math.abs(dx*box.fx+dz*box.fz)>=box.length;
 }
 export async function prepareRacePresentation(THREE,context,course,rivals,{signal,current}) {
- const root=new THREE.Group();root.name='Scoped mapped road race';const visuals=[],byUid=new Map();let disposed=false;
+ const root=new THREE.Group();root.name='Scoped mapped road race';const visuals=[],byUid=new Map();let disposed=false,furniture=null;
  const material=new THREE.MeshBasicMaterial({color:0xb7f568,transparent:true,opacity:.8,depthWrite:false});
  const pole=new THREE.BoxGeometry(.16,2.8,.16),gates=[];
  for(let i=0;i<3;i++) {
@@ -29,8 +30,9 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
  const paint=buildRacePaint(course),paintGeometry=new THREE.BufferGeometry();paintGeometry.setAttribute('position',new THREE.BufferAttribute(paint.positions,3));paintGeometry.setAttribute('color',new THREE.BufferAttribute(paint.colors,3));
  const paintMaterial=new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
  const painted=new THREE.Mesh(paintGeometry,paintMaterial);painted.name='Surveyed finish and full-chassis grid paint';root.add(painted);
- const dispose=()=>{if(disposed)return;disposed=true;for(const visual of visuals)visual.dispose();detachSceneObject(root);pole.dispose();material.dispose();lineGeometry.dispose();lineMaterial.dispose();paintGeometry.dispose();paintMaterial.dispose();};
+ const dispose=()=>{if(disposed)return;disposed=true;furniture?.dispose();for(const visual of visuals)visual.dispose();detachSceneObject(root);pole.dispose();material.dispose();lineGeometry.dispose();lineMaterial.dispose();paintGeometry.dispose();paintMaterial.dispose();};
  try {
+  furniture=prepareRaceFurniture(THREE,context,course);root.add(furniture.root);
   for(let i=0;i<rivals.length;i++) {
    if(!current()||signal.aborted)throw Error('race_world_changed');
    const profile=rivals[i].profile,visual=createUrbanVehicleVisual(THREE,{id:`rival:${i}`,variant:profile.variant,condition:profile.conditionValue});
@@ -44,6 +46,7 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
    mount(){if(disposed||!current())throw Error('race_world_changed');context.scene.add(root);},
    update(snapshot,uid,dt){
     const player=snapshot.players.find(p=>p.uid===uid),next=player?.progress?.nextGate||0;
+    furniture.update(player?.pose);
     for(let i=0;i<gates.length;i++) {
      const gate=course.gates[next+i],host=gates[i];host.visible=!!gate&&!player?.progress?.finished;
      if(!gate)continue;host.position.set(gate.x,gate.y+.08,gate.z);host.rotation.y=Math.atan2(gate.forward.x,gate.forward.z);
