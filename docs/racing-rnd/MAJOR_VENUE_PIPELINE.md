@@ -42,6 +42,8 @@ complete exact raceway extract. Newer conflicting exact geometry rejects adoptio
 Surveys are private source annotations, consumed by the existing road compiler;
 provider tags or cached JSON cannot confer surveyed status. Its compiled left,
 centre and right heights feed the same renderer, contact query and wheel solver.
+Canonical district-source normalization explicitly transfers that private
+annotation to its immutable way records before the road pass consumes them.
 Ordinary roads retain their existing planar cross-section and fitting policy.
 
 The Racing panel builds the full ordered GP path after the existing world surface

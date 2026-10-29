@@ -11,6 +11,7 @@ import {sampleDistrictGroundElevationMeters} from '../app/js/world/compiler/dist
 import {buildVenueRaceCourses} from '../app/js/racing/venue-courses.js';
 import {earthCoordinateFrame} from '../app/js/earth-core/coordinate-frame.js';
 import {normalizeRaceRouteReference} from '../app/js/racing/course-library.js';
+import {adaptSelectedLocationSource} from '../app/js/world/compiler/selected-location-source-adapter.js';
 const read=file=>fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
 const text=read('app/assets/racing/silverstone/source.json'),source=JSON.parse(text),descriptor=RACING_VENUE_SOURCES[0];
 const ground={status:'accepted',artifactIds:[descriptor.groundArtifactId],contentSha256s:[descriptor.groundContentSha256]};
@@ -48,6 +49,16 @@ test('wrong ground, obsolete source geometry and damaged downloads cannot partia
  const controller=new AbortController();controller.abort();
  await assert.rejects(loadRacingVenueSource(descriptor,{signal:controller.signal,fetchImpl:async()=>({ok:true,text:async()=>text})}),error=>error.name==='AbortError');
  await assert.rejects(loadRacingVenueSource(descriptor,{fetchImpl:async()=>({ok:true,text:async()=>text+' '})}),/integrity_failed/);
+});
+test('reviewed survey ownership survives the actual canonical district-source normalization used before road compilation',()=>{
+ const prepared=prepareVenueSourceMerge({},source,descriptor,ground),elements=prepared.data.elements,nodes={};
+ for(const node of elements.filter(e=>e.type==='node'))nodes[node.id]=node;
+ const normalized=adaptSelectedLocationSource({data:prepared.data,location:descriptor.anchor,nodes,
+  selection:{roadWays:elements.filter(e=>e.type==='way'),buildingWays:[],landuseWays:[],poiNodes:[]}});
+ const road=normalized.selection.roadWays.find(w=>String(w.id)==='55224167');
+ assert.equal(roadSourceSurvey(road)?.groundContentSha256,descriptor.groundContentSha256);
+ assert.ok(Object.isFrozen(road));
+ assert.equal(roadSourceSurvey(JSON.parse(JSON.stringify(road))),null,'serializing raw source cannot forge a trusted review annotation');
 });
 test('the actual compact EA artifact is hash-bound, admitted by the existing ground compiler and covers the full GP road with lateral clearance',()=>{
  const bytes=read('app/assets/ground/silverstone/ground-artifact.json'),artifact=JSON.parse(bytes),manifest=JSON.parse(read('app/assets/ground/silverstone/ground-manifest.json'));
