@@ -609,6 +609,177 @@ var require_vehicle_garage_rules = __commonJS({
         }
       }
     ].map((record) => Object.freeze(record)));
+    var RACING_FLEET_ASSETS2 = Object.freeze([
+      {
+        "schemaVersion": 1,
+        "id": "road-spectral-gt-rs",
+        "label": "Spectral GT RS",
+        "url": "/app/assets/models/vehicles/racing-fleet/road-spectral-gt-rs.glb",
+        "roles": [
+          "road-vehicle-presentation"
+        ],
+        "vehicleVariantIds": [
+          "spectral_gt"
+        ],
+        "license": "CC0-1.0",
+        "sourceUrl": "https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7",
+        "attribution": "Spectral GT RS: original model by JaronKBragg7337, CC0; World Explorer derivative.",
+        "sourceCredit": "JaronKBragg7337",
+        "dimensionsMeters": {
+          "width": 2.3285577297210693,
+          "height": 1.5486845970153809,
+          "length": 4.800000190734863
+        },
+        "paintMaterialNames": [
+          "Spectral Blue \u2014 Clearcoat",
+          "Midnight Blue \u2014 Shadow Panels"
+        ],
+        "wheelLayout": [
+          {
+            "id": "rear-left",
+            "position": [
+              -0.935663491487503,
+              0.49779149889945984,
+              -1.3795274794101715
+            ],
+            "radius": 0.49779149889945984
+          },
+          {
+            "id": "rear-right",
+            "position": [
+              0.935663491487503,
+              0.49779149889945984,
+              -1.3795274794101715
+            ],
+            "radius": 0.49779149889945984
+          },
+          {
+            "id": "front-left",
+            "position": [
+              -0.935663491487503,
+              0.49779149889945984,
+              1.247704952955246
+            ],
+            "radius": 0.49779149889945984
+          },
+          {
+            "id": "front-right",
+            "position": [
+              0.935663491487503,
+              0.49779149889945984,
+              1.247704952955246
+            ],
+            "radius": 0.49779149889945984
+          }
+        ],
+        "driverEyeGroundMeters": [
+          -0.396,
+          1.3,
+          -0.3
+        ],
+        "sourceUpAxis": "y",
+        "rigPolicy": "preserve-parts",
+        "collisionPolicy": "existing-road-vehicle-envelope",
+        "instancePolicy": {
+          "geometry": "shared",
+          "materials": "clone"
+        },
+        "loadPolicy": {
+          "bounded": true,
+          "timeoutMs": 2e4
+        },
+        "budgets": {
+          "bytes": 2417868,
+          "triangles": 82556,
+          "textureEdgePixels": 512,
+          "maxInstances": 4
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "id": "road-meridian-gt",
+        "label": "Meridian GT",
+        "url": "/app/assets/models/vehicles/racing-fleet/road-meridian-gt.glb",
+        "roles": [
+          "road-vehicle-presentation"
+        ],
+        "vehicleVariantIds": [
+          "meridian_gt"
+        ],
+        "license": "CC0-1.0",
+        "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635",
+        "attribution": "Meridian GT: original model by Innerscene, CC0; World Explorer derivative.",
+        "sourceCredit": "Innerscene",
+        "dimensionsMeters": {
+          "width": 2.2371997833251953,
+          "height": 1.3470001218374819,
+          "length": 4.840494155883789
+        },
+        "paintMaterialNames": [
+          "paint"
+        ],
+        "wheelLayout": [
+          {
+            "id": "front-right",
+            "position": [
+              0.8500000536441803,
+              0.32799999869894236,
+              1.4450469613075256
+            ],
+            "radius": 0.3249999984400347
+          },
+          {
+            "id": "front-left",
+            "position": [
+              -0.8499999344348907,
+              0.32799999869894236,
+              1.4450469613075256
+            ],
+            "radius": 0.3249999984400347
+          },
+          {
+            "id": "rear-right",
+            "position": [
+              0.8500000536441803,
+              0.32799999869894236,
+              -1.4149530529975891
+            ],
+            "radius": 0.3249999984400347
+          },
+          {
+            "id": "rear-left",
+            "position": [
+              -0.8499999344348907,
+              0.32799999869894236,
+              -1.4149530529975891
+            ],
+            "radius": 0.3249999984400347
+          }
+        ],
+        "driverEyeGroundMeters": [
+          0.461,
+          1.035,
+          0.08
+        ],
+        "sourceUpAxis": "y",
+        "rigPolicy": "preserve-parts",
+        "collisionPolicy": "existing-road-vehicle-envelope",
+        "instancePolicy": {
+          "geometry": "shared",
+          "materials": "clone"
+        },
+        "loadPolicy": {
+          "bounded": true,
+          "timeoutMs": 2e4
+        },
+        "budgets": {
+          "bytes": 1702196,
+          "triangles": 57854,
+          "textureEdgePixels": 512,
+          "maxInstances": 4
+        }
+      }
+    ].map((record) => Object.freeze(record)));
     var ROAD_VEHICLE_DEFINITIONS2 = Object.freeze([
       Object.freeze({ id: "compact", label: "Compact hatchback", bodyStyle: "compact", handlingLabel: "Nimble", width: 1.65, height: 1.42, length: 3.65, cabinScale: 0.48, wheelRadius: 0.34, speedFactor: 1.04, acceleration: 2.8, turningRadius: 4.6, accelerationScale: 1.13, steeringScale: 1.14, gripScale: 0.98, brakeScale: 1.04, topSpeedMph: 120, weight: 18, color: 9060165, parkedEligible: true }),
       Object.freeze({ id: "sedan", label: "Four-door sedan", bodyStyle: "sedan", handlingLabel: "Balanced", width: 1.78, height: 1.45, length: 4.45, cabinScale: 0.5, wheelRadius: 0.36, speedFactor: 1, acceleration: 2.5, turningRadius: 5.2, accelerationScale: 1, steeringScale: 1, gripScale: 1, brakeScale: 1, topSpeedMph: 120, weight: 22, color: 3235705, parkedEligible: true }),
@@ -637,9 +808,11 @@ var require_vehicle_garage_rules = __commonJS({
       { id: "cadillac_coupe", assetId: "road-cadillac-coupe-deville", bodyStyle: "sedan", handlingLabel: "Long-wheelbase cruiser", massKg: 2240, seatCount: 6, weight: 16, color: 8171424, topSpeedMph: 105, accelerationScale: 0.8, steeringScale: 0.76, gripScale: 0.96, brakeScale: 0.91, turningRadius: 6.6 },
       { id: "cadillac_fleetwood", assetId: "road-cadillac-fleetwood-brougham", bodyStyle: "sedan", handlingLabel: "Luxury touring sedan", massKg: 1930, seatCount: 6, weight: 20, color: 7022133, topSpeedMph: 105, accelerationScale: 0.83, steeringScale: 0.8, gripScale: 1.02, brakeScale: 0.96, turningRadius: 6.4 },
       { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
-      { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 }
+      { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
+      { id: "meridian_gt", assetId: "road-meridian-gt", bodyStyle: "sedan", category: "Grand touring", handlingLabel: "Front-engine grand tourer", massKg: 1580, seatCount: 2, weight: 0, color: 9053747, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.08, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.5, parkedEligible: false },
+      { id: "spectral_gt", assetId: "road-spectral-gt-rs", bodyStyle: "sedan", category: "Track sports", handlingLabel: "Track-focused grip", massKg: 1280, seatCount: 2, weight: 0, color: 1527433, topSpeedMph: 120, accelerationScale: 1.62, steeringScale: 1.17, gripScale: 1.26, brakeScale: 1.38, turningRadius: 5.2, parkedEligible: false }
     ].map((profile) => {
-      const asset = EXPLORER_FLEET_ASSETS2.find((entry) => entry.id === profile.assetId);
+      const asset = [...EXPLORER_FLEET_ASSETS2, ...RACING_FLEET_ASSETS2].find((entry) => entry.id === profile.assetId);
       return Object.freeze({
         ...profile,
         ...asset.dimensionsMeters,
@@ -651,8 +824,9 @@ var require_vehicle_garage_rules = __commonJS({
         cabinScale: 0.5,
         speedFactor: 1,
         acceleration: 2.5,
-        parkedEligible: true,
-        rights: { kind: "licensed-model", brand: asset.label, attribution: asset.attribution }
+        parkedEligible: profile.parkedEligible !== false,
+        driverEyeGroundMeters: asset.driverEyeGroundMeters,
+        rights: { kind: "licensed-model", brand: asset.license === "CC0-1.0" ? "unbranded" : asset.label, attribution: asset.attribution }
       });
     }));
     var VEHICLE_CATALOG2 = Object.freeze([...ROAD_VEHICLE_DEFINITIONS2, ...LICENSED_ROAD_PROFILES2].map((definition) => {
@@ -693,7 +867,9 @@ var require_vehicle_garage_rules = __commonJS({
       cadillac_coupe: 22e3,
       cadillac_fleetwood: 26e3,
       golf_ii: 9e3,
-      datsun_280z: 34e3
+      datsun_280z: 34e3,
+      meridian_gt: 78e3,
+      spectral_gt: 125e3
     };
     var PERSONAL_VEHICLES2 = Object.freeze([
       Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),
@@ -703,7 +879,7 @@ var require_vehicle_garage_rules = __commonJS({
         variantId: v.id,
         assetId: v.assetId || "",
         price: prices2[v.id],
-        category: v.bodyStyle,
+        category: v.category || v.bodyStyle,
         defaultVisual: false
       }))
     ]);
@@ -2482,6 +2658,179 @@ var EXPLORER_FLEET_ASSETS = Object.freeze([
   }
 ].map((record) => Object.freeze(record)));
 
+// app/js/assets/racing-fleet-assets.js
+var RACING_FLEET_ASSETS = Object.freeze([
+  {
+    "schemaVersion": 1,
+    "id": "road-spectral-gt-rs",
+    "label": "Spectral GT RS",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-spectral-gt-rs.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "spectral_gt"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7",
+    "attribution": "Spectral GT RS: original model by JaronKBragg7337, CC0; World Explorer derivative.",
+    "sourceCredit": "JaronKBragg7337",
+    "dimensionsMeters": {
+      "width": 2.3285577297210693,
+      "height": 1.5486845970153809,
+      "length": 4.800000190734863
+    },
+    "paintMaterialNames": [
+      "Spectral Blue \u2014 Clearcoat",
+      "Midnight Blue \u2014 Shadow Panels"
+    ],
+    "wheelLayout": [
+      {
+        "id": "rear-left",
+        "position": [
+          -0.935663491487503,
+          0.49779149889945984,
+          -1.3795274794101715
+        ],
+        "radius": 0.49779149889945984
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.935663491487503,
+          0.49779149889945984,
+          -1.3795274794101715
+        ],
+        "radius": 0.49779149889945984
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.935663491487503,
+          0.49779149889945984,
+          1.247704952955246
+        ],
+        "radius": 0.49779149889945984
+      },
+      {
+        "id": "front-right",
+        "position": [
+          0.935663491487503,
+          0.49779149889945984,
+          1.247704952955246
+        ],
+        "radius": 0.49779149889945984
+      }
+    ],
+    "driverEyeGroundMeters": [
+      -0.396,
+      1.3,
+      -0.3
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 2417868,
+      "triangles": 82556,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-meridian-gt",
+    "label": "Meridian GT",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-meridian-gt.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "meridian_gt"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635",
+    "attribution": "Meridian GT: original model by Innerscene, CC0; World Explorer derivative.",
+    "sourceCredit": "Innerscene",
+    "dimensionsMeters": {
+      "width": 2.2371997833251953,
+      "height": 1.3470001218374819,
+      "length": 4.840494155883789
+    },
+    "paintMaterialNames": [
+      "paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.8500000536441803,
+          0.32799999869894236,
+          1.4450469613075256
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.8499999344348907,
+          0.32799999869894236,
+          1.4450469613075256
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.8500000536441803,
+          0.32799999869894236,
+          -1.4149530529975891
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.8499999344348907,
+          0.32799999869894236,
+          -1.4149530529975891
+        ],
+        "radius": 0.3249999984400347
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.461,
+      1.035,
+      0.08
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 1702196,
+      "triangles": 57854,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  }
+].map((record) => Object.freeze(record)));
+
 // app/js/engine/vehicle-catalog.js?v=6
 var VEHICLE_ROOT_TO_GROUND_METERS = 1.12;
 var ROAD_VEHICLE_DEFINITIONS = Object.freeze([
@@ -2512,9 +2861,11 @@ var LICENSED_ROAD_PROFILES = Object.freeze([
   { id: "cadillac_coupe", assetId: "road-cadillac-coupe-deville", bodyStyle: "sedan", handlingLabel: "Long-wheelbase cruiser", massKg: 2240, seatCount: 6, weight: 16, color: 8171424, topSpeedMph: 105, accelerationScale: 0.8, steeringScale: 0.76, gripScale: 0.96, brakeScale: 0.91, turningRadius: 6.6 },
   { id: "cadillac_fleetwood", assetId: "road-cadillac-fleetwood-brougham", bodyStyle: "sedan", handlingLabel: "Luxury touring sedan", massKg: 1930, seatCount: 6, weight: 20, color: 7022133, topSpeedMph: 105, accelerationScale: 0.83, steeringScale: 0.8, gripScale: 1.02, brakeScale: 0.96, turningRadius: 6.4 },
   { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
-  { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 }
+  { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
+  { id: "meridian_gt", assetId: "road-meridian-gt", bodyStyle: "sedan", category: "Grand touring", handlingLabel: "Front-engine grand tourer", massKg: 1580, seatCount: 2, weight: 0, color: 9053747, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.08, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.5, parkedEligible: false },
+  { id: "spectral_gt", assetId: "road-spectral-gt-rs", bodyStyle: "sedan", category: "Track sports", handlingLabel: "Track-focused grip", massKg: 1280, seatCount: 2, weight: 0, color: 1527433, topSpeedMph: 120, accelerationScale: 1.62, steeringScale: 1.17, gripScale: 1.26, brakeScale: 1.38, turningRadius: 5.2, parkedEligible: false }
 ].map((profile) => {
-  const asset = EXPLORER_FLEET_ASSETS.find((entry) => entry.id === profile.assetId);
+  const asset = [...EXPLORER_FLEET_ASSETS, ...RACING_FLEET_ASSETS].find((entry) => entry.id === profile.assetId);
   return Object.freeze({
     ...profile,
     ...asset.dimensionsMeters,
@@ -2526,8 +2877,9 @@ var LICENSED_ROAD_PROFILES = Object.freeze([
     cabinScale: 0.5,
     speedFactor: 1,
     acceleration: 2.5,
-    parkedEligible: true,
-    rights: { kind: "licensed-model", brand: asset.label, attribution: asset.attribution }
+    parkedEligible: profile.parkedEligible !== false,
+    driverEyeGroundMeters: asset.driverEyeGroundMeters,
+    rights: { kind: "licensed-model", brand: asset.license === "CC0-1.0" ? "unbranded" : asset.label, attribution: asset.attribution }
   });
 }));
 var VEHICLE_CATALOG = Object.freeze([...ROAD_VEHICLE_DEFINITIONS, ...LICENSED_ROAD_PROFILES].map((definition) => {
@@ -2756,7 +3108,9 @@ var prices = {
   cadillac_coupe: 22e3,
   cadillac_fleetwood: 26e3,
   golf_ii: 9e3,
-  datsun_280z: 34e3
+  datsun_280z: 34e3,
+  meridian_gt: 78e3,
+  spectral_gt: 125e3
 };
 var PERSONAL_VEHICLES = Object.freeze([
   Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),
@@ -2766,7 +3120,7 @@ var PERSONAL_VEHICLES = Object.freeze([
     variantId: v.id,
     assetId: v.assetId || "",
     price: prices[v.id],
-    category: v.bodyStyle,
+    category: v.category || v.bodyStyle,
     defaultVisual: false
   }))
 ]);
@@ -3053,6 +3407,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       ready: ai === true,
       slot: players.size,
       car: null,
+      previousFrame: null,
       progress: null,
       lastSequence: -1,
       queue: [],
@@ -3084,6 +3439,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     for (const p of players.values()) {
       p.car = createRaceVehicleState(raceGridPose(course, p.slot), p.profile);
       stepRaceVehicle(course, p.car, NEUTRAL, 1 / 60, p.profile);
+      p.previousFrame = snapshotRaceVehicle(p.car);
       p.progress = createRaceProgress(raceVehicleGroundPose(p.car), startAtMs);
     }
     return snapshot();
@@ -3185,6 +3541,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           p.lastControlAt = command.at;
         }
         const actions = p.ai ? raceAiActions(course, p.car, p.progress, p.profile, { difficulty: p.difficulty }) : p.disconnectedAt !== null || frameAt - p.lastControlAt > 400 ? NEUTRAL : p.actions;
+        p.previousFrame = snapshotRaceVehicle(p.car);
         stepRaceVehicle(course, p.car, actions, 1 / 60, p.profile);
         p.progress = advanceRaceProgress(course, p.progress, raceVehicleGroundPose(p.car), frameAt, { startedAtMs: startAtMs });
       }
@@ -3193,7 +3550,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     }
     return snapshot();
   }
-  function snapshot() {
+  function snapshot(presentation = false) {
     const ordered = [...players.values()].sort((a, b) => a.dnf - b.dnf || (a.progress?.finished && b.progress?.finished ? a.progress.elapsedMs - b.progress.elapsedMs : a.progress?.finished ? -1 : b.progress?.finished ? 1 : (b.progress?.lap || 1) - (a.progress?.lap || 1) || (b.progress?.nextGate || 0) - (a.progress?.nextGate || 0)));
     let previousPosition = 0;
     return {
@@ -3215,6 +3572,13 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
         const previous = ordered[index - 1], tied = !p.dnf && p.progress?.finished && previous?.progress?.finished && p.progress.elapsedMs === previous.progress.elapsedMs;
         const position = tied ? previousPosition : index + 1;
         previousPosition = position;
+        const frame = snapshotRaceVehicle(p.car);
+        if (presentation && phase === "running" && !p.dnf && !p.progress?.finished && p.previousFrame && frame) {
+          const alpha = Math.max(0, Math.min(1, (lastNow - startAtMs - tick * STEP_MS) / STEP_MS));
+          for (const key of ["x", "y", "z", "terrainPitch", "terrainRoll"]) frame[key] = p.previousFrame[key] + (frame[key] - p.previousFrame[key]) * alpha;
+          const turn = frame.angle - p.previousFrame.angle;
+          frame.angle = p.previousFrame.angle + Math.atan2(Math.sin(turn), Math.cos(turn)) * alpha;
+        }
         return {
           uid: p.uid,
           label: p.label,
@@ -3226,11 +3590,11 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           dnf: p.dnf,
           position,
           lastInputSequence: p.lastSequence,
-          pose: p.car ? raceVehicleGroundPose(p.car) : null,
+          pose: frame ? raceVehicleGroundPose(frame) : null,
           speed: p.car?.speed || 0,
           condition: p.car?.condition ?? p.profile.conditionValue,
           barrierContacts: p.car?.barrierContacts ?? 0,
-          vehicleState: snapshotRaceVehicle(p.car),
+          vehicleState: frame,
           progress: p.progress ? {
             nextGate: p.progress.nextGate,
             lap: p.progress.lap,
@@ -3253,7 +3617,8 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     disconnect,
     reconnect,
     leave,
-    snapshot,
+    snapshot: () => snapshot(),
+    presentationSnapshot: () => snapshot(true),
     cancel(cancelReason = "race_cancelled") {
       if (phase === "complete") return snapshot();
       phase = "cancelled";

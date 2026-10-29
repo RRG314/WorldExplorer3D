@@ -6,6 +6,7 @@ import {
   defineTransportCatalogEntry
 } from '../transport/catalog-contract.js?v=1';
 import {EXPLORER_FLEET_ASSETS} from '../assets/explorer-fleet-assets.js';
+import {RACING_FLEET_ASSETS} from '../assets/racing-fleet-assets.js';
 
 const VEHICLE_ROOT_TO_GROUND_METERS = 1.12;
 
@@ -39,14 +40,17 @@ const LICENSED_ROAD_PROFILES = Object.freeze([
   {id:'cadillac_coupe',assetId:'road-cadillac-coupe-deville',bodyStyle:'sedan',handlingLabel:'Long-wheelbase cruiser',massKg:2240,seatCount:6,weight:16,color:0x7cafa0,topSpeedMph:105,accelerationScale:.8,steeringScale:.76,gripScale:.96,brakeScale:.91,turningRadius:6.6},
   {id:'cadillac_fleetwood',assetId:'road-cadillac-fleetwood-brougham',bodyStyle:'sedan',handlingLabel:'Luxury touring sedan',massKg:1930,seatCount:6,weight:20,color:0x6b2635,topSpeedMph:105,accelerationScale:.83,steeringScale:.8,gripScale:1.02,brakeScale:.96,turningRadius:6.4},
   {id:'golf_ii',assetId:'road-volkswagen-golf-ii',bodyStyle:'compact',handlingLabel:'Light city hatchback',massKg:1010,seatCount:5,weight:40,color:0xb7662e,topSpeedMph:110,accelerationScale:1.04,steeringScale:1.12,gripScale:1.04,brakeScale:1.05,turningRadius:4.8},
-  {id:'datsun_280z',assetId:'road-datsun-280z',bodyStyle:'sedan',handlingLabel:'Sport coupe',massKg:1300,seatCount:2,weight:20,color:0xe5bd49,topSpeedMph:120,accelerationScale:1.16,steeringScale:1.1,gripScale:1.07,brakeScale:1.09,turningRadius:5.1}
+  {id:'datsun_280z',assetId:'road-datsun-280z',bodyStyle:'sedan',handlingLabel:'Sport coupe',massKg:1300,seatCount:2,weight:20,color:0xe5bd49,topSpeedMph:120,accelerationScale:1.16,steeringScale:1.1,gripScale:1.07,brakeScale:1.09,turningRadius:5.1},
+  {id:'meridian_gt',assetId:'road-meridian-gt',bodyStyle:'sedan',category:'Grand touring',handlingLabel:'Front-engine grand tourer',massKg:1580,seatCount:2,weight:0,color:0x8a2633,topSpeedMph:120,accelerationScale:1.38,steeringScale:1.08,gripScale:1.14,brakeScale:1.22,turningRadius:5.5,parkedEligible:false},
+  {id:'spectral_gt',assetId:'road-spectral-gt-rs',bodyStyle:'sedan',category:'Track sports',handlingLabel:'Track-focused grip',massKg:1280,seatCount:2,weight:0,color:0x174e89,topSpeedMph:120,accelerationScale:1.62,steeringScale:1.17,gripScale:1.26,brakeScale:1.38,turningRadius:5.2,parkedEligible:false}
 ].map(profile=>{
-  const asset=EXPLORER_FLEET_ASSETS.find(entry=>entry.id===profile.assetId);
+  const asset=[...EXPLORER_FLEET_ASSETS,...RACING_FLEET_ASSETS].find(entry=>entry.id===profile.assetId);
   return Object.freeze({...profile,...asset.dimensionsMeters,label:asset.label,wheelContacts:asset.wheelLayout,
     wheelBase:Math.max(...asset.wheelLayout.map(w=>w.position[2]))-Math.min(...asset.wheelLayout.map(w=>w.position[2])),
     halfTrack:(Math.max(...asset.wheelLayout.map(w=>w.position[0]))-Math.min(...asset.wheelLayout.map(w=>w.position[0])))*.5,
-    wheelRadius:asset.wheelLayout[0].radius,cabinScale:.5,speedFactor:1,acceleration:2.5,parkedEligible:true,
-    rights:{kind:'licensed-model',brand:asset.label,attribution:asset.attribution}});
+    wheelRadius:asset.wheelLayout[0].radius,cabinScale:.5,speedFactor:1,acceleration:2.5,parkedEligible:profile.parkedEligible!==false,
+    driverEyeGroundMeters:asset.driverEyeGroundMeters,
+    rights:{kind:'licensed-model',brand:asset.license==='CC0-1.0'?'unbranded':asset.label,attribution:asset.attribution}});
 }));
 
 const VEHICLE_CATALOG = Object.freeze([...ROAD_VEHICLE_DEFINITIONS,...LICENSED_ROAD_PROFILES].map((definition) => {

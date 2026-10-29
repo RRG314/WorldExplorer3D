@@ -328,3 +328,13 @@ All seven models below are adapted under [CC BY 4.0](https://creativecommons.org
 - [Dassault Falcon 10](https://sketchfab.com/3d-models/falcon10-0d5a676f75da403b8419154b102d55a7) — manilov.ap (https://sketchfab.com/manilov.ap). File: `vehicles/explorer-fleet/aircraft-falcon-10.glb`.
 
 The coupe author does not specify an exact model year. The long Fleetwood Brougham depicts the early 1980s. The source and derived checksums, measured budgets and transformations are recorded in `vehicles/explorer-fleet/asset-manifest.json`.
+
+## Unbranded racing fleet
+
+- [Spectral GT RS](https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7), original model by JaronKBragg7337, CC0 1.0 Universal.
+- [Generic front-engine grand tourer coupe](https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635), original model by Innerscene, CC0 1.0 Universal. Named Meridian GT in this game.
+
+World Explorer derivatives use uniform metre scale, forward-axis and ground
+normalization, bounded simplification, compatible glazing and separate wheel
+pivots. Exact source/derivative hashes, dimensions and budgets are in
+`vehicles/racing-fleet/asset-manifest.json`. No source gameplay code is imported.

@@ -581,6 +581,179 @@ var EXPLORER_FLEET_ASSETS = Object.freeze([
   }
 ].map((record) => Object.freeze(record)));
 
+// app/js/assets/racing-fleet-assets.js
+var RACING_FLEET_ASSETS = Object.freeze([
+  {
+    "schemaVersion": 1,
+    "id": "road-spectral-gt-rs",
+    "label": "Spectral GT RS",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-spectral-gt-rs.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "spectral_gt"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7",
+    "attribution": "Spectral GT RS: original model by JaronKBragg7337, CC0; World Explorer derivative.",
+    "sourceCredit": "JaronKBragg7337",
+    "dimensionsMeters": {
+      "width": 2.3285577297210693,
+      "height": 1.5486845970153809,
+      "length": 4.800000190734863
+    },
+    "paintMaterialNames": [
+      "Spectral Blue \u2014 Clearcoat",
+      "Midnight Blue \u2014 Shadow Panels"
+    ],
+    "wheelLayout": [
+      {
+        "id": "rear-left",
+        "position": [
+          -0.935663491487503,
+          0.49779149889945984,
+          -1.3795274794101715
+        ],
+        "radius": 0.49779149889945984
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.935663491487503,
+          0.49779149889945984,
+          -1.3795274794101715
+        ],
+        "radius": 0.49779149889945984
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.935663491487503,
+          0.49779149889945984,
+          1.247704952955246
+        ],
+        "radius": 0.49779149889945984
+      },
+      {
+        "id": "front-right",
+        "position": [
+          0.935663491487503,
+          0.49779149889945984,
+          1.247704952955246
+        ],
+        "radius": 0.49779149889945984
+      }
+    ],
+    "driverEyeGroundMeters": [
+      -0.396,
+      1.3,
+      -0.3
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 2417868,
+      "triangles": 82556,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "road-meridian-gt",
+    "label": "Meridian GT",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-meridian-gt.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "meridian_gt"
+    ],
+    "license": "CC0-1.0",
+    "sourceUrl": "https://www.innerscene.com/tools/library/3d-parts/generic-front-engine-grand-tourer-coupe-9a08f635",
+    "attribution": "Meridian GT: original model by Innerscene, CC0; World Explorer derivative.",
+    "sourceCredit": "Innerscene",
+    "dimensionsMeters": {
+      "width": 2.2371997833251953,
+      "height": 1.3470001218374819,
+      "length": 4.840494155883789
+    },
+    "paintMaterialNames": [
+      "paint"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.8500000536441803,
+          0.32799999869894236,
+          1.4450469613075256
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.8499999344348907,
+          0.32799999869894236,
+          1.4450469613075256
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.8500000536441803,
+          0.32799999869894236,
+          -1.4149530529975891
+        ],
+        "radius": 0.3249999984400347
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.8499999344348907,
+          0.32799999869894236,
+          -1.4149530529975891
+        ],
+        "radius": 0.3249999984400347
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.461,
+      1.035,
+      0.08
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 1702196,
+      "triangles": 57854,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  }
+].map((record) => Object.freeze(record)));
+
 // app/js/engine/vehicle-catalog.js?v=6
 var ROAD_VEHICLE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: "compact", label: "Compact hatchback", bodyStyle: "compact", handlingLabel: "Nimble", width: 1.65, height: 1.42, length: 3.65, cabinScale: 0.48, wheelRadius: 0.34, speedFactor: 1.04, acceleration: 2.8, turningRadius: 4.6, accelerationScale: 1.13, steeringScale: 1.14, gripScale: 0.98, brakeScale: 1.04, topSpeedMph: 120, weight: 18, color: 9060165, parkedEligible: true }),
@@ -610,9 +783,11 @@ var LICENSED_ROAD_PROFILES = Object.freeze([
   { id: "cadillac_coupe", assetId: "road-cadillac-coupe-deville", bodyStyle: "sedan", handlingLabel: "Long-wheelbase cruiser", massKg: 2240, seatCount: 6, weight: 16, color: 8171424, topSpeedMph: 105, accelerationScale: 0.8, steeringScale: 0.76, gripScale: 0.96, brakeScale: 0.91, turningRadius: 6.6 },
   { id: "cadillac_fleetwood", assetId: "road-cadillac-fleetwood-brougham", bodyStyle: "sedan", handlingLabel: "Luxury touring sedan", massKg: 1930, seatCount: 6, weight: 20, color: 7022133, topSpeedMph: 105, accelerationScale: 0.83, steeringScale: 0.8, gripScale: 1.02, brakeScale: 0.96, turningRadius: 6.4 },
   { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
-  { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 }
+  { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
+  { id: "meridian_gt", assetId: "road-meridian-gt", bodyStyle: "sedan", category: "Grand touring", handlingLabel: "Front-engine grand tourer", massKg: 1580, seatCount: 2, weight: 0, color: 9053747, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.08, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.5, parkedEligible: false },
+  { id: "spectral_gt", assetId: "road-spectral-gt-rs", bodyStyle: "sedan", category: "Track sports", handlingLabel: "Track-focused grip", massKg: 1280, seatCount: 2, weight: 0, color: 1527433, topSpeedMph: 120, accelerationScale: 1.62, steeringScale: 1.17, gripScale: 1.26, brakeScale: 1.38, turningRadius: 5.2, parkedEligible: false }
 ].map((profile) => {
-  const asset = EXPLORER_FLEET_ASSETS.find((entry) => entry.id === profile.assetId);
+  const asset = [...EXPLORER_FLEET_ASSETS, ...RACING_FLEET_ASSETS].find((entry) => entry.id === profile.assetId);
   return Object.freeze({
     ...profile,
     ...asset.dimensionsMeters,
@@ -624,8 +799,9 @@ var LICENSED_ROAD_PROFILES = Object.freeze([
     cabinScale: 0.5,
     speedFactor: 1,
     acceleration: 2.5,
-    parkedEligible: true,
-    rights: { kind: "licensed-model", brand: asset.label, attribution: asset.attribution }
+    parkedEligible: profile.parkedEligible !== false,
+    driverEyeGroundMeters: asset.driverEyeGroundMeters,
+    rights: { kind: "licensed-model", brand: asset.license === "CC0-1.0" ? "unbranded" : asset.label, attribution: asset.attribution }
   });
 }));
 var VEHICLE_CATALOG = Object.freeze([...ROAD_VEHICLE_DEFINITIONS, ...LICENSED_ROAD_PROFILES].map((definition) => {
@@ -668,7 +844,9 @@ var prices = {
   cadillac_coupe: 22e3,
   cadillac_fleetwood: 26e3,
   golf_ii: 9e3,
-  datsun_280z: 34e3
+  datsun_280z: 34e3,
+  meridian_gt: 78e3,
+  spectral_gt: 125e3
 };
 var PERSONAL_VEHICLES = Object.freeze([
   Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),
@@ -678,7 +856,7 @@ var PERSONAL_VEHICLES = Object.freeze([
     variantId: v.id,
     assetId: v.assetId || "",
     price: prices[v.id],
-    category: v.bodyStyle,
+    category: v.category || v.bodyStyle,
     defaultVisual: false
   }))
 ]);

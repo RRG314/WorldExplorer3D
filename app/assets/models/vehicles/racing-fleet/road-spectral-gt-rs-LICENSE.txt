@@ -1,0 +1,5 @@
+Spectral GT RS
+Original model by JaronKBragg7337
+Source: https://github.com/JaronKBragg7337/spectral-gt-rs/tree/34499c501908818a2b08e589a7aecf963343cee7
+CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+Derivative: World Explorer axis/base normalization, uniform metre scale, static closed rest pose, bounded simplification and texture sizes, wheel pivots and compatible glazing. No source gameplay code included. No endorsement implied.
