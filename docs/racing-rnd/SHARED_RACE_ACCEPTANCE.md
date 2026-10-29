@@ -1,0 +1,94 @@
+# Shared racing acceptance — October 29, 2026
+
+The fixed finish line remains `FINISH_GOAL.md`. These accepted checks do not
+need another complete race unless their owning code changes. This is staging
+evidence; the racing package has not been deployed to production.
+
+## Actual city and deployed services
+
+Frozen browser build: `5.6.1+f2d621309ecd.1b27b746bce01a83.staging`.
+Authority source: `283bfe2`, ready Cloud Run revision `00002-gdp`.
+
+The current Monaco city district retained 10,097 buildings and 11,533 roads.
+Qualification exported 148 usable spans and 907 surface samples, with retained
+OpenStreetMap and Copernicus provenance. The approved 698.252 m city sprint is
+**not** the Monaco Grand Prix circuit.
+
+The creator completed a server-timed private qualification, submitted it through
+the actual game interface, and a disposable reviewer approved it in Account.
+The temporary reviewer claim was restored and its refresh tokens revoked.
+
+Two disposable authenticated room members then joined the approved course via
+live TLS, Auth and App Check. The browser drove the owned DeLorean through normal
+keyboard input; the second client used the existing control protocol and BMW
+rules without running a second city renderer. Both used the real server clock.
+
+| Accepted outcome | Evidence |
+| --- | --- |
+| Two finished participants | BMW 43.713 s; DeLorean 84.350 s |
+| Immutable competitive receipt | Persisted by the deployed authority |
+| Existing wallet awards | 250 and 150 Credits; no second currency |
+| Browser Journal | Online result and Journal saved feedback |
+| Shared comparable records | Actual view read the live DeLorean class and rendered 84.35 s |
+| World return | Normal walking admission followed by keyboard movement |
+| Runtime errors during accepted race | Zero page or console errors |
+
+Car class includes vehicle, upgrades, starting condition, grid row and physics.
+The two different cars do not belong on one comparable-time board. Their order
+in the individual race result is separate from those class-specific records.
+
+Walking approach was controlled test setup through the existing typed surface
+travel owner. Model adoption, room admission and timed driving were real. This
+does not claim ordinary approach driving, two physical devices, Play Integrity,
+or headset comfort. Earlier qualification, lease/proximity, browser timeout and
+verification-driver failures are retained in private evidence.
+
+## One performance window
+
+The same accepted race supplied one 60,000.3 ms desktop measurement:
+
+| Metric | Result |
+| --- | ---: |
+| Average frame rate | 40.45 FPS |
+| 95th percentile | 34.1 ms |
+| 99th percentile | 50.0 ms |
+| Worst frame | 100.1 ms |
+| Frames over 250 ms | 0 |
+| Moving time | 41.43 s |
+
+This meets the existing 30 FPS desktop floor, 35 ms p95, 50 ms p99 and 250 ms
+maximum. One isolated frame exceeded 100 ms; the existing hitch guard passed.
+It is not a physical-phone thermal/memory measurement or acceptance of unbuilt
+major venues. Earlier slower runs remain retained rather than being relabelled.
+
+## Shared vehicle handback correction
+
+Inspection after the race exposed two separate representation contracts:
+
+- Gate/timing poses are ground contact. Room vehicles require chassis-root Y,
+  pitch and roll. Renew/release now project the authoritative numeric vehicle
+  frame, retain the lobby's existing pose, and preserve immutable ground timing.
+- A shared personal BMW uses a personal category rather than the ordinary sedan
+  category. Personal identity now selects the registered model and asset through
+  the existing catalogue and model lease owner. Unknown/mismatched personal
+  definitions are rejected rather than rendered as another sedan.
+
+Twelve focused transaction/reconciliation checks passed. Two older VM checks
+initially failed because their import stripping ignored the current second
+import; the harness now supplies the real control policy. Two selected service
+regressions passed. Actual BMW and DeLorean GLBs were rendered in a controlled
+scene, both matched their registered IDs, and model leases returned to zero.
+The shared-times view also read the live accepted result. Those are focused
+component/service checks, not another city run or a full styled gameplay screen.
+
+The source gate also detected existing mixed module URLs for vehicle settings
+and BMW preparation. Imports now use their canonical versions; this changes no
+handling constants or competitive record keys.
+
+## Still outside this acceptance
+
+The balanced major-venue register still has twelve researched layouts and zero
+complete playable packs. It needs rights-cleared geographic content, discipline
+rules and actual complete venue acceptance. A final coordinated artifact and
+its changed distribution paths remain required. Absent Apple and VR hardware
+are disclosed limitations, not repeated approval questions.

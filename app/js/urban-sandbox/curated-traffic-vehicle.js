@@ -2,7 +2,7 @@ import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import {vehicleWheelRig} from '../transport/vehicle-wheel-motion.js';
-import {prepareE34Model} from '../engine/curated-player-car.js';
+import {prepareE34Model} from '../engine/curated-player-car.js?v=7';
 
 const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   compact: 'traffic-compact-hatchback-v1',

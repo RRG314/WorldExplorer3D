@@ -1073,6 +1073,7 @@ __export(engine_entry_exports, {
   raceGridPose: () => raceGridPose,
   racePublicationIdentity: () => racePublicationIdentity,
   raceRecordConfiguration: () => raceRecordConfiguration,
+  raceVehicleWorldPose: () => raceVehicleWorldPose,
   racingCareerContext: () => racingCareerContext,
   racingRivalOutcome: () => racingRivalOutcome,
   racingSeriesStandings: () => racingSeriesStandings,
@@ -1422,7 +1423,7 @@ function carSpeedToWorldUnitsPerSecond(simulationSpeed = 0, metersPerWorldUnit =
   return mphToWorldUnitsPerSecond(carSpeedToMph(simulationSpeed), metersPerWorldUnit);
 }
 
-// app/js/physics/vehicle-config.js
+// app/js/physics/vehicle-config.js?v=1
 var ROAD_CAR_CONFIG = Object.freeze({
   // Simulation speed is 2 units per displayed MPH. Keep the road-car envelope
   // in one importable data contract so physics and verification share values.
@@ -2825,6 +2826,12 @@ function raceVehicleSpeedMetersPerSecond(car) {
 function raceVehicleGroundPose(car) {
   return { x: car.x, y: car.y - VEHICLE_ROOT_TO_GROUND_METERS, z: car.z, yaw: car.angle };
 }
+function raceVehicleWorldPose(player) {
+  const frame = player?.vehicleState;
+  if (!frame) return null;
+  if (!["x", "y", "z", "angle", "terrainPitch", "terrainRoll"].every((key) => Number.isFinite(frame[key]))) throw Error("race_vehicle_frame_missing");
+  return { x: frame.x, y: frame.y, z: frame.z, yaw: frame.angle, pitch: frame.terrainPitch, roll: frame.terrainRoll };
+}
 var RACE_VEHICLE_NUMERIC_FIELDS = Object.freeze([
   "x",
   "y",
@@ -3410,6 +3417,7 @@ function racingRivalOutcome(challenge) {
   raceGridPose,
   racePublicationIdentity,
   raceRecordConfiguration,
+  raceVehicleWorldPose,
   racingCareerContext,
   racingRivalOutcome,
   racingSeriesStandings,

@@ -1,5 +1,5 @@
 import {prepareVehicleDriveFrame,stepVehiclePlanarDrive,integrateVehiclePlanarPosition}from'../physics/vehicle-planar-dynamics.js';
-import {ROAD_CAR_CONFIG}from'../physics/vehicle-config.js';
+import {ROAD_CAR_CONFIG}from'../physics/vehicle-config.js?v=1';
 import {carSpeedToMph,mphToCarSpeed,carSpeedToWorldUnitsPerSecond}from'../physics/vehicle-speed-units.js';
 import {VEHICLE_CATALOG,vehicleHandlingProfile,vehicleConditionDynamics,VEHICLE_ROOT_TO_GROUND_METERS}from'../engine/vehicle-catalog.js?v=6';
 import {resolveVehicleRoadContactPose}from'../engine/vehicle-road-attitude.js?v=3';
@@ -52,6 +52,13 @@ export function stepRaceVehicle(course,car,actions,dt,profile){
 }
 export function raceVehicleSpeedMetersPerSecond(car){return carSpeedToMph(car.speed)*.44704;}
 export function raceVehicleGroundPose(car){return {x:car.x,y:car.y-VEHICLE_ROOT_TO_GROUND_METERS,z:car.z,yaw:car.angle};}
+// Timing gates use ground contact; ordinary room vehicles publish the chassis
+// root. Reuse the authoritative numeric frame, including its surveyed attitude.
+export function raceVehicleWorldPose(player){
+ const frame=player?.vehicleState;if(!frame)return null;
+ if(!['x','y','z','angle','terrainPitch','terrainRoll'].every(key=>Number.isFinite(frame[key])))throw Error('race_vehicle_frame_missing');
+ return {x:frame.x,y:frame.y,z:frame.z,yaw:frame.angle,pitch:frame.terrainPitch,roll:frame.terrainRoll};
+}
 export function raceVehicleWheelDistance(car,dt){return carSpeedToWorldUnitsPerSecond(car.speed,1)*dt;}
 
 // One explicit frame contract for session snapshots and the existing physics

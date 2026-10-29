@@ -1,5 +1,5 @@
 import {advanceRoadRaceFrame} from './physics/road-race-delegate.js';
-import {PLANETARY_ROVER_CONFIG} from './physics/vehicle-config.js';
+import {PLANETARY_ROVER_CONFIG} from './physics/vehicle-config.js?v=1';
 import { resolvePlanetaryVehicleObstacle } from './physics/planetary-obstacle-response.js';
 import {updateVehicleWheels} from './transport/vehicle-wheel-motion.js';
 import { shouldRefreshRoadQuery } from './physics/road-query-policy.js';

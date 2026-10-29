@@ -15,3 +15,14 @@ maximum85.3ms,zero frames over100ms. Hitch guard passed,average desktop rate
 remains unaccepted. Source coverage10,097buildings/11,533roads retained. Mac
 resource pressure was observed but causation was not isolated. This does not
 validate sustained racing/multiplayer or physical-phone performance.
+
+## October 29 live shared-city acceptance
+
+Frozen f2d6213 actual Monaco shared race, one 60,000.3 ms desktop window:
+40.4498 FPS, p95 34.1 ms, p99 50.0 ms, maximum 100.1 ms, no frame over 250 ms.
+The existing desktop budget and hitch guard passed. Moving time was 41.43 s;
+this was real browser keyboard input with a separate authenticated protocol peer
+and the deployed race authority, not two full renderers or physical devices.
+No repeated minute is required for unchanged city/handling code. Earlier runs
+remain failed/diagnostic evidence. Major venues and physical-device sustained
+performance are separate claims. See SHARED_RACE_ACCEPTANCE.md.

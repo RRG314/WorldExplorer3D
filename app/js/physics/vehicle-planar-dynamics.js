@@ -1,6 +1,6 @@
 import {arcadeSteeringYawTarget,earthDrivingSteeringProfile,resolveCarDriveCommand} from '../controls/traversal-control-policy.js?v=9';
 import {carSpeedToMph,carSpeedToWorldUnitsPerSecond,mphToCarSpeed} from './vehicle-speed-units.js?v=2';
-import {ROAD_CAR_CONFIG,PLANETARY_ROVER_CONFIG} from './vehicle-config.js';
+import {ROAD_CAR_CONFIG,PLANETARY_ROVER_CONFIG} from './vehicle-config.js?v=1';
 import {stepAutomaticPowertrain} from './automatic-powertrain.js';
 
 // One planar driving calculation for player vehicles and controller-driven race

@@ -1309,7 +1309,7 @@ function releaseDetailedTrafficVehicle(state, vehicle) {
 
 function attachCuratedTrafficDetail(state, vehicle) {
   if (!vehicle?.visual?.root || vehicle.serviceType === 'responder' || vehicle.playerClaimed) return false;
-  const assetId = CURATED_TRAFFIC_ASSET_BY_VARIANT[String(vehicle.variant?.id || '')];
+  const assetId = vehicle.assetId || CURATED_TRAFFIC_ASSET_BY_VARIANT[String(vehicle.variant?.id || '')];
   if (!assetId) return false;
   const root = vehicle.visual.root;
   void attachCuratedTrafficVehicle(THREE, root, {
@@ -3425,7 +3425,7 @@ function startUrbanSandboxRuntime(options = {}) {
   state.personalVehicles=createPersonalVehicleRuntime({context:appCtx,state,isCurrent:()=>activeWorldMatches(state),
     async prepare(definition,record,spawn,controls){
       const variant=VEHICLE_CATALOG.find(v=>v.id===definition.variantId);
-      const vehicle={id:`personal:${getCurrentUser()?.uid||'device'}:${definition.id}`,personalVehicleId:definition.id,
+      const vehicle={id:`personal:${getCurrentUser()?.uid||'device'}:${definition.id}`,personalVehicleId:definition.id,assetId:definition.assetId,
         vehicleIdentity:personalVehicleIdentity(definition.id),variant,color:variant.color,condition:record.condition,
         durabilityPolicy:variant.durabilityPolicy,resistance:variant.resistance,driverSide:state.driveOnLeft?1:-1,
         x:spawn.x,y:spawn.carY,z:spawn.z,yaw:spawn.angle,attachedToPlayer:false,occupied:false,source:'personal-garage'};

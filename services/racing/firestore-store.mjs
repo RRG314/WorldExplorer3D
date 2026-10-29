@@ -1,6 +1,6 @@
 import {Timestamp} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
-import {createRaceVehicleProfile,normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById,
+import {createRaceVehicleProfile,raceVehicleWorldPose,normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById,
  raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,RACE_PHYSICS_VERSION,prepareExplorerCreditAward,racingCareerContext} from './generated/engine.mjs';
 import {digest} from './authority.mjs';
 const time=v=>v?.toMillis?.()??0;
@@ -88,7 +88,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    }
    const until=nowMs+15000,expiresAt=ts(until),snapshot=race.session.snapshot();
    tx.update(lock(race),{expiresAt,updatedAt:ts(nowMs)});
-   for(const [uid,p,car]of rows){const pose=snapshot.players.find(row=>row.uid===uid)?.pose||car.pose;
+   for(const [uid,p,car]of rows){const pose=raceVehicleWorldPose(snapshot.players.find(row=>row.uid===uid))||car.pose;
     tx.update(entity(race,uid,p.vehicleId),{raceCustody:{id:race.id,instanceId,expiresAt},leaseExpiresAt:expiresAt,pose,updatedAt:ts(nowMs)});
     tx.set(user(uid).collection('gameplay').doc('vehicleUpgrades'),{raceReservation:{id:race.id,instanceId,expiresAt}},{merge:true});}
    return {leaseUntil:until};
@@ -100,7 +100,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    const ref=entity(race,uid,p.vehicleId),progressRef=user(uid).collection('gameplay').doc('vehicleUpgrades');
    const [es,gs]=await Promise.all([tx.get(ref),tx.get(progressRef)]),saved=value(es),progress=value(gs);
    if(saved?.raceCustody?.id!==race.id||saved.raceCustody.instanceId!==instanceId)return;
-   const pose=race.session?.snapshot().players.find(row=>row.uid===uid)?.pose||saved.pose;
+   const pose=raceVehicleWorldPose(race.session?.snapshot().players.find(row=>row.uid===uid))||saved.pose;
    tx.update(ref,{raceCustody:null,pose,leaseExpiresAt:ts(nowMs+15000),updatedAt:ts(nowMs)});
    if(progress?.raceReservation?.id===race.id&&progress.raceReservation.instanceId===instanceId)tx.set(progressRef,{raceReservation:null},{merge:true});
   });

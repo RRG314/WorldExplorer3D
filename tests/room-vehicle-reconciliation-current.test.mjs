@@ -2,12 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {resolveControlState} from '../app/js/transport/control-state.js';
 import { publishedRoomVehicleDefinition, reconcilePublishedRoomVehicles } from '../app/js/urban-sandbox/room-vehicle-reconciliation.js';
 
 const entity = (id, x = 10) => ({
   entityId: id, kind: 'vehicle', style: 'van', label: 'Delivery van', color: 0x123456,
   pose: { x, y: 3, z: 0, yaw: .5, pitch: .1, roll: -.1 }, condition: .8,
   leaseOwnerUid: '', leaseExpiresMs: 0
+});
+test('shared personal identities resolve their registered models, including the default BMW',()=>{
+ const bmw=publishedRoomVehicleDefinition({...entity('personal:owner:bmw_e34'),label:'BMW 525i E34',style:'Personal sedan'});
+ assert.equal(bmw.personalVehicleId,'bmw_e34');assert.equal(bmw.assetId,'vehicle-bmw-525i-e34');
+ assert.equal(bmw.vehicleIdentity,'player-default:sedan');assert.equal(bmw.variant.id,'sedan');
+ const delorean=publishedRoomVehicleDefinition({...entity('personal:owner:delorean'),label:'DeLorean DMC-12',style:'sedan'});
+ assert.equal(delorean.variant.id,'delorean');assert.equal(delorean.assetId,'road-delorean-dmc12');
+ assert.equal(publishedRoomVehicleDefinition({...entity('personal:owner:unknown'),label:'Four-door sedan',style:'sedan'}),null);
+ assert.equal(publishedRoomVehicleDefinition({...entity('personal:owner:delorean'),label:'Four-door sedan',style:'sedan'}),null);
+ assert.equal(publishedRoomVehicleDefinition({...entity('personal:bmw_e34'),label:'BMW 525i E34',style:'Personal sedan'}),null);
 });
 function harness(rows = [entity('shared')], budget = 4) {
   const state = { vehicles: [], remoteEntities: new Map(rows.map(row => [row.entityId, row])), budget, driveOnLeft: true };
@@ -86,8 +97,8 @@ test('the real room update reconciles unseeded cars and applies their occupied l
   // Isolate Firebase subscription setup while retaining the actual runtime's
   // update/lease code. The supplied map represents a committed server snapshot.
   const filename = process.env.WE3D_ROOM_AUTHORITY_SOURCE || new URL('../app/js/urban-sandbox/room-authority-runtime.js', import.meta.url);
-  const source = fs.readFileSync(filename, 'utf8').replace(/^import .*;\n/m, '').replace(/^export \{.*\};?$/m, '');
-  const context = { appCtx: { getCurrentMultiplayerRoom: () => null }, Date, Map, Set, Object, Math,
+  const source = fs.readFileSync(filename, 'utf8').replace(/^import .*;\n/gm, '').replace(/^export \{.*\};?$/m, '');
+  const context = { appCtx: { getCurrentMultiplayerRoom: () => null }, resolveControlState, Date, Map, Set, Object, Math,
     addEventListener() {}, removeEventListener() {}, setInterval, clearInterval };
   vm.createContext(context); vm.runInContext(source, context);
   const runtime = context.createUrbanRoomAuthorityRuntime({
@@ -106,8 +117,8 @@ test('rejected lease restores the last server pose after exit without needing an
   const vehicle = h.state.vehicles[0]; vehicle.x = 100;
   let room = null;
   const source = fs.readFileSync(new URL('../app/js/urban-sandbox/room-authority-runtime.js', import.meta.url), 'utf8')
-    .replace(/^import .*;\n/m, '').replace(/^export \{.*\};?$/m, '');
-  const context = { appCtx: { car: {}, getCurrentMultiplayerRoom: () => room }, Date, Map, Set, Object, Math,
+    .replace(/^import .*;\n/gm, '').replace(/^export \{.*\};?$/m, '');
+  const context = { appCtx: { car: {}, getCurrentMultiplayerRoom: () => room }, resolveControlState, Date, Map, Set, Object, Math,
     addEventListener() {}, removeEventListener() {}, setInterval: () => 1, clearInterval() {} };
   vm.createContext(context); vm.runInContext(source, context);
   const runtime = context.createUrbanRoomAuthorityRuntime({
