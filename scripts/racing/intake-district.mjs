@@ -35,11 +35,11 @@ async function main(){
  const cli=createRequire(path.join(execFileSync('npm',['root','-g'],{encoding:'utf8'}).trim(),'firebase-tools/package.json'));
  const {requireAuth}=cli('./lib/requireAuth'),auth=cli('./lib/auth'),{getAccessToken}=cli('./lib/apiv2');
  const account=auth.getGlobalDefaultAccount();if(!account)throw Error('Sign in with the Firebase CLI first.');
- await requireAuth({project,account:account.user.email});
+ await requireAuth({project,user:account.user,tokens:account.tokens});
  // Firestore's Admin wrapper requires certificate/default credentials. Use
  // the supported OAuth client instead of presenting CLI tokens as a custom
  // Admin credential. Refresh remains owned by the already signed-in CLI.
- const runtime=createRequire(new URL('../../functions/package.json',import.meta.url)),{Firestore,Timestamp}=runtime('@google-cloud/firestore'),{OAuth2Client}=runtime('google-auth-library');
+ const runtime=createRequire(new URL('../../services/racing/package.json',import.meta.url)),{Firestore,Timestamp}=runtime('@google-cloud/firestore'),{OAuth2Client}=runtime('google-auth-library');
  const oauth=new OAuth2Client({quotaProjectId:project});oauth.refreshHandler=async()=>({access_token:await getAccessToken(),expiry_date:Date.now()+3600000});
  const db=new Firestore({projectId:project,authClient:oauth});
  try{await db.runTransaction(async tx=>{

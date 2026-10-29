@@ -15,7 +15,10 @@ export function createRaceConnection({uid,endpoint,credentials,join,isCurrent,We
  }
  async function connect(){
   if(!active()||connecting||now()<nextAttempt)return;
-  connecting=true;const request=++revision;
+  // Frames keep pumping while Auth/App Check refresh over the network. Own
+  // that wait before yielding; an old/zero deadline otherwise cancels the
+  // credential request on the next frame, before a socket can even open.
+  connecting=true;nextAttempt=now()+10000;const request=++revision;
   try {
    const identity=await credentials();if(!active()||request!==revision)return;
    const ws=new WebSocketClass(url.href);socket=ws;

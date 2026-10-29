@@ -117,6 +117,14 @@
       }
     ],
     "rewrites": [
+      {"source":"/getRacingService","function":"getRacingService"},
+      {"source":"/getRacingRecords","function":"getRacingRecords"},
+      {"source":"/getRacingCatalog","function":"getRacingCatalog"},
+      {"source":"/getMyRacingRoutes","function":"getMyRacingRoutes"},
+      {"source":"/commitRacingRoute","function":"commitRacingRoute"},
+      {"source":"/reviewRacingRoutes","function":"reviewRacingRoutes"},
+      {"source":"/getRacingCareer","function":"getRacingCareer"},
+      {"source":"/commitRacingCareer","function":"commitRacingCareer"},
       {"source":"/manageAppTesters","function":"manageAppTesters"},
       {"source":"/appTesterEmailWebhook","function":"appTesterEmailWebhook"},
       {

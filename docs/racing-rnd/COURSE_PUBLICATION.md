@@ -65,3 +65,5 @@ as one compatible candidate. A source/component test is not live-service, actual
 city, hardware or professional race-venue acceptance. Existing local city routes
 and researched venue references do not become complete major-track packs merely
 by being listed in this workflow.
+
+Operator intake uses the pinned racing-service dependencies (`npm ci --prefix services/racing`). Its OAuth-backed Firestore client and the Firebase CLI account/tokens are explicit; no application-default credential or service-account key file is required. Same-origin Hosting routes cover every racing browser endpoint.

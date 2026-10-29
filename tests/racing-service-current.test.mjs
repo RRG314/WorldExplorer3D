@@ -15,6 +15,28 @@ const require=createRequire(new URL('../services/racing/package.json',import.met
 const course=createRaceCourse(buildRaceRoadGraph([{sourceId:'controlled-road',a:{x:0,y:0,z:0},b:{x:0,y:0,z:250},widthMeters:8,driveable:true,supported:true}]),['controlled-road:forward'],{locationId:'controlled',locationLabel:'Controlled road',anchor:{lat:43,lon:7},participants:4});
 const courseId=await raceCourseKey(course),profile=createRaceVehicleProfile('bmw_e34');
 const turn=()=>new Promise(resolve=>setImmediate(resolve));
+test('credential acquisition keeps its deadline while frames pump and cannot open after owner replacement',async()=>{
+ let clock=1700000000000,release,owner=true;const identity=new Promise(resolve=>release=resolve),errors=[],sockets=[];
+ class Socket extends EventTarget{constructor(){super();this.readyState=0;sockets.push(this);}close(){this.readyState=3;}send(){}}
+ const connection=createRaceConnection({uid:'driver',endpoint:'wss://example.test/race',credentials:()=>identity,join:{courseId},now:()=>clock,isCurrent:()=>owner,WebSocketClass:Socket,onError:r=>errors.push(r)});
+ const pending=connection.connect();
+ try{
+  for(let i=0;i<20;i++){clock+=16;connection.pump();}
+  assert.deepEqual(errors,[],'ordinary frames must not expire credentials before their deadline');
+  release({idToken:'controlled',appCheckToken:'controlled'});await pending;assert.equal(sockets.length,1);
+  owner=false;connection.pump();assert.equal(sockets[0].readyState,3);
+ }finally{release({idToken:'controlled',appCheckToken:'controlled'});await pending;connection.stop();}
+});
+test('obsolete credential requests cannot open sockets after expiry or disposal',async()=>{
+ for(const cancel of ['owner','deadline']){
+  let clock=1700000000000,release,owner=true;const identity=new Promise(resolve=>release=resolve),errors=[],sockets=[];
+  class Socket{constructor(){sockets.push(this);}close(){}}
+  const connection=createRaceConnection({uid:'driver',endpoint:'wss://example.test/race',credentials:()=>identity,join:{courseId},now:()=>clock,isCurrent:()=>owner,WebSocketClass:Socket,onError:r=>errors.push(r)}),pending=connection.connect();
+  if(cancel==='owner'){owner=false;connection.pump();}
+  else{for(let i=0;i<6;i++){clock+=10001;connection.pump();}assert.deepEqual(errors,['race_reconnect_expired']);}
+  release({idToken:'controlled',appCheckToken:'controlled'});await pending;await turn();assert.equal(sockets.length,0);connection.stop();
+ }
+});
 test('shared grid-to-finish classes separate rear rows and changed grid lengths while preserving practice configuration',()=>{
  const front=raceCompetitiveRecordConfiguration(profile,{slot:0,participants:4});
  assert.deepEqual(front,raceCompetitiveRecordConfiguration(profile,{slot:1,participants:4}));
