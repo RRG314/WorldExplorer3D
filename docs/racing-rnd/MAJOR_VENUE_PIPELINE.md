@@ -138,6 +138,48 @@ using its hash-matching captured raw response. The ODbL attribution and recipe
 are in `app/assets/racing/ATTRIBUTION.md`. No official map or venue artwork is
 included; factual source intake does not certify a finished playable venue.
 
+## Rheinland-Pfalz ground source adapter
+
+`config/racing-venues/nordschleife-ground.json` pins 56 original one-kilometre
+[government DGM1 tiles](https://geobasis-rlp.de/data/dgm1/current/tif/), their
+individual byte lengths and SHA-256 digests. The retained file-year is 2025;
+it is not a claim that every tile was flown in 2025. The [provider's product
+description](https://lvermgeo.rlp.de/fileadmin/lvermgeo/pdf/produktblaetter/DGM.pdf)
+specifies ETRS89/UTM32 with DHHN2016 heights and excludes bridge decks.
+[DL-DE-BY 2.0](https://www.govdata.de/dl-de/by-2-0) permits attributed use and
+adaptation; processing and source attribution must remain identified.
+
+The offline adapter `scripts/build-rlp-venue-ground.mjs` checks all pinned inputs,
+uses at most twelve decoded source tiles (48 MB of heights), and interpolates
+through actual adjacent pixel centres across file boundaries. It rejects missing
+contributors, wrong CRS, moved grids and malformed sources. Compact patch planning
+reuses the existing global ground grid without allocating millions of per-point
+JavaScript objects. The England builder keeps its existing grid/coverage behavior
+and now uses this compact option for its fine source preparation too.
+
+The existing pinned coordinate preparer accepts an explicit source CRS, retaining
+its England default. For this source it requires the open [GCG2016 grid](https://cdn.proj.org/de_bkg_README.txt)
+and the existing EGM2008 grid, with network and approximate fallback transformations
+disabled. The selected operation's stated 8.1 m accuracy is recorded separately
+from native source detail and centimetre delivery precision. GCG2016 is attributed
+to BKG under CC BY 4.0. Do not silently use a different vertical datum.
+
+Four bounded adjoining patches are planned for the full mapped loop and its
+surroundings. The same accepted-ground compiler must accept every output before
+catalogue admission. Source capture and processor checks do not establish a bridge
+survey, a qualified road surface, a released Nordschleife pack or gameplay quality.
+
+```sh
+WE3D_DATUM_PYTHON=/path/to/pinned/python node scripts/build-rlp-venue-ground.mjs \
+  --config=config/racing-venues/nordschleife-ground.json \
+  --data-dir=/path/to/captured-inputs --output-dir=/new/path/ground
+```
+
+An optional `--patch=ID` compiles one selected patch into a new output directory,
+allowing an interrupted part to be repaired without rebuilding accepted parts.
+Original rasters and failed outputs are retained outside Git. Supporting terrain
+artifacts alone must not enable an unqualified venue in the runtime registry.
+
 ## Reproduction
 
 Captured source inputs belong outside Git; store the raw EA rasters and pinned

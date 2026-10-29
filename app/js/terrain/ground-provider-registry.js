@@ -2,6 +2,20 @@ export const GROUND_ARTIFACT_SCHEMA_VERSION = 1;
 export const GROUND_TARGET_VERTICAL_DATUM = 'EGM2008';
 
 const PROVIDERS = Object.freeze({
+  'rlp-lidar-dgm1': Object.freeze({
+    id: 'rlp-lidar-dgm1',
+    label: 'Rheinland-Pfalz DGM1 bare-earth LIDAR terrain',
+    sourceKind: 'bare-earth-dem',
+    sourceClassification: 'accepted-ground',
+    nativeVerticalDatum: 'DHHN2016 height (EPSG:7837); artifact transformed to EGM2008',
+    nominalResolutionMeters: 1,
+    coverage: 'Rheinland-Pfalz; artifact coverage manifest required; bridge decks excluded from source',
+    licenseStatus: 'dl-de-by-2.0-with-attribution',
+    runtimeDelivery: 'precompiled-artifact-only',
+    priority: 100,
+    sourceDocument: 'https://lvermgeo.rlp.de/geodaten-geoshop/open-data/',
+    datumDocument: 'https://cdn.proj.org/de_bkg_README.txt'
+  }),
   'ea-lidar-composite-dtm-2022': Object.freeze({
     id: 'ea-lidar-composite-dtm-2022',
     label: 'Environment Agency LIDAR Composite 2022 bare-earth DTM',

@@ -1,28 +1,31 @@
-import json,math,pathlib,pyproj,struct,sys
+import json,math,pathlib,pyproj,struct,sys,re
 from pyproj.transformer import TransformerGroup
 from pyproj.aoi import AreaOfInterest
 base=pathlib.Path(sys.argv[1])
+output_base=pathlib.Path(sys.argv[3]) if len(sys.argv)>3 else base
 pyproj.datadir.append_data_dir(str((base/'grids').resolve()))
 plan=json.load(open(sys.argv[2])) if len(sys.argv)>2 else None
 coverage=plan['coverage'] if plan else {'west':-.17,'south':51.48,'east':-.09,'north':51.54}
-g=TransformerGroup('EPSG:9056+3855','EPSG:7405',always_xy=True,area_of_interest=AreaOfInterest(coverage['west'],coverage['south'],coverage['east'],coverage['north']),allow_ballpark=False)
+target_crs=plan.get('targetCrs','EPSG:7405') if plan else 'EPSG:7405'
+assert re.fullmatch(r'EPSG:\d+(?:\+\d+)?',target_crs), 'Declared source CRS required'
+g=TransformerGroup('EPSG:9056+3855',target_crs,always_xy=True,area_of_interest=AreaOfInterest(coverage['west'],coverage['south'],coverage['east'],coverage['north']),allow_ballpark=False)
 assert pyproj.__version__ == '3.7.2' and pyproj.proj_version_str == '9.5.1', 'Pinned PROJ runtime required'
 assert g.best_available and len(g.transformers)==1, 'Exact non-ballpark datum grids required'
 tr=g.transformers[0]
-metadata={'source':'EPSG:9056+3855','target':'EPSG:7405','definition':tr.definition,'description':tr.description,'accuracyMeters':tr.accuracy,'pyprojVersion':pyproj.__version__,'projVersion':pyproj.proj_version_str}
+metadata={'source':'EPSG:9056+3855','target':target_crs,'definition':tr.definition,'description':tr.description,'accuracyMeters':tr.accuracy,'pyprojVersion':pyproj.__version__,'projVersion':pyproj.proj_version_str}
 if plan:
  grid=plan['grid'];spacing=grid['spacingMeters'];radius=6378137
  count=(grid['maxColumn']-grid['minColumn']+1)*(grid['maxRow']-grid['minRow']+1)
  assert 0<count<=1500000, 'Bounded venue ground grid required'
  # Row-major triples avoid a JSON object for each fine-resolution point. The
  # resulting elevations still enter the existing accepted-ground compiler.
- with (base/(plan['id']+'.coordinates.f64')).open('wb') as output:
+ with (output_base/(plan['id']+'.coordinates.f64')).open('wb') as output:
   longitudes=[math.degrees(column*spacing/radius) for column in range(grid['minColumn'],grid['maxColumn']+1)]
   for row in range(grid['minRow'],grid['maxRow']+1):
    latitude=math.degrees(2*math.atan(math.exp(row*spacing/radius))-math.pi/2)
    east,north,offset=tr.transform(longitudes,[latitude]*len(longitudes),[0]*len(longitudes),errcheck=True)
    for values in zip(east,north,offset):output.write(struct.pack('<ddd',*values))
- (base/(plan['id']+'.transform.json')).write_text(json.dumps(metadata,indent=2)+'\n')
+ (output_base/(plan['id']+'.transform.json')).write_text(json.dumps(metadata,indent=2)+'\n')
  print(json.dumps({'id':plan['id'],'samples':count,'accuracyMeters':tr.accuracy}))
  sys.exit(0)
 a=json.load(open('app/assets/ground/london/ground-artifact.json'));spacing=a['grid']['spacingMeters'];radius=6378137

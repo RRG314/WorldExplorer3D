@@ -26,7 +26,7 @@ const manifests=[];
 for(const patch of config.patches){
  const rasterBytes=await fs.readFile(path.join(dataDir,patch.raster.filename));
  if(rasterBytes.length!==patch.raster.bytes||hash(rasterBytes)!==patch.raster.sha256)throw Error('ea_raster_integrity');
- const plan=createGroundBuildPlan({...patch,districtId:patch.id,maxSamples:1500000});
+ const plan=createGroundBuildPlan({...patch,districtId:patch.id,maxSamples:1500000,includePoints:false});
  if(plan.parts.length!==1)throw Error('ea_venue_grid_must_not_cross_antimeridian');
  const part=plan.parts[0],grid=part.grid,coordinatePlan={id:patch.id,grid,coverage:part.coverage};
  const coordinatePlanPath=path.join(dataDir,patch.id+'.plan.json');
