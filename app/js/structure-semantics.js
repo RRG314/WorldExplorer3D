@@ -674,7 +674,7 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const profileDistance = profileTotal * distanceRatio;
     const model = feature.transportSurfaceModel || null;
     const atGrade = feature.structureSemantics?.terrainMode === 'at_grade';
-    const terrainDraped = atGrade && model?.engineeredApproach !== true;
+    const terrainDraped = atGrade && model?.engineeredApproach !== true && !model?.surveyedSurface;
     const terrainY = Number(sampleTerrainY(point.x, point.z));
     const surfaceOffset = feature.surfaceOffsets instanceof Float32Array ?
       Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceOffsets, profileDistance)) || 0 :

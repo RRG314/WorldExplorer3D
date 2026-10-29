@@ -1087,6 +1087,8 @@ module.exports = __toCommonJS(engine_entry_exports);
 
 // app/js/racing/course-rules.js
 var RACE_COURSE_VERSION = 1;
+var RACE_MAX_ROUTE_EDGES = 1024;
+var RACE_MINIMUM_SPAN_METERS = 0.5;
 var RACE_DISCIPLINES = Object.freeze(["sprint", "circuit", "time-trial"]);
 var finitePoint = (p) => p && ["x", "y", "z"].every((k) => Number.isFinite(p[k]));
 var distance = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
@@ -1159,16 +1161,17 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
     };
     if (!road?.sourceId || !finitePoint(road.a) || !finitePoint(road.b) || road.driveable !== true || road.supported !== true) continue;
     const length = distance(road.a, road.b) * metersPerUnit, width = Number(road.widthMeters);
-    if (length < 2 || !Number.isFinite(width) || width < minimumWidth || Math.abs(road.b.y - road.a.y) * metersPerUnit / length > maximumGrade) continue;
+    if (length < RACE_MINIMUM_SPAN_METERS || !Number.isFinite(width) || width < minimumWidth || Math.abs(road.b.y - road.a.y) * metersPerUnit / length > maximumGrade) continue;
     if (road.blocked === true || road.structure === "tunnel" && !(road.clearanceMeters >= 2.5)) continue;
     const from = node(road.a, String(road.a.connectionLayer || "road")), to = node(road.b, String(road.b.connectionLayer || "road"));
+    if (from === to) continue;
     if (road.direction !== "reverse") add(from, to, false);
     if (road.direction !== "forward") add(to, from, true);
   }
   return { version: RACE_COURSE_VERSION, metersPerUnit, nodes, edges, outgoing };
 }
 function createRaceCourse(graph, path, settings = {}) {
-  if (!Array.isArray(path) || path.length < 1 || path.length > 500) throw Error("invalid_race_route");
+  if (!Array.isArray(path) || path.length < 1 || path.length > RACE_MAX_ROUTE_EDGES) throw Error("invalid_race_route");
   const byId = new Map(graph.edges.map((e) => [e.id, e])), edges = path.map((id) => byId.get(id));
   if (edges.some((e) => !e)) throw Error("race_road_missing");
   const discipline = settings.discipline || "sprint";
@@ -3166,7 +3169,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
 
 // app/js/racing/course-library.js
 function normalizeRaceRouteReference(value) {
-  if (!value || value.version !== 1 || !/^race-district:[a-f0-9]{64}$/.test(value.districtFingerprint) || !Array.isArray(value.path) || value.path.length < 1 || value.path.length > 500 || value.path.some((id) => typeof id !== "string" || id.length > 190) || !RACE_DISCIPLINES.includes(value.discipline) || !Number.isInteger(value.laps) || value.laps < 1 || value.laps > 8 || !Number.isInteger(value.participants) || value.participants < 1 || value.participants > 4) throw Error("invalid_saved_race_route");
+  if (!value || value.version !== 1 || !/^race-district:[a-f0-9]{64}$/.test(value.districtFingerprint) || !Array.isArray(value.path) || value.path.length < 1 || value.path.length > RACE_MAX_ROUTE_EDGES || value.path.some((id) => typeof id !== "string" || id.length > 190) || !RACE_DISCIPLINES.includes(value.discipline) || !Number.isInteger(value.laps) || value.laps < 1 || value.laps > 8 || !Number.isInteger(value.participants) || value.participants < 1 || value.participants > 4) throw Error("invalid_saved_race_route");
   const offset = value.startOffsetMeters ?? null;
   if (offset !== null && (!Number.isFinite(offset) || offset <= 0)) throw Error("invalid_saved_race_route");
   return {

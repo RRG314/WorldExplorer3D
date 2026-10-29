@@ -4,15 +4,17 @@ import {roadMetersPerWorldUnit}from'../world/road-units.js';
 import {createBuildingCollisionQuery}from'../physics/building-collision.js?v=5';
 import {resolveTunnelSpace}from'../world/compiler/tunnel-space-query.js';
 import {drainCooperatively,yieldToWorldFrame}from'../world/cooperative-scheduling.js?v=1';
-import {buildRaceRoadGraph,createRaceCourse,shortestRacePath}from'./course-rules.js';
+import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
 // Read published world facts through their existing owners. Qualification never
 // replaces a road, runs a provider query, flattens terrain or changes residency.
-export async function collectRaceDistrict(context,{locationId,locationLabel,radiusWorld=270,current=()=>true,yieldWork=yieldToWorldFrame}={}){
+export async function collectRaceDistrict(context,{locationId,locationLabel,radiusWorld=270,sourceFeatureIds=null,current=()=>true,yieldWork=yieldToWorldFrame}={}){
  const publication=context.worldPublication,traversal=context.buildTraversalNetworks?.()?.drive;
  if(!publication?.requestId||context.worldLoading||!traversal?.segments||!context.SurfaceQuery?.driveAt||!context.sampleFeatureSurfaceY)throw Error('race_world_not_ready');
  const metersPerUnit=Number(context.METERS_PER_WORLD_UNIT)||1.11,envelope={width:2.35,length:6.5,height:2.4};
  const radius=Math.max(100,Math.min(1200,Number(radiusWorld)||270)),checkBuilding=createBuildingCollisionQuery(context),roads=[];
+ const selectedSources=sourceFeatureIds?new Set(sourceFeatureIds):null;
+ if(selectedSources&&(!selectedSources.size||selectedSources.size>500||[...selectedSources].some(id=>typeof id!=='string'||!id||id.length>180)))throw Error('invalid_race_source_selection');
  const diagnostics={sourceSegments:traversalSegmentCount(traversal.segments),eligible:0,rejected:{},sampledPositions:0};
  const rejected=reason=>{diagnostics.rejected[reason]=(diagnostics.rejected[reason]||0)+1;};
  const active=()=>current()&&context.worldPublication===publication&&!context.worldLoading;
@@ -26,8 +28,9 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    if(Math.max(Math.hypot(p1.x,p1.z),Math.hypot(p2.x,p2.z))>radius)continue;
    const length=Math.hypot(p2.x-p1.x,p2.z-p1.z)*metersPerUnit;
    const widthMeters=minimumRoadWidthOnInterval(feature,segIndex,sourceTStart,sourceTEnd)*roadMetersPerWorldUnit(feature);
-   if(length<2||widthMeters<6||!roadSegmentIsDriveable(feature,segIndex,sourceTStart,sourceTEnd)){rejected('width_or_access');yield;continue;}
+   if(length<RACE_MINIMUM_SPAN_METERS||widthMeters<6||!roadSegmentIsDriveable(feature,segIndex,sourceTStart,sourceTEnd)){rejected('width_or_access');yield;continue;}
    const sourceFeatureId=String(feature.transportRecord?.identity||feature.sourceFeatureId||feature.sourceRoadId||feature.id||'');
+   if(selectedSources&&!selectedSources.has(sourceFeatureId))continue;
    if(!sourceFeatureId){rejected('unstable_source');yield;continue;}
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';

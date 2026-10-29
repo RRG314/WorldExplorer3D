@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "pyprojVersion": "3.7.2",
+  "projVersion": "9.5.1",
+  "sourceVerticalRmseMeters": 0.15,
+  "attribution": "Environment Agency copyright and/or database right 2022. All rights reserved.",
+  "licenseDocument": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+  "grids": [
+    {
+      "url": "https://cdn.proj.org/uk_os_OSGM15_GB.tif",
+      "filename": "uk_os_OSGM15_GB.tif",
+      "bytes": 1540925,
+      "sha256": "bf0ac81f1c0c33332693d7d606f335b793c3c2995b8e69eeb1350bd94adcde3b"
+    },
+    {
+      "url": "https://cdn.proj.org/uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+      "filename": "uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+      "bytes": 3035814,
+      "sha256": "5d6ed64d2119952c4c559fa1fccbc594b6520fc3ec3ef2fc10be13202c4384fa"
+    },
+    {
+      "url": "https://cdn.proj.org/us_nga_egm08_25.tif",
+      "filename": "us_nga_egm08_25.tif",
+      "bytes": 80585622,
+      "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a"
+    }
+  ],
+  "venueId": "silverstone-grand-prix",
+  "sourceRelease": "EA-LIDAR-COMPOSITE-2022:DTM-1m",
+  "sourceDocument": "https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc",
+  "patches": [
+    {
+      "id": "silverstone-gp-fine-v1",
+      "centerLatitude": 52.0713,
+      "centerLongitude": -1.0168,
+      "widthMeters": 2400,
+      "heightMeters": 2400,
+      "spacingMeters": 4,
+      "raster": {
+        "filename": "silverstone-ea-dtm-1m.tif",
+        "bytes": 58721123,
+        "sha256": "fbc1fa4179b2fbd377d41e1206ae486de59ff290d9e598f6623acad95f3257f5",
+        "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&coverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&subset=E%28466000%2C469500%29&subset=N%28240000%2C244000%29&format=image%2Ftiff",
+        "downloadedAt": "2026-10-29T11:29:23Z",
+        "spacingMeters": 1
+      }
+    }
+  ]
+}

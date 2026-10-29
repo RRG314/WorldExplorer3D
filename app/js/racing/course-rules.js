@@ -1,6 +1,8 @@
 // Portable race-course facts and rules. The world compiler supplies road facts;
 // this module cannot invent pavement, change a building or move a transport.
 export const RACE_COURSE_VERSION=1;
+export const RACE_MAX_ROUTE_EDGES=1024;
+export const RACE_MINIMUM_SPAN_METERS=.5;
 export const RACE_DISCIPLINES=Object.freeze(['sprint','circuit','time-trial']);
 const finitePoint=p=>p&&['x','y','z'].every(k=>Number.isFinite(p[k]));
 const distance=(a,b)=>Math.hypot(b.x-a.x,b.z-a.z);
@@ -38,9 +40,10 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximum
  for(const road of roads){
   if(!road?.sourceId||!finitePoint(road.a)||!finitePoint(road.b)||road.driveable!==true||road.supported!==true)continue;
   const length=distance(road.a,road.b)*metersPerUnit,width=Number(road.widthMeters);
-  if(length<2||!Number.isFinite(width)||width<minimumWidth||Math.abs(road.b.y-road.a.y)*metersPerUnit/length>maximumGrade)continue;
+  if(length<RACE_MINIMUM_SPAN_METERS||!Number.isFinite(width)||width<minimumWidth||Math.abs(road.b.y-road.a.y)*metersPerUnit/length>maximumGrade)continue;
   if(road.blocked===true||(road.structure==='tunnel'&&!(road.clearanceMeters>=2.5)))continue;
   const from=node(road.a,String(road.a.connectionLayer||'road')),to=node(road.b,String(road.b.connectionLayer||'road'));
+  if(from===to)continue;
   function add(a,b,reverse){
    const heights=road.heightSamples;
    if(heights&&(!Array.isArray(heights)||heights.length<2||heights.length>250||heights.some((s,i)=>!Number.isFinite(s.t)||!Number.isFinite(s.y)||s.t<0||s.t>1||i>0&&s.t<=heights[i-1].t)||heights[0].t!==0||heights.at(-1).t!==1))throw Error('invalid_race_road_heights');
@@ -84,7 +87,7 @@ export function shortestRacePath(graph,start,finish,{excludedEdges=new Set()}={}
 }
 
 export function createRaceCourse(graph,path,settings={}){
- if(!Array.isArray(path)||path.length<1||path.length>500)throw Error('invalid_race_route');
+ if(!Array.isArray(path)||path.length<1||path.length>RACE_MAX_ROUTE_EDGES)throw Error('invalid_race_route');
  const byId=new Map(graph.edges.map(e=>[e.id,e])),edges=path.map(id=>byId.get(id));if(edges.some(e=>!e))throw Error('race_road_missing');
  const discipline=settings.discipline||'sprint';if(!RACE_DISCIPLINES.includes(discipline))throw Error('invalid_race_discipline');
  const closed=edges.at(-1).to===edges[0].from;

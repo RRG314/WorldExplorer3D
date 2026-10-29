@@ -293,6 +293,10 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const centerUpperBounds = allocate(Float64Array, sampleCount);
   const terrainEnvelope = allocate(Float32Array, sampleCount);
   const mode = semantics?.terrainMode || 'at_grade';
+  const surfaceSurvey=feature.surfaceSurveyEvidence||null;
+  if(surfaceSurvey&&(surfaceSurvey.version!==1||mode!=='at_grade'||engineeredApproach||
+    surfaceSurvey.sourceFeatureId!==String(feature.sourceFeatureId)||!surfaceSurvey.groundArtifactId||
+    !/^[a-f0-9]{64}$/.test(surfaceSurvey.groundContentSha256)||!(surfaceSurvey.maximumCrossfall>0&&surfaceSurvey.maximumCrossfall<=.7)))throw Error('invalid_reviewed_road_surface');
   const minimumStructureSurfaceY = Number(feature.minimumStructureSurfaceY);
   const maximumAtGradeCut = Math.max(
     0,
@@ -445,7 +449,7 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
         maximumGrade,
         allocate
       );
-  if(mode==='at_grade'&&!engineeredApproach){
+  if(mode==='at_grade'&&!engineeredApproach&&!surfaceSurvey){
     const ordinaryFit=fitOrdinaryStreetProfile(sampleDistances,centerHeights,[
       {distance:0,targetSurfaceY:endpointGroundStart+surfaceBias},
       {distance:total,targetSurfaceY:endpointGroundEnd+surfaceBias},
@@ -558,6 +562,13 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const rightHeights = edgeStorage.subarray(centerHeights.length);
   leftHeights.set(centerHeights);
   rightHeights.set(centerHeights);
+  if(surfaceSurvey){
+    for(let index=0;index<sampleCount;index++){
+      const leftDelta=leftGround[index]-groundHeights[index],rightDelta=rightGround[index]-groundHeights[index];
+      if(Math.max(Math.abs(leftDelta),Math.abs(rightDelta))/halfWidth>surfaceSurvey.maximumCrossfall)throw Error('reviewed_road_surface_crossfall_exceeded');
+      leftHeights[index]+=leftDelta;rightHeights[index]+=rightDelta;
+    }
+  }
 
   const stats = profileStats(
     sampleDistances,
@@ -571,6 +582,7 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     sourceFeatureId: String(feature.sourceFeatureId || feature.id || ''),
     terrainMode: mode,
     engineeredApproach,
+    surveyedSurface:surfaceSurvey?Object.freeze({...surfaceSurvey}):null,
     verticalGroup: String(semantics?.verticalGroup || `${mode}:0`),
     width: halfWidth * 2,
     surfaceBias,

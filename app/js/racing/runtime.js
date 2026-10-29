@@ -2,6 +2,7 @@ import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import {resolveControlState} from '../transport/control-state.js';
 import {collectRaceDistrict,recommendRaceCourses} from './world-course-source.js';
+import {buildVenueRaceCourses} from './venue-courses.js';
 import {createRaceCourse,shortestRacePath} from './course-rules.js';
 import {raceDistrictFingerprint,raceCourseReference,restoreRaceCourse,raceCourseKey} from './course-library.js';
 import {createRaceVehicleProfile} from './vehicle-controller.js';
@@ -24,7 +25,7 @@ import {racingServiceOptions,readRacingCatalog,commitRacingRoute} from './servic
 import {assertRaceCourseInDistrict,reconstructPublishedRace,rebaseRaceReference} from './publication-rules.js';
 import {releaseRoadRaceMotion} from '../physics/road-race-delegate.js';
 const formatTime=ms=>Number.isFinite(ms)?`${Math.floor(ms/60000)}:${((ms%60000)/1000).toFixed(2).padStart(5,'0')}`:'—';
-const messages={no_qualified_racing_roads:'No supported racing district is ready here. Continue loading nearby roads or choose another destination.',
+const messages={race_venue_surface_incomplete:'The full circuit surface could not be verified. Return to exploration or try this location again.',race_venue_direction_unavailable:'This circuit’s driving direction could not be verified. Return to exploration.',no_qualified_racing_roads:'No supported racing district is ready here. Continue loading nearby roads or choose another destination.',
  no_qualified_race_route:'These roads do not yet form a safe race route. Choose another location or create a route on the map.',race_route_length:'Use a connected route between 200 m and 8 km.',
  race_grid_has_no_clearance:'Start on a longer, wider straight so the grid fits.',race_turn_too_sharp:'That route contains a turn too tight for the starting grid. Choose another approach.',
  disconnected_race_route:'Those junctions are not connected by a qualified driving route.',race_circuit_not_closed:'Add a route back to the start for a circuit.',
@@ -160,7 +161,9 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   busy=true;status('Checking roads…');render();
   try {
    if(!c.gameStarted||resolveControlState(c).frame!=='surface')throw Error('race_world_changed');
-   const facts=await collectRaceDistrict(c,{current});const derived=recommendRaceCourses(facts),hash=await raceDistrictFingerprint(facts);
+   const venue=c.worldLoadRuntimeState?.venuePack;
+   const facts=await collectRaceDistrict(c,{current,...(venue?{radiusWorld:venue.qualificationRadiusWorld,sourceFeatureIds:venue.sourceFeatureIds}:{})});
+   const derived=venue?buildVenueRaceCourses(facts,venue):recommendRaceCourses(facts),hash=await raceDistrictFingerprint(facts);
    if(!current())throw Error('race_world_changed');district=facts;graph=derived.graph;events=derived.events;routeDiagnostics=derived.diagnostics;fingerprint=hash;selected=0;
    for(const saved of listStoredActivities().filter(a=>a.raceRoute&&a.locationLabel===facts.locationLabel))try{events.push(restoreRaceCourse(saved.raceRoute,district,graph,hash));}catch{/* Kept in the library for explicit recovery; never silently remap it. */}
    const nodeSelect=el('[data-race-node]');

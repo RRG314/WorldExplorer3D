@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "venueId": "silverstone-grand-prix",
+  "source": {
+    "provider": "OpenStreetMap via Overpass",
+    "endpoint": "https://overpass-api.de/api/interpreter",
+    "query": "[out:json][timeout:45];way[highway=raceway](52.055,-1.04,52.09,-0.99);out meta geom;",
+    "coverage": {
+      "south": 52.055,
+      "west": -1.04,
+      "north": 52.09,
+      "east": -0.99
+    },
+    "responseSha256": "8b201638209894ac56c4f065fbc9338f816b43ccc2636d16dd5ffdb035294554"
+  },
+  "layout": {
+    "name": "Silverstone \u00b7 Grand Prix circuit",
+    "closed": true,
+    "wayIds": [
+      55224167,
+      169854842,
+      169800226,
+      169800223,
+      169800225,
+      169848882,
+      169800224,
+      169800222,
+      169618242,
+      169618240,
+      169618241,
+      169618245,
+      169609611,
+      169730588,
+      3571477,
+      169730585,
+      169730587,
+      169733768,
+      169730586,
+      430075118,
+      169733766,
+      169733769,
+      169733770,
+      169848880,
+      169848884,
+      169848881,
+      55224168
+    ],
+    "referenceLengthMeters": 5891,
+    "referenceUrl": "https://www.formula1.com/en/racing/2026/great-britain",
+    "usableWidthMeters": 12,
+    "widthReferenceUrl": "https://api.fia.com/sites/default/files/circuits_fia20250707.pdf",
+    "widthNote": "Conservative authored usable corridor from the published reference width; not a claim of a uniform measured pavement boundary. Original mapped width tags remain intact.",
+    "timingNote": "World Explorer timing line on Hamilton Straight; records are game times, not official circuit or series records."
+  }
+}

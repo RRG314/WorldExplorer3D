@@ -4,6 +4,11 @@ Owner instruction, October 28, 2026: finish the product against a fixed end goal
 do not wait for hardware the owner does not have. No purchases or production
 deployment before the release candidate is accepted.
 
+Owner confirmation, October 29: wait for the major-track packs as well. The
+accepted city-road release candidate does not reduce this finish goal. Complete
+the balanced circuit, oval and rally coverage in `RACE_VENUE_COVERAGE.md` before
+calling this release ready; researched catalogue entries do not count as packs.
+
 The finish line is one versioned release candidate, with these outcomes checked
 once on the final affected paths. A failed check is repaired and rechecked at its
 failure boundary; it does not restart the whole release sequence.

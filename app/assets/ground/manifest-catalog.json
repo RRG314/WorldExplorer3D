@@ -1927,6 +1927,92 @@
     },
     {
       "schemaVersion": 1,
+      "artifactId": "silverstone-gp-fine-v1",
+      "providerId": "ea-lidar-composite-dtm-2022",
+      "sourceRelease": "EA-LIDAR-COMPOSITE-2022:DTM-1m",
+      "contentSha256": "1b1f66af6f8bcbd9db84abe0b123d69bb016955d06afcb55d2a0aee782c306bd",
+      "spacingMeters": 4,
+      "coverage": {
+        "south": 52.06049982714078,
+        "north": 52.08207890039975,
+        "west": -1.0343561507465893,
+        "east": -0.9992499894432285
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "bare-earth-dtm",
+        "sourceCrs": "EPSG:7405",
+        "targetCrs": "EPSG:9056+3855",
+        "sourceConfigurationSha256": "022f4296b11c549b1edd9b783da42824604db49bb2f11c016137965274409f75",
+        "raster": {
+          "filename": "silverstone-ea-dtm-1m.tif",
+          "bytes": 58721123,
+          "sha256": "fbc1fa4179b2fbd377d41e1206ae486de59ff290d9e598f6623acad95f3257f5",
+          "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&coverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&subset=E%28466000%2C469500%29&subset=N%28240000%2C244000%29&format=image%2Ftiff",
+          "downloadedAt": "2026-10-29T11:29:23Z",
+          "spacingMeters": 1
+        },
+        "rasterMetadata": {
+          "origin": [
+            466000,
+            244000
+          ],
+          "resolution": [
+            1,
+            -1
+          ],
+          "width": 3500,
+          "height": 4000,
+          "nodata": -3.4028234663852886e+38
+        },
+        "resampling": "bilinear at native pixel centres; every contributing pixel required; no nodata fill",
+        "quantization": {
+          "scaleMeters": 0.01,
+          "maximumErrorMeters": 0.004999997336057049
+        },
+        "normalization": {
+          "source": "EPSG:9056+3855",
+          "target": "EPSG:7405",
+          "definition": "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad step proj=vgridshift grids=us_nga_egm08_25.tif multiplier=1 step inv proj=vgridshift grids=uk_os_OSGM15_GB.tif multiplier=1 step inv proj=hgridshift grids=uk_os_OSTN15_NTv2_OSGBtoETRS.tif step proj=tmerc lat_0=49 lon_0=-2 k=0.9996012717 x_0=400000 y_0=-100000 ellps=airy",
+          "description": "axis order change (2D) + Inverse of WGS 84 to EGM2008 height (1) using WGS 84 to WGS 84 (G1674) + Inverse of WGS 84 to WGS 84 (G1674) + Inverse of ETRS89 to WGS 84 (1) + ETRS89 to ODN height (2) + Inverse of OSGB36 to ETRS89 (2) + British National Grid",
+          "accuracyMeters": 8.038,
+          "pyprojVersion": "3.7.2",
+          "projVersion": "9.5.1",
+          "grids": [
+            {
+              "url": "https://cdn.proj.org/uk_os_OSGM15_GB.tif",
+              "filename": "uk_os_OSGM15_GB.tif",
+              "bytes": 1540925,
+              "sha256": "bf0ac81f1c0c33332693d7d606f335b793c3c2995b8e69eeb1350bd94adcde3b"
+            },
+            {
+              "url": "https://cdn.proj.org/uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+              "filename": "uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+              "bytes": 3035814,
+              "sha256": "5d6ed64d2119952c4c559fa1fccbc594b6520fc3ec3ef2fc10be13202c4384fa"
+            },
+            {
+              "url": "https://cdn.proj.org/us_nga_egm08_25.tif",
+              "filename": "us_nga_egm08_25.tif",
+              "bytes": 80585622,
+              "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a"
+            }
+          ]
+        },
+        "sourceVerticalRmseMeters": 0.15
+      },
+      "attribution": {
+        "notice": "Environment Agency copyright and/or database right 2022. All rights reserved.",
+        "licenseDocument": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+        "modified": true
+      },
+      "url": "./silverstone/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
       "artifactId": "svalbard-ground",
       "providerId": "copernicus-dem-classified-ground-v1",
       "sourceRelease": "COP-DEM-2021:GLO-30",

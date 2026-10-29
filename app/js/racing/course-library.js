@@ -1,7 +1,7 @@
-import {createRaceCourse,RACE_DISCIPLINES} from './course-rules.js';
+import {createRaceCourse,RACE_DISCIPLINES,RACE_MAX_ROUTE_EDGES} from './course-rules.js';
 export function normalizeRaceRouteReference(value) {
  if(!value||value.version!==1||!/^race-district:[a-f0-9]{64}$/.test(value.districtFingerprint)||
-  !Array.isArray(value.path)||value.path.length<1||value.path.length>500||value.path.some(id=>typeof id!=='string'||id.length>190)||
+  !Array.isArray(value.path)||value.path.length<1||value.path.length>RACE_MAX_ROUTE_EDGES||value.path.some(id=>typeof id!=='string'||id.length>190)||
   !RACE_DISCIPLINES.includes(value.discipline)||!Number.isInteger(value.laps)||value.laps<1||value.laps>8||
   !Number.isInteger(value.participants)||value.participants<1||value.participants>4)throw Error('invalid_saved_race_route');
  const offset=value.startOffsetMeters??null;if(offset!==null&&(!Number.isFinite(offset)||offset<=0))throw Error('invalid_saved_race_route');

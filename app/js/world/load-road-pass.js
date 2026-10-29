@@ -1,4 +1,5 @@
 import {publishedRoadSourceTopology} from './road-source-topology.js';
+import {roadSourceSurvey} from './road-source-survey.js';
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {roadDimensionsFromSource} from './road-units.js';
 import {streetScaleForWorld} from './compiler/street-frontage-policy.js';
@@ -87,7 +88,8 @@ export async function buildRoadGeometryPass(options = {}) {
       subtype: type
     });
     const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
-    const transportRecord = normalizeTransportSource({
+    const survey=roadSourceSurvey(way);
+    const sourceRecord = normalizeTransportSource({
       sourceId: sourceFeatureId,
       id: way.id,
       type: 'way',
@@ -101,6 +103,11 @@ export async function buildRoadGeometryPass(options = {}) {
         ? 'shortbread-v1'
         : 'osm-overpass'
     }, way.tags || {});
+    // Retain OSM tags and their widths. A reviewed, conservative usable race
+    // corridor is a separate authoring fact, never a fabricated OSM width tag.
+    const transportRecord=survey?Object.freeze({...sourceRecord,
+      crossSection:Object.freeze({...sourceRecord.crossSection,widthMeters:survey.usableWidthMeters,widthSource:'reviewed-venue-usable-corridor'}),
+      provenance:Object.freeze({...sourceRecord.provenance,reviewedVenue:survey.venueId})}):sourceRecord;
     const dimensions = roadDimensionsFromSource(transportRecord,streetScaleForWorld(appCtx));
     const {width} = dimensions;
     const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
@@ -137,6 +144,7 @@ export async function buildRoadGeometryPass(options = {}) {
       sourceNodeIds: Object.freeze(sourceTopologyNodes.map(node => node.id)),
       sourceTopologyNodes,
       transportRecord,
+      ...(survey?{surfaceSurveyEvidence:survey}:{}),
       type,
       surfaceTag: String(way.tags?.surface || '').toLowerCase(),
       litTag: String(way.tags?.lit || '').toLowerCase(),
