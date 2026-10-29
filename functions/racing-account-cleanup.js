@@ -47,7 +47,7 @@ async function cleanupRacingAccount({db,uid,nowMs=Date.now()}){
    const live=await tx.get(row.ref);if(!live.exists)return;const r=live.data(),without=map=>Object.fromEntries(Object.entries(map||{}).filter(([key])=>key!==uid));
    const creator=r.course?.publication?.ownerUid===uid,course=creator?{...r.course,name:'Archived route',publication:{...r.course.publication,ownerUid:null}}:r.course;
    tx.set(row.ref,{...r,participantUids:(r.participantUids||[]).filter(id=>id!==uid),profiles:without(r.profiles),careerContexts:without(r.careerContexts),
-    receipt:{...r.receipt,players:r.receipt.players.filter(p=>p.uid!==uid)},snapshot:{...r.snapshot,creatorUid:r.snapshot.creatorUid===uid?null:r.snapshot.creatorUid,leaderUid:r.snapshot.leaderUid===uid?null:r.snapshot.leaderUid,players:r.snapshot.players.filter(p=>p.uid!==uid)},...(course?{course}:{})});
+    receipt:{...r.receipt,players:r.receipt.players.filter(p=>p.uid!==uid)},snapshot:{...r.snapshot,creatorUid:r.snapshot.creatorUid===uid?null:r.snapshot.creatorUid??null,leaderUid:r.snapshot.leaderUid===uid?null:r.snapshot.leaderUid??null,players:r.snapshot.players.filter(p=>p.uid!==uid)},...(course?{course}:{})});
    tx.delete(row.ref.collection('careerApplications').doc(uid));
   });}}
  await anonymizeResults(db.collection('racingResults').where('participantUids','array-contains',uid));
