@@ -107,11 +107,13 @@ const getAcceptedGroundRuntimeSnapshot = () =>
 const prepareAcceptedGroundForLocation = (options) =>
   acceptedGroundRuntime.prepare(options);
 const prepareAcceptedGroundFromCatalog = async (options = {}) => {
-  acceptedGroundCatalogState = await loadAcceptedGroundCatalog({
+  const catalog = await loadAcceptedGroundCatalog({
     url: options.catalogUrl,
     fetchImpl: options.fetchImpl,
     signal: options.signal
   });
+  if(options.signal?.aborted)throw options.signal.reason instanceof Error?options.signal.reason:new DOMException('Ground catalog load aborted','AbortError');
+  acceptedGroundCatalogState = catalog;
   if (acceptedGroundCatalogState.status !== 'accepted') {
     return acceptedGroundRuntime.clear(
       acceptedGroundCatalogState.reason || 'ground-catalog-rejected'
@@ -122,6 +124,7 @@ const prepareAcceptedGroundFromCatalog = async (options = {}) => {
     longitude: options.longitude,
     manifests: acceptedGroundCatalogState.manifests,
     coverageProbes: options.coverageProbes,
+    requiredArtifacts: options.requiredArtifacts,
     signal: options.signal
   });
 };

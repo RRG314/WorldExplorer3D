@@ -43,7 +43,7 @@ import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.
 import { compileTransportFacilityGraph, selectFacilitySourceElements } from "../transport/facility-compiler.js?v=4";
 import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=7";
 import { fetchMappedAirportData, isAirportSelection } from "./osm-airport-source.js?v=1";
-import {racingVenueSourceAt,loadRacingVenueSource,prepareVenueSourceMerge} from '../racing/venue-source-packs.js';
+import {racingVenueSourceAt,loadRacingVenueSource,prepareVenueSourceMerge,createRacingVenueGroundPlan} from '../racing/venue-source-packs.js';
 import {SurfacePublicationError} from './surface-publication-error.js';
 
 export function selectExactFacilityElements(data = {}) {
@@ -226,12 +226,21 @@ export function createWorldRoadLoader(deps = {}) {
       useSyntheticFallbackRoads,
       worldSession
     } = session;
+    const venueSource=racingVenueSourceAt(appCtx.LOC);
+    let venueData=null,venueGroundPlan=null;
+    if(venueSource){
+      try{
+        venueData=await runProviderWork('reviewed-geographic-pack',venueSource.id,signal=>loadRacingVenueSource(venueSource,{signal}));
+        if(!isActiveLoadContext())return finishSupersededWorldLoadRuntimeSession(session,'superseded-during-venue-source');
+        venueGroundPlan=createRacingVenueGroundPlan(venueSource,venueData);
+      }catch(error){if(!isActiveLoadContext())throw error;throw new SurfacePublicationError('reviewed-venue-source',error);}
+    }
     let acceptedGroundReady = false;
     try {
       acceptedGroundReady = await runProviderWork('accepted-ground', 'activate', (signal) =>
         activateAcceptedGroundForWorldLoad({
           appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
-          signal, startLoadPhase
+          signal, startLoadPhase, venueGroundPlan
         })
       );
     } catch (error) {
@@ -772,12 +781,9 @@ export function createWorldRoadLoader(deps = {}) {
         });
         appCtx.addEarthWorldObject?.(appCtx.transportFacilityVisual.group);
         const nodes = {};
-        const venueSource=racingVenueSourceAt(appCtx.LOC);
         if(venueSource){
           try{
-            const source=await runProviderWork('reviewed-geographic-pack',venueSource.id,signal=>loadRacingVenueSource(venueSource,{signal}));
-            if(!isActiveLoadContext())return finishSupersededWorldLoadRuntimeSession(session,'superseded-during-venue-source');
-            const prepared=prepareVenueSourceMerge(data,source,venueSource,appCtx.getAcceptedGroundRuntimeSnapshot?.());
+            const prepared=prepareVenueSourceMerge(data,venueData,venueSource,appCtx.getAcceptedGroundRuntimeSnapshot?.());
             data=prepared.data;runtimeState.venuePack=loadMetrics.venuePack=prepared.metadata;
           }catch(error){if(!isActiveLoadContext())throw error;throw new SurfacePublicationError('reviewed-venue-source',error);}
         }

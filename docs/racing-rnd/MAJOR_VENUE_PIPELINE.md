@@ -46,6 +46,25 @@ Canonical district-source normalization explicitly transfers that private
 annotation to its immutable way records before the road pass consumes them.
 Ordinary roads retain their existing planar cross-section and fitting policy.
 
+The loader reads each reviewed source once, before preparing terrain. It plans
+ground probes at no more than two-metre spacing down the entire mapped route,
+including both pavement edges plus a two-metre margin. The existing accepted
+ground owner can activate a finite group of up to 32 explicitly pinned artifacts
+from one provider and source release. This admits adjoining tiles outside the
+starting point without widening their actual coverage, loading the whole ground
+catalogue or creating another terrain sampler. Missing, changed or ambiguous
+tiles reject the group before fetch; a failed tile or uncovered route probe
+rejects the entire prepared stack. A reviewed venue cannot proceed using the
+ordinary worldwide fallback in place of its required ground.
+
+Ordinary location selection keeps its existing anchor-based behavior. Late
+success, rejection or exceptions from an obsolete ground preparation cannot
+clear or overwrite a replacement world's accepted stack. A current cancelled
+preparation retires its partial stack; an already-aborted request cannot disturb
+an accepted world. The actual Silverstone source and hash-verified EA artifact
+pass the full-route probe plan through the world activation owner in component
+integration. This is not rendered-world or completed-venue acceptance.
+
 The Racing panel builds the full ordered GP path after the existing world surface
 qualification. Missing spans reject the event instead of falling back to the
 shorter National circuit. The old two-metre minimum discarded five real mapped

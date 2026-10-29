@@ -14,10 +14,36 @@ export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;
  return RACING_VENUE_SOURCES.find(pack=>geographicVenueDistance(pack.anchor,location)<=15)||null;
 }
+export function racingVenueGroundRequirements(descriptor){
+ const required=descriptor.groundArtifacts||[{artifactId:descriptor.groundArtifactId,contentSha256:descriptor.groundContentSha256}];
+ if(!Array.isArray(required)||!required.length||required.length>32||required.some(item=>typeof item?.artifactId!=='string'||!item.artifactId||item.artifactId.length>160||!/^[a-f0-9]{64}$/.test(item.contentSha256))||new Set(required.map(item=>item.artifactId)).size!==required.length||
+  !required.some(item=>item.artifactId===descriptor.groundArtifactId&&item.contentSha256===descriptor.groundContentSha256))throw Error('venue_ground_group_invalid');
+ return Object.freeze(required.map(item=>Object.freeze({artifactId:item.artifactId,contentSha256:item.contentSha256})));
+}
+export function createRacingVenueGroundPlan(descriptor,source){
+ const layout=compileMappedVenueLayout(source),requiredArtifacts=racingVenueGroundRequirements(descriptor),coverageProbes=[];
+ if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
+ const halfWidth=source.layout.usableWidthMeters*.5+2,metersPerDegree=6371008.8*Math.PI/180;
+ for(let index=1;index<layout.points.length;index++){
+  const a=layout.points[index-1],b=layout.points[index],length=geographicVenueDistance(a,b),steps=Math.max(1,Math.ceil(length/2));
+  const east=(b.lon-a.lon)*Math.cos((a.lat+b.lat)*Math.PI/360)*metersPerDegree,north=(b.lat-a.lat)*metersPerDegree;
+  const magnitude=Math.hypot(east,north);
+  for(let step=0;step<=steps;step++){
+   const t=step/steps,lat=a.lat+(b.lat-a.lat)*t,lon=a.lon+(b.lon-a.lon)*t;
+   for(const lateral of [-halfWidth,0,halfWidth])coverageProbes.push(Object.freeze({latitude:lat+east/magnitude*lateral/metersPerDegree,
+    longitude:lon-north/magnitude*lateral/(metersPerDegree*Math.cos(lat*Math.PI/180))}));
+   if(coverageProbes.length>60000)throw Error('venue_ground_probe_bound');
+  }
+ }
+ return Object.freeze({requiredArtifacts,coverageProbes:Object.freeze(coverageProbes)});
+}
 const inside=(point,bounds)=>point&&point.lat>=bounds.south&&point.lat<=bounds.north&&point.lon>=bounds.west&&point.lon<=bounds.east;
 export function prepareVenueSourceMerge(data,source,descriptor,ground){
- const index=ground?.artifactIds?.indexOf(descriptor.groundArtifactId)??-1;
- if(ground?.status!=='accepted'||index<0||ground.contentSha256s?.[index]!==descriptor.groundContentSha256)throw Error('venue_ground_not_ready');
+ const required=racingVenueGroundRequirements(descriptor);
+ if(ground?.status!=='accepted'||required.some(item=>{
+  const index=ground.artifactIds?.indexOf(item.artifactId)??-1;
+  return index<0||ground.contentSha256s?.[index]!==item.contentSha256;
+ }))throw Error('venue_ground_not_ready');
  const layout=compileMappedVenueLayout(source);
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  const original=Array.isArray(data?.elements)?data.elements:[],existingNodes=new Map(original.filter(e=>e.type==='node').map(e=>[e.id,e]));
@@ -46,14 +72,14 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   const sourceFeatureId=`osm:way:${raw.id}`,way={type:'way',id:raw.id,version:raw.version,nodes:[...raw.nodes],tags:{...raw.tags,_sourceFeatureId:sourceFeatureId,_sourceCompleteness:'lossless',...(!layoutWays.has(raw.id)?{_regionalContext:'fixed-location'}:{})}};
   if(layoutWays.has(raw.id))annotateRoadSourceSurvey(way,{version:1,venueId:descriptor.id,sourceFeatureId,
    usableWidthMeters:source.layout.usableWidthMeters,maximumCrossfall:descriptor.maximumCrossfall,
-   groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256});
+   groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required});
   elements.set(`way:${raw.id}`,way);
  }
  return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({id:descriptor.id,name:descriptor.name,status:'source-prepared',
   sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
   sourceFeatureIds:Object.freeze(layout.wayIds.map(id=>`osm:way:${id}`)),mappedLengthMeters:layout.lengthMeters,
   referenceLengthMeters:layout.referenceLengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,
-  groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,retiredGeneralized})};
+  groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required,retiredGeneralized})};
 }
 export async function loadRacingVenueSource(descriptor,{fetchImpl=globalThis.fetch,signal}={}){
  const response=await fetchImpl(descriptor.sourceUrl,{signal});

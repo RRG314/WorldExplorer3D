@@ -1,4 +1,5 @@
 import { resolveWorldSurfaceDomain } from "../earth-core/world-surface-domain.js?v=3";
+import {racingVenueSourceAt,racingVenueGroundRequirements} from '../racing/venue-source-packs.js';
 
 export async function activateAcceptedGroundForWorldLoad(options = {}) {
   const {
@@ -56,14 +57,16 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
   appCtx.showLoad('Verifying accepted ground data...');
   let state;
   try {
+    const venue=racingVenueSourceAt(appCtx.LOC);
     state = typeof appCtx.prepareAcceptedGroundFromCatalog === 'function'
       ? await appCtx.prepareAcceptedGroundFromCatalog({
           latitude: appCtx.LOC.lat,
           longitude: appCtx.LOC.lon,
-          coverageProbes: [{
+          coverageProbes: options.venueGroundPlan?.coverageProbes || [{
             latitude: appCtx.LOC.lat,
             longitude: appCtx.LOC.lon
           }],
+          ...(venue?{requiredArtifacts:options.venueGroundPlan?.requiredArtifacts||racingVenueGroundRequirements(venue)}:{}),
           signal
         })
       : {
@@ -85,6 +88,8 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
     appCtx.publishLocationTerrain?.();
     return true;
   }
+
+  if(options.venueGroundPlan)throw Error('reviewed_venue_ground_unavailable: '+String(state?.reason||'not-ready'));
 
   const fallback = Object.freeze({
     status: 'fallback',
