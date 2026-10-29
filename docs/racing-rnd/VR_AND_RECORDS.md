@@ -53,6 +53,14 @@ separate release requirements.
 
 ## Finish handoff
 
+Practice presentation samples the two latest accepted 60 Hz vehicle frames at
+the current session-clock remainder, with one simulation tick of latency. The
+player body, its chase/cabin views and practice rivals use that same timeline.
+This avoids repeated poses followed by double advances when render intervals
+straddle a fixed tick. Sampling does not advance physics, interpolate timing
+gates or modify session/result snapshots. Countdown and terminal poses stay
+exact; stopping the controller retires its presentation with its existing scope.
+
 A completed player's exact crossing snapshot remains the result evidence. The
 road controller returns a stationary final frame through the existing physics
 delegate, without changing the finish pose or timing. This makes replay possible

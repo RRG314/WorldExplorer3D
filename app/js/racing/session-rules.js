@@ -30,7 +30,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   const envelope=course.vehicleEnvelope||{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},handling=profile?.handling;
   if(!handling||handling.width>envelope.widthMeters||handling.length>envelope.lengthMeters||handling.height>envelope.heightMeters)throw Error('race_vehicle_exceeds_course_envelope');
   const p={uid,label:String(label||'Explorer').slice(0,40),profile,ai:ai===true,difficulty:Math.max(0,Math.min(1,Number(difficulty)||.65)),ready:ai===true,
-   slot:players.size,car:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false};
+   slot:players.size,car:null,previousFrame:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false};
   players.set(uid,p);for(const other of players.values())if(!other.ai)other.ready=false;return snapshot();
  }
  function setReady(uid,ready){lobby();const p=participant(uid);if(p.ai)throw Error('race_rival_control_forbidden');p.ready=ready===true;return snapshot();}
@@ -39,7 +39,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   if(players.size<1||!activeHumans().length||[...players.values()].some(p=>!p.ready||p.disconnectedAt!==null))throw Error('race_not_ready');
   if(!Number.isFinite(nowMs)||nowMs<lastNow)throw Error('invalid_race_clock');
   startAtMs=nowMs+4000;lastNow=nowMs;phase='countdown';
-  for(const p of players.values()){p.car=createRaceVehicleState(raceGridPose(course,p.slot),p.profile);stepRaceVehicle(course,p.car,NEUTRAL,1/60,p.profile);p.progress=createRaceProgress(raceVehicleGroundPose(p.car),startAtMs);}
+  for(const p of players.values()){p.car=createRaceVehicleState(raceGridPose(course,p.slot),p.profile);stepRaceVehicle(course,p.car,NEUTRAL,1/60,p.profile);p.previousFrame=snapshotRaceVehicle(p.car);p.progress=createRaceProgress(raceVehicleGroundPose(p.car),startAtMs);}
   return snapshot();
  }
  function control(uid,sequence,actions,receivedAtMs){
@@ -87,6 +87,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     if(p.disconnectedAt!==null&&frameAt-p.disconnectedAt>10000){p.dnf=true;continue;}
     while(p.queue.length&&p.queue[0].at<=frameAt){const command=p.queue.shift();p.actions=command.actions;p.lastControlAt=command.at;}
     const actions=p.ai?raceAiActions(course,p.car,p.progress,p.profile,{difficulty:p.difficulty}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
+    p.previousFrame=snapshotRaceVehicle(p.car);
     stepRaceVehicle(course,p.car,actions,1/60,p.profile);
     p.progress=advanceRaceProgress(course,p.progress,raceVehicleGroundPose(p.car),frameAt,{startedAtMs:startAtMs});
    }
@@ -94,20 +95,33 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   }
   return snapshot();
  }
- function snapshot(){
+ function snapshot(presentation=false){
   const ordered=[...players.values()].sort((a,b)=>a.dnf-b.dnf||(a.progress?.finished&&b.progress?.finished?a.progress.elapsedMs-b.progress.elapsedMs:a.progress?.finished?-1:b.progress?.finished?1:
    (b.progress?.lap||1)-(a.progress?.lap||1)||(b.progress?.nextGate||0)-(a.progress?.nextGate||0)));
   let previousPosition=0;
   return {id,phase,reason,courseName:course.name,discipline:course.discipline,laps:course.laps,creatorUid,leaderUid,createdAtMs,startAtMs,maximumDurationMs,
    serverAtMs:lastNow,simulationAtMs:startAtMs===null?null:startAtMs+tick*STEP_MS,completedAtMs,
    players:ordered.map((p,index)=>{const previous=ordered[index-1],tied=!p.dnf&&p.progress?.finished&&previous?.progress?.finished&&p.progress.elapsedMs===previous.progress.elapsedMs;
-    const position=tied?previousPosition:index+1;previousPosition=position;return {uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
-    disconnected:p.disconnectedAt!==null,dnf:p.dnf,position,lastInputSequence:p.lastSequence,pose:p.car?raceVehicleGroundPose(p.car):null,
+    const position=tied?previousPosition:index+1;previousPosition=position;
+    const frame=snapshotRaceVehicle(p.car);
+    // The render clock can fall between fixed ticks, including frames with no
+    // tick or two ticks. Sample the last two accepted frames with one tick of
+    // latency; damping the camera cannot repair a body that repeats then jumps.
+    // This is only a view. Gates, results, controls and the authoritative car
+    // retain their exact fixed-step state. Terminal handoff is exact as well.
+    if(presentation&&phase==='running'&&!p.dnf&&!p.progress?.finished&&p.previousFrame&&frame){
+     const alpha=Math.max(0,Math.min(1,(lastNow-startAtMs-tick*STEP_MS)/STEP_MS));
+     for(const key of ['x','y','z','terrainPitch','terrainRoll'])frame[key]=p.previousFrame[key]+(frame[key]-p.previousFrame[key])*alpha;
+     const turn=frame.angle-p.previousFrame.angle;
+     frame.angle=p.previousFrame.angle+Math.atan2(Math.sin(turn),Math.cos(turn))*alpha;
+    }
+    return {uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
+    disconnected:p.disconnectedAt!==null,dnf:p.dnf,position,lastInputSequence:p.lastSequence,pose:frame?raceVehicleGroundPose(frame):null,
     speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,barrierContacts:p.car?.barrierContacts??0,
-    vehicleState:snapshotRaceVehicle(p.car),
+    vehicleState:frame,
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
      bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null};})};
  }
- return Object.freeze({add,setReady,start,control,advance,disconnect,reconnect,leave,snapshot,
+ return Object.freeze({add,setReady,start,control,advance,disconnect,reconnect,leave,snapshot:()=>snapshot(),presentationSnapshot:()=>snapshot(true),
   cancel(cancelReason='race_cancelled'){if(phase==='complete')return snapshot();phase='cancelled';reason=cancelReason;return snapshot();}});
 }

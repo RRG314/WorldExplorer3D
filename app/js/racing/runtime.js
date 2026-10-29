@@ -457,7 +457,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   if(careerView&&careerOwner!==(getCurrentUser()?.uid||''))disposeCareer();
   if(online&&!c.registerRuntimeSystem)online.pump();
   if(!controller)return;if(!controller.isCurrent()){stop('race_vehicle_or_world_changed');return;}
-  const snapshot=controller.snapshot();presentation?.update(snapshot,controller.uid,dt);
+  const snapshot=controller.snapshot();presentation?.update(controller.presentationSnapshot?.()||snapshot,controller.uid,dt);
   const fresh=!online||online.connected()&&online.isFresh(),changed=fresh!==lastUiFresh;lastUiFresh=fresh;
   if(snapshot.serverAtMs-lastUiAt<100&&snapshot.phase==='running'&&!changed)return;lastUiAt=snapshot.serverAtMs;
   const player=snapshot.players.find(p=>p.uid===controller.uid),left=Math.max(0,(snapshot.startAtMs||0)-snapshot.serverAtMs);
