@@ -1,0 +1,597 @@
+{
+  "scope": "Retained calibrated driving kernel before optional banked-pavement support; terrain attitude alone must not opt ordinary roads or planetary rovers into the new dynamics.",
+  "sourceSha256": "e03290d49d66ea0a98274760bddd0ca8ead24eef864a7ff93e44e2cf16345984",
+  "cases": [
+    {
+      "config": {
+        "id": "ordinary-road",
+        "variant": "sedan",
+        "condition": 1,
+        "grip": 1
+      },
+      "sequence": [
+        {
+          "frames": 180,
+          "actions": {
+            "throttle": 1
+          }
+        },
+        {
+          "frames": 60,
+          "actions": {
+            "throttle": 0.5,
+            "steer": 0.4
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "steer": -0.7,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 100,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 100,
+          "actions": {
+            "reverse": 1,
+            "steer": 0.4
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 4.182346720370796,
+          "z": 20.63216411499205,
+          "y": 1.12,
+          "angle": 0.2,
+          "speed": 69.69659439128705,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": 0,
+          "vFwd": 67.90237605772116,
+          "vLat": 0,
+          "rearSlip": 0,
+          "steerSm": 0,
+          "throttleSm": 0.9999999847700202,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 2,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 3450.964884062158,
+          "engineLoad": 1,
+          "vx": 2.7164968787405432,
+          "vz": 13.40089982187549,
+          "driftAngle": 2.7755575615628914e-17
+        },
+        {
+          "x": 9.506061998016811,
+          "z": 34.145231184605215,
+          "y": 1.12,
+          "angle": 0.5849222806155937,
+          "speed": 77.4284591425013,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": 0.4458188324413671,
+          "vFwd": 76.53941915850274,
+          "vLat": -0.015386903888769888,
+          "rearSlip": 0,
+          "steerSm": 0.3999996673885124,
+          "throttleSm": 0.5012393760505818,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 2,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 3871.531432020065,
+          "engineLoad": 0.5,
+          "vx": 8.507298370942275,
+          "vz": 12.852121920906958,
+          "driftAngle": 0.00020103240723090554
+        },
+        {
+          "x": 12.445117340521584,
+          "z": 43.096403084279125,
+          "y": 1.12,
+          "angle": -0.08647495373613995,
+          "speed": 45.12129924930345,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -1.2605962871474103,
+          "vFwd": 49.27355716123492,
+          "vLat": -5.820750952193586,
+          "rearSlip": -0.23723272438046555,
+          "steerSm": -0.6999807244854552,
+          "throttleSm": 0.005568266493376631,
+          "isDrifting": true,
+          "_driftHoldTimer": 0.65,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 2,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 2412.2306775985594,
+          "engineLoad": 0,
+          "vx": -1.2539835289920065,
+          "vz": 9.850690442330212,
+          "driftAngle": 0.04014307598222666
+        },
+        {
+          "x": 10.238661757829682,
+          "z": 50.05667377851102,
+          "y": 1.12,
+          "angle": -0.3385096449732253,
+          "speed": 0,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -1.720049006026404e-11,
+          "vFwd": 0.20734001694417586,
+          "vLat": 1.6355794881836469e-12,
+          "rearSlip": 9.239792786813666e-8,
+          "steerSm": -5.146928910967607e-11,
+          "throttleSm": 2.5279890769809527e-7,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 1,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 850.0238199843086,
+          "engineLoad": 0,
+          "vx": -0.013865050676160801,
+          "vz": 0.039382532925560716,
+          "driftAngle": 0
+        },
+        {
+          "x": 11.919889956971605,
+          "z": 47.94103688556891,
+          "y": 1.12,
+          "angle": -1.0237744644163491,
+          "speed": -18.150883464083865,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -0.9303215669003969,
+          "vFwd": -17.027167559506612,
+          "vLat": 0.06221849899489401,
+          "rearSlip": 0,
+          "steerSm": 0.39999999997058816,
+          "throttleSm": 1.1477052653526344e-11,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": -1,
+          "shiftTime": 0,
+          "driveGear": -1,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 1244.6980682834044,
+          "engineLoad": 1,
+          "vx": 2.93493464622392,
+          "vz": -1.7727498736058915,
+          "driftAngle": 0
+        }
+      ]
+    },
+    {
+      "config": {
+        "id": "damaged-wet-m3",
+        "variant": "bmw_m3_e46",
+        "condition": 0.45,
+        "grip": 0.65
+      },
+      "sequence": [
+        {
+          "frames": 180,
+          "actions": {
+            "throttle": 1
+          }
+        },
+        {
+          "frames": 60,
+          "actions": {
+            "throttle": 0.5,
+            "steer": 0.4
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "steer": -0.7,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 100,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 100,
+          "actions": {
+            "reverse": 1,
+            "steer": 0.4
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 3.5690349911097,
+          "z": 17.60660236753304,
+          "y": 1.12,
+          "angle": 0.2,
+          "speed": 59.61370174540615,
+          "condition": 0.45,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": 0,
+          "vFwd": 58.28223800539586,
+          "vLat": 0,
+          "rearSlip": 0,
+          "steerSm": 0,
+          "throttleSm": 0.9999999847700202,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 2,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 3339.0754397501423,
+          "engineLoad": 1,
+          "vx": 2.3316344260631867,
+          "vz": 11.502313737019858,
+          "driftAngle": 0
+        },
+        {
+          "x": 7.572000716412268,
+          "z": 29.38860628329718,
+          "y": 1.12,
+          "angle": 0.485305845865298,
+          "speed": 65.8544231091028,
+          "condition": 0.45,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": 0.34129016357112485,
+          "vFwd": 65.16294060144915,
+          "vLat": -0.015068172893168986,
+          "rearSlip": 0,
+          "steerSm": 0.3999996673885124,
+          "throttleSm": 0.5012393760505818,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 2,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 3703.290620171659,
+          "engineLoad": 0.5,
+          "vx": 6.118368525128631,
+          "vz": 11.608089533012064,
+          "driftAngle": 0.00023123837699035033
+        },
+        {
+          "x": 9.785730696646718,
+          "z": 37.16404715283991,
+          "y": 1.12,
+          "angle": -0.03137235173689028,
+          "speed": 38.37654997792691,
+          "condition": 0.45,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -0.9653810593830269,
+          "vFwd": 41.90828705510706,
+          "vLat": -4.121049813485544,
+          "rearSlip": -0.21214194159294938,
+          "steerSm": -0.6999807244854552,
+          "throttleSm": 0.005568266493376631,
+          "isDrifting": true,
+          "_driftHoldTimer": 0.65,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 2,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 2305.7137579028604,
+          "engineLoad": 0,
+          "vx": -0.5467205219707675,
+          "vz": 8.426042458969532,
+          "driftAngle": 0.033421437673236784
+        },
+        {
+          "x": 8.296994275982419,
+          "z": 44.170952110271685,
+          "y": 1.12,
+          "angle": -0.23261981532828768,
+          "speed": 0,
+          "condition": 0.45,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -2.194328501152573e-10,
+          "vFwd": 0.9393010106745805,
+          "vLat": 2.1869439022562208e-11,
+          "rearSlip": 7.31578678482182e-8,
+          "steerSm": -5.146928910967607e-11,
+          "throttleSm": 2.5279890769809527e-7,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "shiftTime": 0,
+          "driveGear": 1,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 850.1998786803127,
+          "engineLoad": 0,
+          "vx": -0.043603470930664856,
+          "vz": 0.18405194291387017,
+          "driftAngle": 0
+        },
+        {
+          "x": 9.40012436960444,
+          "z": 42.115923137889425,
+          "y": 1.12,
+          "angle": -0.7660737236153582,
+          "speed": -15.95394844857996,
+          "condition": 0.45,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -0.7643331945313587,
+          "vFwd": -14.955550291611054,
+          "vLat": 0.052112265965993554,
+          "rearSlip": 0,
+          "steerSm": 0.39999999997058816,
+          "throttleSm": 1.1477052653526344e-11,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": -1,
+          "shiftTime": 0,
+          "driveGear": -1,
+          "engineRedlineRpm": 6200,
+          "engineRpm": 1242.9109992130072,
+          "engineLoad": 1,
+          "vx": 2.0955310280805164,
+          "vz": -2.1629915712060446,
+          "driftAngle": 0
+        }
+      ]
+    },
+    {
+      "config": {
+        "id": "space-rover",
+        "variant": "suv",
+        "condition": 1,
+        "grip": 1,
+        "planetary": true
+      },
+      "sequence": [
+        {
+          "frames": 180,
+          "actions": {
+            "throttle": 1
+          }
+        },
+        {
+          "frames": 60,
+          "actions": {
+            "throttle": 0.5,
+            "steer": 0.4
+          }
+        },
+        {
+          "frames": 45,
+          "actions": {
+            "steer": -0.7,
+            "brake": 1
+          }
+        },
+        {
+          "frames": 100,
+          "actions": {
+            "serviceBrake": 1
+          }
+        },
+        {
+          "frames": 100,
+          "actions": {
+            "reverse": 1,
+            "steer": 0.4
+          }
+        }
+      ],
+      "checkpoints": [
+        {
+          "x": 13.208445746029655,
+          "z": 65.15930853095117,
+          "y": 1.12,
+          "angle": 0.2,
+          "speed": 24,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": 0,
+          "vFwd": 23.99999999688971,
+          "vLat": 0,
+          "rearSlip": 0,
+          "steerSm": 0,
+          "throttleSm": 0.9999999847700202,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "vx": 4.76806393846355,
+          "vz": 23.52159786514151,
+          "driftAngle": 2.7755575615628914e-17
+        },
+        {
+          "x": 23.27473298593399,
+          "z": 86.57958997291607,
+          "y": 1.12,
+          "angle": 0.7351454060378269,
+          "speed": 24,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": 0.6146037541815411,
+          "vFwd": 23.99999999999896,
+          "vLat": -0.03345539567017121,
+          "rearSlip": 0,
+          "steerSm": 0.3999996673885124,
+          "throttleSm": 0.5012393760505818,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "vx": 16.071865386292362,
+          "vz": 17.82403608244628,
+          "driftAngle": 0.0013939739166836107
+        },
+        {
+          "x": 28.068600860826066,
+          "z": 92.84115406199379,
+          "y": 1.12,
+          "angle": 0.4928906087275759,
+          "speed": 1.0761335955172833,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -0.10235944421882154,
+          "vFwd": 2.096008750764215,
+          "vLat": 0.00857440867578619,
+          "rearSlip": 0,
+          "steerSm": -0.6999807244854552,
+          "throttleSm": 0.005568266493376631,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "vx": 0.9993314641333453,
+          "vz": 1.842461079251719,
+          "driftAngle": 0
+        },
+        {
+          "x": 28.184122199508288,
+          "z": 93.05712080929075,
+          "y": 1.12,
+          "angle": 0.48644042618873456,
+          "speed": 0,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -6.586945606270587e-12,
+          "vFwd": 0.0000033946890493968945,
+          "vLat": 7.146977500911988e-13,
+          "rearSlip": 0,
+          "steerSm": -5.146928910967607e-11,
+          "throttleSm": 2.5279890769809527e-7,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": 1,
+          "vx": 0.000001586957283701716,
+          "vz": 0.000003000913247963322,
+          "driftAngle": 0
+        },
+        {
+          "x": 24.990987468547125,
+          "z": 82.76773969440617,
+          "y": 1.12,
+          "angle": 0.1263885803190532,
+          "speed": -7.199999999999999,
+          "condition": 1,
+          "boostReady": true,
+          "isAirborne": false,
+          "terrainPitch": 0.3,
+          "terrainRoll": 0.4,
+          "yawRate": -0.23720393834589296,
+          "vFwd": -7.19998270834914,
+          "vLat": 0.018341825426085298,
+          "rearSlip": 0,
+          "steerSm": 0.39999999997058816,
+          "throttleSm": 1.1477052653526344e-11,
+          "isDrifting": false,
+          "_driftHoldTimer": 0,
+          "vy": 0,
+          "_terrainAirTimer": 0,
+          "_roadContinuityTimer": 0,
+          "_driveDirection": -1,
+          "vx": -0.8893792809208766,
+          "vz": -7.144864723544822,
+          "driftAngle": -3.139045177228837
+        }
+      ]
+    }
+  ]
+}

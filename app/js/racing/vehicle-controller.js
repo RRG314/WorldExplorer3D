@@ -1,3 +1,4 @@
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_ROLL}from'../physics/road-plane-dynamics.js';
 import {prepareVehicleDriveFrame,stepVehiclePlanarDrive,integrateVehiclePlanarPosition}from'../physics/vehicle-planar-dynamics.js';
 import {ROAD_CAR_CONFIG}from'../physics/vehicle-config.js?v=1';
 import {carSpeedToMph,mphToCarSpeed,carSpeedToWorldUnitsPerSecond}from'../physics/vehicle-speed-units.js';
@@ -27,6 +28,7 @@ export function stepRaceVehicle(course,car,actions,dt,profile){
  if(!(dt>0&&dt<=1/30))throw Error('invalid_race_physics_step');
  const frame=prepareVehicleDriveFrame(car,{...actions,boost:0},dt,profile.config);
  const driving=stepVehiclePlanarDrive(car,dt,frame,{config:profile.config,planetary:false,metersPerWorldUnit:course.metersPerUnit,
+  ...(course.surfaceModel===BANKED_ROAD_MODEL?{roadPlane:{pitch:car.terrainPitch||0,roll:car.terrainRoll||0}}:{}),
   surfaceDynamics:profile.surface,vehicleHandling:profile.handling,vehicleCondition:profile.condition,vehicleUpgrades:profile.upgrades,
   characterVehicle:profile.character,maxSpd:Math.min(profile.config.maxSpd,mphToCarSpeed(profile.handling.topSpeedMph)),
   friction:profile.config.friction,accel:profile.config.accel*profile.handling.accelerationScale});
@@ -42,7 +44,7 @@ export function stepRaceVehicle(course,car,actions,dt,profile){
   car.speed*=.35;car.vFwd*=.35;car.vLat*=.2;car.barrierContacts++;
  }
  const segment=course.segments[support.index];
- const contact=resolveVehicleRoadContactPose({x,z,y:support.y,yaw:car.angle,variant:profile.variant,
+ const contact=resolveVehicleRoadContactPose({...(course.surfaceModel===BANKED_ROAD_MODEL?{maximumRoll:BANKED_ROAD_MAXIMUM_ROLL}:{}),x,z,y:support.y,yaw:car.angle,variant:profile.variant,
   pitch:car.terrainPitch||0,roll:car.terrainRoll||0,
   sampleSurface:(px,pz)=>projectRacePosition(course,{x:px,z:pz,y:support.y},{minimumMeters:Math.max(0,segment.startMeters-12),maximumMeters:Math.min(course.lengthMeters,segment.startMeters+segment.lengthMeters+12)})?.y});
  car.x=x;car.z=z;car.y=contact.y+VEHICLE_ROOT_TO_GROUND_METERS;

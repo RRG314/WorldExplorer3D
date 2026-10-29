@@ -1535,6 +1535,46 @@ function advanceRaceProgress(course, progress, pose, nowMs, { startedAtMs, maxim
   return next;
 }
 
+// app/js/physics/road-plane-dynamics.js
+var BANKED_ROAD_MODEL = "banked-road-v1";
+var BANKED_ROAD_MAXIMUM_CROSSFALL = 0.7;
+var BANKED_ROAD_MAXIMUM_ROLL = Math.atan(BANKED_ROAD_MAXIMUM_CROSSFALL);
+var ROAD_GRAVITY_METERS_PER_SECOND_SQUARED = 9.81;
+function roadPlaneForces({ pitch, roll, forwardSpeedMetersPerSecond, yawRate, tyreGrip }) {
+  if (![pitch, roll, forwardSpeedMetersPerSecond, yawRate, tyreGrip].every(Number.isFinite) || Math.abs(pitch) > 0.55 + 1e-8 || Math.abs(roll) > BANKED_ROAD_MAXIMUM_ROLL + 1e-8 || tyreGrip < 0 || tyreGrip > 1.35) throw Error("invalid_road_plane_dynamics");
+  const cp = Math.cos(pitch), cr = Math.cos(roll), sr = Math.sin(roll), g = ROAD_GRAVITY_METERS_PER_SECOND_SQUARED;
+  const horizontalSpeed = forwardSpeedMetersPerSecond * cp, curveAccelerationRight = horizontalSpeed * yawRate;
+  const gravityForward = g * Math.sin(pitch), gravityRight = -g * cp * sr;
+  const normalAcceleration = Math.max(0, g * cp * cr - curveAccelerationRight * sr), tractionAcceleration = tyreGrip * normalAcceleration;
+  const lateralDemand = curveAccelerationRight * cr - gravityRight;
+  const longitudinalTractionAcceleration = Math.sqrt(Math.max(0, tractionAcceleration ** 2 - lateralDemand ** 2));
+  const lateralResidualAcceleration = gravityRight + Math.max(-tractionAcceleration, Math.min(tractionAcceleration, lateralDemand)) - curveAccelerationRight * cr;
+  const minimumCurveAcceleration = -g * cp * (tyreGrip * cr + sr) / (cr - tyreGrip * sr);
+  const maximumCurveAcceleration = g * cp * (tyreGrip * cr - sr) / (cr + tyreGrip * sr);
+  const denominator = (horizontalSpeed < 0 ? -1 : 1) * Math.max(2, Math.abs(horizontalSpeed));
+  const first = minimumCurveAcceleration / denominator, second = maximumCurveAcceleration / denominator;
+  return Object.freeze({
+    pitch,
+    roll,
+    gravityForward,
+    gravityRight,
+    normalAcceleration,
+    tractionAcceleration,
+    lateralDemand,
+    longitudinalTractionAcceleration,
+    lateralResidualAcceleration,
+    lateralGripReserve: tractionAcceleration > 0 ? longitudinalTractionAcceleration / tractionAcceleration : 0,
+    // Insufficient static grip causes a downhill slide, not an invented steering
+    // input. Zero heading rate remains possible even outside the no-slip cone.
+    minimumYawRate: Math.min(0, first, second),
+    maximumYawRate: Math.max(0, first, second)
+  });
+}
+function roadPlaneHorizontalVelocity(forward, lateral, { pitch, roll }) {
+  if (![forward, lateral, pitch, roll].every(Number.isFinite)) throw Error("invalid_road_plane_velocity");
+  return { right: lateral * Math.cos(roll), forward: forward * Math.cos(pitch) + lateral * Math.sin(pitch) * Math.sin(roll) };
+}
+
 // app/js/controls/traversal-control-policy.js?v=9
 var PRIMARY_TRAVEL_MODE_ORDER = Object.freeze(["walk", "drive", "plane", "drone"]);
 var MAX_STEERING_ANGLE_RAD = 1.22;
@@ -1754,9 +1794,11 @@ function stepVehiclePlanarDrive(car, dt, frame, environment) {
   const driftBrakeSpeed = mphToCarSpeed(16);
   const earthDriftBrakeIntent = !planetary && braking && (left || right) && spd > driftBrakeSpeed;
   const tyreGrip = Math.max(0.2, Math.min(1.35, Number(config.gripRoad || 0.96) * surfaceDynamics.grip * vehicleHandling.gripScale * vehicleCondition.gripScale * vehicleUpgrades.gripScale));
-  const gripAcceleration = tyreGrip * 9.81 / 0.22352;
+  const roadPlane = !planetary && hasGroundControl && environment.roadPlane ? roadPlaneForces({ ...environment.roadPlane, forwardSpeedMetersPerSecond: carSpeedToMph(car.speed) * 0.44704, yawRate: car.yawRate || 0, tyreGrip }) : null;
+  const gripAcceleration = (roadPlane?.tractionAcceleration ?? tyreGrip * 9.81) / 0.22352;
   const lateralAcceleration = Math.min(gripAcceleration * 0.9, Math.abs((car.yawRate || 0) * carSpeedToMph(car.speed) * 0.44704) / 0.22352);
-  const availableLongitudinal = Math.sqrt(Math.max(0, gripAcceleration * gripAcceleration - lateralAcceleration * lateralAcceleration));
+  const availableLongitudinal = roadPlane ? roadPlane.longitudinalTractionAcceleration / 0.22352 : Math.sqrt(Math.max(0, gripAcceleration * gripAcceleration - lateralAcceleration * lateralAcceleration));
+  if (roadPlane) car.speed += roadPlane.gravityForward / 0.22352 * dt;
   const transmission = planetary ? 1 : stepAutomaticPowertrain(car, frame, dt, vehicleHandling);
   if (driveCommand.serviceBrake && hasGroundControl) {
     const configuredStopRate = Math.max(6, Number(planetary ? PLANETARY_ROVER_CONFIG.brake : config.brake) || 18) * (planetary ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale) * characterVehicle.brakingScale * vehicleUpgrades.brakeScale;
@@ -1896,13 +1938,16 @@ function stepVehiclePlanarDrive(car, dt, frame, environment) {
   }
   const radiusAuthority = Math.max(0.76, Math.min(1.22, 5.2 / vehicleHandling.turningRadius));
   const tyreYawLimit = tyreGrip * 9.81 / Math.max(2, Math.abs(carSpeedToMph(car.speed)) * 0.44704) * (isDrifting ? 1.35 : 1);
-  const maxYawRate = planetary ? Infinity : Math.min(tyreYawLimit, earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority * characterVehicle.steeringAngleScale);
-  const yawRateTarget = arcadeSteeringYawTarget(
+  const bankForces = roadPlane ? roadPlaneForces({ ...roadPlane, forwardSpeedMetersPerSecond: carSpeedToMph(car.speed) * 0.44704, yawRate: car.yawRate || 0, tyreGrip }) : null;
+  const bankMinimumYaw = bankForces?.minimumYawRate ?? -tyreYawLimit, bankMaximumYaw = bankForces?.maximumYawRate ?? tyreYawLimit;
+  const maxYawRate = planetary ? Infinity : Math.min(bankForces ? Math.max(Math.abs(bankMinimumYaw), Math.abs(bankMaximumYaw)) : tyreYawLimit, earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority * characterVehicle.steeringAngleScale);
+  let yawRateTarget = arcadeSteeringYawTarget(
     v,
     steerAngle * steerAuthority,
     wheelBase,
     maxYawRate
   );
+  if (bankForces) yawRateTarget = Math.max(bankMinimumYaw, Math.min(bankMaximumYaw, yawRateTarget));
   car.yawRate += (yawRateTarget - car.yawRate) * (1 - Math.exp(-dt * yawResponse));
   if (planetary) {
     car.yawRate *= Math.exp(-dt * yawDamp);
@@ -1917,6 +1962,8 @@ function stepVehiclePlanarDrive(car, dt, frame, environment) {
     car.yawRate *= Math.exp(-dt * 2);
     car.angle += car.yawRate * dt;
   }
+  const bankGripReserve = bankForces?.lateralGripReserve ?? 1;
+  if (bankForces) latDamp *= bankGripReserve;
   car.vFwd += (car.speed - car.vFwd) * (1 - Math.exp(-dt * 8));
   car.vLat *= Math.exp(-dt * latDamp);
   const halfWheelBase = wheelBase * 0.5;
@@ -1930,6 +1977,10 @@ function stepVehiclePlanarDrive(car, dt, frame, environment) {
       rearGripDamp *= 0.12;
       rearLat += car.steerSm * 2.35 * (0.5 + 0.5 * speedNorm);
     }
+  }
+  if (bankForces) {
+    frontGripDamp *= bankGripReserve;
+    rearGripDamp *= bankGripReserve;
   }
   frontLat *= Math.exp(-dt * frontGripDamp);
   rearLat *= Math.exp(-dt * rearGripDamp);
@@ -1962,15 +2013,24 @@ function stepVehiclePlanarDrive(car, dt, frame, environment) {
     const yawKick = car.steerSm * 1.28 * (0.35 + 0.65 * speedNorm);
     car.yawRate += yawKick * dt * 4.6;
   }
-  if (!planetary) car.yawRate = Math.max(-tyreYawLimit, Math.min(tyreYawLimit, car.yawRate));
+  if (!planetary) car.yawRate = Math.max(bankMinimumYaw, Math.min(bankMaximumYaw, car.yawRate));
+  if (bankForces) {
+    const forces = roadPlaneForces({ ...bankForces, forwardSpeedMetersPerSecond: carSpeedToMph(car.vFwd) * 0.44704, yawRate: car.yawRate, tyreGrip });
+    car.vLat += forces.lateralResidualAcceleration / 0.22352 * dt;
+  }
   car.isDrifting = isDrifting;
-  return { wheelBase, steerAngle, isDrifting, spdAbs };
+  return { wheelBase, steerAngle, isDrifting, spdAbs, ...roadPlane ? { roadPlane: { pitch: roadPlane.pitch, roll: roadPlane.roll } } : {} };
 }
-function integrateVehiclePlanarPosition(car, dt, { wheelBase, isDrifting, spdAbs }, metersPerWorldUnit = 1.11, planetary = false) {
+function integrateVehiclePlanarPosition(car, dt, { wheelBase, isDrifting, spdAbs, roadPlane }, metersPerWorldUnit = 1.11, planetary = false) {
   const sinA = Math.sin(car.angle), cosA = Math.cos(car.angle);
   const lateralVelForPosition = !planetary && isDrifting ? car.vLat * 0.34 : car.vLat;
-  const worldForwardVelocity = planetary ? car.vFwd : carSpeedToWorldUnitsPerSecond(car.vFwd, metersPerWorldUnit);
-  const worldLateralVelocity = planetary ? lateralVelForPosition : carSpeedToWorldUnitsPerSecond(lateralVelForPosition, metersPerWorldUnit);
+  let worldForwardVelocity = planetary ? car.vFwd : carSpeedToWorldUnitsPerSecond(car.vFwd, metersPerWorldUnit);
+  let worldLateralVelocity = planetary ? lateralVelForPosition : carSpeedToWorldUnitsPerSecond(lateralVelForPosition, metersPerWorldUnit);
+  if (!planetary && roadPlane) {
+    const horizontal = roadPlaneHorizontalVelocity(worldForwardVelocity, worldLateralVelocity, roadPlane);
+    worldForwardVelocity = horizontal.forward;
+    worldLateralVelocity = horizontal.right;
+  }
   car.vx = sinA * worldForwardVelocity + cosA * worldLateralVelocity;
   car.vz = cosA * worldForwardVelocity - sinA * worldLateralVelocity;
   const velMag = Math.hypot(car.vx, car.vz);
@@ -2857,8 +2917,9 @@ function resolveVehicleRoadContactPose(options = {}) {
     authority: "edge-plane-fallback"
   });
   const poseDelta = (pitch2, roll2, contact) => Math.cos(pitch2) * Math.sin(roll2) * contact.side * layout.halfTrack - Math.sin(pitch2) * contact.front * layout.halfWheelbase;
+  const maximumRoll = clamp(finiteNumber3(options.maximumRoll, 0.55), 0, Math.atan(0.7));
   let pitch = clamp(fallbackPitch, -0.55, 0.55);
-  let roll = clamp(fallbackRoll, -0.55, 0.55);
+  let roll = clamp(fallbackRoll, -maximumRoll, maximumRoll);
   if (!footprint(pitch, roll) || !sampleSurface) return fallback();
   let previousMaximumWheelPenetration = 0;
   for (let index = 0; index < 4; index += 1) {
@@ -2875,7 +2936,7 @@ function resolveVehicleRoadContactPose(options = {}) {
     const forwardSlope = (frontHeight - rearHeight) / (2 * layout.halfWheelbase * Math.cos(pitch));
     const rightSlope = ((rightHeight - leftHeight) / (2 * layout.halfTrack) - forwardSlope * Math.sin(pitch) * Math.sin(roll)) / Math.cos(roll);
     const nextPitch = clamp(-Math.atan(forwardSlope), -0.55, 0.55);
-    const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -0.55, 0.55);
+    const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -maximumRoll, maximumRoll);
     if (Math.abs(nextPitch - pitch) + Math.abs(nextRoll - roll) < 1e-7) break;
     pitch = nextPitch;
     roll = nextRoll;
@@ -3044,6 +3105,7 @@ function stepRaceVehicle(course, car, actions, dt, profile) {
     config: profile.config,
     planetary: false,
     metersPerWorldUnit: course.metersPerUnit,
+    ...course.surfaceModel === BANKED_ROAD_MODEL ? { roadPlane: { pitch: car.terrainPitch || 0, roll: car.terrainRoll || 0 } } : {},
     surfaceDynamics: profile.surface,
     vehicleHandling: profile.handling,
     vehicleCondition: profile.condition,
@@ -3070,6 +3132,7 @@ function stepRaceVehicle(course, car, actions, dt, profile) {
   }
   const segment = course.segments[support.index];
   const contact = resolveVehicleRoadContactPose({
+    ...course.surfaceModel === BANKED_ROAD_MODEL ? { maximumRoll: BANKED_ROAD_MAXIMUM_ROLL } : {},
     x,
     z,
     y: support.y,

@@ -74,8 +74,9 @@ function resolveVehicleRoadContactPose(options = {}) {
   const poseDelta = (pitch, roll, contact) =>
     Math.cos(pitch) * Math.sin(roll) * contact.side * layout.halfTrack -
     Math.sin(pitch) * contact.front * layout.halfWheelbase;
+  const maximumRoll=clamp(finiteNumber(options.maximumRoll,.55),0,Math.atan(.7));
   let pitch = clamp(fallbackPitch, -.55, .55);
-  let roll = clamp(fallbackRoll, -.55, .55);
+  let roll = clamp(fallbackRoll, -maximumRoll, maximumRoll);
   if (!footprint(pitch, roll) || !sampleSurface) return fallback();
   let previousMaximumWheelPenetration = 0;
   for (let index = 0; index < 4; index += 1) {
@@ -94,7 +95,7 @@ function resolveVehicleRoadContactPose(options = {}) {
     const rightSlope = ((rightHeight - leftHeight) / (2 * layout.halfTrack) -
       forwardSlope * Math.sin(pitch) * Math.sin(roll)) / Math.cos(roll);
     const nextPitch = clamp(-Math.atan(forwardSlope), -.55, .55);
-    const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -.55, .55);
+    const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -maximumRoll, maximumRoll);
     if (Math.abs(nextPitch - pitch) + Math.abs(nextRoll - roll) < 1e-7) break;
     pitch = nextPitch;
     roll = nextRoll;
