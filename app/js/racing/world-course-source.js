@@ -4,6 +4,8 @@ import {roadMetersPerWorldUnit}from'../world/road-units.js';
 import {createBuildingCollisionQuery}from'../physics/building-collision.js?v=5';
 import {resolveTunnelSpace}from'../world/compiler/tunnel-space-query.js';
 import {drainCooperatively,yieldToWorldFrame}from'../world/cooperative-scheduling.js?v=1';
+import {STREET_POLYGON_GRID_WORLD}from'../world/compiler/street-coordinate-grid.js';
+import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.js';
 import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
 // Read published world facts through their existing owners. Qualification never
@@ -15,7 +17,8 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  const radius=Math.max(100,Math.min(1200,Number(radiusWorld)||270)),checkBuilding=createBuildingCollisionQuery(context),roads=[];
  const selectedSources=sourceFeatureIds?new Set(sourceFeatureIds):null;
  if(selectedSources&&(!selectedSources.size||selectedSources.size>500||[...selectedSources].some(id=>typeof id!=='string'||!id||id.length>180)))throw Error('invalid_race_source_selection');
- const diagnostics={sourceSegments:traversalSegmentCount(traversal.segments),eligible:0,rejected:{},sampledPositions:0};
+ const diagnostics={sourceSegments:traversalSegmentCount(traversal.segments),eligible:0,rejected:{},sampledPositions:0,
+  precisionContacts:0,maximumPrecisionDistanceWorld:0,maximumGroundProfileDepartureMeters:0};
  const rejected=reason=>{diagnostics.rejected[reason]=(diagnostics.rejected[reason]||0)+1;};
  const active=()=>current()&&context.worldPublication===publication&&!context.worldLoading;
  function* collect(){
@@ -26,24 +29,56 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    if(!feature||!segment.p1||!segment.p2)continue;
    const {p1,p2,segIndex,sourceTStart=0,sourceTEnd=1}=segment;
    if(Math.max(Math.hypot(p1.x,p1.z),Math.hypot(p2.x,p2.z))>radius)continue;
+   const sourceFeatureId=String(feature.transportRecord?.identity||feature.sourceFeatureId||feature.sourceRoadId||feature.id||'');
+   if(selectedSources&&!selectedSources.has(sourceFeatureId))continue;
    const length=Math.hypot(p2.x-p1.x,p2.z-p1.z)*metersPerUnit;
    const widthMeters=minimumRoadWidthOnInterval(feature,segIndex,sourceTStart,sourceTEnd)*roadMetersPerWorldUnit(feature);
    if(length<RACE_MINIMUM_SPAN_METERS||widthMeters<6||!roadSegmentIsDriveable(feature,segIndex,sourceTStart,sourceTEnd)){rejected('width_or_access');yield;continue;}
-   const sourceFeatureId=String(feature.transportRecord?.identity||feature.sourceFeatureId||feature.sourceRoadId||feature.id||'');
-   if(selectedSources&&!selectedSources.has(sourceFeatureId))continue;
    if(!sourceFeatureId){rejected('unstable_source');yield;continue;}
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
    const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[];
-   let failure='',minimumClearance=Infinity;
+   let failure='',minimumClearance=Infinity,firstPoint=null,lastPoint=null;
    const steps=Math.max(1,Math.ceil(length/4)),spanMeters=1.2;
-   function height(x,z,t){return context.sampleFeatureSurfaceY(feature,x,z,{x,z,dist:0,segIndex,t:sourceTStart+(sourceTEnd-sourceTStart)*t});}
+   const mode=feature.structureSemantics?.terrainMode;
+   const groundOwned=mode==='at_grade'&&feature.transportSurfaceModel?.engineeredApproach!==true;
+   function surface(x,z,t){
+    const center={x:p1.x+(p2.x-p1.x)*t,z:p1.z+(p2.z-p1.z)*t};
+    const projection={...center,segIndex,t:sourceTStart+(sourceTEnd-sourceTStart)*t};
+    const guide=context.sampleFeatureSurfaceY(feature,x,z,projection);
+    if(!Number.isFinite(guide))return null;
+    const contacts=context.roadContactIndex;let contact=null;
+    if(contacts){
+     const y=contacts.sampleAt(x,z,guide,mode||null);
+     if(Number.isFinite(y))contact={x,z,y,distance:0};
+     else {
+      // Project source precision to a real uploaded triangle. Collision is
+      // never expanded, and a missing road cannot be filled by this reader.
+      contact=contacts.nearestSurfaceAt?.(x,z,roadSourceCoordinateTolerance(x,z,STREET_POLYGON_GRID_WORLD),mode||null);
+      if(!contact)return null;
+      diagnostics.precisionContacts++;
+      diagnostics.maximumPrecisionDistanceWorld=Math.max(diagnostics.maximumPrecisionDistanceWorld,contact.distance);
+     }
+    }
+    const px=contact?.x??x,pz=contact?.z??z;
+    const drive=context.SurfaceQuery.driveAt(px,pz,{preferRoad:true,currentY:contact?.y??guide,
+     nearestRoad:{road:feature,dist:Math.hypot(px-center.x,pz-center.z),pt:center,segIndex,t:projection.t,y:guide}});
+    if(drive?.kind!=='road'||!Number.isFinite(drive.position?.y)||
+       contact&&Math.abs(drive.position.y-contact.y)*metersPerUnit>.35||
+       !groundOwned&&Math.abs(drive.position.y-guide)*metersPerUnit>.35)return null;
+    // Ordinary at-grade profiles are grading inputs. The published road top
+    // owns driving height after terrain tessellation and intersecting corridors.
+    // Engineered bridges/tunnels retain the independent profile/layer fence.
+    if(groundOwned)diagnostics.maximumGroundProfileDepartureMeters=Math.max(diagnostics.maximumGroundProfileDepartureMeters,Math.abs(drive.position.y-guide)*metersPerUnit);
+    return {x:px,z:pz,y:drive.position.y};
+   }
    for(let sample=0;sample<=steps;sample++){
-    const t=sample/steps,x=p1.x+(p2.x-p1.x)*t,z=p1.z+(p2.z-p1.z)*t,y=height(x,z,t);diagnostics.sampledPositions++;
-    if(!Number.isFinite(y)){failure='missing_surface';break;}
+    const t=sample/steps,x=p1.x+(p2.x-p1.x)*t,z=p1.z+(p2.z-p1.z)*t;diagnostics.sampledPositions++;
     if(context.transportDetail?.hasReadyCoverageAt?.({x,z},0)===false){failure='road_publication_pending';break;}
-    const drive=context.SurfaceQuery.driveAt(x,z,{preferRoad:true,currentY:y});
-    if(drive?.kind!=='road'||!Number.isFinite(drive.position?.y)||Math.abs(drive.position.y-y)*metersPerUnit>.35){failure='surface_layer_mismatch';break;}
+    const point=surface(x,z,t);
+    if(!point){failure='surface_layer_mismatch';break;}
+    const y=point.y;
+    if(sample===0)firstPoint=point;if(sample===steps)lastPoint=point;
     const water=context.SurfaceQuery.waterAt?.(x,z),space=tunnel?resolveTunnelSpace(feature,x,z,y+.5):null;
     if(tunnel){if(!space?.inside){failure='unqualified_tunnel';break;}minimumClearance=Math.min(minimumClearance,space.clearance*metersPerUnit);}
     if(water?.feature&&Number.isFinite(water.position?.y)&&water.position.y>y+.15&&!space?.inside){failure='submerged_road';break;}
@@ -52,7 +87,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
      if(checkBuilding(x+fx*offset,z+fz*offset,envelope.width*.5/metersPerUnit,{actorBaseY:y,actorHeight:envelope.height/metersPerUnit}).collision){failure='blocked_clearance';break;}
     }
     if(failure)break;
-    const lateral=spanMeters/metersPerUnit,leftY=height(x-fz*lateral,z+fx*lateral,t),rightY=height(x+fz*lateral,z-fx*lateral,t);
+    const lateral=spanMeters/metersPerUnit,leftY=surface(x-fz*lateral,z+fx*lateral,t)?.y,rightY=surface(x+fz*lateral,z-fx*lateral,t)?.y;
     if(!Number.isFinite(leftY)||!Number.isFinite(rightY)){failure='missing_crossfall';break;}
     const previous=samples.at(-1);
     if(previous&&Math.abs(y-previous.y)*metersPerUnit/(length/steps)>.22){failure='steep_grade';break;}
@@ -63,7 +98,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    }
    if(failure){rejected(failure);continue;}
    const key=`${sourceFeatureId}:${segIndex}:${sourceTStart.toFixed(6)}:${sourceTEnd.toFixed(6)}`;
-   const a={x:p1.x,y:samples[0].y,z:p1.z,connectionLayer:`source-node:${segment.fromId}`},b={x:p2.x,y:samples.at(-1).y,z:p2.z,connectionLayer:`source-node:${segment.toId}`};
+   const a={...firstPoint,connectionLayer:`source-node:${segment.fromId}`},b={...lastPoint,connectionLayer:`source-node:${segment.toId}`};
    roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,
     driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:samples,heightSampleSpanMeters:spanMeters,
     sourceAuthority:String(feature.transportRecord?.provenance?.authority||feature.sourceAuthority||'published-world-road')});

@@ -40,8 +40,13 @@ accepted ground hash. It preserves unrelated roads, buildings, water, identities
 and source tags. Fully contained generalized raceways are replaced by the
 complete exact raceway extract. Newer conflicting exact geometry rejects adoption.
 Surveys are private source annotations, consumed by the existing road compiler;
-provider tags or cached JSON cannot confer surveyed status. Its compiled left,
-centre and right heights feed the same renderer, contact query and wheel solver.
+provider tags or cached JSON cannot confer surveyed status. At-grade profiles
+are inputs to the terrain grading owner. The final published road triangles
+own the actual driving surface after intersecting grades and terrain tessellation.
+Qualification reads those triangles and the normal surface query at the centre
+and both wheel positions; it does not certify a provisional profile as rendered
+geometry. Profile departures remain separate diagnostics. Independent bridge,
+tunnel and engineered approach heights retain their profile/layer checks.
 Canonical district-source normalization explicitly transfers that private
 annotation to its immutable way records before the road pass consumes them.
 Ordinary roads retain their existing planar cross-section and fitting policy.

@@ -1,7 +1,8 @@
 import * as bundle from '../../../vendor/clipper/index.js';
+import {STREET_POLYGON_GRID_WORLD} from './street-coordinate-grid.js';
+export {STREET_POLYGON_GRID_WORLD} from './street-coordinate-grid.js';
 const C = bundle.default || globalThis.ClipperLib;
 // Explicit integer coordinate grid shared with independent replay checks.
-export const STREET_POLYGON_GRID_WORLD = 0.001;
 export function createStreetPolygonKernel({grid = STREET_POLYGON_GRID_WORLD} = {}) {
 if (!Number.isFinite(grid) || grid <= 0) throw new RangeError('Polygon grid must be positive');
 const SCALE = 1 / grid;
