@@ -40,7 +40,8 @@ const LICENSED_ROAD_PROFILES = Object.freeze([
   {id:'cadillac_coupe',assetId:'road-cadillac-coupe-deville',bodyStyle:'sedan',handlingLabel:'Long-wheelbase cruiser',massKg:2240,seatCount:6,weight:16,color:0x7cafa0,topSpeedMph:105,accelerationScale:.8,steeringScale:.76,gripScale:.96,brakeScale:.91,turningRadius:6.6},
   {id:'cadillac_fleetwood',assetId:'road-cadillac-fleetwood-brougham',bodyStyle:'sedan',handlingLabel:'Luxury touring sedan',massKg:1930,seatCount:6,weight:20,color:0x6b2635,topSpeedMph:105,accelerationScale:.83,steeringScale:.8,gripScale:1.02,brakeScale:.96,turningRadius:6.4},
   {id:'golf_ii',assetId:'road-volkswagen-golf-ii',bodyStyle:'compact',handlingLabel:'Light city hatchback',massKg:1010,seatCount:5,weight:40,color:0xb7662e,topSpeedMph:110,accelerationScale:1.04,steeringScale:1.12,gripScale:1.04,brakeScale:1.05,turningRadius:4.8},
-  {id:'datsun_280z',assetId:'road-datsun-280z',bodyStyle:'sedan',handlingLabel:'Sport coupe',massKg:1300,seatCount:2,weight:20,color:0xe5bd49,topSpeedMph:120,accelerationScale:1.16,steeringScale:1.1,gripScale:1.07,brakeScale:1.09,turningRadius:5.1}
+  {id:'datsun_280z',assetId:'road-datsun-280z',bodyStyle:'sedan',handlingLabel:'Sport coupe',massKg:1300,seatCount:2,weight:20,color:0xe5bd49,topSpeedMph:120,accelerationScale:1.16,steeringScale:1.1,gripScale:1.07,brakeScale:1.09,turningRadius:5.1},
+  {id:'bmw_m3_e46',assetId:'road-bmw-m3-e46',bodyStyle:'sedan',category:'Performance coupe',handlingLabel:'M3 sports coupe',massKg:1495,seatCount:4,weight:0,color:0x225690,topSpeedMph:120,accelerationScale:1.38,steeringScale:1.12,gripScale:1.14,brakeScale:1.22,turningRadius:5.2,parkedEligible:false}
 ].map(profile=>{
   const asset=[...EXPLORER_FLEET_ASSETS,...RACING_FLEET_ASSETS].find(entry=>entry.id===profile.assetId);
   return Object.freeze({...profile,...asset.dimensionsMeters,label:asset.label,wheelContacts:asset.wheelLayout,

@@ -609,7 +609,92 @@ var require_vehicle_garage_rules = __commonJS({
         }
       }
     ].map((record) => Object.freeze(record)));
-    var RACING_FLEET_ASSETS2 = Object.freeze([]);
+    var RACING_FLEET_ASSETS2 = Object.freeze([
+      {
+        "schemaVersion": 1,
+        "id": "road-bmw-m3-e46",
+        "label": "BMW M3 E46",
+        "url": "/app/assets/models/vehicles/racing-fleet/road-bmw-m3-e46.glb",
+        "roles": [
+          "road-vehicle-presentation"
+        ],
+        "vehicleVariantIds": [
+          "bmw_m3_e46"
+        ],
+        "license": "CC-BY-4.0",
+        "sourceUrl": "https://sketchfab.com/3d-models/bmw-m3-e46-f1b00ff37d504629b10031da32bc7497",
+        "attribution": "BMW M3 E46 by MMC Works",
+        "sourceCredit": "M\xE1rcio Meireles (https://sketchfab.com/marciomeireles)",
+        "dimensionsMeters": {
+          "width": 1.9006898684883853,
+          "height": 1.3690595307716498,
+          "length": 4.493
+        },
+        "paintMaterialNames": [
+          "Car_Paint_-_All_Colors"
+        ],
+        "wheelLayout": [
+          {
+            "id": "front-right",
+            "position": [
+              0.7402718961238861,
+              0.3208164716925239,
+              1.4547739028930664
+            ],
+            "radius": 0.32033197629789356
+          },
+          {
+            "id": "front-left",
+            "position": [
+              -0.7258506417274475,
+              0.3220483546028845,
+              1.4835588932037354
+            ],
+            "radius": 0.32033200218575075
+          },
+          {
+            "id": "rear-right",
+            "position": [
+              0.7378740608692169,
+              0.32033199071884155,
+              -1.2492441236972809
+            ],
+            "radius": 0.32033199071884155
+          },
+          {
+            "id": "rear-left",
+            "position": [
+              -0.740881621837616,
+              0.32033199071884155,
+              -1.249243974685669
+            ],
+            "radius": 0.32033199071884155
+          }
+        ],
+        "driverEyeGroundMeters": [
+          0.345,
+          1.075,
+          0.015
+        ],
+        "sourceUpAxis": "y",
+        "rigPolicy": "preserve-parts",
+        "collisionPolicy": "existing-road-vehicle-envelope",
+        "instancePolicy": {
+          "geometry": "shared",
+          "materials": "clone"
+        },
+        "loadPolicy": {
+          "bounded": true,
+          "timeoutMs": 2e4
+        },
+        "budgets": {
+          "bytes": 3049196,
+          "triangles": 101109,
+          "textureEdgePixels": 512,
+          "maxInstances": 4
+        }
+      }
+    ].map((record) => Object.freeze(record)));
     var ROAD_VEHICLE_DEFINITIONS2 = Object.freeze([
       Object.freeze({ id: "compact", label: "Compact hatchback", bodyStyle: "compact", handlingLabel: "Nimble", width: 1.65, height: 1.42, length: 3.65, cabinScale: 0.48, wheelRadius: 0.34, speedFactor: 1.04, acceleration: 2.8, turningRadius: 4.6, accelerationScale: 1.13, steeringScale: 1.14, gripScale: 0.98, brakeScale: 1.04, topSpeedMph: 120, weight: 18, color: 9060165, parkedEligible: true }),
       Object.freeze({ id: "sedan", label: "Four-door sedan", bodyStyle: "sedan", handlingLabel: "Balanced", width: 1.78, height: 1.45, length: 4.45, cabinScale: 0.5, wheelRadius: 0.36, speedFactor: 1, acceleration: 2.5, turningRadius: 5.2, accelerationScale: 1, steeringScale: 1, gripScale: 1, brakeScale: 1, topSpeedMph: 120, weight: 22, color: 3235705, parkedEligible: true }),
@@ -638,7 +723,8 @@ var require_vehicle_garage_rules = __commonJS({
       { id: "cadillac_coupe", assetId: "road-cadillac-coupe-deville", bodyStyle: "sedan", handlingLabel: "Long-wheelbase cruiser", massKg: 2240, seatCount: 6, weight: 16, color: 8171424, topSpeedMph: 105, accelerationScale: 0.8, steeringScale: 0.76, gripScale: 0.96, brakeScale: 0.91, turningRadius: 6.6 },
       { id: "cadillac_fleetwood", assetId: "road-cadillac-fleetwood-brougham", bodyStyle: "sedan", handlingLabel: "Luxury touring sedan", massKg: 1930, seatCount: 6, weight: 20, color: 7022133, topSpeedMph: 105, accelerationScale: 0.83, steeringScale: 0.8, gripScale: 1.02, brakeScale: 0.96, turningRadius: 6.4 },
       { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
-      { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 }
+      { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
+      { id: "bmw_m3_e46", assetId: "road-bmw-m3-e46", bodyStyle: "sedan", category: "Performance coupe", handlingLabel: "M3 sports coupe", massKg: 1495, seatCount: 4, weight: 0, color: 2250384, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.12, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.2, parkedEligible: false }
     ].map((profile) => {
       const asset = [...EXPLORER_FLEET_ASSETS2, ...RACING_FLEET_ASSETS2].find((entry) => entry.id === profile.assetId);
       return Object.freeze({
@@ -695,7 +781,8 @@ var require_vehicle_garage_rules = __commonJS({
       cadillac_coupe: 22e3,
       cadillac_fleetwood: 26e3,
       golf_ii: 9e3,
-      datsun_280z: 34e3
+      datsun_280z: 34e3,
+      bmw_m3_e46: 54e3
     };
     var PERSONAL_VEHICLES2 = Object.freeze([
       Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),
@@ -2485,7 +2572,92 @@ var EXPLORER_FLEET_ASSETS = Object.freeze([
 ].map((record) => Object.freeze(record)));
 
 // app/js/assets/racing-fleet-assets.js
-var RACING_FLEET_ASSETS = Object.freeze([]);
+var RACING_FLEET_ASSETS = Object.freeze([
+  {
+    "schemaVersion": 1,
+    "id": "road-bmw-m3-e46",
+    "label": "BMW M3 E46",
+    "url": "/app/assets/models/vehicles/racing-fleet/road-bmw-m3-e46.glb",
+    "roles": [
+      "road-vehicle-presentation"
+    ],
+    "vehicleVariantIds": [
+      "bmw_m3_e46"
+    ],
+    "license": "CC-BY-4.0",
+    "sourceUrl": "https://sketchfab.com/3d-models/bmw-m3-e46-f1b00ff37d504629b10031da32bc7497",
+    "attribution": "BMW M3 E46 by MMC Works",
+    "sourceCredit": "M\xE1rcio Meireles (https://sketchfab.com/marciomeireles)",
+    "dimensionsMeters": {
+      "width": 1.9006898684883853,
+      "height": 1.3690595307716498,
+      "length": 4.493
+    },
+    "paintMaterialNames": [
+      "Car_Paint_-_All_Colors"
+    ],
+    "wheelLayout": [
+      {
+        "id": "front-right",
+        "position": [
+          0.7402718961238861,
+          0.3208164716925239,
+          1.4547739028930664
+        ],
+        "radius": 0.32033197629789356
+      },
+      {
+        "id": "front-left",
+        "position": [
+          -0.7258506417274475,
+          0.3220483546028845,
+          1.4835588932037354
+        ],
+        "radius": 0.32033200218575075
+      },
+      {
+        "id": "rear-right",
+        "position": [
+          0.7378740608692169,
+          0.32033199071884155,
+          -1.2492441236972809
+        ],
+        "radius": 0.32033199071884155
+      },
+      {
+        "id": "rear-left",
+        "position": [
+          -0.740881621837616,
+          0.32033199071884155,
+          -1.249243974685669
+        ],
+        "radius": 0.32033199071884155
+      }
+    ],
+    "driverEyeGroundMeters": [
+      0.345,
+      1.075,
+      0.015
+    ],
+    "sourceUpAxis": "y",
+    "rigPolicy": "preserve-parts",
+    "collisionPolicy": "existing-road-vehicle-envelope",
+    "instancePolicy": {
+      "geometry": "shared",
+      "materials": "clone"
+    },
+    "loadPolicy": {
+      "bounded": true,
+      "timeoutMs": 2e4
+    },
+    "budgets": {
+      "bytes": 3049196,
+      "triangles": 101109,
+      "textureEdgePixels": 512,
+      "maxInstances": 4
+    }
+  }
+].map((record) => Object.freeze(record)));
 
 // app/js/engine/vehicle-catalog.js?v=6
 var VEHICLE_ROOT_TO_GROUND_METERS = 1.12;
@@ -2517,7 +2689,8 @@ var LICENSED_ROAD_PROFILES = Object.freeze([
   { id: "cadillac_coupe", assetId: "road-cadillac-coupe-deville", bodyStyle: "sedan", handlingLabel: "Long-wheelbase cruiser", massKg: 2240, seatCount: 6, weight: 16, color: 8171424, topSpeedMph: 105, accelerationScale: 0.8, steeringScale: 0.76, gripScale: 0.96, brakeScale: 0.91, turningRadius: 6.6 },
   { id: "cadillac_fleetwood", assetId: "road-cadillac-fleetwood-brougham", bodyStyle: "sedan", handlingLabel: "Luxury touring sedan", massKg: 1930, seatCount: 6, weight: 20, color: 7022133, topSpeedMph: 105, accelerationScale: 0.83, steeringScale: 0.8, gripScale: 1.02, brakeScale: 0.96, turningRadius: 6.4 },
   { id: "golf_ii", assetId: "road-volkswagen-golf-ii", bodyStyle: "compact", handlingLabel: "Light city hatchback", massKg: 1010, seatCount: 5, weight: 40, color: 12019246, topSpeedMph: 110, accelerationScale: 1.04, steeringScale: 1.12, gripScale: 1.04, brakeScale: 1.05, turningRadius: 4.8 },
-  { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 }
+  { id: "datsun_280z", assetId: "road-datsun-280z", bodyStyle: "sedan", handlingLabel: "Sport coupe", massKg: 1300, seatCount: 2, weight: 20, color: 15056201, topSpeedMph: 120, accelerationScale: 1.16, steeringScale: 1.1, gripScale: 1.07, brakeScale: 1.09, turningRadius: 5.1 },
+  { id: "bmw_m3_e46", assetId: "road-bmw-m3-e46", bodyStyle: "sedan", category: "Performance coupe", handlingLabel: "M3 sports coupe", massKg: 1495, seatCount: 4, weight: 0, color: 2250384, topSpeedMph: 120, accelerationScale: 1.38, steeringScale: 1.12, gripScale: 1.14, brakeScale: 1.22, turningRadius: 5.2, parkedEligible: false }
 ].map((profile) => {
   const asset = [...EXPLORER_FLEET_ASSETS, ...RACING_FLEET_ASSETS].find((entry) => entry.id === profile.assetId);
   return Object.freeze({
@@ -2762,7 +2935,8 @@ var prices = {
   cadillac_coupe: 22e3,
   cadillac_fleetwood: 26e3,
   golf_ii: 9e3,
-  datsun_280z: 34e3
+  datsun_280z: 34e3,
+  bmw_m3_e46: 54e3
 };
 var PERSONAL_VEHICLES = Object.freeze([
   Object.freeze({ id: "bmw_e34", label: "BMW 525i E34", variantId: "sedan", assetId: "vehicle-bmw-525i-e34", price: 0, category: "Personal sedan", defaultVisual: true }),

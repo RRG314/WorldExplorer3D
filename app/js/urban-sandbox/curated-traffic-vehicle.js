@@ -19,6 +19,7 @@ const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   cadillac_fleetwood: 'road-cadillac-fleetwood-brougham',
   golf_ii: 'road-volkswagen-golf-ii',
   datsun_280z: 'road-datsun-280z',
+  bmw_m3_e46: 'road-bmw-m3-e46',
 });
 
 const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';

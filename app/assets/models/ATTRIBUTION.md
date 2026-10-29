@@ -328,3 +328,13 @@ All seven models below are adapted under [CC BY 4.0](https://creativecommons.org
 - [Dassault Falcon 10](https://sketchfab.com/3d-models/falcon10-0d5a676f75da403b8419154b102d55a7) — manilov.ap (https://sketchfab.com/manilov.ap). File: `vehicles/explorer-fleet/aircraft-falcon-10.glb`.
 
 The coupe author does not specify an exact model year. The long Fleetwood Brougham depicts the early 1980s. The source and derived checksums, measured budgets and transformations are recorded in `vehicles/explorer-fleet/asset-manifest.json`.
+
+## BMW M3 E46
+
+- Original model: [BMW M3 E46](https://sketchfab.com/3d-models/bmw-m3-e46-f1b00ff37d504629b10031da32bc7497) by MMC Works.
+- Mesh licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Runtime derivative: uniform metre normalization, bounded solid-part geometry
+  simplification, reduced textures, compatible glazing, straightened showcase
+  wheel pose and four steering/spin pivots. Original interior is retained.
+- Rights notice and source/derivative hashes accompany the GLB in
+  `vehicles/racing-fleet/`. No source simulation is imported.

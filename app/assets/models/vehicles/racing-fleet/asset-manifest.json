@@ -1,1 +1,76 @@
-{"schemaVersion":1,"assets":[]}
+{
+  "schemaVersion": 1,
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "assets": [
+    {
+      "id": "road-bmw-m3-e46",
+      "label": "BMW M3 E46",
+      "variantId": "bmw_m3_e46",
+      "sourceUrl": "https://sketchfab.com/3d-models/bmw-m3-e46-f1b00ff37d504629b10031da32bc7497",
+      "attribution": "BMW M3 E46 by MMC Works",
+      "sourceCredit": "Márcio Meireles (https://sketchfab.com/marciomeireles)",
+      "license": "CC-BY-4.0",
+      "filename": "road-bmw-m3-e46.glb",
+      "sourceArchiveSha256": "646b76b04853df219522d73162bb3108e5d85f00729fd460ce05120ed1c9d054",
+      "sha256": "0a2d9c5b63c800ffea703f4773dfe4006b9fa442334a85e8c0aa451f6b25db65",
+      "bytes": 3049196,
+      "sourceTriangles": 846922,
+      "triangles": 101109,
+      "materials": 36,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 1.9006898684883853,
+        "height": 1.3690595307716498,
+        "length": 4.493
+      },
+      "driverEyeGroundMeters": [
+        0.345,
+        1.075,
+        0.015
+      ],
+      "paintMaterialNames": [
+        "Car_Paint_-_All_Colors"
+      ],
+      "wheelLayout": [
+        {
+          "id": "front-right",
+          "position": [
+            0.7402718961238861,
+            0.3208164716925239,
+            1.4547739028930664
+          ],
+          "radius": 0.32033197629789356
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.7258506417274475,
+            0.3220483546028845,
+            1.4835588932037354
+          ],
+          "radius": 0.32033200218575075
+        },
+        {
+          "id": "rear-right",
+          "position": [
+            0.7378740608692169,
+            0.32033199071884155,
+            -1.2492441236972809
+          ],
+          "radius": 0.32033199071884155
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.740881621837616,
+            0.32033199071884155,
+            -1.249243974685669
+          ],
+          "radius": 0.32033199071884155
+        }
+      ],
+      "aircraft": false,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel pivots. Adjusted paint/trim roughness and selected body colors. Front wheel assemblies straightened from the original 20 degree showcase pose; four runtime wheel pivots. No gameplay simulation imported."
+    }
+  ]
+}
