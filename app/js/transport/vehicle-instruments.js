@@ -12,8 +12,15 @@ export function createVehicleInstruments(THREE, root) {
   const context = canvas.getContext('2d');
   const texture = new THREE.CanvasTexture(canvas);
   texture.encoding = THREE.sRGBEncoding;
-  const previous = [...materials].map(material => ({material,map:material.map,emissiveMap:material.emissiveMap}));
+  texture.flipY = false; // Prepared glTF UVs already use the image's top row.
+  const previous = [...materials].map(material => ({material,map:material.map,emissiveMap:material.emissiveMap,
+    color:material.color.clone(),emissive:material.emissive.clone(),
+    emissiveIntensity:material.emissiveIntensity,toneMapped:material.toneMapped}));
   for (const material of materials) {
+    // Exporters may fold the uniform placeholder image into dark PBR factors.
+    // The live display supplies its own colors and must replace those factors.
+    material.color.setHex(0xffffff); material.emissive.setHex(0xffffff);
+    material.emissiveIntensity = .65; material.toneMapped = false;
     material.map = texture; material.emissiveMap = texture;
     material.needsUpdate = true;
   }
@@ -47,7 +54,10 @@ export function createVehicleInstruments(THREE, root) {
   update();
   return Object.freeze({update,dispose() {
     if(disposed)return; disposed = true;
-    for(const {material,map,emissiveMap} of previous){material.map=map;material.emissiveMap=emissiveMap;}
+    for(const {material,map,emissiveMap,color,emissive,emissiveIntensity,toneMapped} of previous){
+      material.map=map;material.emissiveMap=emissiveMap;material.color.copy(color);material.emissive.copy(emissive);
+      material.emissiveIntensity=emissiveIntensity;material.toneMapped=toneMapped;
+    }
     texture.dispose();
   }});
 }
