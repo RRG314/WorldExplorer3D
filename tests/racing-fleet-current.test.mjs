@@ -126,6 +126,14 @@ test('the Porsche derivative keeps its share-alike identity, rigid wheels, conte
  assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-caliper').length,4);
  assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-steering'&&n.extras.front).length,2);
  const screen=json.nodes.find(n=>n.extras?.vehicleInstrumentDisplay===true);assert.equal(screen.extras.vehicleInstrumentStyle,'five-dial');
+ const {NodeIO}=await import('@gltf-transform/core'),{ALL_EXTENSIONS}=await import('@gltf-transform/extensions');
+ const doc=await new NodeIO().registerExtensions(ALL_EXTENSIONS).readBinary(new Uint8Array(bytes));
+ const face=doc.getRoot().listNodes().find(n=>n.getExtras().vehicleInstrumentDisplay).getMesh().listPrimitives()[0];
+ const uv=face.getAttribute('TEXCOORD_0');assert.ok(uv,'live atlas retains its exported binding');
+ assert.equal(uv.getCount(),face.getAttribute('POSITION').getCount());
+ const values=Array.from({length:uv.getCount()},(_,i)=>uv.getElement(i,[]));
+ assert.ok(Math.max(...values.map(v=>v[0]))-Math.min(...values.map(v=>v[0]))>.9);
+ assert.ok(Math.max(...values.map(v=>v[1]))-Math.min(...values.map(v=>v[1]))>.5);
  assert.ok(!json.materials.some(m=>['coat','Material'].includes(m.name)));
  assert.equal(json.animations?.length||0,0);assert.equal(json.skins?.length||0,0);
  assert.ok(!json.buffers.some(b=>b.uri));assert.ok(!(json.images||[]).some(i=>i.uri));

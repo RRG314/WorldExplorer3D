@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 import bpy
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 source, out = [Path(p) for p in sys.argv[sys.argv.index('--')+1:]]
 original = source/'scene.glb'
@@ -50,6 +51,7 @@ def material(name, rgb, rough=.65, metal=0):
 leather = material('Black_Leather', (.023,.027,.031), .86)
 upholstery = material('Seat_Leather', (.12,.135,.145), .8)
 liner = material('Headliner', (.035,.037,.04), .98)
+liner.use_backface_culling = True
 metal = material('Satin_Aluminium', (.34,.37,.40), .32, .78)
 dark = material('Dark_Trim', (.012,.016,.02), .5, .12)
 red = material('Red_Controls', (.42,.01,.012), .6)
@@ -119,13 +121,49 @@ for side in [-1,1]:
     tube('Door handle',(side*.68,.74,.08),(side*.68,.74,.21),.012,metal)
     box('Sun visor',(side*.33,1.19,.19),(.29,.018,.12),liner,.008)
 
+# Fit the inner lining below the actual retained roof, including its curved
+# sides and windshield boundary. A guessed wide horizontal sheet protruded
+# through the exterior; neither camera hiding nor double-sided paint fixes it.
+bpy.context.view_layer.update()
+roof_vertices=[]
+roof_faces=[]
+for obj in prepared:
+    if obj.type!='MESH':
+        continue
+    paint_slots={i for i,m in enumerate(obj.data.materials) if m and m.name=='paint'}
+    if not paint_slots:
+        continue
+    for polygon in obj.data.polygons:
+        if polygon.material_index not in paint_slots:
+            continue
+        start=len(roof_vertices)
+        roof_vertices.extend(obj.matrix_world @ obj.data.vertices[i].co for i in polygon.vertices)
+        roof_faces.append(tuple(range(start,start+len(polygon.vertices))))
+roof=BVHTree.FromPolygons(roof_vertices,roof_faces)
+def roof_height(x,z):
+    hit,normal,index,distance=roof.ray_cast(Vector((x,-z,2)),Vector((0,0,-1)),2)
+    return hit.z if hit is not None and hit.z>1.1 else None
 points=[]
-for z in [-.86,-.60,-.33,-.06,.20]:
-    for x in [-.65,-.43,-.21,0,.21,.43,.65]:
-        y=1.22+.035*(1-(x/.65)**2)-.035*((z+.30)/.56)**2
-        points.append((x,y,z))
+for z in [-.78,-.60,-.40,-.20,0,.10]:
+    widths=[]
+    for side in [-1,1]:
+        width=0
+        for i in range(1,61):
+            if roof_height(side*i*.01,z) is None:
+                break
+            width=i*.01
+        widths.append(width)
+    half_width=min(widths)-.015
+    if half_width<.35:
+        raise RuntimeError('Prepared lining has no continuous source roof')
+    for step in [-1,-2/3,-1/3,0,1/3,2/3,1]:
+        x=step*half_width
+        height=roof_height(x,z)
+        if height is None:
+            raise RuntimeError('Prepared lining crossed a source roof opening')
+        points.append((x,height-.018,z))
 faces=[]
-for row in range(4):
+for row in range(5):
     for col in range(6):
         a=row*7+col
         faces.append((a,a+1,a+8,a+7))
@@ -141,6 +179,19 @@ display = material('Five_Dial_Display',(1,1,1),.8)
 shader=display.node_tree.nodes.get('Principled BSDF')
 shader.inputs['Emission Color'].default_value=(1,1,1,1)
 shader.inputs['Emission Strength'].default_value=.4
+# Retain glTF UVs by exporting a nonuniform authored placeholder texture. A
+# texture-free material lets exporters remove TEXCOORD_0 before runtime binding.
+image=bpy.data.images.new('Original dial atlas placeholder',width=8,height=8)
+pixels=[]
+for y in range(8):
+    for x in range(8):
+        value=.025 if (x+y)%2 else .045
+        pixels.extend((value,value+.01,value+.02,1))
+image.pixels=pixels
+texture=display.node_tree.nodes.new('ShaderNodeTexImage')
+texture.image=image
+display.node_tree.links.new(texture.outputs['Color'],shader.inputs['Base Color'])
+display.node_tree.links.new(texture.outputs['Color'],shader.inputs['Emission Color'])
 vertices=[]
 triangles=[]
 uvs=[]

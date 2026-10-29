@@ -851,8 +851,8 @@ var require_vehicle_garage_rules = __commonJS({
           "timeoutMs": 2e4
         },
         "budgets": {
-          "bytes": 3153476,
-          "triangles": 73197,
+          "bytes": 3157228,
+          "triangles": 73209,
           "textureEdgePixels": 512,
           "maxInstances": 4
         }
@@ -3003,8 +3003,8 @@ var RACING_FLEET_ASSETS = Object.freeze([
       "timeoutMs": 2e4
     },
     "budgets": {
-      "bytes": 3153476,
-      "triangles": 73197,
+      "bytes": 3157228,
+      "triangles": 73209,
       "textureEdgePixels": 512,
       "maxInstances": 4
     }
