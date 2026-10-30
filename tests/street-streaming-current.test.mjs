@@ -479,3 +479,33 @@ test('retired prepared coverage cannot publish mapped paths into a replacement w
  assert.equal(await overview.publishPreparedCoverage(),false);assert.equal(calls,0);
  assert.equal(h.worker.terminated,true);assert.equal(overview.stats.workerActive,false);
 });
+
+for(const changedField of ['roads','buildings','landuses','linearFeatures'])test(`initial overview retries ${changedField} replacement during acknowledged source transfer`,async t=>{
+ const h=harness(t,{holdType:'source-chunk'});h.ctx.worldLoading=true;
+ h.ctx.roads=[{type:'residential',width:8,pts:[{x:0,z:0},{x:40,z:0}]}];
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true});t.after(()=>overview.dispose());
+ const pending=overview.prepareInitialCoverage({x:0,z:0});
+ for(let i=0;i<30&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ const retired=h.worker;assert.equal(retired.held.data.type,'source-chunk');
+ h.ctx[changedField]=[...h.ctx[changedField],changedField==='roads'?{type:'residential',width:8,pts:[{x:50,z:0},{x:90,z:0}]}:{pts:[]}];
+ retired.held.deliver();
+ // The same loading owner retries the changed source. It must not publish the
+ // old worker's partial coverage or convert normal source replacement to failure.
+ for(let i=0;i<30&&h.worker===retired;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(retired.terminated,true);assert.notEqual(overview.stats.status,'failed');assert.equal(overview.stats.error,null);
+ for(let i=0;i<30&&overview.stats.status!=='prepared';i++){
+  if(h.worker?.held){const held=h.worker.held;h.worker.held=null;held.deliver();}
+  await new Promise(resolve=>setImmediate(resolve));
+ }
+ assert.equal(await pending,true);assert.equal(overview.stats.status,'prepared');assert.equal(overview.stats.completedCells,2);
+ assert.equal(overview.stats.sourceInvalidations,1);
+});
+
+test('initial overview still fails a real worker error when the source and load remain current',async t=>{
+ const h=harness(t,{holdType:'source-begin'});h.ctx.worldLoading=true;
+ const overview=createStreetOverview(h.ctx,{deferPresentation:true});t.after(()=>overview.dispose());
+ const pending=overview.prepareInitialCoverage({x:0,z:0});
+ for(let i=0;i<30&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
+ h.worker.onerror({message:'controlled current-source failure'});
+ await assert.rejects(pending,/controlled current-source failure/);assert.equal(overview.stats.status,'failed');assert.equal(overview.stats.completedCells,0);
+});

@@ -122,7 +122,14 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
    return coverageReady?publishPreparedCoverage({current}):true;
  }
  function runOwned(task,run){
-   active=task().catch(error=>{if(valid()&&run===generation){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{if(run===generation)active=null;});
+   active=task().catch(error=>{if(valid()&&run===generation){
+     worker?.terminate();worker=null;prepared=false;stats.workerActive=false;
+     // Building detail and other source owners can replace their lists while
+     // an acknowledged snapshot is in flight. Retire that unfinished worker
+     // and let this same owner take the new source; it is not a failed world.
+     if(!sourcesMatch()){stats.status='waiting';stats.error=null;stats.sourceInvalidations=(stats.sourceInvalidations||0)+1;}
+     else{stats.status='failed';stats.error=String(error.message);}
+   }}).finally(()=>{if(run===generation)active=null;});
  }
  function step(focus){
    setDetailBounds(appCtx.streetPavement?.coverageBounds);
