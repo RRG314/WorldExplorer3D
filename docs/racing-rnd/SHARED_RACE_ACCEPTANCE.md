@@ -162,6 +162,29 @@ rejections, invalid raw heights or invalid canonical heights. All 127 retain
 full profiles through the 668,691-byte storage round trip, with at most 19
 lateral points and measured fit error below 3 mm. Maximum departure from the
 compiled surface is 44.5 mm; this is local agreement, not survey accuracy.
-The affected source-join view was inspected. Timing-line admission, finished
-presentation, discipline gameplay and final performance remain open. No major
-venue pack is accepted.
+The affected source-join view was inspected. No major venue pack is accepted.
+
+The oval's original frontstretch game timing reference now qualifies and starts
+private practice through the normal menu. A continuously held acceleration
+check crosses the first gate with no race barrier contacts; leaving returns to
+exploration. This is circuit-style practice, not completed oval rules or an
+official surveyed timing line.
+
+Permanent outside wall and curved catch fencing publish through the existing
+post-transport exterior owner: 32 bounded sections and 557 indexed wall
+colliders. An actual outward approach remains inside the wall. Six impact
+correction frames omit complete wheel telemetry, so that check does not certify
+four contacts throughout an impact or final pacing. The wall footing reads
+actual published contacts, with a four-centimetre nearest-triangle limit at
+clipped caps; road contact and qualification tolerances are unchanged.
+
+Native frontstretch and 31-degree-bank views show the double yellow boundary,
+white outside line, wall and fence. Paint uses the existing road-marking depth
+policy and clips to published triangles. Newly refined terrain vertices resolve
+retained mapped cover through the existing mapped-ground owner rather than
+inheriting a coarse urban neighbour. Focused regressions cover narrow lawns,
+material weights and detailed-source priority; native sampled lawns retain
+grass material while unclassified adjacent ground retains its prior class.
+Pit architecture, further landscape detail, oval discipline, complete venue
+play and final performance remain open. These improvements are not finished
+pack or production acceptance.
