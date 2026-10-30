@@ -1,3 +1,4 @@
+import {ROAD_SOURCE_MINIMUM_SPAN_METERS,roadMetersPerWorldUnit} from './road-units.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
 import {
@@ -252,7 +253,11 @@ function buildTraversalGraph(mode = 'walk') {
       const p1 = pathPoints[i].point;
       const p2 = pathPoints[i + 1].point;
       const length = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-      if (!(length > 0.05)) continue;
+      const exact=feature.transportRecord?.completeness==='lossless'&&pathPoints[i].aliases.length&&pathPoints[i+1].aliases.length;
+      // A certified connection can split a retained source span less than five
+      // centimetres from its node. Dropping just that interval disconnects the
+      // path. Preserve its metric source precision; legacy proximity is unchanged.
+      if (!(length > 0.05) && !(exact&&length*roadMetersPerWorldUnit(feature)>=ROAD_SOURCE_MINIMUM_SPAN_METERS)) continue;
       const source = traversalSourceInterval(
         feature.pts, distances,
         pathPoints[i].distanceAlong,

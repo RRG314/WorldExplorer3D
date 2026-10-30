@@ -1,5 +1,6 @@
 // Portable race-course facts and rules. The world compiler supplies road facts;
 // this module cannot invent pavement, change a building or move a transport.
+import {ROAD_SOURCE_MINIMUM_SPAN_METERS} from '../world/road-units.js';
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL} from '../physics/road-plane-dynamics.js';
 import {normalizeRaceVenueSource,assertRaceVenueRoads,raceVenueMaximumLength} from './venue-course-policy.js';
 export const RACE_COURSE_VERSION=1;
@@ -7,7 +8,7 @@ export const RACE_MAX_ROUTE_EDGES=2048;
 // Keep source-node topology down to centimetres, above the approved snapshot's
 // millimetre coordinate precision. Work is bounded by counts and route length,
 // not by dropping a short link from an otherwise connected real layout.
-export const RACE_MINIMUM_SPAN_METERS=.01;
+export const RACE_MINIMUM_SPAN_METERS=ROAD_SOURCE_MINIMUM_SPAN_METERS;
 export const RACE_DISCIPLINES=Object.freeze(['sprint','circuit','time-trial']);
 const finitePoint=p=>p&&['x','y','z'].every(k=>Number.isFinite(p[k]));
 const distance=(a,b)=>Math.hypot(b.x-a.x,b.z-a.z);

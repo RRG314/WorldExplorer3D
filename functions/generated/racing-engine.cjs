@@ -1357,6 +1357,9 @@ __export(engine_entry_exports, {
 });
 module.exports = __toCommonJS(engine_entry_exports);
 
+// app/js/world/road-units.js
+var ROAD_SOURCE_MINIMUM_SPAN_METERS = 0.01;
+
 // app/js/physics/road-plane-dynamics.js
 var BANKED_ROAD_MODEL = "banked-road-v1";
 var BANKED_ROAD_MAXIMUM_CROSSFALL = 0.7;
@@ -1431,7 +1434,7 @@ var raceVenueMaximumLength = (venue) => venue ? Math.max(8e3, Math.min(3e4, venu
 // app/js/racing/course-rules.js
 var RACE_COURSE_VERSION = 1;
 var RACE_MAX_ROUTE_EDGES = 2048;
-var RACE_MINIMUM_SPAN_METERS = 0.01;
+var RACE_MINIMUM_SPAN_METERS = ROAD_SOURCE_MINIMUM_SPAN_METERS;
 var RACE_DISCIPLINES = Object.freeze(["sprint", "circuit", "time-trial"]);
 var finitePoint = (p) => p && ["x", "y", "z"].every((k) => Number.isFinite(p[k]));
 var distance = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);

@@ -1,3 +1,5 @@
+// Exact retained source/junction spans must survive at centimetre scale.
+export const ROAD_SOURCE_MINIMUM_SPAN_METERS=.01;
 // Source cross sections remain in metres. Meshes and spatial queries use
 // world coordinates; convert at that boundary exactly once.
 export function roadMetersPerWorldUnit(feature) {

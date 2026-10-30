@@ -56,3 +56,20 @@ test('the actual complete Silverstone source passes through transport and naviga
  const result=buildVenueRaceCourses(district,{id:source.venueId,name:'Silverstone',status:'source-prepared',sourceFeatureIds:source.layout.wayIds.map(id=>`osm:way:${id}`),mappedLengthMeters:5880.622911204611});
  assert.equal(result.events[0].sourcePath.length,506);assert.ok(result.events[0].lengthMeters>5800);
 });
+
+function exactSplitFixture(completeness='lossless'){
+ const feature=road(1,[{x:-100,z:0},{x:0,z:0},{x:100,z:0}],[1,2,3]);feature.transportRecord={...feature.transportRecord,completeness};
+ feature.transportGraphRef={direction:'forward',driveable:true,stations:[{nodeId:'controlled-certified-junction',connectionKind:'endpoint-interior',
+  distanceAlong:100.0243,segmentIndex:1,segmentT:.000243,point:{x:.0243,z:0}}]};
+ initWorldTraversal({runtimeRoadFeatures:()=>[feature],isVehicleRoad:()=>true,enableLinearFeatures:()=>false,featureTraversalKey:()=> 'ground'});
+ ctx.linearFeatures=[];ctx.transportNetworkModel={id:'controlled-certified-junctions'};invalidateTraversalNetworks();
+ return materializeTraversalSegments(buildTraversalNetworks().drive.segments);
+}
+test('a certified junction split preserves the centimetre span next to a retained source node',()=>{
+ const rows=exactSplitFixture();assert.equal(rows.length,3);assert.equal(rows[0].toId,rows[1].fromId);assert.equal(rows[1].toId,rows[2].fromId);
+ assert.ok(rows[1].length<.05);assert.ok(rows[1].length*rows[1].feature.metersPerWorldUnit>=.01);
+ assert.equal(rows[1].sourceTStart,0);assert.ok(rows[1].sourceTEnd>0&&rows[1].sourceTEnd<.001);
+});
+test('generalized source retains its existing proximity and minimum-span behavior',()=>{
+ assert.equal(exactSplitFixture('generalized').length,2);
+});
