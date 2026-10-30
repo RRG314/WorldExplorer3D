@@ -96,6 +96,13 @@ lap remain unchanged. The normal rolling grid also visibly contains the real
 M3 E92 race car and Carrera 4S alongside the original BMW. These accept the
 changed paint and grid-presentation boundaries, not the surrounding venue pack.
 
+Nine further exact paddock identities now replace inferred towers with seven
+low service exteriors, another open canopy and low viewing terraces. Native
+publication confirms 22 reviewed paddock roots, five canopies, the nine corrected
+building heights and closed exterior admission, and replacement collision.
+The changed views were inspected. Additional generic entry buildings remain;
+this accepts the nine source-bound replacements, not complete paddock context.
+
 Complete venue presentation, changed live multiplayer/catalogue acceptance and
 the final moving-scene budget remain open; no major pack is accepted. Circuit
 pit gameplay is still explicitly unavailable.

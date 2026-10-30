@@ -74,3 +74,12 @@ test('browser, socket-service and Functions bundles reconstruct the same profile
  }
  assert.deepEqual(snapshots[1],snapshots[0]);assert.deepEqual(snapshots[2],snapshots[0]);
 });
+
+test('filtered grid and checker paint retain actual lateral creases, including their pixel footprint',async()=>{
+ const {course}=fixture(),moved=structuredClone(course);for(const segment of moved.segments)for(const row of segment.heightSamples)row.racingOffsetMeters=4.7;
+ const {buildRacePaint}=await import('../app/js/racing/course-markings.js');
+ const departure=paint=>{let max=0;for(let i=0;i<paint.positions.length;i+=9){const x=(paint.positions[i]+paint.positions[i+3]+paint.positions[i+6])/3,y=(paint.positions[i+1]+paint.positions[i+4]+paint.positions[i+7])/3;max=Math.max(max,Math.abs(y-height(x)-.018));}return max;};
+ assert.ok(departure(buildRacePaint(moved,{filtered:false}))>.005,'the controlled grid crosses the real bank/apron fold');
+ const paint=buildRacePaint(moved);assert.ok(departure(paint)<.00001,'no filtered triangle may bridge the accepted crease');
+ for(let i=0;i<paint.positions.length;i+=3)assert.ok(paint.positions[i]>=-3&&paint.positions[i]<=15,'filter padding stays on qualified physical pavement');
+});

@@ -28,10 +28,10 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
  }
  const lineGeometry=new THREE.BufferGeometry().setFromPoints(course.points.map(p=>new THREE.Vector3(p.x,p.y+.08,p.z)));
  const lineMaterial=new THREE.LineBasicMaterial({color:0xb7f568,transparent:true,opacity:.45});root.add(new THREE.Line(lineGeometry,lineMaterial));
- const paint=buildRacePaint(course),paintGeometry=new THREE.BufferGeometry();paintGeometry.setAttribute('position',new THREE.BufferAttribute(paint.positions,3));paintGeometry.setAttribute('color',new THREE.BufferAttribute(paint.colors,3));
+ const paint=buildRacePaint(course),paintGeometry=new THREE.BufferGeometry();paintGeometry.setAttribute('position',new THREE.BufferAttribute(paint.positions,3));paintGeometry.setAttribute('color',new THREE.BufferAttribute(paint.colors,3));paintGeometry.setAttribute('markingStroke',new THREE.BufferAttribute(paint.strokeCoverage,4));
  paintGeometry.computeVertexNormals();
  const paintMaterial=createRoadMarkingMaterial({color:0xffffff,emissive:0,emissiveIntensity:0,roughness:.9,
-  vertexColors:true,side:THREE.DoubleSide,depthWrite:false},THREE);
+  vertexColors:true,side:THREE.DoubleSide,depthWrite:false,filteredStroke:true},THREE);
  const painted=new THREE.Mesh(paintGeometry,paintMaterial);painted.name='Surveyed finish and full-chassis grid paint';
  // Match the existing road-marking layer. Depth-write-free paint drawn before
  // the terrain owner's order-2 pavement is overwritten by that later batch.

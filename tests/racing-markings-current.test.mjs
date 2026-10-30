@@ -18,7 +18,7 @@ test('the bundled renderer detaches race presentation and releases every owned g
  view.mount();assert.equal(view.root.parent,context.scene);const geometries=new Set(),materials=new Set(),released=new Set();
  const paint=view.root.children.find(o=>o.name==='Surveyed finish and full-chassis grid paint');
  assert.ok(paint.material.polygonOffsetFactor<=-6,'paint uses the shared bias ahead of the -2 road surface');
- assert.equal(paint.material.vertexColors,true);assert.equal(paint.material.depthWrite,false);
+ assert.equal(paint.material.vertexColors,true);assert.equal(paint.material.depthWrite,false);assert.equal(paint.material.transparent,true);assert.equal(paint.geometry.attributes.markingStroke.count,paint.geometry.attributes.position.count);
  assert.equal(paint.geometry.attributes.normal.count,paint.geometry.attributes.position.count,'lit road paint needs the accepted geometry normals');
  view.root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});
  for(const resource of [...geometries,...materials])resource.addEventListener('dispose',()=>{assert.ok(!released.has(resource));released.add(resource);});
@@ -27,7 +27,7 @@ test('the bundled renderer detaches race presentation and releases every owned g
  }finally{globalThis.document=previous;}
 });
 test('paint is one bounded vertex buffer and follows real grade/crossfall in metre coordinates',()=>{
- const c=course(),paint=buildRacePaint(c),copy=structuredClone(c);assert.ok(paint.positions.length<20000);assert.equal(paint.positions.length,paint.colors.length);
+ const c=course(),paint=buildRacePaint(c),copy=structuredClone(c);assert.ok(paint.positions.length<20000);assert.equal(paint.positions.length,paint.colors.length);assert.equal(paint.strokeCoverage.length,paint.positions.length/3*4);const legacy=buildRacePaint(c,{filtered:false}),edgePositions=[];for(let i=0;i<paint.strokeCoverage.length;i+=4)if(paint.strokeCoverage[i+3]<0)edgePositions.push(...paint.positions.slice(i/4*3,i/4*3+3));assert.deepEqual(new Float32Array(edgePositions),legacy.positions.slice(0,edgePositions.length),'accepted event edges keep their exact vertices');assert.deepEqual(paint.rectangles,legacy.rectangles);
  assert.equal(paint.rectangles.length,Math.ceil((9-.4)/.6)*2+16+c.segments.length*2);
  for(let i=0;i<paint.positions.length;i+=3){const [x,y,z]=paint.positions.slice(i,i+3);assert.ok(Number.isFinite(x+y+z));
   const lateral=x*c.metersPerUnit,expected=z*.04+lateral*.08/1.2+.018/c.metersPerUnit;

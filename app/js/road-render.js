@@ -20,6 +20,7 @@ vec2 markingHigh=clamp((vMarkingStroke.zw-vMarkingStroke.xy)/markingFootprint+0.
 vec2 markingLow=clamp((-vMarkingStroke.zw-vMarkingStroke.xy)/markingFootprint+0.5,0.0,1.0);
 vec2 markingCoverage=markingHigh-markingLow;
 if(vMarkingStroke.z<0.0)markingCoverage.x=1.0;
+if(vMarkingStroke.w<0.0)markingCoverage.y=1.0;
 diffuseColor.a*=markingCoverage.x*markingCoverage.y;
 #include <alphatest_fragment>`);
     };

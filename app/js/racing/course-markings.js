@@ -1,4 +1,4 @@
-import {racePavementCrossSection} from './pavement-cross-section.js';
+import {racePavementCrossSection,racePavementLateralOffsets} from './pavement-cross-section.js';
 import {sampleRaceSegmentY,raceSegmentAtDistance} from './course-rules.js';
 
 // Original race paint, derived from the qualified deck. It adds presentation
@@ -11,19 +11,35 @@ export function raceCourseSurfacePoint(course,distanceMeters,lateralMeters=0,lif
   y:sampleRaceSegmentY(segment,t,lateralMeters)+liftMeters/unit,
   z:segment.a.z+(segment.b.z-segment.a.z)*t-forward.x*lateralMeters/unit};
 }
-export function buildRacePaint(course) {
- const positions=[],colors=[],rectangles=[];
+export function buildRacePaint(course,{filtered=true}={}) {
+ const positions=[],colors=[],rectangles=[],strokeCoverage=[];
  const sectionAt=d=>{const s=raceSegmentAtDistance(course,Math.max(0,Math.min(course.lengthMeters,d)));return racePavementCrossSection(s,(d-s.startMeters)/s.lengthMeters);},valueAt=(v,d)=>typeof v==='function'?v(d):v,bankRelative=offset=>course.pavementModel?(d=>(sectionAt(d)?.racingOffsetMeters||0)+offset):offset;
- function rectangle(start,end,left,right,color) {
+ function clip(points,distance){const out=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length],da=distance(a),db=distance(b),ia=da>=-1e-9,ib=db>=-1e-9;if(ia)out.push(a);if(ia!==ib){const t=da/(da-db);out.push({d:a.d+(b.d-a.d)*t,l:a.l+(b.l-a.l)*t});}}return out;}
+ function rectangle(start,end,left,right,color,filterStroke=filtered) {
   const a=Math.max(0,start),b=Math.min(course.lengthMeters,end);if(b<=a)return;
-  // Split at source boundaries as well as metre intervals; a paint quad must
-  // not bridge a crest or connect vertically separated source decks.
-  const splits=[a,b,...course.segments.map(s=>s.startMeters).filter(d=>d>a&&d<b)];
-  for(let d=a+1;d<b;d++)splits.push(d);splits.sort((x,y)=>x-y);
+  const pad=filterStroke?.25:0,from=Math.max(0,a-pad),to=Math.min(course.lengthMeters,b+pad),center=(a+b)/2,halfLength=(b-a)/2;
+  const boundary=(d,side)=>{const section=sectionAt(d),seg=raceSegmentAtDistance(course,d);return side<0?section?.minimumMeters??-seg.widthMeters/2:section?.maximumMeters??seg.widthMeters/2;};
+  // Only grid and finish strokes need the filtered footprint. Existing event
+  // edges retain their exact geometry and opaque coverage, including joins.
+  const splits=[from,to,...course.segments.map(s=>s.startMeters).filter(d=>d>from&&d<to)];
+  for(let d=from+1;d<to;d++)splits.push(d);splits.sort((x,y)=>x-y);
+  function emit(points){
+   for(let i=1;i<points.length-1;i++)for(const q of [points[0],points[i],points[i+1]]){
+    const p=raceCourseSurfacePoint(course,q.d,q.l,.018),lo=valueAt(left,q.d),hi=valueAt(right,q.d);
+    positions.push(p.x,p.y,p.z);colors.push(color,color,color);strokeCoverage.push(q.d-center,q.l-(lo+hi)/2,filterStroke?halfLength:-1,filterStroke?(hi-lo)/2:-1);
+   }
+  }
   for(let i=1;i<splits.length;i++){
-   if(splits[i]<=splits[i-1])continue;
-   const points=[[splits[i-1],left],[splits[i-1],right],[splits[i],right],[splits[i],left]].map(([d,l])=>raceCourseSurfacePoint(course,d,valueAt(l,d),.018));
-   for(const index of [0,1,2,0,2,3]){const p=points[index];positions.push(p.x,p.y,p.z);colors.push(color,color,color);}
+   const lo=splits[i-1],hi=splits[i];if(hi<=lo)continue;
+   const points=[[lo,left,-1],[hi,left,-1],[hi,right,1],[lo,right,1]].map(([d,l,side])=>({d,l:filterStroke?(side<0?Math.max(boundary(d,-1)+.01,valueAt(l,d)-pad):Math.min(boundary(d,1)-.01,valueAt(l,d)+pad)):valueAt(l,d)}));
+   if(!filterStroke){emit([points[0],points[3],points[2],points[1]]);continue;}
+   // Split padded paint at the same accepted lateral creases. Padding is
+   // render coverage on qualified pavement, never extrapolated road support.
+   const segment=raceSegmentAtDistance(course,(lo+hi)/2),t=d=>Math.max(0,Math.min(1,(d-segment.startMeters)/segment.lengthMeters)),lower=racePavementLateralOffsets(segment,t(lo)),upper=racePavementLateralOffsets(segment,t(hi));
+   if(!lower){emit(points);continue;}
+   for(let k=1;k<lower.length;k++){
+    const edge=(d,j)=>lower[j]+(upper[j]-lower[j])*(d-lo)/(hi-lo),part=clip(clip(points,p=>p.l-edge(p.d,k-1)),p=>edge(p.d,k)-p.l);emit(part);
+   }
   }
   rectangles.push({start:a,end:b,left:valueAt(left,(a+b)/2),right:valueAt(right,(a+b)/2),...(typeof left==='function'||typeof right==='function'?{variableLateral:true}:{})});
  }
@@ -31,7 +47,7 @@ export function buildRacePaint(course) {
  // flat paint on its accepted surface, not invented raised kerb geometry.
  for(const segment of course.venueSource?.id==='daytona-tri-oval'?[]:course.segments)for(const side of [-1,1]) {
   const edge=side*(segment.widthMeters/2-.32);
-  if(segment.pavementModel){const edgeAt=d=>{const s=sectionAt(d);return side<0?s.minimumMeters+.32:s.maximumMeters-.32;};rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,d=>edgeAt(d)-.06,d=>edgeAt(d)+.06,.88);}else rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,edge-.06,edge+.06,.88);
+  if(segment.pavementModel){const edgeAt=d=>{const s=sectionAt(d);return side<0?s.minimumMeters+.32:s.maximumMeters-.32;};rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,d=>edgeAt(d)-.06,d=>edgeAt(d)+.06,.88,false);}else rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,edge-.06,edge+.06,.88,false);
  }
  const last=course.segments.at(-1),width=Math.min(16,(racePavementCrossSection(last,1)?.racingWidthMeters??last.widthMeters)-.4),columns=Math.max(2,Math.ceil(width/.6));
  for(let row=0;row<2;row++)for(let col=0;col<columns;col++){
@@ -49,5 +65,5 @@ export function buildRacePaint(course) {
   rectangle(center-halfLength,center-halfLength+.1,bankRelative(lateral-halfWidth),bankRelative(lateral+halfWidth),.88);
   rectangle(center+halfLength-.1,center+halfLength,bankRelative(lateral-halfWidth),bankRelative(lateral+halfWidth),.88);
  }
- return {positions:new Float32Array(positions),colors:new Float32Array(colors),rectangles};
+ return {positions:new Float32Array(positions),colors:new Float32Array(colors),strokeCoverage:new Float32Array(strokeCoverage),rectangles};
 }
