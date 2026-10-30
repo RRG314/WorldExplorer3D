@@ -2875,8 +2875,8 @@ var RACING_FLEET_ASSETS = Object.freeze([
       "timeoutMs": 2e4
     },
     "budgets": {
-      "bytes": 3049196,
-      "triangles": 101109,
+      "bytes": 3056732,
+      "triangles": 101181,
       "textureEdgePixels": 512,
       "maxInstances": 4
     }

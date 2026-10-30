@@ -45,3 +45,17 @@ test('the five-dial cabin reads accepted speed, RPM and gear without inventing a
   assert.ok(text.includes('100')&&text.includes('G 5'));instrument.dispose();
  }finally{if(originalDocument===undefined)delete globalThis.document;else globalThis.document=originalDocument;}
 });
+test('the four original M3 faces show accepted telemetry and keep the two unavailable auxiliary values explicit',()=>{
+ const originalDocument=globalThis.document,text=[],segments=[];
+ const context={fillRect(){},fillText(v){text.push(v);},beginPath(){},arc(){},fill(){},stroke(){},moveTo(){},lineTo(x,y){segments.push([x,y]);}};
+ globalThis.document={createElement:()=>({getContext:()=>context})};
+ try{
+  const root=new THREE.Group(),material=new THREE.MeshStandardMaterial(),screen=new THREE.Mesh(new THREE.PlaneGeometry(),material);
+  screen.userData={vehicleInstrumentDisplay:true,vehicleInstrumentStyle:'four-dial'};root.add(screen);
+  const instrument=createVehicleInstruments(THREE,root);text.length=0;segments.length=0;
+  instrument.update(64.7,6351,4,8000);assert.ok(text.includes('65')&&text.includes('G 4')&&text.includes('RPM ×1000'));assert.equal(text.filter(t=>t==='—').length,2);
+  const previous=segments.map(v=>v.slice());segments.length=0;text.length=0;
+  instrument.update(-8,1500,1,8000,true);assert.ok(text.includes('8')&&text.includes('G R'));assert.notDeepEqual(segments,previous);
+  let released=0;material.map.addEventListener('dispose',()=>released++);instrument.dispose();instrument.dispose();assert.equal(released,1);
+ }finally{if(originalDocument===undefined)delete globalThis.document;else globalThis.document=originalDocument;}
+});

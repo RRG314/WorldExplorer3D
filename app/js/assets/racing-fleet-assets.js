@@ -14,7 +14,7 @@ export const RACING_FLEET_ASSETS = Object.freeze([
     "license": "CC-BY-4.0",
     "sourceUrl": "https://sketchfab.com/3d-models/bmw-m3-e46-f1b00ff37d504629b10031da32bc7497",
     "attribution": "BMW M3 E46 by MMC Works",
-    "sourceCredit": "M\u00e1rcio Meireles (https://sketchfab.com/marciomeireles)",
+    "sourceCredit": "Márcio Meireles (https://sketchfab.com/marciomeireles)",
     "dimensionsMeters": {
       "width": 1.9006898684883853,
       "height": 1.3690595307716498,
@@ -78,8 +78,8 @@ export const RACING_FLEET_ASSETS = Object.freeze([
       "timeoutMs": 20000
     },
     "budgets": {
-      "bytes": 3049196,
-      "triangles": 101109,
+      "bytes": 3056732,
+      "triangles": 101181,
       "textureEdgePixels": 512,
       "maxInstances": 4
     }

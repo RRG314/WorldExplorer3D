@@ -336,6 +336,10 @@ The coupe author does not specify an exact model year. The long Fleetwood Brough
 - Runtime derivative: uniform metre normalization, bounded solid-part geometry
   simplification, reduced textures, compatible glazing, straightened showcase
   wheel pose and four steering/spin pivots. Original interior is retained.
+  The four original gauge bodies and front caps retain their source detail;
+  authored cap UVs bind the existing instance-owned speed/RPM/gear display.
+  Temperature and fuel values remain unavailable. Dial artwork is an original
+  interpretation, not a factory instrument scan.
 - Rights notice and source/derivative hashes accompany the GLB in
   `vehicles/racing-fleet/`. No source simulation is imported.
 

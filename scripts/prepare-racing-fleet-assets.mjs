@@ -14,6 +14,7 @@ import sharp from 'sharp';
 import {createHash} from 'node:crypto';
 import {mkdir, readdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {captureE46InstrumentFaces,restoreE46InstrumentFaces} from './lib/e46-instrument-faces.mjs';
 
 const recipes = [
  {key:'porsche_carrera_4s',inputDirectory:'prepared-porsche-carrera-v3',prepared:true,id:'road-porsche-911-carrera-4s',variantId:'porsche_carrera_4s',license:'CC-BY-SA-4.0',licenseUrl:'https://creativecommons.org/licenses/by-sa/4.0/',attribution:'Porsche 911 Carrera 4S by Karol Miklas',sourceCredit:'Karol Miklas (https://sketchfab.com/karolmiklas)',
@@ -108,6 +109,7 @@ for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includ
   const center=[(bounds.min[0]+bounds.max[0])/2,bounds.min[1],(bounds.min[2]+bounds.max[2])/2];
   const normalize=new Matrix4().makeScale(...scale).multiply(new Matrix4().makeTranslation(...center.map(v=>-v)));
   for(const node of meshes)transformMesh(node.getMesh(),normalize.toArray());
+  const instrumentFaces=recipe.key==='bmw_m3_e46'?captureE46InstrumentFaces(meshes):null;
   // Correct mirror-like painted bodywork for the game's outdoor lighting.
   // Keep stainless steel, glass, upholstery and authored texture maps separate.
   for(const mat of root.listMaterials())if(recipe.paint?.includes(mat.getName())){
@@ -123,6 +125,13 @@ for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includ
   const sourceTriangles=triangleCount(doc);
   await doc.transform(weld(),simplify({simplifier:MeshoptSimplifier,ratio:recipe.ratio,error:.001,lockBorder:false}));
   simplifySolidModifierSeams(doc);
+  if(instrumentFaces){
+    // A nonuniform atlas keeps the UV stream through solid-texture pruning.
+    // The instance instrument owner replaces it before the model is mounted.
+    const pixels=Buffer.from([8,13,18,255,16,22,29,255,16,22,29,255,8,13,18,255]);
+    const placeholder=doc.createTexture('E46 instrument placeholder').setMimeType('image/png').setImage(await sharp(pixels,{raw:{width:2,height:2,channels:4}}).png().toBuffer());
+    restoreE46InstrumentFaces(doc,instrumentFaces,placeholder);
+  }
   // Wheel groups retain artist geometry/materials. Split combined left/right
   // wheel primitives by axle quadrant, never by cutting arbitrary body panels.
   const wheelMeshes=new Map();
@@ -156,7 +165,11 @@ for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includ
     steering.setExtras({transportPart:'wheel-steering',front:key.startsWith('front')});
     spin.setExtras({transportPart:'wheel-spin',radiusMeters:radius});wheelLayout.push({id:key,position:c,radius});
   }
-  await doc.transform(prune(),dedup(),join({filter:node=>!node.getExtras().transportPart&&!node.getExtras().aircraftRotor}),prune());
+  await doc.transform(prune(),dedup(),join({filter:node=>!node.getExtras().transportPart&&!node.getExtras().aircraftRotor&&!node.getExtras().vehicleInstrumentDisplay}),prune());
+  if(instrumentFaces){
+    const displays=root.listNodes().filter(n=>n.getExtras().vehicleInstrumentDisplay),faces=displays[0]?.getMesh()?.listPrimitives();
+    if(displays.length!==1||faces.length!==1||!faces[0].getAttribute('TEXCOORD_0')||faces[0].getIndices()?.getCount()!==576)throw Error('E46 display UV or source cap detail was lost');
+  }
   const bytes=await io.writeBinary(doc), filename=recipe.id+'.glb';
   if(bytes.length>7_000_000||triangleCount(doc)>110_000)throw Error(`${recipe.key}: derived model exceeds intake budget (${bytes.length} bytes, ${triangleCount(doc)} triangles).`);
   if(!recipe.aircraft&&wheelLayout.length!==4)throw Error(`${recipe.key}: expected four wheel pivots, found ${wheelLayout.length}.`);
@@ -165,6 +178,7 @@ for (const recipe of recipes.filter(r=>!selectedKeys.length||selectedKeys.includ
   await writeFile(path.join(outputDir,recipe.id+'-LICENSE.txt'),sourceLicense);
   const record={id:recipe.id,label:recipe.label,variantId:recipe.variantId||null,sourceUrl:sourceLicense.match(/\* source:\s*(https:\/\/\S+)/)?.[1],attribution:`${recipe.label} by ${recipe.author}`,sourceCredit:sourceLicense.match(/\* author:\s*([^\n]+)/)?.[1],license:'CC-BY-4.0',filename,sourceArchiveSha256:intake.archiveSha256,sha256:hash(bytes),bytes:bytes.length,sourceTriangles,triangles:triangleCount(doc),materials:root.listMaterials().length,textureEdgePixels:512,dimensionsMeters:{width:recipe.dimensions[0],height:recipe.dimensions[1],length:recipe.dimensions[2]},driverEyeGroundMeters:recipe.eye,paintMaterialNames:recipe.paint||[],wheelLayout,aircraft:recipe.aircraft===true,modifications:'Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel pivots. Adjusted paint/trim roughness and selected body colors. Front wheel assemblies straightened from the original 20 degree showcase pose; four runtime wheel pivots. No gameplay simulation imported.'};
   records.push(record);console.log(JSON.stringify({id:record.id,bytes:record.bytes,triangles:record.triangles,materials:record.materials,wheels:wheelLayout.length}));
+  if(instrumentFaces)record.modifications+=' Original four gauge bodies retained at source detail; cap UVs prepared for instance-owned speed/RPM/gear instruments; auxiliary values unavailable.';
 }
 await writeFile(path.join(outputDir,'asset-manifest.json'),JSON.stringify({schemaVersion:1,licenseUrls:[...new Set(records.map(r=>r.licenseUrl||'https://creativecommons.org/licenses/by/4.0/'))],assets:records},null,2)+'\n');
 const catalog=records.map(r=>({schemaVersion:1,id:r.id,label:r.label,url:`/app/assets/models/vehicles/racing-fleet/${r.filename}`,roles:['road-vehicle-presentation'],vehicleVariantIds:r.variantId?[r.variantId]:[],license:r.license,sourceUrl:r.sourceUrl,attribution:r.attribution,sourceCredit:r.sourceCredit,dimensionsMeters:r.dimensionsMeters,paintMaterialNames:r.paintMaterialNames,wheelLayout:r.wheelLayout,driverEyeGroundMeters:r.driverEyeGroundMeters,sourceUpAxis:'y',rigPolicy:'preserve-parts',collisionPolicy:'existing-road-vehicle-envelope',instancePolicy:{geometry:'shared',materials:'clone'},loadPolicy:{bounded:true,timeoutMs:20000},budgets:{bytes:r.bytes,triangles:r.triangles,textureEdgePixels:r.textureEdgePixels,maxInstances:4}}));

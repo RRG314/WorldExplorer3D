@@ -32,6 +32,9 @@ test('the real M3 derivative keeps its licensed identity, matching geometry, whe
  const spin=json.nodes.filter(n=>n.extras?.transportPart==='wheel-spin'),steering=json.nodes.filter(n=>n.extras?.transportPart==='wheel-steering');
  assert.equal(spin.length,4);assert.equal(steering.filter(n=>n.extras.front).length,2);
  assert.equal(json.nodes.filter(n=>n.extras?.transportPart==='wheel-caliper').length,4);
+ const displays=json.nodes.filter(n=>n.extras?.vehicleInstrumentDisplay);assert.equal(displays.length,1);assert.equal(displays[0].extras.vehicleInstrumentStyle,'four-dial');
+ const face=json.meshes[displays[0].mesh].primitives;assert.equal(face.length,1);assert.ok(Number.isInteger(face[0].attributes.TEXCOORD_0));
+ assert.equal(json.accessors[face[0].indices].count,192*3,'original gauge caps retain their source detail');
  for(const n of steering)assert.ok(n.children.some(i=>json.nodes[i].extras?.transportPart==='wheel-spin'));
  assert.ok(!json.buffers.some(b=>b.uri));assert.ok(!(json.images||[]).some(i=>i.uri));
  assert.ok(record.triangles<=110000&&bytes.length<=7000000);assert.equal(car.length,4.493);

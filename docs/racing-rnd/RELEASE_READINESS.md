@@ -11,7 +11,10 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   derivatives. The E92 and Carrera have interpreted cabins with live speed,
   RPM and gear instruments; unavailable Porsche auxiliary values remain explicit.
   They retain the shared 120 mph class limit. These are not factory cockpit or
-  GT3 homologation claims. The E46's original gauge artwork remains unfinished.
+  GT3 homologation claims. The E46 now retains its original four gauge bodies
+  and source cap detail with authored live instrument UVs. Temperature and fuel
+  values remain explicitly unavailable; this is original dial artwork. Its final
+  actual-world cabin/drive view is pending.
 - Controlled held-input acceleration/braking and model/contact checks passed
   for the added cars. Actual world controls bought all three through the existing
   device-local wallet, drove the E92 and Carrera, switched models and released
