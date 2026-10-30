@@ -123,6 +123,13 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   publishes the wider relief. The sampled 150-metre roadside height difference
   fell from 7.41 m to 0.071 m. This is an affected terrain boundary check;
   forest density, materials and roadside detail still need visual acceptance.
+- The portable road-height contract now supports bounded lateral breakpoints
+  on explicitly admitted banked surfaces. The same profile survives reversal,
+  timing-line splits, immutable courses, canonical/chunk storage and both
+  generated runtimes; approved geometry identities include it. Controlled
+  four-wheel contact responds to a raised edge. This is shared-contract
+  support only: physical venue kerb geometry, world qualification and actual
+  driving over those kerbs remain to be implemented and accepted.
 - Actual held-key Silverstone driving reproduced fixed-tick pose repeats and
   double advances independently of pulsed automation, barriers or camera-mode
   changes. Practice now samples adjacent accepted session frames for the body,

@@ -18,7 +18,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  const publication=context.worldPublication,traversal=context.buildTraversalNetworks?.()?.drive;
  if(!publication?.requestId||context.worldLoading||!traversal?.segments||!context.SurfaceQuery?.driveAt||!context.sampleFeatureSurfaceY)throw Error('race_world_not_ready');
  const metersPerUnit=Number(context.METERS_PER_WORLD_UNIT)||1.11,envelope={width:2.35,length:6.5,height:2.4};
- const runtime=context.worldLoadRuntimeState,pack=runtime?.sequence===publication.sequence?runtime.venuePack:null;
+ const runtime=context.worldLoadRuntimeState,pack=runtime&&runtime.sequence===publication.sequence?runtime.venuePack:null;
  const adopted=pack?.status==='source-prepared'?pack.venueSource:undefined,venueSource=normalizeRaceVenueSource(adopted);
  if(venueSource&&(pack.id!==venueSource.id||pack.sourceSha256!==venueSource.sourceSha256||JSON.stringify(pack.sourceFeatureIds)!==JSON.stringify(venueSource.sourceFeatureIds)))throw Error('race_invalid_venue_extent');
  const radius=venueSource?venueSource.qualificationRadiusWorld:Math.max(100,Math.min(1200,Number(radiusWorld)||270)),checkBuilding=createBuildingCollisionQuery(context),roads=[];

@@ -11,6 +11,9 @@ export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
  const venueSource=normalizeRaceVenueSource(raw.venueSource);
  const m=raw.metersPerUnit;if(!Number.isFinite(m)||m<=0||m>10)fail();
  const number=n=>{if(!Number.isFinite(n)||Math.abs(n)>1e7)fail();return Math.round(n*m*1000)/(m*1000);};
+ const lateral=s=>{if(s.lateralSamples===undefined)return {};
+  if(!Array.isArray(s.lateralSamples)||s.lateralSamples.length<3||s.lateralSamples.length>8)fail();
+  return {lateralSamples:s.lateralSamples.map(p=>({offsetMeters:number(p?.offsetMeters),y:number(p?.y)}))};};
  const point=p=>({x:number(p?.x),y:number(p?.y),z:number(p?.z),connectionLayer:label(p?.connectionLayer,180)});
  const anchor={lat:Number(raw.anchor?.lat),lon:Number(raw.anchor?.lon)};
  if(!Number.isFinite(anchor.lat)||Math.abs(anchor.lat)>85||!Number.isFinite(anchor.lon)||Math.abs(anchor.lon)>180)fail();
@@ -21,7 +24,7 @@ export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
   return {sourceId:label(r.sourceId,180),sourceFeatureId:label(r.sourceFeatureId,180),label:label(r.label,100),a:point(r.a),b:point(r.b),
    ...(r.surfaceModel!==undefined?{surfaceModel:r.surfaceModel}:{}),
    widthMeters:number(r.widthMeters),direction:r.direction||'both',structure:r.structure,clearanceMeters:number(r.clearanceMeters||0),driveable:true,supported:true,
-   heightSamples:samples.map(s=>({t:s.t,y:number(s.y),leftY:number(s.leftY),rightY:number(s.rightY)})),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
+   heightSamples:samples.map(s=>({t:s.t,y:number(s.y),leftY:number(s.leftY),rightY:number(s.rightY),...lateral(s)})),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
  }).sort((a,b)=>a.sourceId.localeCompare(b.sourceId));
  const facts={type:'RaceDistrictFacts',version:1,...(venueSource?{venueSource}:{}),locationId,locationLabel:label(raw.locationLabel,80),anchor,metersPerUnit:m,roads};
  const graph=buildRaceRoadGraph(roads,{metersPerUnit:m,venueSource,partialVenue});if(graph.edges.length<roads.length)fail();return facts;

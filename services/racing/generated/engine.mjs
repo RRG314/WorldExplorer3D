@@ -1398,7 +1398,13 @@ function prepareRaceCourseGeometry(course) {
     Object.freeze(segment.b);
     Object.freeze(segment.forward);
     if (segment.heightSamples) {
-      segment.heightSamples.forEach(Object.freeze);
+      for (const sample of segment.heightSamples) {
+        if (sample.lateralSamples) {
+          sample.lateralSamples.forEach(Object.freeze);
+          Object.freeze(sample.lateralSamples);
+        }
+        Object.freeze(sample);
+      }
       Object.freeze(segment.heightSamples);
     }
     Object.freeze(segment);
@@ -1448,6 +1454,32 @@ function raceSegmentAtDistance(course, distanceMeters) {
   }
   return segments[low];
 }
+function copyHeightSample(sample) {
+  return { ...sample, ...sample.lateralSamples ? { lateralSamples: sample.lateralSamples.map((p) => ({ ...p })) } : {} };
+}
+function lateralHeight(samples, offset) {
+  let lower = samples[0], upper = samples.at(-1);
+  if (offset <= lower.offsetMeters) upper = samples[1];
+  else if (offset >= upper.offsetMeters) lower = samples.at(-2);
+  else for (let i = 1; i < samples.length; i++) if (samples[i].offsetMeters >= offset) {
+    lower = samples[i - 1];
+    upper = samples[i];
+    break;
+  }
+  return lower.y + (upper.y - lower.y) * (offset - lower.offsetMeters) / (upper.offsetMeters - lower.offsetMeters);
+}
+function validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model) {
+  if (!heights.some((s) => s.lateralSamples !== void 0)) return true;
+  if (model !== BANKED_ROAD_MODEL || width > 30) return false;
+  let previous = null;
+  for (const station of heights) {
+    const points = station.lateralSamples;
+    if (!Array.isArray(points) || points.length < 3 || points.length > 8 || points.some((p, i) => !p || !Number.isFinite(p.offsetMeters) || !Number.isFinite(p.y) || i > 0 && (p.offsetMeters - points[i - 1].offsetMeters < 0.02 || Math.abs(p.y - points[i - 1].y) * metersPerUnit / (p.offsetMeters - points[i - 1].offsetMeters) > BANKED_ROAD_MAXIMUM_CROSSFALL + 1e-8)) || Math.abs(points[0].offsetMeters + width / 2) > 1e-3 || Math.abs(points.at(-1).offsetMeters - width / 2) > 1e-3 || !points.some((p) => p.offsetMeters === 0 && Math.abs(p.y - station.y) * metersPerUnit <= 1e-3) || !Number.isFinite(station.leftY) || !Number.isFinite(station.rightY) || Math.abs(lateralHeight(points, -span) - station.leftY) * metersPerUnit > 1e-3 || Math.abs(lateralHeight(points, span) - station.rightY) * metersPerUnit > 1e-3) return false;
+    if (previous && (points.length !== previous.lateralSamples.length || points.some((p, i) => p.offsetMeters !== previous.lateralSamples[i].offsetMeters || Math.abs(p.y - previous.lateralSamples[i].y) * metersPerUnit / ((station.t - previous.t) * length) > maximumGrade + 1e-8))) return false;
+    previous = station;
+  }
+  return true;
+}
 function sampleRaceSegmentY(segment, t, lateralMeters = 0) {
   const samples = segment.heightSamples;
   if (!samples?.length) return segment.a.y + (segment.b.y - segment.a.y) * t;
@@ -1458,13 +1490,23 @@ function sampleRaceSegmentY(segment, t, lateralMeters = 0) {
     break;
   }
   const blend = Math.max(0, Math.min(1, (t - lower.t) / Math.max(1e-9, upper.t - lower.t))), y = lower.y + (upper.y - lower.y) * blend;
+  if (lower.lateralSamples && upper.lateralSamples) {
+    const a = lateralHeight(lower.lateralSamples, lateralMeters), b = lateralHeight(upper.lateralSamples, lateralMeters);
+    return a + (b - a) * blend;
+  }
   const side = lateralMeters < 0 ? "leftY" : "rightY", edge = Number.isFinite(lower[side]) && Number.isFinite(upper[side]) ? lower[side] + (upper[side] - lower[side]) * blend : y;
   return y + (edge - y) * Math.abs(lateralMeters) / Math.max(0.1, segment.heightSampleSpanMeters || 1.2);
 }
 function sliceHeights(segment, start, end) {
   if (!segment.heightSamples?.length) return null;
-  const at = (t) => ({ t: (t - start) / (end - start), y: sampleRaceSegmentY(segment, t), leftY: sampleRaceSegmentY(segment, t, -segment.heightSampleSpanMeters), rightY: sampleRaceSegmentY(segment, t, segment.heightSampleSpanMeters) });
-  return [at(start), ...segment.heightSamples.filter((s) => s.t > start && s.t < end).map((s) => ({ ...s, t: (s.t - start) / (end - start) })), at(end)];
+  const at = (t) => ({
+    t: (t - start) / (end - start),
+    y: sampleRaceSegmentY(segment, t),
+    leftY: sampleRaceSegmentY(segment, t, -segment.heightSampleSpanMeters),
+    rightY: sampleRaceSegmentY(segment, t, segment.heightSampleSpanMeters),
+    ...segment.heightSamples[0].lateralSamples ? { lateralSamples: segment.heightSamples[0].lateralSamples.map((p) => ({ offsetMeters: p.offsetMeters, y: sampleRaceSegmentY(segment, t, p.offsetMeters) })) } : {}
+  });
+  return [at(start), ...segment.heightSamples.filter((s) => s.t > start && s.t < end).map((s) => ({ ...copyHeightSample(s), t: (s.t - start) / (end - start) })), at(end)];
 }
 function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximumGrade = 0.22, venueSource, partialVenue = false } = {}) {
   if (!(metersPerUnit > 0 && metersPerUnit <= 10) || !Array.isArray(roads) || roads.length > 5e4) throw Error("invalid_race_road_source");
@@ -1489,7 +1531,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
       if (heights && (!Array.isArray(heights) || heights.length < 2 || heights.length > 250 || heights.some((s, i) => !Number.isFinite(s.t) || !Number.isFinite(s.y) || s.t < 0 || s.t > 1 || i > 0 && s.t <= heights[i - 1].t) || heights[0].t !== 0 || heights.at(-1).t !== 1)) throw Error("invalid_race_road_heights");
       if (heights) {
         const span = Number(road.heightSampleSpanMeters ?? 1.2);
-        if (!(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > (road.surfaceModel === BANKED_ROAD_MODEL ? BANKED_ROAD_MAXIMUM_CROSSFALL : 0.15)))) throw Error("invalid_race_road_heights");
+        if (!validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, road.surfaceModel) || !(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > (road.surfaceModel === BANKED_ROAD_MODEL ? BANKED_ROAD_MAXIMUM_CROSSFALL : 0.15)))) throw Error("invalid_race_road_heights");
       }
       const id = `${String(road.sourceId).slice(0, 180)}:${reverse ? "reverse" : "forward"}`, edge = {
         id,
@@ -1502,7 +1544,13 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
         clearanceMeters: Number(road.clearanceMeters) || 0
       };
       if (heights) {
-        edge.heightSamples = reverse ? heights.map((s) => ({ ...s, t: 1 - s.t, leftY: s.rightY, rightY: s.leftY })).reverse() : heights.map((s) => ({ ...s }));
+        edge.heightSamples = reverse ? heights.map((s) => ({
+          ...copyHeightSample(s),
+          t: 1 - s.t,
+          leftY: s.rightY,
+          rightY: s.leftY,
+          ...s.lateralSamples ? { lateralSamples: s.lateralSamples.map((p) => ({ offsetMeters: -p.offsetMeters || 0, y: p.y })).reverse() } : {}
+        })).reverse() : heights.map(copyHeightSample);
         edge.heightSampleSpanMeters = Number(road.heightSampleSpanMeters) || 1.2;
       }
       if (road.surfaceModel) edge.surfaceModel = road.surfaceModel;
@@ -1555,7 +1603,7 @@ function createRaceCourse(graph, path, settings = {}) {
       startMeters: lengthMeters,
       structure: edge.structure,
       clearanceMeters: edge.clearanceMeters,
-      ...edge.heightSamples ? { heightSamples: edge.heightSamples.map((s) => ({ ...s })), heightSampleSpanMeters: edge.heightSampleSpanMeters } : {}
+      ...edge.heightSamples ? { heightSamples: edge.heightSamples.map(copyHeightSample), heightSampleSpanMeters: edge.heightSampleSpanMeters } : {}
     });
     points.push({ ...b });
     lengthMeters += edge.length;
@@ -4003,6 +4051,11 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
     if (!Number.isFinite(n) || Math.abs(n) > 1e7) fail2();
     return Math.round(n * m * 1e3) / (m * 1e3);
   };
+  const lateral = (s) => {
+    if (s.lateralSamples === void 0) return {};
+    if (!Array.isArray(s.lateralSamples) || s.lateralSamples.length < 3 || s.lateralSamples.length > 8) fail2();
+    return { lateralSamples: s.lateralSamples.map((p) => ({ offsetMeters: number(p?.offsetMeters), y: number(p?.y) })) };
+  };
   const point = (p) => ({ x: number(p?.x), y: number(p?.y), z: number(p?.z), connectionLayer: label(p?.connectionLayer, 180) });
   const anchor = { lat: Number(raw.anchor?.lat), lon: Number(raw.anchor?.lon) };
   if (!Number.isFinite(anchor.lat) || Math.abs(anchor.lat) > 85 || !Number.isFinite(anchor.lon) || Math.abs(anchor.lon) > 180) fail2();
@@ -4024,7 +4077,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
       clearanceMeters: number(r.clearanceMeters || 0),
       driveable: true,
       supported: true,
-      heightSamples: samples.map((s) => ({ t: s.t, y: number(s.y), leftY: number(s.leftY), rightY: number(s.rightY) })),
+      heightSamples: samples.map((s) => ({ t: s.t, y: number(s.y), leftY: number(s.leftY), rightY: number(s.rightY), ...lateral(s) })),
       heightSampleSpanMeters: number(r.heightSampleSpanMeters)
     };
   }).sort((a, b) => a.sourceId.localeCompare(b.sourceId));
