@@ -327,8 +327,11 @@ async function applyTransportTerrainCorridors(options = {}) {
   if(options.isCurrent?.()===false)return null;
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
   refreshFarTerrainBoundaryHeights();
+  const reviewedCorridorRefinement=await refreshReviewedVenueTerrain({current:options.isCurrent,yieldWork:options.yieldBetweenTiles});
+  if(options.isCurrent?.()===false)return null;
   clearTerrainHeightCache();
   const stats = Object.freeze({
+    reviewedCorridorRefinement,
     authority: 'compiled_transport_surface',
     heightSamplingAuthority: 'rendered-triangle-barycentric',
     frontageQueries:appCtx.streetFrontageGrading?.stats?.(),
@@ -399,6 +402,7 @@ const {
   refreshFarTerrainSurfaceColors,
   refreshFarWaterDetailCoverage,
   refreshFarTerrainBoundaryHeights,
+  refreshReviewedVenueTerrain,
   resetFarTerrainClipmap,
   sampleFarTerrainWorldYAt,
   getFarTerrainSurfaceSnapshot,

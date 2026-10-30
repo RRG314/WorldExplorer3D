@@ -685,7 +685,8 @@ function createFarFieldTerrainApi(deps = {}) {
       spec,
       worldCoverResult: worldCoverContext,
       surfaceGrid: built.surfaceGrid,
-      refreshBoundaryHeights:built.refreshBoundaryHeights
+      refreshBoundaryHeights:built.refreshBoundaryHeights,
+      refineReviewedCorridors:built.refineReviewedCorridors
     };
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
     applyMappedSurfaceTintOwnership(mesh);
@@ -998,6 +999,12 @@ function createFarFieldTerrainApi(deps = {}) {
       terrainHeightWithPortalCuts(farFieldMesh.userData.structureTerrainPortalDescriptors, x, z, height);
   }
 
+  async function refreshReviewedVenueTerrain(options={}) {
+    if(!farFieldMesh||!farFieldSurfaceState)return null;
+    const mesh=farFieldMesh,state=farFieldSurfaceState;
+    return state.refineReviewedCorridors?.(mesh,{...options,current:()=>farFieldMesh===mesh&&farFieldSurfaceState===state&&options.current?.()!==false});
+  }
+
   function refreshFarTerrainBoundaryHeights() {
     if(!farFieldMesh || !farFieldSurfaceState)return 0;
     return farFieldSurfaceState.refreshBoundaryHeights?.(appCtx.terrainGroup?.children)||0;
@@ -1144,6 +1151,7 @@ function createFarFieldTerrainApi(deps = {}) {
     refreshFarWaterDetailCoverage,
     refreshFarTerrainSurfaceColors,
     refreshFarTerrainBoundaryHeights,
+    refreshReviewedVenueTerrain,
     resetFarTerrainClipmap,
     sampleFarTerrainWorldYAt,
     getFarTerrainSurfaceSnapshot: () => farFieldSurfaceState ? {grid:farFieldSurfaceState.surfaceGrid,portals:farFieldMesh?.userData?.structureTerrainPortalDescriptors || []} : null,

@@ -1,3 +1,4 @@
+import {refineReviewedCorridorCells,corridorSegmentDistance} from './reviewed-corridor-refinement.js';
 import {mappedWaterBedMetersAt, createMappedWaterBedSampler} from './mapped-water-bed.js';
 import {
   addCoverageEdges,
@@ -627,8 +628,86 @@ function createFarFieldGeometryPlanner(deps = {}) {
       if(changed){attribute.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();}
       return changed;
     };
+    let reviewedRefinement=null;
+    async function refineReviewedCorridors(mesh,{current=()=>true,yieldWork=yieldForRegion}={}){
+      const runtime=appCtx.worldLoadRuntimeState,pack=runtime?.venuePack,venue=pack?.venueSource;
+      if(!venue||runtime.sequence!==appCtx._worldLoadSequence)return null;
+      if(reviewedRefinement)return reviewedRefinement;
+      const selected=new Set(venue.sourceFeatureIds),roads=(appCtx.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
+      if(roads.length!==selected.size||roads.some(r=>r.surfaceSurveyEvidence?.venueSource!==venue||r.transportSurfaceModel?.surveyedSurface?.venueSource!==venue||r.transportSurfaceModel.reviewedSurfacePhase!=='accepted'))throw Error('reviewed_terrain_source_unavailable');
+      const scale=Number(appCtx.WORLD_UNITS_PER_METER)||1,exaggeration=Number(appCtx.TERRAIN_Y_EXAGGERATION)||1,segments=[];
+      for(const road of roads){
+        if(road.structureSemantics?.terrainMode!=='at_grade')continue;
+        const half=road.width*.5;
+        for(let i=1;i<road.pts.length;i++)segments.push({a:road.pts[i-1],b:road.pts[i],innerRadius:half+8*scale,outerRadius:half+40*scale});
+      }
+      const originalCount=geometry.attributes.position.count,lines=collectDetailBoundaryLines(appCtx.terrainGroup?.children),
+        oldGrid={xValues,zValues,worldYs,boundaryTriangles,detailedCoverage:spec.detailedCoverage};
+      const active=()=>current()&&appCtx.worldLoadRuntimeState===runtime&&!mesh.userData?.farFieldDisposed;
+      const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:positionData,segments,current:active,yieldWork,
+        innerSpacing:2*scale,outerSpacing:8*scale,
+        skipCell:c=>cellFullyInsideDetailedCoverage(c.minX,c.maxX,c.minZ,c.maxZ,spec.detailedCoverage),
+        heightAt:(x,z,candidates)=>{
+          const seam=detailHeightAt(lines,'x',x,z)??detailHeightAt(lines,'z',x,z);
+          if(Number.isFinite(seam))return seam;
+          const old=sampleFarFieldGridWorldY(x,z,oldGrid);let weight=0;
+          for(const segment of candidates){
+            const distance=corridorSegmentDistance(x,z,segment),t=Math.max(0,Math.min(1,(distance-segment.innerRadius)/(segment.outerRadius-segment.innerRadius)));
+            weight=Math.max(weight,1-t*t*(3-2*t));
+          }
+          if(!weight)return old;
+          const {lat,lon}=worldToLatLon(x,z),meters=acceptedElevation(lat,lon);
+          if(!Number.isFinite(meters))throw Error('reviewed_terrain_ground_unavailable');
+          const base=meters*scale*exaggeration,graded=terrainTileDeps.applyStructureTerrainCuts(x,z,base),
+            ground=terrainTileDeps.resolveWaterTerrainY(x,z,graded);
+          return old+(ground-old)*weight;
+        }});
+      const count=refined.positions.length/3,staged=new Map();let slice=performance.now();
+      const recipe=i=>{
+        const x=refined.positions[i*3],z=refined.positions[i*3+2],column=intervalIndex(xValues,Math.max(xValues[0],Math.min(xValues.at(-1),x))),row=intervalIndex(zValues,Math.max(zValues[0],Math.min(zValues.at(-1),z))),
+          u=Math.max(0,Math.min(1,(x-xValues[column])/(xValues[column+1]-xValues[column]))),v=Math.max(0,Math.min(1,(z-zValues[row])/(zValues[row+1]-zValues[row]))),a=row*xValues.length+column,b=a+1,c=a+xValues.length,d=c+1;
+        return u+v<=1?[[a,1-u-v],[b,u],[c,v]]:[[d,u+v-1],[c,1-u],[b,1-v]];
+      };
+      for(const [name,attribute] of Object.entries(geometry.attributes)){
+        if(name==='position'||name==='normal')continue;
+        if(attribute.count!==originalCount)throw Error('reviewed_terrain_attribute_shape');
+        const array=new attribute.array.constructor(count*attribute.itemSize);array.set(attribute.array);
+        for(let i=originalCount;i<count;i++){
+          const weights=recipe(i);
+          for(let component=0;component<attribute.itemSize;component++)array[i*attribute.itemSize+component]=weights.reduce((sum,[index,weight])=>sum+attribute.array[index*attribute.itemSize+component]*weight,0);
+          if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
+        }
+        staged.set(name,new THREE.BufferAttribute(array,attribute.itemSize,attribute.normalized));
+      }
+      const tints=mesh.userData.mappedSurfaceTints,modes=mesh.userData.mappedSurfaceModes;
+      let nextTints=tints,nextModes=modes;
+      if(tints){nextTints=new Float32Array(count*3);nextTints.set(tints);}
+      if(modes)nextModes=[...modes];
+      for(let i=originalCount;i<count;i++){
+        const weights=recipe(i),nearest=weights.reduce((a,b)=>a[1]>=b[1]?a:b)[0];
+        if(nextTints)for(let component=0;component<3;component++)nextTints[i*3+component]=tints[nearest*3+component];
+        if(nextModes)nextModes[i]=modes[nearest];
+        if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
+      }
+      if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');
+      // One atomic adoption into the same mesh and query. No provisional
+      // geometry or separate height field becomes visible while preparing.
+      geometry.setAttribute('position',new THREE.BufferAttribute(refined.positions,3));
+      for(const [name,attribute]of staged)geometry.setAttribute(name,attribute);
+      geometry.setIndex(new THREE.BufferAttribute(refined.indices,1));geometry.deleteAttribute('normal');geometry.computeVertexNormals();geometry.computeBoundingSphere();
+      positionData=refined.positions;
+      for(const [index,p]of pointsByIndex){p.x=positionData[index*3];p.y=positionData[index*3+1];p.z=positionData[index*3+2];}
+      for(let i=0;i<worldYs.length;i++)worldYs[i]=positionData[i*3+1];
+      boundaryTriangles.clear();
+      for(const [id,triangles]of refined.trianglesByCell)boundaryTriangles.set(id,triangles.map(ids=>ids.map(point)));
+      mesh.userData.mappedSurfaceTints=nextTints;mesh.userData.mappedSurfaceModes=nextModes;
+      reviewedRefinement=Object.freeze({...refined.stats,venueId:venue.id,sourceSha256:venue.sourceSha256});
+      mesh.userData.reviewedCorridorRefinement=reviewedRefinement;
+      return reviewedRefinement;
+    }
     return {
       geometry,
+      refineReviewedCorridors,
       refreshBoundaryHeights,
       columns: xValues.length,
       rows: zValues.length,
