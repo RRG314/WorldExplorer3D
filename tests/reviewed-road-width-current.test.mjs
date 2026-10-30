@@ -20,7 +20,7 @@ test('mapped-width preparation probes the complete pavement and preserves privat
  for(const way of ways)assert.equal(roadSourceSurvey(way)?.pavementWidthPolicy,source.layout.wayIds.includes(way.id)?'mapped':undefined);
  const changed=structuredClone(source);changed.ways.find(w=>w.id===changed.layout.wayIds[0]).tags.width='6';
  assert.throws(()=>createRacingVenueGroundPlan(descriptor,changed),/mapped_pavement_width_invalid/);
- assert.equal(RACING_VENUE_SOURCES.some(pack=>pack.id===source.venueId),false);
+ assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).raceAdmission,'pending-timing-line');
 });
 test('authored corridor behavior and ordinary roads retain their existing contracts; unknown or wider mapped corridors reject',()=>{
  const original=record({id:1,tags:{highway:'raceway'}});assert.equal(reviewedRoadTransportRecord(original,null),original);

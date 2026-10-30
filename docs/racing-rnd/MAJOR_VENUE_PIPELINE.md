@@ -195,6 +195,16 @@ backend candidate. No public client write or read permission is added.
 
 ## Full Nordschleife source
 
+The Nordschleife descriptor explicitly grants virtual motor access to its
+reviewed private raceway ways. The existing transport source owner preserves
+OSM `access=private`, raw tags and pedestrian restrictions, while its game
+motor-access decision can enter the existing driving graph. This capability
+requires the privately adopted venue survey, complete lossless raceway identity
+and exact approved source membership. Ordinary private roads, explicit motor
+bans, incomplete sources and provider/cache JSON cannot opt in. It makes no
+claim about permission to drive on the real-world property.
+
+
 `config/racing-venues/nordschleife-layout.json` and the adapted
 `app/assets/racing/nordschleife/source.json` retain the complete connected loop:
 53 ordered ways, 1,067 original spans, T13 and five mapped bridge ways. Source

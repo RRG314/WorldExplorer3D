@@ -24,7 +24,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  ]),
  reviewedDeckProfiles:Object.freeze({url:'/app/assets/racing/nordschleife/decks.json',contentSha256:'586ba8daef6c299170ea0a619cec2bed4b40ba57f09cec6522f4b187fdc62647'}),
  pavementWidthPolicy:'mapped',surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:3500,
- routeExtent:'mapped-venue-v1',raceAdmission:'pending-timing-line'
+ routeExtent:'mapped-venue-v1',motorAccess:'virtual-raceway-v1',raceAdmission:'pending-timing-line'
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;
@@ -104,6 +104,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
    ...(descriptor.pavementWidthPolicy==='mapped'?{pavementWidthPolicy:'mapped'}:{}),
    usableWidthMeters:source.layout.usableWidthMeters,maximumCrossfall:descriptor.maximumCrossfall,
    ...(descriptor.surfaceModel?{surfaceModel:descriptor.surfaceModel}:{}),
+   ...(descriptor.motorAccess?{motorAccess:descriptor.motorAccess}:{}),
    ...(deck?{geographicDeckProfile:deck}:{}),
    ...(pavement?{geographicPavementProfile:pavement}:{}),
    groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required});

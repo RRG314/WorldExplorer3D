@@ -20,5 +20,18 @@ export function reviewedRoadTransportRecord(record,survey){
   if(!String(record.crossSection?.widthSource).startsWith('source:width')||survey.usableWidthMeters>record.crossSection.widthMeters)throw Error('reviewed_road_mapped_width_unavailable');
   crossSection=record.crossSection;
  }else crossSection=Object.freeze({...record.crossSection,widthMeters:survey.usableWidthMeters,widthSource:'reviewed-venue-usable-corridor'});
- return Object.freeze({...record,crossSection,provenance:Object.freeze({...record.provenance,reviewedVenue:survey.venueId})});
+ let access=record.access;
+ let safeForDriving=record.safeForDriving;
+ if(survey.motorAccess!==undefined){
+  // A reviewed virtual raceway is driveable in the game, even where the map
+  // correctly records private real-world access. Preserve the original tags
+  // and pedestrian decision. No ordinary private road or explicit motor ban
+  // can acquire this capability from provider/cache JSON.
+  if(survey.motorAccess!=='virtual-raceway-v1'||record.sourceTags?.highway!=='raceway'||record.sourceTags?.access!=='private'||
+   record.completeness!=='lossless'||record.routeState!=='complete'||access?.motorSource!=='access'||
+   !survey.venueSource||survey.venueSource.id!==survey.venueId||!survey.venueSource.sourceFeatureIds.includes(record.identity))throw Error('invalid_reviewed_raceway_access');
+  access=Object.freeze({...access,motorVehicle:'allowed',motorSource:'reviewed:virtual-raceway'});safeForDriving=true;
+ }
+ return Object.freeze({...record,crossSection,access,safeForDriving,provenance:Object.freeze({...record.provenance,reviewedVenue:survey.venueId,
+  ...(survey.motorAccess?{reviewedMotorAccess:survey.motorAccess}:{})})});
 }
