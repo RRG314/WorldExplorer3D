@@ -199,3 +199,18 @@ transformation. Source and datum uncertainties remain unchanged. The image
 sample distance is not a statement of boundary accuracy. No observation imagery
 is included as a game texture. Pit/parking pavement, paint, fences, timing and
 oval gameplay remain subject to venue acceptance.
+
+### Daytona paddock garage exteriors
+
+The original garage models retain the exact outlines of OpenStreetMap ways
+[407709766](https://www.openstreetmap.org/way/407709766),
+[407709767](https://www.openstreetmap.org/way/407709767) and
+[407713767](https://www.openstreetmap.org/way/407713767), under ODbL-1.0,
+© OpenStreetMap contributors. Source revisions and observation dates are
+retained in `daytona-paddock-survey.js`. The same retained NAIP observation
+informed roof interpretation; it is not distributed as game artwork.
+
+The 5.2 m eaves, 6.4 m ridges, closed service bays, ribs, vents, glazing and
+safety trim are original estimates. They do not reproduce sponsor graphics or
+confer interior admission. Terrain support, collision, LOD and disposal use the
+existing building publication and lifecycle owners.
