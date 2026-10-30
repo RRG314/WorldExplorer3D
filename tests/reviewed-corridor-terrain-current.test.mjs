@@ -46,21 +46,23 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {createFarFieldGeometryPlanner} from '../app/js/terrain/far-field-geometry.js?v=18';
 const sandbox=vm.createContext({console});vm.runInContext(fs.readFileSync(new URL('../app/vendor/three/build/three.min.js',import.meta.url),'utf8'),sandbox);
-async function owner(t){
+async function owner(t,{noninteger=false,detailed=false}={}){
  const prior=globalThis.THREE,T=sandbox.THREE;globalThis.THREE=T;t.after(()=>{globalThis.THREE=prior;});
  const venue={id:'controlled-refinement',sourceSha256:'a'.repeat(64),sourceFeatureIds:['osm:way:one']},
   survey={venueSource:venue},road={sourceFeatureId:'osm:way:one',width:8,pts:[{x:-300,z:17},{x:300,z:17}],surfaceSurveyEvidence:survey,
    structureSemantics:{terrainMode:'at_grade'},transportSurfaceModel:{reviewedSurfacePhase:'accepted',surveyedSurface:survey}},
   appCtx={_worldLoadSequence:1,worldLoadRuntimeState:{sequence:1,venuePack:{venueSource:venue}},roads:[road],terrainGroup:{children:[]},WORLD_UNITS_PER_METER:1,TERRAIN_Y_EXAGGERATION:1};
- let available=true;
+ let available=true,near=null;
+ if(detailed){const positions=[];for(let z=0;z<=20;z+=10)for(let x=0;x<=20;x+=10)positions.push(x,10+.03*x+.1*(z-17),z);
+  const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));near=new T.Mesh(geometry);near.userData.isTerrainMesh=true;appCtx.terrainGroup.children.push(near);t.after(()=>{near.geometry.dispose();near.material.dispose();});}
  const planner=createFarFieldGeometryPlanner({appCtx,farFieldGridIntervalMeters:320,farFieldGapFillIntervalMeters:40,worldToLatLon:(x,z)=>({lat:z,lon:x}),
   sampleAcceptedGroundElevationAtLatLon:(z,x)=>available?50-40*Math.exp(-(((z-17)/10)**2))+.03*x:NaN,latLonToTileXY:()=>({x:0,y:0}),
   terrainTileDeps:{applyStructureTerrainCuts:(x,z,y)=>Math.abs(z-17)<=4?10+.03*x+.1*(z-17):y,resolveWaterTerrainY:(x,z,y)=>y}}),
-  built=await planner.buildFarFieldGeometry({outer:{minX:-320,maxX:320,minZ:-320,maxZ:320},inner:{minX:-5,maxX:5,minZ:-5,maxZ:5},detailedCoverage:[]},new Map(),0,{contextZoom:0,waterAreas:[]}),
+  built=await planner.buildFarFieldGeometry({outer:noninteger?{minX:-320.1,maxX:320.1,minZ:-320.1,maxZ:320.1}:{minX:-320,maxX:320,minZ:-320,maxZ:320},inner:{minX:-5,maxX:5,minZ:-5,maxZ:5},detailedCoverage:detailed?[{minX:0,maxX:20,minZ:0,maxZ:20}]:[]},new Map(),0,{contextZoom:0,waterAreas:[]}),
   mesh=new T.Mesh(built.geometry,new T.MeshBasicMaterial());
  mesh.userData.mappedSurfaceTints=built.mappedSurfaceTints;mesh.userData.mappedSurfaceModes=built.mappedSurfaceModes;
  t.after(()=>{mesh.geometry.dispose();mesh.material.dispose();});
- return {built,mesh,appCtx,unavailable:()=>{available=false;}};
+ return {built,mesh,appCtx,near,unavailable:()=>{available=false;}};
 }
 
 test('the existing geometry owner adopts refined buffers and the same height query atomically, retaining material attribute shapes',async t=>{
@@ -93,4 +95,22 @@ test('narrow detailed-seam cells refine only their long axis within the same geo
  for(let i=0;i<result.indices.length;i+=3){const[a,b,c]=[...result.indices.slice(i,i+3)].map(id=>({x:result.positions[id*3],z:result.positions[id*3+2]}));
   assert.ok((b.z-a.z)*(c.x-a.x)-(b.x-a.x)*(c.z-a.z)>0,'no collapsed narrow leaves');
  }
+});
+
+
+test('float32 geospatial mesh bounds can refine without querying beyond the original far-grid extent',async t=>{
+ const h=await owner(t,{noninteger:true});
+ const result=await h.built.refineReviewedCorridors(h.mesh);assert.ok(result.vertices>0);
+ assert.ok(Math.abs(sampleFarFieldGridWorldY(70,17,h.built.surfaceGrid)-12.1)<.0001);
+});
+
+
+test('refined far cells preserve detailed-tile holes and continue following their published seam heights',async t=>{
+ const h=await owner(t,{detailed:true,noninteger:true});
+ await h.built.refineReviewedCorridors(h.mesh);
+ assert.equal(sampleFarFieldGridWorldY(10,17,h.built.surfaceGrid),null,'detailed terrain retains the hole');
+ const before=sampleFarFieldGridWorldY(-.1,17,h.built.surfaceGrid);assert.ok(Number.isFinite(before));
+ const p=h.near.geometry.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,p.getY(i)+1);
+ assert.ok(h.built.refreshBoundaryHeights([h.near])>0);
+ assert.ok(sampleFarFieldGridWorldY(-.1,17,h.built.surfaceGrid)>before+.5,'query and same geometry retain live seam ownership after refinement');
 });

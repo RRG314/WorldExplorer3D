@@ -650,14 +650,20 @@ function createFarFieldGeometryPlanner(deps = {}) {
         heightAt:(x,z,candidates)=>{
           const seam=detailHeightAt(lines,'x',x,z)??detailHeightAt(lines,'z',x,z);
           if(Number.isFinite(seam))return seam;
-          const old=sampleFarFieldGridWorldY(x,z,oldGrid);let weight=0;
+          // The existing mesh stores float32 coordinates, which can round an
+          // outer edge a few micrometres beyond its double-precision grid.
+          // Read that same boundary value without extending terrain coverage.
+          const queryX=Math.max(xValues[0],Math.min(xValues.at(-1),x)),queryZ=Math.max(zValues[0],Math.min(zValues.at(-1),z)),
+            old=sampleFarFieldGridWorldY(queryX,queryZ,oldGrid);
+          if(!Number.isFinite(old))throw Error(`reviewed_terrain_boundary_unavailable: ${x},${z}`);
+          let weight=0;
           for(const segment of candidates){
             const distance=corridorSegmentDistance(x,z,segment),t=Math.max(0,Math.min(1,(distance-segment.innerRadius)/(segment.outerRadius-segment.innerRadius)));
             weight=Math.max(weight,1-t*t*(3-2*t));
           }
           if(!weight)return old;
           const {lat,lon}=worldToLatLon(x,z),meters=acceptedElevation(lat,lon);
-          if(!Number.isFinite(meters))throw Error('reviewed_terrain_ground_unavailable');
+          if(!Number.isFinite(meters))throw Error(`reviewed_terrain_source_ground_unavailable: ${lat},${lon}`);
           const base=meters*scale*exaggeration,graded=terrainTileDeps.applyStructureTerrainCuts(x,z,base),
             ground=terrainTileDeps.resolveWaterTerrainY(x,z,graded);
           return old+(ground-old)*weight;
@@ -689,6 +695,13 @@ function createFarFieldGeometryPlanner(deps = {}) {
         if(nextModes)nextModes[i]=modes[nearest];
         if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
       }
+      const nextBoundaryBindings=new Map(boundaryBindings);
+      for(let i=0;i<count;i++){
+        const x=refined.positions[i*3],z=refined.positions[i*3+2];
+        if(Number.isFinite(detailHeightAt(lines,'x',x,z)))nextBoundaryBindings.set(i,'x');
+        else if(Number.isFinite(detailHeightAt(lines,'z',x,z)))nextBoundaryBindings.set(i,'z');
+        if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
+      }
       if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');
       // One atomic adoption into the same mesh and query. No provisional
       // geometry or separate height field becomes visible while preparing.
@@ -696,6 +709,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       for(const [name,attribute]of staged)geometry.setAttribute(name,attribute);
       geometry.setIndex(new THREE.BufferAttribute(refined.indices,1));geometry.deleteAttribute('normal');geometry.computeVertexNormals();geometry.computeBoundingSphere();
       positionData=refined.positions;
+      boundaryBindings.clear();for(const [index,axis]of nextBoundaryBindings)boundaryBindings.set(index,axis);
       for(const [index,p]of pointsByIndex){p.x=positionData[index*3];p.y=positionData[index*3+1];p.z=positionData[index*3+2];}
       for(let i=0;i<worldYs.length;i++)worldYs[i]=positionData[i*3+1];
       boundaryTriangles.clear();
