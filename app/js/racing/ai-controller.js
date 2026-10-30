@@ -20,13 +20,14 @@ export function raceAiActions(course,car,progress,profile,{difficulty=.65,format
  const goal=course.gates[progress.nextGate],pose=raceVehicleGroundPose(car),speed=Math.abs(raceVehicleSpeedMetersPerSecond(car));
  const projection=projectRacePosition(course,pose,formation?{}:{minimumMeters:Math.max(0,(course.gates[progress.nextGate-1]?.distanceMeters||0)-8),maximumMeters:Math.min(course.lengthMeters,goal.distanceMeters+15)});
  if(!projection)return {steer:0,throttle:0,serviceBrake:1};
- const look=clamp(3.5+speed*.6,4,15),target=pointOnRaceCourse(course,projection.distanceMeters+look,laneOffsetMeters);
- const dx=(target.x-car.x)*course.metersPerUnit,dz=(target.z-car.z)*course.metersPerUnit,heading=Math.atan2(dx,dz),error=wrap(heading-car.angle);
+ const oval=course.discipline==='oval',look=oval?clamp(4+speed*.8,6,45):clamp(3.5+speed*.6,4,15),target=pointOnRaceCourse(course,projection.distanceMeters+look,laneOffsetMeters);
+ const dx=(target.x-car.x)*course.metersPerUnit,dz=(target.z-car.z)*course.metersPerUnit,heading=Math.atan2(dx,dz),
+  error=wrap(heading-car.angle+(oval?Math.atan2((laneOffsetMeters-(projection.lateralMeters-(projection.pavement?.racingOffsetMeters||0)))*1.4,speed+4):0));
  const steering=earthDrivingSteeringProfile(carSpeedToMph(Math.abs(car.speed)));
  const desiredAngle=Math.atan2(2*profile.handling.wheelBase*Math.sin(error),Math.max(2,Math.hypot(dx,dz)));
  const maxAngle=steering.maxSteeringAngle*profile.handling.steeringScale*profile.condition.steeringScale;
  const steer=clamp(desiredAngle/Math.max(.1,maxAngle)*1.35,-1,1);
- let targetSpeed=formation?paceMetersPerSecond:Math.min(profile.handling.topSpeedMph*.44704*(.32+.25*clamp(difficulty,0,1)),23);
+ let targetSpeed=formation?paceMetersPerSecond:oval?Math.min(profile.handling.topSpeedMph*.44704*(.55+.3*clamp(difficulty,0,1)),65):Math.min(profile.handling.topSpeedMph*.44704*(.32+.25*clamp(difficulty,0,1)),23);
  const gripAcceleration=profile.config.gripRoad*profile.surface.grip*profile.handling.gripScale*profile.condition.gripScale*profile.upgrades.gripScale*9.81;
  const planningDeceleration=Math.max(1.2,Math.min(4,gripAcceleration*.45,profile.config.brake*.22352*profile.handling.brakeScale*.65));
  const horizon=Math.min(180,Math.max(70,speed*speed/(2*planningDeceleration)+look+15));
@@ -38,7 +39,8 @@ export function raceAiActions(course,car,progress,profile,{difficulty=.65,format
   if(!index&&!isClosedRaceDiscipline(course.discipline))continue;
   const bend=Math.acos(clamp(previous.forward.x*segment.forward.x+previous.forward.z*segment.forward.z,-1,1));
   if(bend<.12)continue;
-  const corner=Math.max(2.8,Math.min(15,4.5/bend))*Math.sqrt(profile.surface.grip),brakeDistance=Math.max(0,ahead-look*.35);
+  const radius=(previous.lengthMeters+segment.lengthMeters)*.5/bend,
+   corner=oval?Math.sqrt(Math.max(1,radius)*gripAcceleration*.55):Math.max(2.8,Math.min(15,4.5/bend))*Math.sqrt(profile.surface.grip),brakeDistance=Math.max(0,ahead-look*.35);
   targetSpeed=Math.min(targetSpeed,Math.sqrt(corner*corner+2*planningDeceleration*brakeDistance));
  }
  targetSpeed*=clamp(1-Math.abs(error)*.32,.25,1);

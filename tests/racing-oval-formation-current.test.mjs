@@ -6,6 +6,7 @@ import {createRaceVehicleProfile} from '../app/js/racing/vehicle-controller.js';
 import {racePhysicsVersion,raceRecordConfiguration,raceCompetitiveRecordConfiguration,RACE_OVAL_PHYSICS_VERSION,RACE_PROFILED_PAVEMENT_PHYSICS_VERSION} from '../app/js/racing/record-rules.js';
 import {createPracticeRaceController} from '../app/js/racing/road-activity-controller.js';
 import {createNetworkRaceController} from '../app/js/racing/network-controller.js';
+import {raceAiActions} from '../app/js/racing/ai-controller.js';
 const profile=createRaceVehicleProfile('bmw_m3_e92_race');
 function session(engine={createRaceSession,createRaceVehicleProfile},id='rolling'){
  const {course}=createOvalFormatFixture(),s=engine.createRaceSession({id,course,creatorUid:'driver',createdAtMs:0});
@@ -48,4 +49,14 @@ test('practice admission uses the same rolling staging pose and network presenta
  for(let i=1;i<=120;i++){const at=i*1000/60;if(i%3===0){s.advance(at);state={...s.snapshot(),physicsVersion:racePhysicsVersion(course),profiles:{driver:configuration}};}const frozen=JSON.stringify(state);frame=network.step(1/60,{steer:1,throttle:1});views.push(network.presentationSnapshot().players.find(p=>p.uid==='two').pose);assert.equal(JSON.stringify(state),frozen,'presentation cannot edit authoritative packets');}
  const changes=views.slice(10).map((p,i)=>Math.hypot(p.x-views[i+9].x,p.z-views[i+9].z));assert.ok(Math.min(...changes)>.05&&Math.max(...changes)<.3,'rivals cannot hold and jump at each 50 ms packet');
  assert.ok(Math.hypot(frame.x-original.x,frame.z-original.z)>15);assert.ok(controls>100);fresh=false;assert.equal(network.step(1/60,{}).speed,0);network.dispose();
+});
+test('oval rivals retain distinct columns after green and use actual turn radius beyond the city pace cap',()=>{
+ const {course}=createOvalFormatFixture(),s=createRaceSession({id:'controlled-oval-laps',course,creatorUid:'driver',createdAtMs:0});s.add({uid:'driver',profile});for(const [i,uid]of ['rival:one','rival:two','rival:three'].entries())s.add({uid,profile,ai:true,difficulty:.8});s.setReady('driver',true);s.start('driver',0);
+ let state=s.snapshot(),maximumSpeed=0;
+ for(let now=50,sequence=0;now<=300000;now+=50,sequence++){
+  const me=state.players.find(p=>p.uid==='driver');if(!me.progress.finished)s.control('driver',sequence,raceAiActions(course,me.vehicleState,me.progress,profile,{difficulty:.8,laneOffsetMeters:-1.4}),now);
+  state=s.advance(now);maximumSpeed=Math.max(maximumSpeed,...state.players.map(p=>p.speed));if(state.phase==='complete')break;
+ }
+ assert.equal(state.phase,'complete');assert.ok(state.players.every(p=>p.progress.finished&&!p.dnf));assert.ok(maximumSpeed*.22352>26,'wide oval bends must not inherit the 23 m/s city cap');
+ assert.ok(state.players.every(p=>p.barrierContacts===0),'the faster controls must still stay inside the qualified physical pavement');
 });

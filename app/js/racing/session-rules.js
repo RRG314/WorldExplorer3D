@@ -114,7 +114,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     if(p.dnf||p.progress.finished)continue;
     if(p.disconnectedAt!==null&&frameAt-p.disconnectedAt>10000){p.dnf=true;continue;}
     while(p.queue.length&&p.queue[0].at<=frameAt){const command=p.queue.shift();p.actions=command.actions;p.lastControlAt=command.at;}
-    const actions=p.ai?raceAiActions(course,p.car,p.progress,p.profile,{difficulty:p.difficulty}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
+    const actions=p.ai?raceAiActions(course,p.car,p.progress,p.profile,{difficulty:p.difficulty,...(rolling?{laneOffsetMeters:course.participants===1?0:p.slot%2===0?-1.4:1.4}:{})}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
     p.previousFrame=snapshotRaceVehicle(p.car);
     stepRaceVehicle(course,p.car,actions,1/60,p.profile);
     p.progress=advanceRaceProgress(course,p.progress,raceVehicleGroundPose(p.car),frameAt,{startedAtMs:startAtMs});

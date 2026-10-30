@@ -3730,13 +3730,13 @@ function raceAiActions(course, car, progress, profile, { difficulty = 0.65, form
   const goal = course.gates[progress.nextGate], pose = raceVehicleGroundPose(car), speed = Math.abs(raceVehicleSpeedMetersPerSecond(car));
   const projection = projectRacePosition(course, pose, formation ? {} : { minimumMeters: Math.max(0, (course.gates[progress.nextGate - 1]?.distanceMeters || 0) - 8), maximumMeters: Math.min(course.lengthMeters, goal.distanceMeters + 15) });
   if (!projection) return { steer: 0, throttle: 0, serviceBrake: 1 };
-  const look = clamp2(3.5 + speed * 0.6, 4, 15), target = pointOnRaceCourse(course, projection.distanceMeters + look, laneOffsetMeters);
-  const dx = (target.x - car.x) * course.metersPerUnit, dz = (target.z - car.z) * course.metersPerUnit, heading = Math.atan2(dx, dz), error = wrap(heading - car.angle);
+  const oval = course.discipline === "oval", look = oval ? clamp2(4 + speed * 0.8, 6, 45) : clamp2(3.5 + speed * 0.6, 4, 15), target = pointOnRaceCourse(course, projection.distanceMeters + look, laneOffsetMeters);
+  const dx = (target.x - car.x) * course.metersPerUnit, dz = (target.z - car.z) * course.metersPerUnit, heading = Math.atan2(dx, dz), error = wrap(heading - car.angle + (oval ? Math.atan2((laneOffsetMeters - (projection.lateralMeters - (projection.pavement?.racingOffsetMeters || 0))) * 1.4, speed + 4) : 0));
   const steering = earthDrivingSteeringProfile(carSpeedToMph(Math.abs(car.speed)));
   const desiredAngle = Math.atan2(2 * profile.handling.wheelBase * Math.sin(error), Math.max(2, Math.hypot(dx, dz)));
   const maxAngle = steering.maxSteeringAngle * profile.handling.steeringScale * profile.condition.steeringScale;
   const steer = clamp2(desiredAngle / Math.max(0.1, maxAngle) * 1.35, -1, 1);
-  let targetSpeed = formation ? paceMetersPerSecond : Math.min(profile.handling.topSpeedMph * 0.44704 * (0.32 + 0.25 * clamp2(difficulty, 0, 1)), 23);
+  let targetSpeed = formation ? paceMetersPerSecond : oval ? Math.min(profile.handling.topSpeedMph * 0.44704 * (0.55 + 0.3 * clamp2(difficulty, 0, 1)), 65) : Math.min(profile.handling.topSpeedMph * 0.44704 * (0.32 + 0.25 * clamp2(difficulty, 0, 1)), 23);
   const gripAcceleration = profile.config.gripRoad * profile.surface.grip * profile.handling.gripScale * profile.condition.gripScale * profile.upgrades.gripScale * 9.81;
   const planningDeceleration = Math.max(1.2, Math.min(4, gripAcceleration * 0.45, profile.config.brake * 0.22352 * profile.handling.brakeScale * 0.65));
   const horizon = Math.min(180, Math.max(70, speed * speed / (2 * planningDeceleration) + look + 15));
@@ -3749,7 +3749,7 @@ function raceAiActions(course, car, progress, profile, { difficulty = 0.65, form
     if (!index && !isClosedRaceDiscipline(course.discipline)) continue;
     const bend = Math.acos(clamp2(previous.forward.x * segment.forward.x + previous.forward.z * segment.forward.z, -1, 1));
     if (bend < 0.12) continue;
-    const corner = Math.max(2.8, Math.min(15, 4.5 / bend)) * Math.sqrt(profile.surface.grip), brakeDistance = Math.max(0, ahead - look * 0.35);
+    const radius = (previous.lengthMeters + segment.lengthMeters) * 0.5 / bend, corner = oval ? Math.sqrt(Math.max(1, radius) * gripAcceleration * 0.55) : Math.max(2.8, Math.min(15, 4.5 / bend)) * Math.sqrt(profile.surface.grip), brakeDistance = Math.max(0, ahead - look * 0.35);
     targetSpeed = Math.min(targetSpeed, Math.sqrt(corner * corner + 2 * planningDeceleration * brakeDistance));
   }
   targetSpeed *= clamp2(1 - Math.abs(error) * 0.32, 0.25, 1);
@@ -3980,7 +3980,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           p.actions = command.actions;
           p.lastControlAt = command.at;
         }
-        const actions = p.ai ? raceAiActions(course, p.car, p.progress, p.profile, { difficulty: p.difficulty }) : p.disconnectedAt !== null || frameAt - p.lastControlAt > 400 ? NEUTRAL : p.actions;
+        const actions = p.ai ? raceAiActions(course, p.car, p.progress, p.profile, { difficulty: p.difficulty, ...rolling ? { laneOffsetMeters: course.participants === 1 ? 0 : p.slot % 2 === 0 ? -1.4 : 1.4 } : {} }) : p.disconnectedAt !== null || frameAt - p.lastControlAt > 400 ? NEUTRAL : p.actions;
         p.previousFrame = snapshotRaceVehicle(p.car);
         stepRaceVehicle(course, p.car, actions, 1 / 60, p.profile);
         p.progress = advanceRaceProgress(course, p.progress, raceVehicleGroundPose(p.car), frameAt, { startedAtMs: startAtMs });
