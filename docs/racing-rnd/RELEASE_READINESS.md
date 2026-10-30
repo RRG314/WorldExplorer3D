@@ -469,3 +469,13 @@ cancellation. Three detail levels share owned materials and lifetime. Component
 and controlled GPU checks cover the curve, geographic scale, footprint clipping,
 height, retirement and detail selection; native-world publication is pending.
 This is additional venue construction, not completed pack acceptance.
+
+The first native grandstand view found the generic body and roof had already
+entered shared building batches before the deferred replacement. The individual
+building match and collision transfer alone could not retire those copied
+triangles. Matching original visuals now retain a deferred-exterior marker
+through the existing building phase. Ordinary building batching and travelling
+facade details exclude those reserved originals; they remain visible until the
+post-transport replacement succeeds. A real mid-building batch regression covers
+body/roof retention, neighbouring batch preservation and unavailable-ground
+fallback. Native replacement must be rechecked at this publication boundary.

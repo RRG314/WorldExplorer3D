@@ -15,6 +15,13 @@ export function isDaytonaStandRepresentation(data,footprint){
  // outline coverage establishes a unique representation without that shortcut.
  return covered(ring,footprint)>=.8&&covered(footprint,ring)>=.8;
 }
+export function reserveDaytonaGrandstandRepresentations(ctx){
+ if(ctx.worldLoadRuntimeState?.venuePack?.id!=='daytona-tri-oval'||typeof ctx.geoToWorld!=='function')return;
+ const footprint=DAYTONA_STAND_FOOTPRINT.map(p=>ctx.geoToWorld(p.lat,p.lon));
+ // Retain the current visual until the post-transport replacement succeeds,
+ // but keep it out of irreversible render merges and travelling detail copies.
+ for(const mesh of ctx.buildingMeshes||[])if(!mesh.userData?.reviewedVenueExterior&&isDaytonaStandRepresentation(mesh.userData,footprint))mesh.userData.deferredReviewedExterior='daytona-tri-oval';
+}
 // Half-plane clipping of already triangulated source geometry preserves the
 // indented mapped outline, including disjoint concourse/access-bay slices.
 function clip(ring,distance){

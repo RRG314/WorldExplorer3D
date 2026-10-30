@@ -44,3 +44,18 @@ test('world cancellation, unavailable ground and another venue cannot publish th
  const footprint=DAYTONA_STAND_FOOTPRINT.map(p=>ctx.geoToWorld(p.lat,p.lon));assert.equal(isDaytonaStandRepresentation({buildingName:'Daytona',buildingFootprint:footprint.map(p=>({...p,x:p.x+150}))},footprint),false);
  let reads=0;ctx.elevationWorldYAtWorldXZ=(x,z)=>{reads++;return 8+x*.003-z*.002;};const model=createDaytonaGrandstandExterior(T,ctx);assert.ok(model);const compiledReads=reads;model.root.updateMatrixWorld(true);model.root.children[0].update(new T.PerspectiveCamera());assert.equal(reads,compiledReads,'detail selection cannot create a live height authority');disposeLandmarkModel(model.root);
 });
+
+test('the real mid-building batch keeps deferred stand bodies and roofs individually replaceable',async()=>{
+ globalThis.THREE=T;
+ const {ctx:runtime}=await import('../app/js/shared-context.js?v=55'),{batchMidLodBuildingMeshes}=await import('../app/js/world/building-batching.js?v=15');
+ const ctx=context(),scene=new T.Scene(),footprint=DAYTONA_STAND_FOOTPRINT.map(p=>ctx.geoToWorld(p.lat,p.lon)),material=new T.MeshStandardMaterial(),stand=new T.Mesh(new T.BoxGeometry(),material),roof=new T.Mesh(new T.BoxGeometry(),material),others=[0,1].map(()=>new T.Mesh(new T.BoxGeometry(),material));
+ stand.userData={sourceBuildingId:'provider:stand',buildingFootprint:footprint,lodTier:'mid'};roof.userData={...stand.userData,isRoofDetail:true};others.forEach((m,i)=>{m.position.x=i*3;m.userData={sourceBuildingId:'neighbor:'+i,lodTier:'mid'};});scene.add(stand,roof,...others);
+ Object.assign(ctx,{buildingMeshes:[stand,roof,...others],buildings:[],dynamicBuildingColliders:[],replaceWorldCollection(k,v){this[k]=v;},addEarthWorldObject:m=>scene.add(m)});
+ publishReviewedVenueExteriors(ctx,T);assert.equal(stand.userData.deferredReviewedExterior,'daytona-tri-oval');assert.equal(roof.userData.deferredReviewedExterior,'daytona-tri-oval');assert.equal(others[0].userData.deferredReviewedExterior,undefined);
+ Object.assign(runtime,{buildingMeshes:ctx.buildingMeshes,replaceWorldCollection(k,v){this[k]=v;},addEarthWorldObject:m=>scene.add(m)});
+ assert.equal(await batchMidLodBuildingMeshes({yieldToMainThread:async()=>{}}),2);assert.ok(runtime.buildingMeshes.includes(stand)&&runtime.buildingMeshes.includes(roof));
+ const batch=runtime.buildingMeshes.find(m=>m.userData.isBuildingBatch);assert.ok(batch);assert.deepEqual(batch.userData.editableBuildingIndexRanges.map(r=>r.sourceBuildingId),['neighbor:0','neighbor:1']);
+ ctx.buildingMeshes=runtime.buildingMeshes;ctx.elevationWorldYAtWorldXZ=()=>NaN;ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.ok(stand.parent===scene&&roof.parent===scene,'unavailable replacement ground preserves both original visuals');assert.equal(ctx.dynamicBuildingColliders.length,0);
+ ctx.elevationWorldYAtWorldXZ=()=>8;publishReviewedVenueExteriors(ctx,T);ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.ok(stand.parent===null&&roof.parent===null);assert.ok(batch.parent===scene);assert.equal(ctx.buildingMeshes.length,2);
+ for(const m of ctx.buildingMeshes)disposeLandmarkModel(m);for(const k of Object.keys(runtime))delete runtime[k];delete globalThis.THREE;
+});

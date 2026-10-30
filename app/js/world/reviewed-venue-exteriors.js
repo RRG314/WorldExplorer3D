@@ -8,7 +8,7 @@ import {finishVenueSurface} from './venue-surface-materials.js';
 import {replaceVenueCollision,venueComponentCollider} from './venue-collision.js';
 import {createSilverstoneWingExterior,isSilverstoneWing} from './silverstone-wing-exterior.js';
 import {createNordschleifeT13Exterior,isT13StandRepresentation} from './nordschleife-t13-exterior.js';
-import {createDaytonaGrandstandExterior,isDaytonaStandRepresentation} from './daytona-grandstand-exterior.js';
+import {createDaytonaGrandstandExterior,isDaytonaStandRepresentation,reserveDaytonaGrandstandRepresentations} from './daytona-grandstand-exterior.js';
 
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
@@ -205,6 +205,7 @@ export function publishReviewedVenueExteriors(ctx,THREE){
   added.push(root);
  }
  const published=added.map(r=>r.name),venue=ctx.worldLoadRuntimeState?.venuePack,sequence=ctx._worldLoadSequence;
+ reserveDaytonaGrandstandRepresentations(ctx);
  // The existing transport-dependent publication phase runs after final road
  // grading. A pre-grade flat foundation buries this long stand on the hillside.
  const standFactory=venue?.id==='nurburgring-nordschleife'?createNordschleifeT13Exterior:venue?.id==='daytona-tri-oval'?createDaytonaGrandstandExterior:null,
