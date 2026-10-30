@@ -207,3 +207,11 @@ lateral stations across each affected span, up to 32 points, with measured
 3 mm row-fit error and unchanged grade/crossfall guards. It applies detailed
 profiles only to spans with authored bands. Controlled terrain, storage and
 both generated runtime checks pass; native admission must be rechecked.
+
+The next native check exposed flat asphalt slivers between some raised faces.
+Candidate-triangle inspection confirmed real contact steps, so this was a mesh
+defect rather than a profile threshold issue. A retained-source regression
+reproduced the failure at translated world coordinates. The repair keeps final
+edge clipping at accepted-surface precision and avoids snapping those pieces
+back onto the design grid. That regression and eight affected compiler/worker
+cases pass. Native admission and driving verification remain open.

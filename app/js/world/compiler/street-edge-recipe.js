@@ -2,7 +2,7 @@ import {carriagewaySegmentPolygon,carriagewayJoinPolygons} from './street-carria
 import {roadWidthAtSegment} from '../road-cross-section-profile.js?v=1';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {roadMetersPerWorldUnit} from '../road-units.js';
-import {streetPolygonKernel as clip} from './street-polygon-kernel.js';
+import {streetEdgePolygonKernel as clip} from './street-edge-bands.js';
 
 // Plain, bounded compiler input. Only the private reviewed-source adapter may
 // admit it from a live feature; provider tags cannot create physical furniture.

@@ -1,8 +1,7 @@
 import {unionCarriageway} from './street-carriageway.js';
 import {meshPavementTile} from './street-pavement.js';
-import {streetPolygonKernel as clip} from './street-polygon-kernel.js';
 import {compileStreetEdgeRecipe} from './street-edge-recipe.js';
-import {resolveStreetEdgeBands} from './street-edge-bands.js';
+import {resolveStreetEdgeBands,streetEdgePolygonKernel as edgeClip} from './street-edge-bands.js';
 import {indexPavementPositions} from '../pavement-indexed-mesh.js';
 
 // One nonoverlapping top per cell. The terrain-plane partition is temporary
@@ -30,12 +29,12 @@ export function meshCarriagewayTile(tile, sampleTop, partitionSurface, {polygons
   const cellSize=Math.max(tile.bounds.maxX-tile.bounds.minX,tile.bounds.maxZ-tile.bounds.minZ);
   const authored=edgeFaces===undefined?compileStreetEdgeRecipe(tile):null;
   edgeFaces=edgeFaces??authored.faces;
-  const domain=authored?.faces.length?clip.difference(polygons,authored.polygons):polygons;
+  const domain=authored?.faces.length?edgeClip.difference(polygons,authored.polygons):polygons;
   const bands=edgeFaces.length?resolveStreetEdgeBands(edgeFaces,domain,tile.bounds):null,
-    asphalt=bands?.footprint.length?clip.difference(polygons,bands.footprint):polygons;
+    asphalt=bands?.footprint.length?edgeClip.difference(polygons,bands.footprint):polygons;
   const compile=shapes=>{
     if(!shapes.length)return {positions:new Float32Array(),indices:new Uint16Array()};
-    const mesh=meshPavementTile(tile,shapes,sampleOnce,{cellSize,curbHeight:0,includeCurbs:false,includeTriangles:false});
+    const mesh=meshPavementTile(tile,shapes,sampleOnce,{cellSize,curbHeight:0,includeCurbs:false,includeTriangles:false,preclipped:!!bands});
     const partitioned=partitionSurface(mesh.vertices,sampleOnce);
     if(!partitioned)throw new Error(`Carriageway ${tile.key} has incomplete or overlapping terrain support: ${JSON.stringify(partitionSurface.lastCoverage || {})}`);
     return indexPavementPositions(partitioned);

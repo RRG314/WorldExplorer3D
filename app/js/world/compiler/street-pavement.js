@@ -370,7 +370,8 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
 }
 
 // Regular cells keep slope interpolation local. Shared world-grid vertices produce matching tile seams.
-export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [], includeCurbs = true, includeTriangles = true } = {}) {
+export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [], includeCurbs = true, includeTriangles = true, preclipped = false } = {}) {
+  if(preclipped&&(cellSize<tile.bounds.maxX-tile.bounds.minX||cellSize<tile.bounds.maxZ-tile.bounds.minZ||ramps.length))throw Error('invalid_preclipped_pavement');
   const vertices = [], curbVertices = [], triangles = [], b = tile.bounds;
   const polygonBounds = polygons.map(poly => {
     const ring = poly[0];
@@ -398,7 +399,7 @@ export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, c
     const candidates=polygonBounds.filter(p=>p.minX<=x+size && p.maxX>=x && p.minZ<=z+size && p.maxZ>=z).map(p=>p.poly);
     if(!candidates.length)continue;
     const square = polygon([[x, z], [x + size, z], [x + size, z + size], [x, z + size]]);
-    for (const poly of clip.intersection(candidates, square)) {
+    for (const poly of (preclipped?candidates:clip.intersection(candidates, square))) {
       const points = [], holes = [];
       for (let ri = 0; ri < poly.length; ri++) { if (ri) holes.push(points.length); points.push(...poly[ri].slice(0, -1)); }
       const indices = earcut(points.flat(), holes, 2);
