@@ -1,15 +1,26 @@
-import {hasReviewedDeck} from './reviewed-deck-profile.js';
+import {hasReviewedDeck,hasReviewedPavement} from './reviewed-deck-profile.js';
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_GRADE} from '../../physics/road-plane-dynamics.js';
 import {sampleTransportSurfaceAtDistance} from './transport-surface-model.js?v=25';
+
+function reviewedNodeOwners(entries){
+ const decks=entries.filter(entry=>hasReviewedDeck(entry.feature));
+ return decks.length?decks:entries.filter(entry=>hasReviewedPavement(entry.feature));
+}
+function reviewedNodeConflict(entries,target){
+ return entries.some(entry=>Math.abs(entry.surfaceY-target)>(hasReviewedDeck(entry.feature) ? .002 :
+   entry.feature.transportSurfaceModel.surveyedSurface.pavementProfile.maximumAdjustmentMeters/(Number(entry.feature.metersPerWorldUnit)||1)));
+}
 
 function reviewedDeckCrossfall(group,feature,side){
  const entry=group.sides.find(row=>hasReviewedDeck(row.feature));
  if(!entry||hasReviewedDeck(feature))return {};
  const model=entry.feature.transportSurfaceModel,distance=finite(entry.side.distanceAlong),half=model.width/2;
  const slope=(sampleTransportSurfaceAtDistance(model,distance,half)-sampleTransportSurfaceAtDistance(model,distance,-half))/(2*half);
+ let upper=1;while(upper<model.distances.length-1&&model.distances[upper]<distance)upper++;
+ const grade=(model.centerHeights[upper]-model.centerHeights[upper-1])/(model.distances[upper]-model.distances[upper-1]);
  const tangent=(road,s)=>{const i=Math.max(0,Math.min(road.pts.length-2,finite(s.segmentIndex))),a=road.pts[i],b=road.pts[i+1],length=Math.hypot(b.x-a.x,b.z-a.z);if(!(length>1e-8))throw Error('reviewed_deck_invalid_junction_tangent');return {x:(b.x-a.x)/length,z:(b.z-a.z)/length};};
  const a=tangent(entry.feature,entry.side),b=tangent(feature,side);
- return {reviewedDeckCrossfall:slope*(a.x*b.x+a.z*b.z),reviewedDeckSourceId:model.sourceFeatureId};
+ return {reviewedDeckCrossfall:slope*(a.x*b.x+a.z*b.z)+grade*(a.z*b.x-a.x*b.z),reviewedDeckSourceId:model.sourceFeatureId};
 }
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -403,12 +414,12 @@ export function buildTransportContinuityRepairAnchors(
     const terrainFittedAtGrade = atGrade.filter(({ feature, side }) =>
       !hasEngineeredGraphConstraintAt(feature, side));
     const interior = sampled.filter(({ side }) => side?.endpoint === 'interior');
-    const reviewed=sampled.filter(entry=>hasReviewedDeck(entry.feature));
+    const reviewed=reviewedNodeOwners(sampled);
     let target = NaN;
     let owner = null;
     if(reviewed.length){
       owner=reviewed[0];target=owner.surfaceY;
-      if(reviewed.some(entry=>Math.abs(entry.surfaceY-target)>.002))throw Error('reviewed_deck_node_conflict');
+      if(reviewedNodeConflict(reviewed,target))throw Error('reviewed_deck_node_conflict');
       reviewedNodeTargets.set(group.id,target);
     } else if (atGrade.length > 0 && (elevated.length > 0 || subgrade.length > 0)) {
       // Exact mapped surface roads own the physical portal/abutment elevation.
@@ -983,8 +994,8 @@ export function buildExactTransportNodeFinalizationAnchors(
     // through-route, then the highest completed deck (or deepest tunnel).
     // For an all-surface continuation, the existing engineered approach owns
     // the node and is carried into the next terrain-fitted road.
-    const reviewed=entries.filter(entry=>hasReviewedDeck(entry.feature));
-    if(reviewed.length>1&&reviewed.some(entry=>Math.abs(entry.surfaceY-reviewed[0].surfaceY)>.002))throw Error('reviewed_deck_node_conflict');
+    const reviewed=reviewedNodeOwners(entries);
+    if(reviewed.length>1&&reviewedNodeConflict(reviewed,reviewed[0].surfaceY))throw Error('reviewed_deck_node_conflict');
     const owner = reviewed.length>0
       ? reviewed[0]
       : structuralInterior.length > 0

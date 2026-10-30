@@ -200,8 +200,8 @@ admission remains unchanged: this source is not added to the runtime adoption
 registry until complete accepted ground, banking, crossings and venue gameplay
 are supported. Both OSM `pitlane` and `pit_lane` tags reject a main-course layout.
 
-The separate `nordschleife/decks.json` source product now carries all five reviewed
-bridge profiles. Its reproduction recipe pins the retained normalized observations,
+The separate `nordschleife/decks.json` source product carries all five reviewed
+bridge profiles and the nine adjoining observed pavement profiles. Its reproduction recipe pins the retained normalized observations,
 source road digest, mapped versions and nodes, datum metadata and required ground
 group. It distinguishes the four-metre observed core from reconstructed outer
 camber. `loadRacingVenueSource` can load an explicitly hash-bound profile alongside
@@ -209,6 +209,20 @@ the road source; missing, changed or cancelled data rejects preparation. A priva
 source annotation transfers it through normal district normalization and the
 existing geographic-to-world road compilation. Provider/cache JSON cannot grant
 this annotation. No additional height sampler or venue registry entry is created.
+
+Observed approach curves replace bare-earth fitting where DGM excludes the raised
+pavement near a bridge. The same packed transport model owns their heights and
+camber. Eight rough returns are excluded from the source fit; every reconstructed
+gap is bounded to 8.05 m and recorded separately. Shared nodes prefer the measured
+pavement over a lower provisional ground fit, while immutable deck observations
+retain priority. Deck-plane transfer includes longitudinal grade as well as camber
+when the adjoining road turns. It tapers within the next retained pavement station
+instead of overwriting measured camber farther along the road. A reconciliation
+that moves the observed core more than 5 cm rejects physical publication, even if
+the resulting centreline would be continuous. Datum uncertainty remains separate.
+Observed pavement also uses the existing independent-profile mesh branch and
+contact index. Qualification retains its profile/layer comparison; a lower
+published terrain road cannot silently replace the observed surface.
 
 Reproduce the adapted source with the same source builder and this configuration,
 using its hash-matching captured raw response. The ODbL attribution and recipe

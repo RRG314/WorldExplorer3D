@@ -49,11 +49,41 @@
       "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_356_5579_1_rp_2025.tif",
       "bytes": 1906895,
       "sha256": "ec427c39b647cfd6385fb83752ff5eb3f6062c67d93cbc55f17141a7930ff845"
+    },
+    {
+      "filename": "dom1_32_352_5579_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_352_5579_1_rp_2025.tif",
+      "bytes": 2213308,
+      "sha256": "3cba233ddf04cb031abd15a02dc7f49c78c5f0ac38022ba9d4dfc01820eb78f6"
+    },
+    {
+      "filename": "dom1_32_353_5578_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_353_5578_1_rp_2025.tif",
+      "bytes": 2371661,
+      "sha256": "a0f37f1fb394b783a2edabfa0a621b5b561925241960fb1b5668dfaa20174a5c"
+    },
+    {
+      "filename": "dom1_32_355_5579_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_355_5579_1_rp_2025.tif",
+      "bytes": 2079665,
+      "sha256": "45f4125c157e485a6aa90f3b6314368eed11e1746bca00b78e8957dc01911d10"
+    },
+    {
+      "filename": "dom1_32_356_5580_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_356_5580_1_rp_2025.tif",
+      "bytes": 2335424,
+      "sha256": "eefa55f56d45abf26489e9b2555bf9ef7b28eefe6c47b160aa115b047d540208"
     }
   ],
   "license": "DL-DE-BY-2.0",
   "licenseUrl": "https://www.govdata.de/dl-de/by-2-0",
   "attribution": "\u00a9 GeoBasis-DE / LVermGeoRP; DOM1 file-year 2025. Core fitting, datum normalization and wider pavement reconstruction by World Explorer 3D. Geographic path \u00a9 OpenStreetMap contributors, ODbL 1.0.",
   "observedCoreWidthMeters": 4,
-  "maximumCoreResidualMeters": 0.05
+  "maximumCoreResidualMeters": 0.05,
+  "pavementObservations": {
+    "file": "config/racing-venues/observations/nordschleife-approaches.json",
+    "sha256": "203e2897cb59c7f12443f2a916163bbd59bf59deb3e18e48cbb71dec4728da39"
+  },
+  "maximumReconstructedSpanMeters": 8.05,
+  "maximumPavementAdjustmentMeters": 0.05
 }

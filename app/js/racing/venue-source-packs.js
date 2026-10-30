@@ -2,7 +2,7 @@ import {compileMappedVenueLayout,geographicVenueDistance} from './venue-layout.j
 import {annotateRoadSourceSurvey} from '../world/road-source-survey.js';
 import {sha256Text} from '../terrain/ground-artifact.js?v=4';
 import {parseMeters} from '../world/compiler/transport-source-normalizer.js?v=4';
-import {annotateReviewedVenueDecks,reviewedVenueDeckProfile} from './venue-deck-source.js';
+import {annotateReviewedVenueDecks,reviewedVenueDeckProfile,reviewedVenuePavementProfile} from './venue-deck-source.js';
 
 // A reviewed source package is not a playable-catalogue flag. Admission still
 // requires the existing world publication and racing surface qualification.
@@ -81,12 +81,14 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  }
  for(const raw of source.ways){
   const deck=layoutWays.has(raw.id)?reviewedVenueDeckProfile(source,descriptor,raw.id):null;
+  const pavement=layoutWays.has(raw.id)?reviewedVenuePavementProfile(source,descriptor,raw.id):null;
   const sourceFeatureId=`osm:way:${raw.id}`,way={type:'way',id:raw.id,version:raw.version,nodes:[...raw.nodes],tags:{...raw.tags,_sourceFeatureId:sourceFeatureId,_sourceCompleteness:'lossless',...(!layoutWays.has(raw.id)?{_regionalContext:'fixed-location'}:{})}};
   if(layoutWays.has(raw.id))annotateRoadSourceSurvey(way,{version:1,venueId:descriptor.id,sourceFeatureId,
    ...(descriptor.pavementWidthPolicy==='mapped'?{pavementWidthPolicy:'mapped'}:{}),
    usableWidthMeters:source.layout.usableWidthMeters,maximumCrossfall:descriptor.maximumCrossfall,
    ...(descriptor.surfaceModel?{surfaceModel:descriptor.surfaceModel}:{}),
    ...(deck?{geographicDeckProfile:deck}:{}),
+   ...(pavement?{geographicPavementProfile:pavement}:{}),
    groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required});
   elements.set(`way:${raw.id}`,way);
  }

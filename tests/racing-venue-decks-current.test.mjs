@@ -20,8 +20,9 @@ const fetcher=text=>async url=>new Response(url===descriptor.sourceUrl?sourceTex
 
 test('the pinned Nord deck artifact reaches private world-source ownership and the existing geographic conversion',async()=>{
  assert.equal(hash(sourceText),config.sourceSha256);
- assert.equal(hash(profileText),'e906c286f3a856914a91ee3650d7c02e8d8d8bb0482c772a55326b4fe10898c8');
+ assert.equal(hash(profileText),'586ba8daef6c299170ea0a619cec2bed4b40ba57f09cec6522f4b187fdc62647');
  assert.equal(hash(read(config.normalizedObservations.file)),config.normalizedObservations.sha256);
+ assert.equal(artifact.pavements.length,9);assert.equal(artifact.pavements.reduce((n,p)=>n+p.samples.length,0),1714);assert.equal(artifact.pavements.reduce((n,p)=>n+p.excludedReturns.length,0),8);
  assert.equal(artifact.bridges.length,5);assert.equal(artifact.bridges.reduce((n,b)=>n+b.samples.length,0),167);
  const source=await loadRacingVenueSource(descriptor,{fetchImpl:fetcher(profileText)});
  assert.equal(JSON.stringify(source),JSON.stringify(JSON.parse(sourceText)),'the review annotation never becomes provider/cache JSON');
@@ -39,6 +40,7 @@ test('the pinned Nord deck artifact reaches private world-source ownership and t
   assert.equal(converted.deckProfile.contentSha256,deck.contentSha256);assert.equal(converted.geographicDeckProfile,undefined);
   assert.equal(converted.deckProfile.samples.length,bridge.samples.length);
  }
+ for(const p of artifact.pavements){const way=normalized.selection.roadWays.find(w=>Number(w.id)===p.sourceWayId),survey=roadSourceSurvey(way);assert.equal(survey.geographicPavementProfile.maximumAdjustmentMeters,.05);assert.equal(survey.geographicPavementProfile.samples.length,p.samples.length);}
  assert.throws(()=>prepareVenueSourceMerge({},JSON.parse(JSON.stringify(source)),descriptor,ground),/not_prepared/);
  assert.equal(RACING_VENUE_SOURCES.some(s=>s.id===config.venueId),false,'supporting source data alone cannot enable the unfinished venue');
 });
@@ -50,6 +52,7 @@ test('changed source identity, geometry, width, station coverage or ground canno
   a=>a.bridges[0].maximumCoreResidualMeters=.051,a=>a.bridges[0].samples[0].latitude+=.001,
   a=>a.bridges[0].samples[0].heightMetersEgm2008=null,a=>a.bridges[0].samples[0].positiveNormal={...a.bridges[0].samples[0]},
   a=>a.bridges[0].samples.splice(1,3),a=>a.bridges[0].samples[1].fraction=0,
+  a=>a.pavements.pop(),a=>a.pavements[0].sourceVersion++,a=>a.pavements[0].maximumAdjustmentMeters=.051,a=>a.pavements.find(p=>p.excludedReturns.length).excludedReturns=[],a=>a.pavements[0].samples.splice(1,5),
   a=>a.groundArtifacts[0].contentSha256='f'.repeat(64),a=>a.normalization.direction='forward'
  ];
  for(const change of changes){const value=structuredClone(artifact);change(value);const text=JSON.stringify(value),entry={...descriptor,reviewedDeckProfiles:{...descriptor.reviewedDeckProfiles,contentSha256:hash(text)}};

@@ -60,11 +60,13 @@ of official circuit or championship records.
   and gameplay acceptance remain required before runtime adoption. It does not
   substitute for the tourist, GP or combined endurance layouts.
 
-### Reviewed bridge profiles
+### Reviewed bridge and approach profiles
 
 `nordschleife/decks.json` contains five reviewed bridge profiles, derived from
-167 normalized DOM1 stations. The source observations are retained in
-`config/racing-venues/observations/nordschleife-decks.json`; the pinned source
+167 normalized DOM1 stations, and nine adjoining pavement profiles with 1,714
+retained stations. The source observations are retained in
+`config/racing-venues/observations/nordschleife-decks.json` and
+`config/racing-venues/observations/nordschleife-approaches.json`; the pinned source
 rasters, road digest, required ground digests and reproduction parameters are in
 `config/racing-venues/nordschleife-decks.json`.
 
@@ -75,6 +77,11 @@ every pixel. Geographic paths remain © OpenStreetMap contributors under ODbL 1.
 World Explorer 3D fitted a four-metre pavement core and reconstructed its planar
 camber across the wider mapped pavement. Vehicles, rails, vegetation and other
 outer DOM returns are not admitted as pavement observations.
+Eight rough approach stations are excluded. Gaps of at most 8.05 m between
+retained stations are explicitly reconstructed; they are not additional measured
+points. Graph reconciliation may adjust the retained pavement core by at most
+5 cm relative to its recorded profile. This is a local fitting bound, not an
+absolute survey accuracy claim.
 
 Heights are normalized from ETRS89/UTM32 with DHHN2016 heights to the existing
 EGM2008 target through the pinned GCG2016 and EGM2008 grids. The recorded PROJ

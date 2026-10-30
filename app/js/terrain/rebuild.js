@@ -1,4 +1,5 @@
 import {createRoadRegionLease} from './road-region-lease.js';
+import {hasReviewedPavement} from '../world/compiler/reviewed-deck-profile.js';
 import {createTransportCellFacts,transportFromCellFacts} from '../earth-core/world-cell-facts.js';
 import {worldFactFrame} from '../world/world-cell-adapter.js';
 import {prepareTransportDetail} from './transport-detail-runtime.js';
@@ -230,7 +231,7 @@ export function createCompiledRoadSurfaceSampler(feature, fallbackSampler, diagn
       // the cut half of the profile hovering over its own graded ground.
       // Read the published ground in both directions. Bridges and tunnels
       // retain their independent engineered profiles.
-      if (feature?.structureSemantics?.terrainMode === 'at_grade' && feature.transportSurfaceModel?.engineeredApproach !== true && typeof fallbackSampler === 'function') {
+      if (feature?.structureSemantics?.terrainMode === 'at_grade' && feature.transportSurfaceModel?.engineeredApproach !== true && !hasReviewedPavement(feature) && typeof fallbackSampler === 'function') {
         const renderedTerrainY = fallbackSampler(x, z);
         if (Number.isFinite(renderedTerrainY)) {
           if (diagnostics && renderedTerrainY > compiledY) diagnostics.renderedTerrainClamps = Number(diagnostics.renderedTerrainClamps || 0) + 1;
@@ -457,7 +458,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const shared=road.transportSurfacePresentation?.status==='compiled'?road.transportSurfacePresentation:null;
       if(shared){if(seen.has(shared.id))continue;seen.add(shared.id);}
       const renderRoad=shared||road;
-      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(renderRoad)&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
     }
     const terrainReady=new Promise(resolve=>releaseTerrain=resolve);
     preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady});
@@ -587,7 +588,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       // junctions with fan polygons, exposing circles and triangle boundaries.
       const pts = basePts;
       if (!Array.isArray(pts) || pts.length < 2) continue;
-      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true) {
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(renderRoad)) {
         // Regional road indices refer to every carriageway, but only roads
         // with center paint need these dense temporary marking samples after
         // construction. Retaining them for unmarked residential/service roads

@@ -1,7 +1,8 @@
 // Convert reviewed geographic deck observations once, at road compilation.
 // Rendering, support, contacts and approaches then use the shared packed model.
 export function reviewedDeckSurveyInWorld(survey,points,{geoToWorld,heightToWorld}={}){
- const deck=survey?.geographicDeckProfile;if(!deck)return survey;
+ const deck=survey?.geographicDeckProfile||survey?.geographicPavementProfile;if(!deck)return survey;
+ if(survey.geographicDeckProfile&&survey.geographicPavementProfile)throw Error('reviewed_surface_profile_conflict');
  if(typeof geoToWorld!=='function'||typeof heightToWorld!=='function'||points?.length<2)throw Error('reviewed_deck_world_frame_missing');
  const distances=[0];
  for(let i=1;i<points.length;i++){const length=Math.hypot(points[i].x-points[i-1].x,points[i].z-points[i-1].z);if(!(length>1e-6))throw Error('reviewed_deck_source_path_changed');distances.push(distances.at(-1)+length);}
@@ -16,7 +17,9 @@ export function reviewedDeckSurveyInWorld(survey,points,{geoToWorld,heightToWorl
   if(![centerY,positiveY,lateral].every(Number.isFinite)||Math.abs(lateral)<.1)throw Error('reviewed_deck_world_frame_invalid');
   return Object.freeze({t:(distances[index]+row.fraction*length)/distances.at(-1),centerY,crossfall:(positiveY-centerY)/lateral});
  });
- const {geographicDeckProfile,...evidence}=survey;
- return Object.freeze({...evidence,deckProfile:Object.freeze({version:1,coordinateFrame:'world',contentSha256:deck.contentSha256,
-  observedCoreWidthMeters:deck.observedCoreWidthMeters,reconstructedWidthMeters:deck.reconstructedWidthMeters,samples:Object.freeze(samples)})});
+ const {geographicDeckProfile,geographicPavementProfile,...evidence}=survey;
+ const profile=Object.freeze({version:1,coordinateFrame:'world',contentSha256:deck.contentSha256,
+  observedCoreWidthMeters:deck.observedCoreWidthMeters,reconstructedWidthMeters:deck.reconstructedWidthMeters,
+  ...(geographicPavementProfile?{maximumAdjustmentMeters:deck.maximumAdjustmentMeters,reconstructedSpans:deck.reconstructedSpans}:{}),samples:Object.freeze(samples)});
+ return Object.freeze({...evidence,...(geographicPavementProfile?{pavementProfile:profile}:{deckProfile:profile})});
 }

@@ -1,6 +1,7 @@
 import {copyNumericArray} from '../../structure-semantics/numeric-scratch.js';
 import {connectedSideGroups} from './transport-junction-profile.js?v=21';
 import {assignSurfaceStreetJunctions} from './surface-street-junctions.js';
+import {sampleReviewedDeckProfile} from './reviewed-deck-profile.js';
 
 // Ordinary street nodes have terrain-owned elevations. Keep these constraints
 // separate from bridge approaches so a street junction cannot promote an
@@ -18,10 +19,17 @@ export function assignOrdinaryStreetJunctions(features,network,sampleTerrain) {
     if(!point)continue;
     const terrain=sampleTerrain(point.x,point.z);
     if(!Number.isFinite(terrain))continue;
-    const target=terrain+Math.max(...entries.map(e=>Number(e.feature.surfaceBias)||.08));
+    const measured=entries.filter(e=>e.feature.surfaceSurveyEvidence?.pavementProfile).map(e=>{
+      const f=e.feature,profile=f.surfaceSurveyEvidence.pavementProfile;
+      const total=f.pts.slice(1).reduce((n,p,i)=>n+Math.hypot(p.x-f.pts[i].x,p.z-f.pts[i].z),0);
+      return {height:sampleReviewedDeckProfile(profile,e.side.distanceAlong/total).centerY+(Number(f.surfaceBias)||.08),
+        adjustment:profile.maximumAdjustmentMeters/(Number(f.metersPerWorldUnit)||1)};
+    });
+    const target=measured.length?measured.reduce((n,p)=>n+p.height/measured.length,0):terrain+Math.max(...entries.map(e=>Number(e.feature.surfaceBias)||.08));
+    if(measured.some(p=>Math.abs(p.height-target)>p.adjustment))throw Error('reviewed_pavement_node_conflict');
     for(const {side,feature} of entries){
       if(!Number.isFinite(side.distanceAlong))continue;
-      feature.ordinaryStreetAnchors.push({distance:side.distanceAlong,targetSurfaceY:target});
+      feature.ordinaryStreetAnchors.push({distance:side.distanceAlong,targetSurfaceY:target,...(measured.length?{source:'reviewed_pavement'}:{})});
     }
     nodes++;
   }

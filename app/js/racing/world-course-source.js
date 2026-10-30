@@ -7,6 +7,7 @@ import {drainCooperatively,yieldToWorldFrame}from'../world/cooperative-schedulin
 import {STREET_POLYGON_GRID_WORLD}from'../world/compiler/street-coordinate-grid.js';
 import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.js';
 import {assertReviewedSurfaceAccepted}from'../world/compiler/transport-surface-model.js?v=25';
+import {hasReviewedPavement}from'../world/compiler/reviewed-deck-profile.js';
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL}from'../physics/road-plane-dynamics.js';
 import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
@@ -49,7 +50,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    let failure='',minimumClearance=Infinity,firstPoint=null,lastPoint=null;
    const steps=Math.max(1,Math.ceil(length/4)),spanMeters=1.2;
    const mode=feature.structureSemantics?.terrainMode;
-   const groundOwned=mode==='at_grade'&&feature.transportSurfaceModel?.engineeredApproach!==true;
+   const groundOwned=mode==='at_grade'&&feature.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(feature);
    function surface(x,z,t){
     const center={x:p1.x+(p2.x-p1.x)*t,z:p1.z+(p2.z-p1.z)*t};
     const projection={...center,segIndex,t:sourceTStart+(sourceTEnd-sourceTStart)*t};

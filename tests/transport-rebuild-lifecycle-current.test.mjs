@@ -5,9 +5,21 @@ import {ctx} from '../app/js/shared-context.js?v=55';
 import {publishCompiledTransportMeshes} from '../app/js/terrain/rebuild.js';
 import {createTransportDetailCompiler,prepareTransportDetailPlan} from '../app/js/terrain/transport-detail-compiler.js';
 import {refreshTransportStructureAssembliesForPublishedTerrain} from '../app/js/world/structure-aware.js';
+import {updateFeatureSurfaceProfile} from '../app/js/structure-semantics.js?v=63';
 import {compileTunnelSolidBoundaries} from '../app/js/world/compiler/tunnel-solid-publication.js';
 import {compileTransportSurfaceModel} from '../app/js/world/compiler/transport-surface-model.js';
 import {compileTunnelSystemModels} from '../app/js/world/compiler/tunnel-system-model.js';
+
+test('observed pavement publishes its independent mesh and contact height through the normal road owner',async t=>{
+ const h=harness(t),r={type:'raceway',sourceFeatureId:'controlled-pavement',pts:[{x:0,z:32},{x:100,z:32}],width:8,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'},
+  surfaceSurveyEvidence:{version:1,sourceFeatureId:'controlled-pavement',groundArtifactId:'controlled',groundContentSha256:'a'.repeat(64),surfaceModel:'banked-road-v1',maximumCrossfall:.7,
+   pavementProfile:{version:1,coordinateFrame:'world',contentSha256:'b'.repeat(64),observedCoreWidthMeters:4,reconstructedWidthMeters:8,maximumAdjustmentMeters:.05,
+    samples:[{t:0,centerY:1.3,crossfall:0},{t:1,centerY:1.3,crossfall:0}]}}};
+ updateFeatureSurfaceProfile(r,()=>0,{surfaceBias:.18});ctx.roads=[r];
+ const publication=await publishCompiledTransportMeshes(h.deps);
+ assert.ok(publication.meshCount>0);assert.ok(Math.abs(ctx.roadContactIndex.sampleAt(10,32,1.48,'at_grade')-1.48)<.00001);
+ assert.equal(r.transportSurfaceModel.engineeredApproach,false);
+});
 
 function harness(t) {
   const saved={...ctx},previous={THREE:globalThis.THREE,Worker:globalThis.Worker,scheduler:globalThis.scheduler};
