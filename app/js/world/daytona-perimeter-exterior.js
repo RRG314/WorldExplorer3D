@@ -4,6 +4,7 @@ import {venueComponentCollider} from './venue-collision.js';
 import {createChainLinkTexture} from './chain-link-texture.js';
 import {finishVenueSurface} from './venue-surface-materials.js';
 import {createRoadMarkingMaterial} from '../road-render.js?v=4';
+import {appendDaytonaPitMarkings} from './daytona-pit-markings.js';
 
 const quadOrder=[0,1,2,0,2,3];
 function quad(values,points){for(const i of quadOrder)values.push(points[i].x,points[i].y,points[i].z);}
@@ -15,6 +16,8 @@ export function buildDaytonaPerimeter(ctx){
  if(venue?.id!=='daytona-tri-oval'||venue.sourceFeatureIds?.length!==5||!Array.isArray(ctx.roads)||!index?.projectPolygon||!index?.sampleAt)return null;
  const roads=venue.sourceFeatureIds.map(id=>ctx.roads.find(r=>r.sourceFeatureId===id));
  if(roads.length!==5||roads.some(r=>!r?.transportRecord?.crossSection?.pavementSections||r.transportSurfaceModel?.reviewedSurfacePhase!=='accepted'))return null;
+ const pitRoads=(venue.pitSourceFeatureIds||[]).map(id=>ctx.roads.find(r=>r.sourceFeatureId===id));
+ if(pitRoads.some(r=>!r?.transportRecord?.crossSection?.pavementSections||r.transportSurfaceModel?.reviewedSurfacePhase!=='accepted'))return null;
  const chunks=new Map(),colliders=[];let distance=0,paintFaces=0;
  const baseContact=(x,z)=>{
   const y=index.sampleAt(x,z,NaN,'at_grade');if(Number.isFinite(y))return y;
@@ -86,7 +89,8 @@ export function buildDaytonaPerimeter(ctx){
    distance+=length;
   }
  }
- return {chunks:[...chunks.values()],colliders,lengthMeters:distance,paintFaces};
+ const pit=pitRoads.length?appendDaytonaPitMarkings(pitRoads,index,unit,chunkAt,Math.ceil(distance/128)*128):null;
+ return {chunks:[...chunks.values()],colliders,lengthMeters:distance,paintFaces:paintFaces+(pit?.paintFaces||0),...(pit?{pit}:{} )};
 }
 
 export function createDaytonaPerimeterExterior(T,ctx){
@@ -96,7 +100,7 @@ export function createDaytonaPerimeterExterior(T,ctx){
  root.name='Daytona — permanent outer wall, catch fence and boundary paint';
  root.userData={daytonaPerimeter:true,reviewedVenueExterior:true,exteriorOnly:true,
   sourceClaim:'Retained mapped centreline and reviewed pavement sections; original estimated outer wall, catch fence and paint; no official safety specification',
-  presentation:{lengthMeters:plan.lengthMeters,chunks:plan.chunks.length,paintFaces:plan.paintFaces,wallHeightMeters:1.12,fenceTopMeters:6.4,colliders:plan.colliders.length}};
+  presentation:{lengthMeters:plan.lengthMeters,chunks:plan.chunks.length,paintFaces:plan.paintFaces,wallHeightMeters:1.12,fenceTopMeters:6.4,colliders:plan.colliders.length,...(plan.pit?{pit:plan.pit}:{})}};
  const wall=new T.MeshStandardMaterial({color:0xd8dad2,roughness:.95,side:T.DoubleSide}),
   metal=new T.MeshStandardMaterial({color:0x747e81,metalness:.65,roughness:.6,side:T.DoubleSide}),
   fence=new T.MeshStandardMaterial({color:0x899396,map:createChainLinkTexture(T),transparent:true,opacity:.66,depthWrite:false,side:T.DoubleSide,metalness:.35,roughness:.75}),
@@ -110,9 +114,10 @@ export function createDaytonaPerimeterExterior(T,ctx){
  for(const c of plan.chunks){
   const group=new T.Group();group.position.set(c.center.x,c.center.y,c.center.z);root.add(group);
   const lod=new T.LOD(),near=new T.Group(),far=new T.Group();group.add(lod);
-  near.add(mesh(c.wall,wall,c.center),mesh(c.fence,fence,c.center,c.fenceUvs),mesh(c.metal,metal,c.center),mesh(c.paint,paint,c.center,null,c.colors));
+  const wallMesh=c.wall.length?mesh(c.wall,wall,c.center):null,paintMesh=mesh(c.paint,paint,c.center,null,c.colors);
+  if(wallMesh)near.add(wallMesh);if(c.fence.length)near.add(mesh(c.fence,fence,c.center,c.fenceUvs));if(c.metal.length)near.add(mesh(c.metal,metal,c.center));near.add(paintMesh);
   // Shared geometry is owned by this root and disposed by the world lifecycle.
-  const distantPaint=new T.Mesh(near.children[3].geometry,paint);distantPaint.renderOrder=4;far.add(new T.Mesh(near.children[0].geometry,wall),distantPaint);
+  const distantPaint=new T.Mesh(paintMesh.geometry,paint);distantPaint.renderOrder=4;if(wallMesh)far.add(new T.Mesh(wallMesh.geometry,wall));far.add(distantPaint);
   lod.addLevel(near,0);lod.addLevel(far,650/unit);lod.addLevel(new T.Group(),1900/unit);
  }
  finishVenueSurface(T,root,wall,'../../assets/textures/earth/concrete_diffuse.jpg',2/unit);

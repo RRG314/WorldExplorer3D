@@ -7,17 +7,32 @@ import {disposeLandmarkModel} from '../app/js/world/landmark-lifetime.js';
 
 // Controlled five-way bank/apron surface. This checks presentation projection
 // and resource ownership; native venue geometry has its own accepted evidence.
-function fixture(unit,{outerTrim=0,endTrim=0}={}){
+function fixture(unit,{outerTrim=0,endTrim=0,pit=false}={}){
  const roads=[],positions=[],height=l=>(10+(l>=-6?l*.6:-3.6+(l+6)*.02))/unit;
  for(let i=0;i<5;i++){
   const sourceFeatureId=`fixture:${i}`,a={x:0,z:i*40/unit},b={x:0,z:(i+1)*40/unit};
   roads.push({sourceFeatureId,pts:[a,b],transportSurfaceModel:{reviewedSurfacePhase:'accepted'},transportRecord:{crossSection:{pavementSections:{coordinateSpace:'world',nodeDistances:[0,40/unit],nodeFrames:[{x:-1,z:0},{x:-1,z:0}],samples:[0,40/unit].map(distance=>({distance,positive:4/unit,negative:12/unit,bankNegative:6/unit}))}}}});
   for(const [lo,hi]of [[-12,-6],[-6,0],[0,4-outerTrim]])for(const [l,z]of [[lo,a.z+endTrim/unit],[hi,a.z+endTrim/unit],[hi,b.z-endTrim/unit],[lo,a.z+endTrim/unit],[hi,b.z-endTrim/unit],[lo,b.z-endTrim/unit]])positions.push(-l/unit,height(l),z);
  }
+ if(pit)for(let i=0;i<2;i++){
+  const sourceFeatureId=`fixture-pit:${i}`,a={x:30/unit,z:i*310/unit},b={x:30/unit,z:(i+1)*310/unit};
+  roads.push({sourceFeatureId,pts:[a,b],transportSurfaceModel:{reviewedSurfacePhase:'accepted'},transportRecord:{crossSection:{pavementSections:{coordinateSpace:'world',nodeDistances:[0,310/unit],nodeFrames:[{x:-1,z:0},{x:-1,z:0}],samples:[0,310/unit].map(distance=>({distance,positive:8/unit,negative:5/unit,bankNegative:4/unit}))}}}});
+  for(const [l,z]of [[-5,a.z],[8,a.z],[8,b.z],[-5,a.z],[8,b.z],[-5,b.z]])positions.push((30-l)/unit,(8+.02*z*unit+.03*l)/unit,z);
+ }
  const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));const mesh=new T.Mesh(geometry);mesh.userData.terrainMode='at_grade';
  const index=createRoadContactIndex([mesh]);
- return {ctx:{METERS_PER_WORLD_UNIT:unit,worldLoadRuntimeState:{venuePack:{id:'daytona-tri-oval',sourceFeatureIds:roads.map(r=>r.sourceFeatureId)}},buildingMeshes:[],roads,roadContactIndex:index},dispose(){index.dispose();geometry.dispose();mesh.material.dispose();}};
+ return {ctx:{METERS_PER_WORLD_UNIT:unit,worldLoadRuntimeState:{venuePack:{id:'daytona-tri-oval',sourceFeatureIds:roads.slice(0,5).map(r=>r.sourceFeatureId),...(pit?{pitSourceFeatureIds:roads.slice(5).map(r=>r.sourceFeatureId)}:{})}},buildingMeshes:[],roads,roadContactIndex:index},dispose(){index.dispose();geometry.dispose();mesh.material.dispose();}};
 }
+test('pit edge lines, original stall boxes and pace cues use only uploaded pavement while main walls and collision remain exact',()=>{
+ for(const unit of [1,1.11]){const f=fixture(unit,{pit:true}),venue=f.ctx.worldLoadRuntimeState.venuePack,main=buildDaytonaPerimeter({...f.ctx,worldLoadRuntimeState:{venuePack:{...venue,pitSourceFeatureIds:undefined}}}),full=buildDaytonaPerimeter(f.ctx);
+  assert.equal(full.lengthMeters,main.lengthMeters);assert.deepEqual(full.colliders,main.colliders);assert.deepEqual(full.chunks.filter(c=>c.wall.length),main.chunks);
+  assert.ok(Math.abs(full.pit.lengthMeters-620)<1e-8);assert.equal(full.pit.boxes,27);assert.equal(full.pit.sourceWays,2);assert.equal(full.pit.paceMph,22);assert.ok(full.pit.paintFaces>500);
+  const paintOnly=full.chunks.filter(c=>!c.wall.length);assert.ok(paintOnly.length>2);
+  for(const c of paintOnly){assert.equal(c.colors.length,c.paint.length);for(let i=0;i<c.paint.length;i+=3){const x=c.paint[i],y=c.paint[i+1],z=c.paint[i+2],support=f.ctx.roadContactIndex.sampleAt(x,z,NaN,'at_grade');assert.ok(Number.isFinite(support));assert.ok(Math.abs((y-support)*unit-.008)<1e-6);assert.ok(x*unit>22&&x*unit<35);}}
+  const project=f.ctx.roadContactIndex.projectPolygon;assert.throws(()=>buildDaytonaPerimeter({...f.ctx,roadContactIndex:{...f.ctx.roadContactIndex,projectPolygon:(p,...args)=>p.some(p=>p.x*unit>20)?[]:project(p,...args)}}),/pit_paint_unsupported/);
+  assert.equal(buildDaytonaPerimeter({...f.ctx,roads:f.ctx.roads.slice(0,5)}),null,'missing reviewed pit support cannot silently produce an incomplete decoration');f.dispose();
+ }
+});
 test('paint stays on actual bank triangles and outer-wall collision leaves all pavement and apron clear at both unit scales',()=>{
  for(const unit of [1,1.11]){
   const f=fixture(unit),plan=buildDaytonaPerimeter(f.ctx);assert.ok(plan);assert.ok(Math.abs(plan.lengthMeters-200)<1e-9);assert.equal(plan.chunks.length,2);assert.ok(plan.colliders.length>=25&&plan.colliders.length<=30);
@@ -46,16 +61,16 @@ test('a clipped source cap can support a wall footing only within the bounded ac
  }
 });
 test('LOD selection reads no heights and the existing landmark owner releases every unique resource',()=>{
- const f=fixture(1.11),oldDocument=globalThis.document;
+ const oldDocument=globalThis.document;
  globalThis.document={createElement:()=>({getContext:()=>({beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){}})})};
- try{
-  const model=createDaytonaPerimeterExterior(T,f.ctx);assert.ok(model);assert.equal(model.root.children.length,2);
-  for(const c of model.root.children){const levels=c.children[0].levels;assert.deepEqual(levels.map(l=>l.object.children.length),[4,2,0]);
-   for(const p of [levels[0].object.children[3],levels[1].object.children[1]]){assert.equal(p.renderOrder,4);assert.equal(p.material.depthWrite,false);assert.ok(p.material.polygonOffsetFactor< -2,'paint must stay in front of the shared pavement depth bias');}
+ try{for(const pit of [false,true]){const f=fixture(1.11,{pit});
+  const model=createDaytonaPerimeterExterior(T,f.ctx);assert.ok(model);assert.equal(model.root.children.length,pit?7:2);
+  for(const [i,c]of model.root.children.entries()){const levels=c.children[0].levels,paintOnly=pit&&i>=2;assert.deepEqual(levels.map(l=>l.object.children.length),paintOnly?[1,1,0]:[4,2,0]);
+   for(const p of [levels[0].object.children.at(-1),levels[1].object.children.at(-1)]){assert.equal(p.renderOrder,4);assert.equal(p.material.depthWrite,false);assert.ok(p.material.polygonOffsetFactor< -2,'paint must stay in front of the shared pavement depth bias');}
   }
   f.ctx.buildingMeshes.push(model.root);assert.equal(createDaytonaPerimeterExterior(T,f.ctx),null);
   f.ctx.roadContactIndex.sampleAt=()=>{throw Error('live height read');};model.root.updateMatrixWorld(true);model.root.traverse(o=>{if(o.isLOD)o.update(new T.PerspectiveCamera());});
   const resources=new Set();model.root.traverse(o=>{if(o.geometry)resources.add(o.geometry);if(o.material){resources.add(o.material);if(o.material.map)resources.add(o.material.map);}});
-  let disposed=0;for(const r of resources)r.addEventListener('dispose',()=>disposed++);disposeLandmarkModel(model.root);assert.equal(disposed,resources.size);
- }finally{if(oldDocument===undefined)delete globalThis.document;else globalThis.document=oldDocument;f.dispose();}
+  let disposed=0;for(const r of resources)r.addEventListener('dispose',()=>disposed++);disposeLandmarkModel(model.root);assert.equal(disposed,resources.size);f.dispose();
+ }}finally{if(oldDocument===undefined)delete globalThis.document;else globalThis.document=oldDocument;}
 });
