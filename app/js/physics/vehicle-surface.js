@@ -92,7 +92,8 @@ export function sampleEarthVehicleGroundContact(appCtx, options = {}) {
   const leftY = Number.isFinite(byId.left?.y) ? byId.left.y : centerY;
   const feature=center.feature,model=feature?.transportSurfaceModel,survey=model?.surveyedSurface,venue=survey?.venueSource;
   if(roadCentered&&model?.reviewedSurfacePhase==='accepted'&&survey?.surfaceModel===BANKED_ROAD_MODEL&&venue&&
-    feature.surfaceSurveyEvidence?.venueSource===venue&&survey.sourceFeatureId===feature.sourceFeatureId&&venue.sourceFeatureIds?.includes(feature.sourceFeatureId)){
+    feature.surfaceSurveyEvidence?.venueSource===venue&&survey.sourceFeatureId===feature.sourceFeatureId&&
+    (venue.sourceFeatureIds?.includes(feature.sourceFeatureId)||venue.pitSourceFeatureIds?.includes(feature.sourceFeatureId))){
     // Reuse the published-road four-wheel solve already used by racing and
     // vehicle presentation. A highest-probe root floats above a bank even when
     // its body roll is correct. Ordinary roads retain their conservative fit.

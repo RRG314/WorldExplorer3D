@@ -20,6 +20,11 @@ test('ordinary, provisional and unmatched venue roads retain their existing cons
   const f=fixture();change(f);const c=sampleEarthVehicleGroundContact(f.ctx,f.options);assert.equal(c.roll,-.45);assert.equal(c.supportY,10+.60584457947*.85);assert.equal(c.sampledWheelContacts,undefined);
  }
 });
+test('the same privately adopted pit publication uses four physical wheel contacts while unrelated raceways retain ordinary contact',()=>{
+ const f=fixture({bank:.04,grade:.03});f.venue.sourceFeatureIds=['main'];f.venue.pitSourceFeatureIds=['track'];
+ const c=sampleEarthVehicleGroundContact(f.ctx,f.options);assert.equal(c.sampledWheelContacts,4);assert.ok(c.maximumWheelGap<1e-6&&c.maximumWheelPenetration<1e-6);assert.ok(Math.abs(c.supportY-10)<1e-6);
+ f.venue.pitSourceFeatureIds=['another-pit'];const ordinary=sampleEarthVehicleGroundContact(f.ctx,f.options);assert.equal(ordinary.sampledWheelContacts,undefined);assert.ok(ordinary.supportY>10);
+});
 test('missing rotated-wheel road support falls back without accepting an adjacent terrain or separate deck',()=>{
  const f=fixture(),read=f.ctx.SurfaceQuery.driveAt;f.ctx.SurfaceQuery.driveAt=(x,z)=>Math.abs(x-f.options.x)>.3&&Math.abs(z-f.options.z)>.3?{kind:'terrain',position:{y:100}}:read(x,z);
  const c=sampleEarthVehicleGroundContact(f.ctx,f.options);assert.equal(c.sampledWheelContacts,undefined);assert.equal(c.roll,-.45);assert.ok(c.supportY<11);
