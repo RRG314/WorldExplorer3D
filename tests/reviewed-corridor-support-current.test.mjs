@@ -19,6 +19,19 @@ test('unreviewed and elevated roads retain their existing grading ownership',()=
  const grade=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[r]}}),y=plane(6,50)-4;assert.ok(grade.applyStructureTerrainCuts(6,50,y)<plane(6,50)-.1);
  const high={...road(),structureSemantics:{terrainMode:'elevated'}};assert.equal(createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[high]}}).applyStructureTerrainCuts(6,50,y),y);
 });
+
+test('a reviewed pit branch cannot pull the accepted main pavement into its plane at shared entry and exit overlaps',()=>{
+ const main=road(),pit=road(),venue={sourceFeatureIds:['controlled'],pitSourceFeatureIds:['reviewed-pit']};
+ main.surfaceSurveyEvidence={...main.surfaceSurveyEvidence,venueSource:venue,terrainEdgePolicy:'fitted-pavement-boundary-v1'};
+ pit.sourceFeatureId='reviewed-pit';pit.pts=[{x:6,z:20},{x:6,z:80}];pit.surfaceSurveyEvidence={...pit.surfaceSurveyEvidence,sourceFeatureId:pit.sourceFeatureId,venueSource:venue,terrainEdgePolicy:'fitted-pavement-boundary-v1'};
+ updateFeatureSurfaceProfile(main,plane);updateFeatureSurfaceProfile(pit,(x,z)=>plane(x,z)+.4);
+ const mainOnly=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[main]},elevationWorldYAtWorldXZ:plane}),pitOnly=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[pit]},elevationWorldYAtWorldXZ:plane});
+ for(const cuts of [[main,pit],[pit,main]]){const owner=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:cuts},elevationWorldYAtWorldXZ:plane});
+  for(const z of [20,30,50,70,80])for(const x of [-3.9,0,2,3.9])assert.ok(Math.abs(owner.applyStructureTerrainCuts(x,z,plane(x,z))-mainOnly.applyStructureTerrainCuts(x,z,plane(x,z)))<1e-10,'main physical pavement keeps its accepted plane regardless of source order');
+  assert.equal(owner.applyStructureTerrainCuts(9.5,50,plane(9.5,50)),pitOnly.applyStructureTerrainCuts(9.5,50,plane(9.5,50)),'the branch retains its plane beyond the finite primary shoulder');
+  let previous=owner.applyStructureTerrainCuts(3.9,50,plane(3.9,50));for(let x=3.901;x<=9.5;x+=.001){const next=owner.applyStructureTerrainCuts(x,50,plane(x,50));assert.ok(Math.abs(next-previous)<.002,'the existing shoulder joins both planes continuously');previous=next;}
+ }
+});
 test('a generalized access road cannot distort terrain cells supporting a reviewed track',()=>{
  const track=road(),access={sourceFeatureId:'generalized-access',pts:[{x:6,z:0},{x:6,z:100}],width:3.8,surfaceBias:.18,structureSemantics:{terrainMode:'at_grade'}};
  updateFeatureSurfaceProfile(access,(x,z)=>plane(x,z)+.4);

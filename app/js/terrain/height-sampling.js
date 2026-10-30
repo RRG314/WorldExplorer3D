@@ -169,6 +169,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
     // and filtering another array added garbage without changing the grade.
     let ownedWeight = 0, ownedY = 0, ownedStrongest = 0, ownedCount = 0;
     let reviewedWeight = 0, reviewedY = 0, reviewedStrongest = 0;
+    let pitWeight = 0, pitY = 0, pitStrongest = 0;
     for (let i = 0; i < candidates.length; i++) {
       const cut = candidates[i];
       const feature = cut?.feature || cut;
@@ -236,9 +237,19 @@ function createTerrainHeightSamplingApi(deps = {}) {
           const gradeWeight = edgeDistance === 0
             ? Math.max(1e-12, Math.max(0, edge-projected.dist)**2)
             : weight**4 / edgeDistance**2;
-          reviewedY += targetTerrainY * gradeWeight;
-          reviewedWeight += gradeWeight;
-          reviewedStrongest = Math.max(reviewedStrongest, weight);
+          const venue=model.surveyedSurface.venueSource;
+          if(venue&&venue===feature.surfaceSurveyEvidence?.venueSource&&venue.pitSourceFeatureIds?.includes(feature.sourceFeatureId)){
+            // The branch fills its own corridor. At a shared entry/exit the
+            // accepted main road retains its plane, with its existing finite
+            // shoulder carrying the join continuously back into this branch.
+            pitY += targetTerrainY * gradeWeight;
+            pitWeight += gradeWeight;
+            pitStrongest = Math.max(pitStrongest, weight);
+          }else{
+            reviewedY += targetTerrainY * gradeWeight;
+            reviewedWeight += gradeWeight;
+            reviewedStrongest = Math.max(reviewedStrongest, weight);
+          }
           continue;
         }
         if (edgeDistance === 0) {
@@ -299,6 +310,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
     if (atGradeWeightSum > 0) {
       adjustedY = terrainY + (atGradeWeightedY / atGradeWeightSum - terrainY) * strongestAtGradeWeight;
+    }
+    if (pitWeight > 0) {
+      adjustedY += (pitY / pitWeight - adjustedY) * pitStrongest;
     }
     if (reviewedWeight > 0) {
       adjustedY += (reviewedY / reviewedWeight - adjustedY) * reviewedStrongest;
