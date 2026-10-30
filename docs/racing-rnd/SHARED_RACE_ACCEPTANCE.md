@@ -85,6 +85,17 @@ The eight-minute page guard closed after the saved finish; the subsequent trace
 export and extra grid screenshot could not run. The completed journey is retained
 and does not require another lap for that capture failure.
 
+Daytona pit dressing now includes 27 original game stall bays, edge lines,
+PIT/22 pace cues and an entry arrow, clipped to the actual published pavement.
+The native follow-up exposed missing fragments on thin transverse paint under
+non-MSAA rendering. The existing marking material now optionally filters the
+physical strokes over their pixel footprint; ordinary paint retains its prior
+path. Controlled aliased comparisons and both changed native views confirm
+continuous bars and lettering. Road support, walls, collision and the completed
+lap remain unchanged. The normal rolling grid also visibly contains the real
+M3 E92 race car and Carrera 4S alongside the original BMW. These accept the
+changed paint and grid-presentation boundaries, not the surrounding venue pack.
+
 Complete venue presentation, changed live multiplayer/catalogue acceptance and
 the final moving-scene budget remain open; no major pack is accepted. Circuit
 pit gameplay is still explicitly unavailable.

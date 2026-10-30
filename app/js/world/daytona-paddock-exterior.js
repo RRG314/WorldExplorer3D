@@ -75,6 +75,39 @@ function pitCanopy(T,plan,{root,local,world,center,footprint,floor,bottom,ground
  materials[2].bumpMap=materials[2].map;materials[2].map=null;materials[2].bumpScale=.018/unit;materials[2].needsUpdate=true;
  return {root,footprint,bottom,top:floor+ridgeMeters/unit,colliders,sourceBuildingId:plan.sourceBuildingId};
 }
+function paddockBleachers(T,plan,{root,local,world,center,footprint,floor,bottom}){
+ const {unit}=plan,materials=[0xc5c7c3,0x87959c,0x8397a4].map((color,i)=>{const m=new T.MeshStandardMaterial({color,roughness:i?.65:.94,metalness:i?.45:0,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;}),
+  triangles=T.ShapeUtils.triangulateShape(local.map(p=>new T.Vector2(p.u,p.v)),[]).map(ids=>ids.map(i=>local[i])),low=Math.min(...local.map(p=>p.v)),high=Math.max(...local.map(p=>p.v)),mid=local.reduce((n,p)=>n+p.u/local.length,0),
+  distance=p=>Math.min(...plan.pitRoad.pts.slice(1).map((b,i)=>{const a=plan.pitRoad.pts[i],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);})),
+  direction=distance(world(mid,low))<distance(world(mid,high))?1:-1,front=direction>0?low:high,span=high-low,f=p=>direction*(p.v-front)/span;
+ function level(detail){
+  const group=new T.Group(),buffers=materials.map(()=>[]),vertex=(p,y)=>{const q=world(p.u,p.v);return [q.x-center.x,y/unit,q.z-center.z];},
+   polygon=(p,y,mat)=>{for(let i=1;i<p.length-1;i++)buffers[mat].push(...vertex(p[0],y),...vertex(p[i],y),...vertex(p[i+1],y));},
+   wall=(a,b,lo,hi,mat)=>buffers[mat].push(...vertex(a,lo),...vertex(b,lo),...vertex(b,hi),...vertex(a,lo),...vertex(b,hi),...vertex(a,hi));
+  const rows=detail?12:6,stride=12/rows;
+  for(let row=0;row<rows;row++){
+   const lo=.12+row/rows*.66,hi=.12+(row+1)/rows*.66,y=.3*(row+1)*stride;
+   for(const t of triangles){const part=clip(clip(t,p=>f(p)-lo),p=>hi-f(p));polygon(part,y,0);
+    for(let i=0;i<part.length;i++){const a=part[i],b=part[(i+1)%part.length];if(Math.abs(f(a)-lo)<1e-7&&Math.abs(f(b)-lo)<1e-7)wall(a,b,y-.3*stride,y,0);}
+    if(detail){const bench=clip(clip(t,p=>f(p)-(lo+.3*(hi-lo))),p=>lo+.65*(hi-lo)-f(p));polygon(bench,y+.38,2);for(let i=0;i<bench.length;i++){const a=bench[i],b=bench[(i+1)%bench.length];if(Math.abs(f(a)-(lo+.3*(hi-lo)))<1e-7&&Math.abs(f(b)-(lo+.3*(hi-lo)))<1e-7)wall(a,b,y+.28,y+.38,2);}}
+   }
+  }
+  for(const t of triangles){polygon(clip(t,p=>.12-f(p)),.3,0);polygon(clip(t,p=>f(p)-.78),3.6,0);}
+  // Narrow rail panels stay on the clipped rear platform, rather than a box
+  // across an indented source gap. All dimensions are exterior estimates.
+  for(const t of triangles)polygon(clip(clip(t,p=>f(p)-.805),p=>.81-f(p)),4.35,1);
+  if(detail){const v=front+direction*.8075*span,lo=Math.min(...local.map(p=>p.u)),hi=Math.max(...local.map(p=>p.u));for(let u=lo+.5;u<hi-.5;u+=4){if(!inside(world(u,v),footprint))continue;wall({u:u-.04,v},{u:u+.04,v},3.6,4.35,1);wall({u,v:v-.04},{u,v:v+.04},3.6,4.35,1);}}
+
+  for(let i=0;i<local.length;i++){const a=local[i],b=local[(i+1)%local.length],cuts=[0,1];for(let j=0;j<=rows;j++){const at=.12+j/rows*.66,t=(at-f(a))/(f(b)-f(a));if(t>0&&t<1)cuts.push(t);}cuts.sort((a,b)=>a-b);
+   for(let j=1;j<cuts.length;j++){const point=t=>({u:a.u+(b.u-a.u)*t,v:a.v+(b.v-a.v)*t}),p=point(cuts[j-1]),q=point(cuts[j]),fraction=(f(p)+f(q))/2,y=fraction<.12?.3:fraction>=.78?3.6:.3*stride*Math.ceil((fraction-.12)/.66*rows);wall(p,q,0,y,0);}
+  }
+  buffers.forEach((values,i)=>{if(!values.length)return;const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(values,3));g.computeVertexNormals();const m=new T.Mesh(g,materials[i]);m.name=i===0?'Paddock viewing terraces':'Paddock terrace trim';m.castShadow=m.receiveShadow=true;group.add(m);});return group;
+ }
+ const lod=new T.LOD();lod.addLevel(level(true),0);lod.addLevel(level(false),330/unit);lod.addLevel(new T.Group(),1100/unit);root.add(lod);
+ root.userData.sourceClaim='Pinned Overture 2026-09-23.1 plan; NAIP low viewing tiers; original estimated rows, benches and rails; no interior admission';
+ root.userData.architecture={kind:plan.kind,garages:0,rows:12,closedServiceBays:0,roofBays:0,lodLevels:3,eavesMeters:plan.eavesMeters,ridgeMeters:plan.ridgeMeters};
+ return {root,footprint,bottom,top:floor+plan.ridgeMeters/unit,sourceBuildingId:plan.sourceBuildingId};
+}
 // Existing post-transport publication supplies all terrain observations. No
 // runtime sampler, interior admission, scheduler or second building owner.
 export function createDaytonaPaddockExteriors(T,ctx){
@@ -94,11 +127,15 @@ export function createDaytonaPaddockExteriors(T,ctx){
   if(!ground.length||!ground.every(Number.isFinite)||Math.max(...ground)-Math.min(...ground)>4/unit)continue;
   const bottom=Math.min(...ground),floor=Math.max(...ground)+.08/unit,root=new T.Group();root.position.set(center.x,floor,center.z);root.name='Daytona — '+plan.label;
   root.userData={sourceBuildingId:plan.sourceBuildingId,buildingFootprint:footprint,reviewedVenueExterior:true,paddockStructure:true,paddockGarage:plan.kind==='garage',exteriorOnly:true,
-   sourceClaim:'Exact OSM plan; NAIP roof observation; original estimated heights, closed service bays, roof ribs and vents; no interior admission'};
+   sourceClaim:(plan.sourceRelease?'Pinned Overture '+plan.sourceRelease+' plan':'Exact OSM plan')+'; NAIP roof observation; original estimated heights, service facades, roof ribs and vents; no interior admission'};
   if(plan.kind==='pit-canopy'){
    const pitRoad=ctx.roads?.find(r=>r.sourceFeatureId==='osm:way:352067003');if(!pitRoad?.pts?.length)continue;
    root.userData.sourceClaim='Pinned Overture 2026-09-23.1 plan; NAIP confirms low open roof; original estimated height, posts and pit wall; no interior admission';
    results.push(pitCanopy(T,{...plan,ux,uz,pitRoad},{root,local,world,center,footprint,floor,bottom,groundAt:ctx.elevationWorldYAtWorldXZ}));continue;
+  }
+  if(plan.kind==='paddock-bleachers'){
+   const pitRoad=ctx.roads?.find(r=>r.sourceFeatureId==='osm:way:352067003');if(!pitRoad?.pts?.length)continue;
+   results.push(paddockBleachers(T,{...plan,pitRoad},{root,local,world,center,footprint,floor,bottom}));continue;
   }
   const material=(color,roughness=.85,metalness=0)=>{const m=new T.MeshStandardMaterial({color,roughness,metalness,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;},
    wall=material(0xd5cfb7,.95),roof=material(plan.kind==='club'?0x75655b:0xc6ccca,.55,.45),dark=material(0x364147,.9),trim=material(0x818f92,.5,.45),glass=material(0x2e515b,.3,.35),yellow=material(0xc1a14f,.75),foundation=material(0xb4b3a7,.97),

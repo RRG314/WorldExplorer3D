@@ -5,7 +5,7 @@ import {prepareKennedyBuildingWays} from './kennedy-facility.js';
 import {publishKennedyExterior} from './kennedy-exterior.js';
 import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
 import {isSilverstoneWing} from './silverstone-wing-exterior.js';
-import {reviewedDaytonaPitCanopy} from './daytona-paddock-survey.js';
+import {reviewedDaytonaPaddockBuilding} from './daytona-paddock-survey.js';
 import {publishReviewedVenueExteriors} from './reviewed-venue-exteriors.js';
 import {resolveBuildingFoundation} from './building-foundation.js';
 import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=3';
@@ -295,9 +295,10 @@ async function buildBuildingGeometryWithStorage(options, arenas) {
     const bSeed = buildingSeedFromIdentity(way.tags?._sourceFeatureId || way.id);
     const br1 = appCtx.rand01FromInt(bSeed);
     const br2 = appCtx.rand01FromInt(bSeed ^ 0x9e3779b9);
-    const reviewedCanopy=reviewedDaytonaPitCanopy(appCtx,knownSourceBuildingId),semanticTags=reviewedCanopy?
-      {...way.tags,building:'canopy','building:part':undefined,height:String(reviewedCanopy.ridgeMeters),'roof:height':String(reviewedCanopy.ridgeMeters-reviewedCanopy.eavesMeters),min_height:undefined,'building:min_level':undefined,level:undefined}:way.tags;
-    const bt = reviewedCanopy?'canopy':way.tags.building || way.tags['building:part'] || 'yes';
+    const reviewedPaddock=reviewedDaytonaPaddockBuilding(appCtx,knownSourceBuildingId),reviewedCanopy=reviewedPaddock?.kind==='pit-canopy'?reviewedPaddock:null,
+      reviewedType=reviewedCanopy?'canopy':reviewedPaddock?.kind==='paddock-bleachers'?'grandstand':way.tags.building || way.tags['building:part'] || 'yes',
+      semanticTags=reviewedPaddock?{...way.tags,building:reviewedType,'building:part':undefined,height:String(reviewedPaddock.ridgeMeters),'roof:height':String(reviewedPaddock.ridgeMeters-reviewedPaddock.eavesMeters),'building:levels':undefined,min_height:undefined,'building:min_level':undefined,level:undefined}:way.tags;
+    const bt = reviewedType;
     const fallbackHeight = way.tags['building:part'] ?
       10 :
       inferFallbackBuildingHeightMeters(bt, footprintArea, footprintWidth, footprintDepth, br1);
@@ -310,7 +311,7 @@ async function buildBuildingGeometryWithStorage(options, arenas) {
       footprintWidth,
       footprintDepth
     });
-    if(reviewedCanopy)buildingSemantics.heightSource='reviewed_canopy_estimate';
+    if(reviewedPaddock){buildingSemantics.heightSource=reviewedCanopy?'reviewed_canopy_estimate':'reviewed_paddock_estimate';buildingSemantics.exteriorOnly=true;const providerHeight=Number.parseFloat(way.tags.height);if(Number.isFinite(providerHeight))buildingSemantics.providerHeightMeters=providerHeight;}
     // The provider's 6.27 m estimate contradicts the photographed three-storey
     // facade. Preserve it as source evidence, not as a surveyed constraint.
     if (reviewedVenue==='peale-baltimore') {
@@ -332,7 +333,7 @@ async function buildBuildingGeometryWithStorage(options, arenas) {
       loadMetrics.buildingPublication.implausibleGeometry += 1;
       continue;
     }
-    const buildingLevels = Number.parseFloat(way.tags['building:levels']);
+    const buildingLevels = Number.parseFloat(semanticTags['building:levels']);
     const resolvedLevels = buildingSemantics.heightSource==='reviewed_facade_estimate' ? 3 : Number.isFinite(buildingLevels) ?
       Math.max(1, Math.round(buildingLevels)) :
       Math.max(1, Math.min(120, Math.round(height / Math.max(2.8, buildingSemantics.levelHeightMeters || 3.2))));
