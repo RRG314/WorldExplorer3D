@@ -47,6 +47,9 @@ function appendTurnJoin({
   outgoing,
   leftDistance,
   rightDistance,
+  nextLeftDistance = leftDistance,
+  nextRightDistance = rightDistance,
+  minimumTurnRadians = Math.PI / 180,
   sampleTerrainY,
   surfaceBias,
   targetVerts,
@@ -59,7 +62,7 @@ function appendTurnJoin({
   ));
   const signedTurn = Math.atan2(cross, dot);
   const absoluteTurn = Math.abs(signedTurn);
-  if (absoluteTurn < Math.PI / 180) return { joins: 0, triangles: 0, degenerateTriangles: 0 };
+  if (absoluteTurn < minimumTurnRadians || absoluteTurn <= 1e-12) return { joins: 0, triangles: 0, degenerateTriangles: 0 };
 
   const appendDisk = absoluteTurn > Math.PI * 0.94;
   // The segment rectangles already overlap on the inside of a turn. The
@@ -68,6 +71,7 @@ function appendTurnJoin({
   // long triangular holes visible between otherwise valid road segments.
   const side = cross >= 0 ? -1 : 1;
   const radius = side > 0 ? leftDistance : rightDistance;
+  const nextRadius = side > 0 ? nextLeftDistance : nextRightDistance;
   const startAngle = appendDisk
     ? 0
     : Math.atan2(incoming.normalZ * side, incoming.normalX * side);
@@ -80,13 +84,14 @@ function appendTurnJoin({
   const ring = [];
   for (let index = 0; index <= segmentCount; index += 1) {
     const angle = startAngle + sweep * index / segmentCount;
+    const distance = appendDisk ? Math.max(radius,nextRadius) : radius+(nextRadius-radius)*index/segmentCount;
     ring.push(appendPoint(
       targetVerts,
       geometryPoints,
       surfacePoint(
         point,
-        Math.cos(angle) * radius,
-        Math.sin(angle) * radius,
+        Math.cos(angle) * distance,
+        Math.sin(angle) * distance,
         sampleTerrainY,
         surfaceBias + 0.002
       )
@@ -109,11 +114,12 @@ function appendTurnJoin({
   };
 }
 
-export function roadTurnFootprint({ previous, point, next, leftDistance, rightDistance }) {
+export function roadTurnFootprint({ previous, point, next, leftDistance, rightDistance,nextLeftDistance=leftDistance,nextRightDistance=rightDistance,minimumTurnRadians=Math.PI/180 }) {
   const incoming = segmentFrame(previous, point), outgoing = segmentFrame(point, next);
   if (!incoming || !outgoing) return [];
   const targetVerts = [], targetIndices = [], geometryPoints = [];
   appendTurnJoin({ point, incoming, outgoing, leftDistance, rightDistance,
+    nextLeftDistance,nextRightDistance,minimumTurnRadians,
     sampleTerrainY: () => 0, surfaceBias: 0, targetVerts, targetIndices, geometryPoints });
   const polygons = [];
   for (let i=0;i<targetIndices.length;i+=3) {

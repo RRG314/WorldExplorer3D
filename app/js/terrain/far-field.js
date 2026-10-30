@@ -1002,7 +1002,12 @@ function createFarFieldTerrainApi(deps = {}) {
   async function refreshReviewedVenueTerrain(options={}) {
     if(!farFieldMesh||!farFieldSurfaceState)return null;
     const mesh=farFieldMesh,state=farFieldSurfaceState;
-    return state.refineReviewedCorridors?.(mesh,{...options,current:()=>farFieldMesh===mesh&&farFieldSurfaceState===state&&options.current?.()!==false});
+    const current=()=>farFieldMesh===mesh&&farFieldSurfaceState===state&&options.current?.()!==false;
+    const result=await state.refineReviewedCorridors?.(mesh,{...options,current});
+    // The far material can precede venue-source adoption. Refresh its owned
+    // uniforms after the admitted corridor so near and far cells agree.
+    if(current()&&appCtx.worldLoadRuntimeState?.venuePack?.venueSource)applyTerrainSemanticMaterialBlend(mesh,Number(mesh.userData.terrainTextureRepeats)||12);
+    return result;
   }
 
   function refreshFarTerrainBoundaryHeights() {

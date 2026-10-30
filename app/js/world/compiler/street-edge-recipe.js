@@ -51,6 +51,9 @@ export function compileStreetEdgeRecipe(tile){
   }
  }
  for(const join of tile.joins||[]){
+  // A source split is a continuous asphalt corner, not another authored kerb
+  // station. Its adjacent source bands retain their existing end tapers.
+  if(join.pavementContinuation){inner.push(...carriagewayJoinPolygons(join));continue;}
   const s=state(join.road),index=join.road.pts.indexOf(join.point),d=s?.distances[index],bands=Number.isFinite(d)?active(s,d):[];
   const reduced=inset(join,bands,s?.unit||1);inner.push(...carriagewayJoinPolygons(reduced));
   if(!bands.length)continue;

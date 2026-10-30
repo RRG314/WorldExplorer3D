@@ -370,3 +370,17 @@ unchanged ordinary/distant pixels, no GL errors and one shared program. Native
 visual verification of the implemented blend remains open. A visible wedge at
 the Hocheichen approach also needs a terrain/road visibility check; sampled
 qualification alone is not continuous coverage proof.
+
+The implemented distance blend now passes the native foreground view: the
+verges show the mapped physical grass. That view also proves a separate gap
+between differently angled source-way end caps. Exact degree-two continuations
+in the same accepted venue now use the existing swept road corner and terrain
+partition. Actual source widths and placement offsets are retained; source
+nodes, heights and navigation identity are unchanged. The same temporary input
+crosses the existing road worker and recovery lifetime. A controlled regression
+reproduces the missing contact and visible wedge before the fix and supplies
+real road triangles afterwards. Thirteen affected union, kerb, contact and
+worker cases pass; both GPU views were inspected. The far terrain also refreshes
+its existing material uniforms after venue adoption, guarded against world
+replacement. Native verification of the corner remains pending. No venue pack
+is accepted by these component checks.

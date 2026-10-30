@@ -33,6 +33,7 @@ import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
 import { createRoadContactIndex, createRoadContactIndexCooperatively } from './road-contact-index.js?v=1';
 import { createSpatialRoadBatches } from './spatial-road-batches.js';
 import {publishedPavementJoins} from './published-pavement-joins.js';
+import {reviewedRoadContinuations} from './reviewed-road-continuations.js';
 
 const ROAD_SURFACE_BIAS = 0.18;
 
@@ -454,6 +455,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     await yieldToMainThread();
   }
   assertCurrent();
+  const roadContinuations=reviewedRoadContinuations(baseRoads,appCtx.worldLoadRuntimeState?.venuePack?.venueSource);
   if(typeof Worker==='function') {
     const seen=new Set(),planRoads=[];
     for(const road of baseRoads){
@@ -464,7 +466,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(renderRoad)&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
     }
     const terrainReady=new Promise(resolve=>releaseTerrain=resolve);
-    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady});
+    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady,roadContinuations});
     // The final publication awaits this same promise. Handle early rejection
     // while terrain is still compiling, so cancellation never leaks a worker.
     preparingDetail.catch(()=>{});
@@ -681,6 +683,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   assertCurrent();
   await measureAsync('buildCarriagewayRegions',async()=>{
+    roadSurfaceIntegrity.reviewedSourceContinuations=[...roadContinuations.values()].reduce((count,joins)=>count+joins.length,0);
     roadSurfaceIntegrity.reviewedPavementJoins=pavementJoins.length;
     roadSurfaceIntegrity.reviewedPavementJoinVertices=pavementJoins.reduce((count,join)=>count+join.positions.length/3,0);
     if(typeof Worker==='function') {
@@ -699,7 +702,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,pavementJoins,current:isCurrent,yieldWork:yieldToMainThread});
     try {
       trace('indexCarriageways:start',{roads:atGradeRoads.length});
-      const tiles=prepareCarriagewayTiles(atGradeRoads.map(({road})=>{const edgeBandRecipe=reviewedRoadEdgeRecipe(road);return edgeBandRecipe?{...road,edgeBandRecipe}:road;}));
+      const tiles=prepareCarriagewayTiles(atGradeRoads.map(({road})=>{const edgeBandRecipe=reviewedRoadEdgeRecipe(road),endpointContinuations=roadContinuations.get(road);return edgeBandRecipe||endpointContinuations?{...road,...(edgeBandRecipe?{edgeBandRecipe}:{}),...(endpointContinuations?{endpointContinuations}:{})}:road;}));
       trace('indexCarriageways:end',{tiles:tiles.length});
       let sliceStartedAt=now();
       for(const [tileIndex,tile] of tiles.entries()) {

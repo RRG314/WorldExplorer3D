@@ -8,6 +8,7 @@ import {prepareCarriagewayTiles} from '../app/js/world/compiler/street-carriagew
 import {meshCarriagewayTile} from '../app/js/world/compiler/street-carriageway-mesh.js';
 import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js';
 import {createTransportDetailCompiler} from '../app/js/terrain/transport-detail-compiler.js';
+import {reviewedRoadContinuations} from '../app/js/terrain/reviewed-road-continuations.js';
 
 function fixture({halfWidth=4,delta=.0035}={}){
  const x=1750,z=-1400,ground=(px,pz)=>500+.02*(px-x)+.04*(pz-z),top=(px,pz)=>ground(px,pz)+.18,
@@ -48,8 +49,22 @@ test('the shared union height is independent of per-cell source attribution',()=
  const f=fixture(),partition=createPavementTerrainPartition([f.mesh],{includeFarTerrain:true,pavementJoins:f.joins});
  try{const a=meshCarriagewayTile(prepareCarriagewayTiles([f.road])[0],f.top,partition),b=meshCarriagewayTile(prepareCarriagewayTiles([{...f.road,sourceFeatureId:'adjoining-street'}])[0],f.top,partition);assert.deepEqual(a.positions,b.positions);assert.deepEqual(a.indices,b.indices);}finally{partition.dispose();}
 });
+test('an exact continuation fills the outer wedge between differently angled source-way caps',()=>{
+ const f=fixture(),point={x:f.x+.02,z:f.z-2},compile=road=>{
+  const partition=createPavementTerrainPartition([f.mesh],{includeFarTerrain:true,pavementJoins:f.joins});
+  try{const mesh=meshCarriagewayTile(prepareCarriagewayTiles([road])[0],f.top,partition);return createRoadContactIndex([surface(mesh.positions,mesh.indices),surface(f.positions,f.indices)]);}finally{partition.dispose();}
+ },before=compile(f.road),after=compile({...f.road,endpointContinuations:[{previous:f.road.pts[0],point:f.road.pts[1],next:f.approach.pts[1],halfWidth:4,offset:0,nextHalfWidth:4,nextOffset:0,minimumTurnRadians:0,pavementContinuation:true}]});
+ try{assert.equal(before.sampleAt(point.x,point.z),null,'the separate butt caps reproduce the visible wedge');assert.ok(Number.isFinite(after.sampleAt(point.x,point.z)),'the same corner primitive must supply real rendered/contact triangles in the wedge');}finally{before.dispose();after.dispose();}
+});
+test('continuation admission keeps exact node, venue, layer and branch ownership',()=>{
+ const f=fixture({halfWidth:3.8}),venue=f.road.surfaceSurveyEvidence.venueSource,before=structuredClone([f.road.pts,f.approach.pts]),get=roads=>reviewedRoadContinuations(roads,venue);
+ const valid=get([f.road,f.approach]);assert.equal(valid.size,1);const join=valid.get(f.road)[0];assert.equal(join.point,f.road.pts[1]);assert.equal(join.halfWidth,4);assert.equal(join.nextHalfWidth,3.8);
+ for(const b of [{...f.approach,sourceNodeIds:[9,3]},{...f.approach,structureSemantics:{terrainMode:'elevated'}},{...f.approach,transportSurfaceModel:{...f.approach.transportSurfaceModel,reviewedSurfacePhase:'provisional'}},{...f.approach,pts:[{x:f.x+.01,z:f.z},f.approach.pts[1]]}])assert.equal(get([f.road,b]).size,0);
+ const branch={...f.road,sourceFeatureId:'branch',sourceNodeIds:[4,2]};venue.sourceFeatureIds.push('branch');assert.equal(get([f.road,f.approach,branch]).size,0,'a branch cannot be guessed to be a degree-two continuation');
+ assert.deepEqual([f.road.pts,f.approach.pts],before,'source paths remain immutable');
+});
 test('the actual road worker retains the sewn boundary across transfer and region recompilation',{timeout:30000},async t=>{
- const f=fixture(),input={roads:[f.road],terrain:f.terrain,pavementJoins:f.joins,includeOverview:false},direct=createTransportDetailCompiler(input),key=direct.initial.regions[0].key,expected=direct.compile(key),worker=new Worker(`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(new URL('../app/js/terrain/transport-detail-worker.js',import.meta.url).href)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`,{eval:true});t.after(()=>worker.terminate());
+ const f=fixture(),continuations=reviewedRoadContinuations([f.road,f.approach],f.road.surfaceSurveyEvidence.venueSource),input={roads:[{...f.road,endpointContinuations:continuations.get(f.road)}],terrain:f.terrain,pavementJoins:f.joins,includeOverview:false},direct=createTransportDetailCompiler(input),key=direct.initial.regions[0].key,expected=direct.compile(key),worker=new Worker(`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(new URL('../app/js/terrain/transport-detail-worker.js',import.meta.url).href)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`,{eval:true});t.after(()=>worker.terminate());
  const request=data=>new Promise((resolve,reject)=>{worker.once('message',resolve);worker.once('error',reject);worker.postMessage(data);}).finally(()=>worker.removeAllListeners('error'));
- try{const first=await request({type:'prepare',input});assert.equal(first.type,'prepared',first.message);for(let i=0;i<2;i++){const result=await request({type:'compile',key});assert.equal(result.type,'region',result.message);assert.deepEqual(result.batches,expected.batches);const contact=createRoadContactIndex([...result.batches.map(b=>surface(b.positions,b.indices)),surface(f.positions,f.indices)]);try{assert.ok(crossfall(contact,f.x,f.z)<.2);}finally{contact.dispose();}}assert.deepEqual(f.joins[0].positions,fixture().joins[0].positions);}finally{direct.dispose();}
+ try{const first=await request({type:'prepare',input});assert.equal(first.type,'prepared',first.message);for(let i=0;i<2;i++){const result=await request({type:'compile',key});assert.equal(result.type,'region',result.message);assert.deepEqual(result.batches,expected.batches);const contact=createRoadContactIndex([...result.batches.map(b=>surface(b.positions,b.indices)),surface(f.positions,f.indices)]);try{assert.ok(crossfall(contact,f.x,f.z)<.2);assert.ok(Number.isFinite(contact.sampleAt(f.x+.02,f.z-2)),'the actual worker retains the real corner triangles');}finally{contact.dispose();}}assert.deepEqual(f.joins[0].positions,fixture().joins[0].positions);}finally{direct.dispose();}
 });

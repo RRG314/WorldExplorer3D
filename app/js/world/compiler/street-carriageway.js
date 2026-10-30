@@ -51,7 +51,8 @@ export function carriagewaySegmentPolygon(s) {
 }
 
 export function carriagewayJoinPolygons(join) {
-  return roadTurnFootprint({...join,leftDistance:Math.max(.3,join.halfWidth+join.offset),rightDistance:Math.max(.3,join.halfWidth-join.offset)});
+  return roadTurnFootprint({...join,leftDistance:Math.max(.3,join.halfWidth+join.offset),rightDistance:Math.max(.3,join.halfWidth-join.offset),
+    ...(Number.isFinite(join.nextHalfWidth)?{nextLeftDistance:Math.max(.3,join.nextHalfWidth+(join.nextOffset||0)),nextRightDistance:Math.max(.3,join.nextHalfWidth-(join.nextOffset||0))}:{})});
 }
 
 export function unionCarriageway(tile, {clipToBounds = true} = {}) {
@@ -95,6 +96,10 @@ export function prepareCarriagewayTiles(roads, chunkSize = 128) {
     }
     for(let i=1;i<(road.pts?.length || 0)-1;i++) {
       const join={road,previous:road.pts[i-1],point:road.pts[i],next:road.pts[i+1],halfWidth:roadWidthAtSegment(road,i,0)/2,offset:roadPlacementOffsetWorld(road)};
+      for(const polygon of carriagewayJoinPolygons(join))insert('joins',join,polygon);
+    }
+    for(const continuation of road.endpointContinuations||[]){
+      const join={...continuation,road};
       for(const polygon of carriagewayJoinPolygons(join))insert('joins',join,polygon);
     }
   }

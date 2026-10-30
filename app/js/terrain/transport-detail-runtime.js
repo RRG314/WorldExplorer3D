@@ -6,7 +6,7 @@ import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail,actorRequestsRoadDetail,
   transportRegionBounds,transportRegionInWindow,transportRegionDistanceSquared,nearestPendingTransportRegion,
   TRANSPORT_DETAIL_RADIUS,TRANSPORT_RETENTION_RADIUS,MAX_MOVING_TRANSPORT_REGIONS} from './transport-detail-plan.js';
 
-export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null}) {
+export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null,roadContinuations=new Map()}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
   let worker=null,recoveryInput=null,retryAt=0,retryAttempts=0;
   let pending=null,disposed=false,active=null,publish=null,complete=null,retire=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
@@ -101,6 +101,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   appCtx._cancelTransportPreparation=dispose;
   try {
     const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,
+      endpointContinuations:roadContinuations.get(road),
       edgeBandRecipe:reviewedRoadEdgeRecipe(road),pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
       structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
     }));
