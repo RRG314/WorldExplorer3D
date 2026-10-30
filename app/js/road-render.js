@@ -2,10 +2,30 @@ import {applyRoadCreaseNormals} from './terrain/road-crease-normals.js';
 import { normalizePublishedRoadIndices } from './terrain/published-road-integrity.js';
 
 export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8,
-  vertexColors=false,side,depthWrite=true}={},T=globalThis.THREE) {
+  vertexColors=false,side,depthWrite=true,filteredStroke=false}={},T=globalThis.THREE) {
   // Roads use -2. Paint must stay ahead of their depth bias at grazing angles.
-  return new T.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,vertexColors,side:side??T.FrontSide,depthWrite,
+  const material=new T.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,vertexColors,side:side??T.FrontSide,depthWrite,
     polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6});
+  if(filteredStroke){
+    // A thin transverse line can fall entirely between sample centres on the
+    // normal non-MSAA renderer. Projected padding supplies the pixel footprint;
+    // derivative coverage retains the authored physical stroke dimensions.
+    material.transparent=true;material.depthWrite=false;(material.extensions??={}).derivatives=true;
+    material.onBeforeCompile=shader=>{
+      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec4 markingStroke;\nvarying vec4 vMarkingStroke;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvMarkingStroke=markingStroke;');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec4 vMarkingStroke;')
+        .replace('#include <alphatest_fragment>',`vec2 markingFootprint=max(fwidth(vMarkingStroke.xy),vec2(0.0001));
+vec2 markingHigh=clamp((vMarkingStroke.zw-vMarkingStroke.xy)/markingFootprint+0.5,0.0,1.0);
+vec2 markingLow=clamp((-vMarkingStroke.zw-vMarkingStroke.xy)/markingFootprint+0.5,0.0,1.0);
+vec2 markingCoverage=markingHigh-markingLow;
+if(vMarkingStroke.z<0.0)markingCoverage.x=1.0;
+diffuseColor.a*=markingCoverage.x*markingCoverage.y;
+#include <alphatest_fragment>`);
+    };
+    material.customProgramCacheKey=()=> 'road-marking-filtered-stroke-v1';
+  }
+  return material;
 }
 
 function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = [], indices = []) {

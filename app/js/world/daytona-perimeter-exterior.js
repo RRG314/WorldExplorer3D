@@ -104,20 +104,21 @@ export function createDaytonaPerimeterExterior(T,ctx){
  const wall=new T.MeshStandardMaterial({color:0xd8dad2,roughness:.95,side:T.DoubleSide}),
   metal=new T.MeshStandardMaterial({color:0x747e81,metalness:.65,roughness:.6,side:T.DoubleSide}),
   fence=new T.MeshStandardMaterial({color:0x899396,map:createChainLinkTexture(T),transparent:true,opacity:.66,depthWrite:false,side:T.DoubleSide,metalness:.35,roughness:.75}),
-  paint=createRoadMarkingMaterial({color:0xffffff,emissive:0,emissiveIntensity:0,vertexColors:true,roughness:.88,side:T.DoubleSide,depthWrite:false},T);
- function mesh(values,material,center,uvs,colors){
+  paint=createRoadMarkingMaterial({color:0xffffff,emissive:0,emissiveIntensity:0,vertexColors:true,roughness:.88,side:T.DoubleSide,depthWrite:false},T),
+  filteredPaint=plan.pit?createRoadMarkingMaterial({color:0xffffff,emissive:0,emissiveIntensity:0,vertexColors:true,roughness:.88,side:T.DoubleSide,filteredStroke:true},T):null;
+ function mesh(values,material,center,uvs,colors,coverage){
   const g=new T.BufferGeometry(),p=new Float32Array(values.length);
   for(let i=0;i<values.length;i+=3){p[i]=values[i]-center.x;p[i+1]=values[i+1]-center.y;p[i+2]=values[i+2]-center.z;}
-  g.setAttribute('position',new T.BufferAttribute(p,3));if(uvs)g.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));if(colors)g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();g.computeBoundingSphere();
-  const m=new T.Mesh(g,material);m.receiveShadow=true;if(material===paint)m.renderOrder=4;return m;
+  g.setAttribute('position',new T.BufferAttribute(p,3));if(uvs)g.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));if(colors)g.setAttribute('color',new T.Float32BufferAttribute(colors,3));if(coverage)g.setAttribute('markingStroke',new T.Float32BufferAttribute(coverage,4));g.computeVertexNormals();g.computeBoundingSphere();
+  const m=new T.Mesh(g,material);m.receiveShadow=true;if(material===paint||material===filteredPaint)m.renderOrder=4;return m;
  }
  for(const c of plan.chunks){
   const group=new T.Group();group.position.set(c.center.x,c.center.y,c.center.z);root.add(group);
   const lod=new T.LOD(),near=new T.Group(),far=new T.Group();group.add(lod);
-  const wallMesh=c.wall.length?mesh(c.wall,wall,c.center):null,paintMesh=mesh(c.paint,paint,c.center,null,c.colors);
+  const wallMesh=c.wall.length?mesh(c.wall,wall,c.center):null,paintMesh=mesh(c.paint,c.strokeCoverage?filteredPaint:paint,c.center,null,c.colors,c.strokeCoverage);
   if(wallMesh)near.add(wallMesh);if(c.fence.length)near.add(mesh(c.fence,fence,c.center,c.fenceUvs));if(c.metal.length)near.add(mesh(c.metal,metal,c.center));near.add(paintMesh);
   // Shared geometry is owned by this root and disposed by the world lifecycle.
-  const distantPaint=new T.Mesh(paintMesh.geometry,paint);distantPaint.renderOrder=4;if(wallMesh)far.add(new T.Mesh(wallMesh.geometry,wall));far.add(distantPaint);
+  const distantPaint=new T.Mesh(paintMesh.geometry,paintMesh.material);distantPaint.renderOrder=4;if(wallMesh)far.add(new T.Mesh(wallMesh.geometry,wall));far.add(distantPaint);
   lod.addLevel(near,0);lod.addLevel(far,650/unit);lod.addLevel(new T.Group(),1900/unit);
  }
  finishVenueSurface(T,root,wall,'../../assets/textures/earth/concrete_diffuse.jpg',2/unit);

@@ -28,7 +28,7 @@ test('pit edge lines, original stall boxes and pace cues use only uploaded pavem
   assert.equal(full.lengthMeters,main.lengthMeters);assert.deepEqual(full.colliders,main.colliders);assert.deepEqual(full.chunks.filter(c=>c.wall.length),main.chunks);
   assert.ok(Math.abs(full.pit.lengthMeters-620)<1e-8);assert.equal(full.pit.boxes,27);assert.equal(full.pit.sourceWays,2);assert.equal(full.pit.paceMph,22);assert.ok(full.pit.paintFaces>500);
   const paintOnly=full.chunks.filter(c=>!c.wall.length);assert.ok(paintOnly.length>2);
-  for(const c of paintOnly){assert.equal(c.colors.length,c.paint.length);for(let i=0;i<c.paint.length;i+=3){const x=c.paint[i],y=c.paint[i+1],z=c.paint[i+2],support=f.ctx.roadContactIndex.sampleAt(x,z,NaN,'at_grade');assert.ok(Number.isFinite(support));assert.ok(Math.abs((y-support)*unit-.008)<1e-6);assert.ok(x*unit>22&&x*unit<35);}}
+  for(const c of paintOnly){assert.equal(c.colors.length,c.paint.length);assert.equal(c.strokeCoverage.length,c.paint.length/3*4);assert.ok(c.strokeCoverage.every(Number.isFinite));assert.ok(c.strokeCoverage.filter((_,i)=>i%4===3).every(w=>w>=.06&&w<=.4),'coverage retains physical stroke half widths, separately from projected filter padding');for(let i=0;i<c.paint.length;i+=3){const x=c.paint[i],y=c.paint[i+1],z=c.paint[i+2],support=f.ctx.roadContactIndex.sampleAt(x,z,NaN,'at_grade');assert.ok(Number.isFinite(support));assert.ok(Math.abs((y-support)*unit-.008)<1e-6);assert.ok(x*unit>22&&x*unit<35);}}
   const project=f.ctx.roadContactIndex.projectPolygon;assert.throws(()=>buildDaytonaPerimeter({...f.ctx,roadContactIndex:{...f.ctx.roadContactIndex,projectPolygon:(p,...args)=>p.some(p=>p.x*unit>20)?[]:project(p,...args)}}),/pit_paint_unsupported/);
   assert.equal(buildDaytonaPerimeter({...f.ctx,roads:f.ctx.roads.slice(0,5)}),null,'missing reviewed pit support cannot silently produce an incomplete decoration');f.dispose();
  }
@@ -66,7 +66,7 @@ test('LOD selection reads no heights and the existing landmark owner releases ev
  try{for(const pit of [false,true]){const f=fixture(1.11,{pit});
   const model=createDaytonaPerimeterExterior(T,f.ctx);assert.ok(model);assert.equal(model.root.children.length,pit?7:2);
   for(const [i,c]of model.root.children.entries()){const levels=c.children[0].levels,paintOnly=pit&&i>=2;assert.deepEqual(levels.map(l=>l.object.children.length),paintOnly?[1,1,0]:[4,2,0]);
-   for(const p of [levels[0].object.children.at(-1),levels[1].object.children.at(-1)]){assert.equal(p.renderOrder,4);assert.equal(p.material.depthWrite,false);assert.ok(p.material.polygonOffsetFactor< -2,'paint must stay in front of the shared pavement depth bias');}
+   for(const p of [levels[0].object.children.at(-1),levels[1].object.children.at(-1)]){assert.equal(p.renderOrder,4);assert.equal(p.material.depthWrite,false);assert.equal(p.material.transparent,paintOnly);assert.equal(p.geometry.getAttribute('markingStroke')?.count,paintOnly?p.geometry.getAttribute('position').count:undefined);assert.ok(p.material.polygonOffsetFactor< -2,'paint must stay in front of the shared pavement depth bias');}
   }
   f.ctx.buildingMeshes.push(model.root);assert.equal(createDaytonaPerimeterExterior(T,f.ctx),null);
   f.ctx.roadContactIndex.sampleAt=()=>{throw Error('live height read');};model.root.updateMatrixWorld(true);model.root.traverse(o=>{if(o.isLOD)o.update(new T.PerspectiveCamera());});
