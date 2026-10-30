@@ -8,6 +8,7 @@ import {finishVenueSurface} from './venue-surface-materials.js';
 import {replaceVenueCollision,venueComponentCollider} from './venue-collision.js';
 import {createSilverstoneWingExterior,isSilverstoneWing} from './silverstone-wing-exterior.js';
 import {createNordschleifeT13Exterior,isT13StandRepresentation} from './nordschleife-t13-exterior.js';
+import {createDaytonaGrandstandExterior,isDaytonaStandRepresentation} from './daytona-grandstand-exterior.js';
 
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
@@ -206,16 +207,18 @@ export function publishReviewedVenueExteriors(ctx,THREE){
  const published=added.map(r=>r.name),venue=ctx.worldLoadRuntimeState?.venuePack,sequence=ctx._worldLoadSequence;
  // The existing transport-dependent publication phase runs after final road
  // grading. A pre-grade flat foundation buries this long stand on the hillside.
- if(venue?.id==='nurburgring-nordschleife'&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
+ const standFactory=venue?.id==='nurburgring-nordschleife'?createNordschleifeT13Exterior:venue?.id==='daytona-tri-oval'?createDaytonaGrandstandExterior:null,
+  standMatch=venue?.id==='daytona-tri-oval'?isDaytonaStandRepresentation:isT13StandRepresentation;
+ if(standFactory&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
   if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
-  const t13=createNordschleifeT13Exterior(THREE,ctx);if(!t13)return;
-  const retired=new Set(ctx.buildingMeshes.filter(m=>isT13StandRepresentation(m.userData,t13.footprint)));
+  const stand=standFactory(THREE,ctx);if(!stand)return;
+  const retired=new Set(ctx.buildingMeshes.filter(m=>standMatch(m.userData,stand.footprint)));
   for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
-  replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>isT13StandRepresentation(b,t13.footprint)),[
-   venueComponentCollider(t13.root.userData.sourceBuildingId,t13.footprint,t13.bottom,t13.top)
+  replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>standMatch(b,stand.footprint)),[
+   venueComponentCollider(stand.root.userData.sourceBuildingId,stand.footprint,stand.bottom,stand.top)
   ]);
-  ctx.addEarthWorldObject(t13.root);ctx.buildingMeshes.push(t13.root);published.push(t13.root.name);
+  ctx.addEarthWorldObject(stand.root);ctx.buildingMeshes.push(stand.root);published.push(stand.root.name);
  });
  for(const root of added){ctx.addEarthWorldObject(root);ctx.buildingMeshes.push(root);}
  return {published};

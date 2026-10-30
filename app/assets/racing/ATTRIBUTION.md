@@ -158,3 +158,22 @@ EGM2008 grid. [NOAA grid information](https://cdn.proj.org/us_noaa_README.txt),
 is reproduced by `scripts/racing/extract-native-ground-window.mjs`; the shared
 ground product is reproduced by `scripts/build-usgs-venue-ground.mjs` with
 `config/racing-venues/daytona-ground.json` and the retained hash-pinned inputs.
+
+### Daytona grandstand exterior
+
+`app/js/world/daytona-grandstand-survey.js` retains the complete 238-vertex
+unclosed plan of [OpenStreetMap way 350943720](https://www.openstreetmap.org/way/350943720),
+version 10, March 7, 2025, and its mapped 42.6 m height. © OpenStreetMap
+contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
+The native API observation above supplies the source nodes; account metadata
+is omitted. The plan and source height are geographic facts, separate from the
+original estimated architecture in `daytona-grandstand-exterior.js`.
+
+Public-domain USDA NAIP imagery acquired January 17, 2023, observed through
+[USGS NAIP Plus](https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer),
+provides exterior reference. The retained observation locks USDA raster IDs
+36724–36727; its flight date differs from the 2022 program year. No imagery,
+logos or sponsor artwork are game textures. The three seating tiers, 68 rows,
+two concourses, glazing and access-bay details are original estimates. They
+confer no interior admission or official venue endorsement. The existing
+building publication, collision and resource owners manage this exterior.

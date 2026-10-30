@@ -431,7 +431,7 @@ presentation, pits and completed gameplay. No pack acceptance is claimed.
 
 Native verification of the free-driving fit now passes on the same bank. All
 133 held-input frames retain four wheel contacts, with zero sampled penetration
-and a maximum sampled gap of 1.83 cm. Body roll follows approximately 0.522 rad
+and a maximum sampled gap of 2.03 cm after conversion from world units. Body roll follows approximately 0.522 rad
 instead of the old 0.45 rad cap; the root no longer carries the highest-probe
 lift. The corrected bank view and walking handback were inspected. No page,
 console or cleanup errors occurred. The unchanged 127-span qualification is
@@ -448,3 +448,24 @@ existing terrain owners. Earlier venue policies retain their existing geometry.
 Sixteen focused source, topology and ownership checks pass. A controlled actual
 compiler/GPU comparison removes a 2.74 m false shoulder mound, with no GL error.
 Native road/contact and visual verification of this correction remains pending.
+
+The constrained terrain now passes native verification. All 127 spans remain raw
+and canonical valid, with no collector rejection; inline storage retains every
+span. At the measured outer failure point, published terrain changes from
+16.427 to 13.255 world units against native 13.2549. The false outer mound is
+gone in the inspected view. All 134 held-input frames retain four wheel contacts;
+maximum sampled gap is 1.95 cm after unit conversion, with no meaningful
+penetration. Walking handback passes. Page, console and cleanup errors are empty.
+The road outline is still visibly coarse and its full pavement width and venue
+presentation remain unfinished. This accepts the repaired boundary, not the pack.
+
+Daytona's generic stand representation is replaced by an original curved
+exterior fitted to the exact mapped 238-point plan and 42.6 m height. Seating,
+concourses and suites are estimates informed by public-domain USDA imagery;
+source facts and architectural interpretation are identified separately. The
+existing post-transport building publisher transfers the matching visual and
+collision, preserving neighbouring buildings, entrance authority and world
+cancellation. Three detail levels share owned materials and lifetime. Component
+and controlled GPU checks cover the curve, geographic scale, footprint clipping,
+height, retirement and detail selection; native-world publication is pending.
+This is additional venue construction, not completed pack acceptance.
