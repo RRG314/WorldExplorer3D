@@ -56,30 +56,3 @@ test('the actual complete Silverstone source passes through transport and naviga
  const result=buildVenueRaceCourses(district,{id:source.venueId,name:'Silverstone',status:'source-prepared',sourceFeatureIds:source.layout.wayIds.map(id=>`osm:way:${id}`),mappedLengthMeters:5880.622911204611});
  assert.equal(result.events[0].sourcePath.length,506);assert.ok(result.events[0].lengthMeters>5800);
 });
-
-function reviewedTransitionGraph({heightGap=0,xGap=0,sourceMismatch=false,phase='accepted',foreign=false}={}){
- const a=road(1,[{x:-100,z:0},{x:0,z:0}],[10,20]),b=road(2,[{x:xGap,z:0},{x:100,z:0}],[sourceMismatch?21:20,30],'elevated'),
-  c=road(3,[{x:100,z:0},{x:200,z:0}],[30,40]),features=[a,b,c],venueSource=Object.freeze({id:'controlled-bridge-loop',sourceSha256:'a'.repeat(64),sourceFeatureIds:Object.freeze(features.map(f=>f.sourceFeatureId))});
- for(const f of features){
-  f.originalSourceNodeIds=[...f.sourceNodeIds];f.surfaceSurveyEvidence={venueSource};
-  f.transportSurfaceModel={distances:new Float32Array([0,100]),centerHeights:[f===b?heightGap:0,0],leftHeights:[0,0],rightHeights:[0,0],width:12,maximumReviewedCrossfall:0,
-   reviewedSurfacePhase:phase,surveyedSurface:{venueSource:foreign&&f===b?{...venueSource}:venueSource,maximumCrossfall:.7}};
-  // A retained transport model from before final endpoint reconciliation.
-  // Finalized source surfaces must still be represented by this traversal owner.
-  f.transportGraphRef={stations:[],direction:'forward',driveable:true};
- }
- initWorldTraversal({runtimeRoadFeatures:()=>features,isVehicleRoad:()=>true,enableLinearFeatures:()=>false,
-  featureTraversalKey:f=>`${f.structureSemantics.terrainMode}:${f.structureSemantics.verticalOrder||0}`});
- ctx.linearFeatures=[];ctx.transportNetworkModel=null;invalidateTraversalNetworks();
- return materializeTraversalSegments(buildTraversalNetworks().drive.segments);
-}
-
-test('final reviewed bridge endpoints retain explicit source-node continuity across traversal layers',()=>{
- const rows=reviewedTransitionGraph();assert.equal(rows.length,3);
- assert.equal(rows[0].toId,rows[1].fromId);assert.equal(rows[1].toId,rows[2].fromId);
-});
-test('reviewed endpoint continuity never joins mismatched source nodes, unfinalized or foreign surveys, different heights or nearby geometry',()=>{
- for(const options of [{heightGap:2},{xGap:.1},{sourceMismatch:true},{phase:'preparation'},{foreign:true}]){
-  const rows=reviewedTransitionGraph(options);assert.notEqual(rows[0].toId,rows[1].fromId,JSON.stringify(options));
- }
-});

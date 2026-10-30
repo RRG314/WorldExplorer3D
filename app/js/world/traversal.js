@@ -1,4 +1,3 @@
-import {sampleTransportSurfaceAtDistance,assertReviewedSurfaceAccepted} from './compiler/transport-surface-model.js?v=25';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
 import {
@@ -109,42 +108,8 @@ function traversalNodeKey(x, z, feature = null) {
   return `${Math.round(x / TRAVERSAL_NODE_GRID)},${Math.round(z / TRAVERSAL_NODE_GRID)}:${runtime.featureTraversalKey(feature)}`;
 }
 
-// A reviewed layout retains explicit endpoint node identity even where its
-// ground and bridge features belong to different traversal layers. Resolve
-// only declared adjacent source ways after their common surface is finalized;
-// proximity crossings and unrelated decks keep the ordinary layer fence.
-function reviewedVenueEndpointAliases(features){
-  const result=new Map(),byId=new Map(features.map(f=>[f.sourceFeatureId,f]));
-  const trusted=f=>{
-    const venue=f?.surfaceSurveyEvidence?.venueSource,model=f?.transportSurfaceModel;
-    if(!venue||model?.reviewedSurfacePhase!=='accepted'||model.surveyedSurface?.venueSource!==venue||
-      f.transportRecord?.completeness!=='lossless'||!f.transportRecord.identity?.startsWith('osm:way:')||
-      !Array.isArray(f.originalSourceNodeIds)||!Array.isArray(f.pts)||f.pts.length<2)return null;
-    try{assertReviewedSurfaceAccepted(model);}catch{return null;}
-    return venue;
-  };
-  const set=(feature,index,key)=>{if(!result.has(feature))result.set(feature,new Map());result.get(feature).set(index,key);};
-  for(const a of features){
-    const venue=trusted(a);if(!venue)continue;
-    const order=venue.sourceFeatureIds,index=order.indexOf(a.sourceFeatureId);if(index<0)continue;
-    const b=byId.get(order[(index+1)%order.length]);if(!b||trusted(b)!==venue)continue;
-    const modes=[a.structureSemantics?.terrainMode,b.structureSemantics?.terrainMode];
-    if(!modes.includes('at_grade')||!modes.includes('elevated'))continue;
-    const node=a.originalSourceNodeIds.at(-1);
-    if(!/^[0-9]{1,20}$/.test(node)||node!==b.originalSourceNodeIds[0])continue;
-    const p=a.pts.at(-1),q=b.pts[0],meters=Number(a.metersPerWorldUnit);
-    if(!(meters>0&&meters<=10)||b.metersPerWorldUnit!==meters||Math.hypot(p.x-q.x,p.z-q.z)*meters>.01)continue;
-    const ay=sampleTransportSurfaceAtDistance(a.transportSurfaceModel,a.transportSurfaceModel.distances.at(-1)),by=sampleTransportSurfaceAtDistance(b.transportSurfaceModel,0);
-    if(!Number.isFinite(ay)||!Number.isFinite(by)||Math.abs(ay-by)*meters>.05)continue;
-    const key=`reviewed-venue:${venue.id}:${venue.sourceSha256}:osm-node:${node}`;
-    set(a,a.pts.length-1,key);set(b,0,key);
-  }
-  return result;
-}
-
 function buildTraversalGraph(mode = 'walk') {
   const features = traversableFeaturesForMode(mode);
-  const reviewedEndpoints=reviewedVenueEndpointAliases(features);
   const nodes = [];
   const segments = [];
   const nodesByKey = new Map();
@@ -218,7 +183,7 @@ function buildTraversalGraph(mode = 'walk') {
       segmentT: index === points.length - 1 ? 1 : 0,
       sourceNodeKey: sourceNodes.get(`${point.x}:${point.z}`) || '',
       graphNodeId: '',
-      aliases: reviewedEndpoints.get(feature)?.has(index)?[reviewedEndpoints.get(feature).get(index)]:[]
+      aliases: []
     }));
     for (const sample of samples) if (sample.sourceNodeKey) sample.aliases.push(sample.sourceNodeKey);
     for (const station of stations) {

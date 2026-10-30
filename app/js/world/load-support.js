@@ -152,6 +152,14 @@ export async function finalizeLoadedWorld(options = {}) {
     if(error?.name==='AbortError')throw error;
     throw new SurfacePublicationError('pavement',error);
   }
+  // A reviewed long venue can have an early navigation graph before its
+  // finalized transport connections exist. Adopt that existing model now;
+  // retaining the early cache disconnects otherwise supported bridge ends.
+  const runtime=appCtx.worldLoadRuntimeState;
+  if(runtime?.sequence===appCtx._worldLoadSequence&&runtime.venuePack?.status==='source-prepared'&&runtime.venuePack.venueSource){
+    if(typeof appCtx.invalidateTraversalNetworks!=='function')throw new SurfacePublicationError('reviewed-venue-traversal',new Error('Traversal invalidation owner is unavailable'));
+    appCtx.invalidateTraversalNetworks('reviewed-venue-source-ready');
+  }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   await yieldToMainThread();
   // World publication owns the one final arrival. Calling a generic road spawn
