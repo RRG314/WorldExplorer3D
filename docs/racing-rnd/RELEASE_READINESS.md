@@ -222,3 +222,10 @@ and measured row-fit error below 3 mm. Flat asphalt now comes from the authored
 inner asphalt union, avoiding false low contacts in tiny differences between
 clipped roof pieces. This is source-geometry evidence; real terrain, storage,
 driving and complete venue presentation remain separate acceptance boundaries.
+
+Saved native failure data isolated one additional rejection caused only by
+canonical rounding. Lateral profile heights now retain 100 micrometre precision,
+with the original slope guards; ordinary profiles keep their existing values.
+A near-limit regression and both generated runtimes pass. Offline replay of
+the captured native facts removes that rounding-only rejection; ten geometry
+failures and one profile-capacity failure still block the venue.

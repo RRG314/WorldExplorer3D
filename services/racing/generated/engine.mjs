@@ -4080,10 +4080,14 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
     if (!Number.isFinite(n) || Math.abs(n) > 1e7) fail2();
     return Math.round(n * m * 1e3) / (m * 1e3);
   };
+  const roofHeight = (n) => {
+    if (!Number.isFinite(n) || Math.abs(n) > 1e7) fail2();
+    return Math.round(n * m * 1e4) / (m * 1e4);
+  };
   const lateral = (s) => {
     if (s.lateralSamples === void 0) return {};
     if (!Array.isArray(s.lateralSamples) || s.lateralSamples.length < 3 || s.lateralSamples.length > 32) fail2();
-    return { lateralSamples: s.lateralSamples.map((p) => ({ offsetMeters: number(p?.offsetMeters), y: number(p?.y) })) };
+    return { lateralSamples: s.lateralSamples.map((p) => ({ offsetMeters: number(p?.offsetMeters), y: roofHeight(p?.y) })) };
   };
   const point = (p) => ({ x: number(p?.x), y: number(p?.y), z: number(p?.z), connectionLayer: label(p?.connectionLayer, 180) });
   const anchor = { lat: Number(raw.anchor?.lat), lon: Number(raw.anchor?.lon) };
@@ -4106,7 +4110,10 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
       clearanceMeters: number(r.clearanceMeters || 0),
       driveable: true,
       supported: true,
-      heightSamples: samples.map((s) => ({ t: s.t, y: number(s.y), leftY: number(s.leftY), rightY: number(s.rightY), ...lateral(s) })),
+      heightSamples: samples.map((s) => {
+        const height = s.lateralSamples ? roofHeight : number;
+        return { t: s.t, y: height(s.y), leftY: height(s.leftY), rightY: height(s.rightY), ...lateral(s) };
+      }),
       heightSampleSpanMeters: number(r.heightSampleSpanMeters)
     };
   }).sort((a, b) => a.sourceId.localeCompare(b.sourceId));
