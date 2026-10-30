@@ -508,8 +508,11 @@ four wheel contacts and zero penetration: maximum wheel gap 6.21 mm on the bank
 and 0.095 mm on the apron. Walking across the join retains exact feet-to-road
 contact. The owned browser closes without page, console or cleanup errors.
 
-This accepts the affected physical pavement integration only. Gameplay images
-still show a jagged shaded line along parts of the bank/apron join. Paint, safety
+A compact native-section reproduction isolates the jagged shaded bank/apron
+line to vertex-normal averaging across the sharp crease. Crease-aware normals
+remove those wedges in the controlled GPU comparison and native gameplay view,
+while preserving every triangle coordinate and contact witness. This accepts
+the affected physical pavement and shading integration only. Paint, safety
 walls/fencing, pit context, shared asymmetric racing profiles, timing and oval
 rules remain unfinished. It does not add a completed major venue or final moving
 performance acceptance.
