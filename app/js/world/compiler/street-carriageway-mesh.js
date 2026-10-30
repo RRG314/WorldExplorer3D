@@ -44,17 +44,17 @@ export function meshCarriagewayTile(tile, sampleTop, partitionSurface, {polygons
   };
   const result={...compile(asphalt),polygons};
   if(bands){
-    const positions=[],indices=[],colors=[];
+    const positions=[],indices=[],colors=[],baseY=[];
     for(const band of bands.surfaces){
       const mesh=compile(band.polygons),offset=positions.length/3;
       if(offset+mesh.positions.length/3>250000)throw Error('street_edge_band_capacity');
       for(let i=0;i<mesh.positions.length;i+=3){
         const x=mesh.positions[i],z=mesh.positions[i+2],lift=band.a*x+band.b*z+band.c;
-        positions.push(x,mesh.positions[i+1]+lift,z);colors.push(...band.color);
+        positions.push(x,mesh.positions[i+1]+lift,z);colors.push(...band.color);baseY.push(mesh.positions[i+1]);
       }
       for(const index of mesh.indices)indices.push(offset+index);
     }
-    result.edgeBands={positions:new Float32Array(positions),indices:new Uint32Array(indices),colors:new Uint8Array(colors)};
+    result.edgeBands={positions:new Float32Array(positions),indices:new Uint32Array(indices),colors:new Uint8Array(colors),baseY:Float32Array.from(baseY)};
   }
   return result;
 }

@@ -12,17 +12,18 @@ import {createPortalSurfaceClipper} from './portal-surface-clip.js';
 // groups before clipping; a newly cut vertex must not borrow a neighbour's paint.
 export function appendRoadEdgeBands(builder,bands,clipSurface){
  if(!bands?.indices?.length)return;
- const groups=new Map(),p=bands.positions,c=bands.colors;
+ const groups=new Map(),p=bands.positions,c=bands.colors,base=bands.baseY;
+ if(!base||base.length!==p.length/3||!base.every(Number.isFinite))throw Error('invalid_road_base_witness');
  for(let i=0;i<bands.indices.length;i+=3){
   const ids=[bands.indices[i],bands.indices[i+1],bands.indices[i+2]],a=ids[0]*3,key=(c[a]<<16)|(c[a+1]<<8)|c[a+2];
-  if(!groups.has(key)){if(groups.size>=16)throw Error('street_edge_band_capacity');groups.set(key,{color:[c[a],c[a+1],c[a+2]],vertices:[]});}
+  if(!groups.has(key)){if(groups.size>=16)throw Error('street_edge_band_capacity');groups.set(key,{color:[c[a],c[a+1],c[a+2]],vertices:[],baseY:[]});}
   const group=groups.get(key);
-  for(const id of ids){const at=id*3;if(group.color.some((v,j)=>v!==c[at+j]))throw Error('invalid_street_edge_band_color');group.vertices.push(p[at],p[at+1],p[at+2]);}
+  for(const id of ids){const at=id*3;if(group.color.some((v,j)=>v!==c[at+j]))throw Error('invalid_street_edge_band_color');group.vertices.push(p[at],p[at+1],p[at+2]);group.baseY.push(base[id]);}
  }
  for(const group of groups.values()){
-  const indexed=indexPavementPositions(group.vertices),cut=clipSurface(indexed.positions,indexed.indices),colors=new Uint8Array(cut.positions.length);
+  const indexed=indexPavementPositions(group.vertices,{includeSourceVertexIndices:true}),baseY=Float32Array.from(indexed.sourceVertexIndices,i=>group.baseY[i]),cut=clipSurface(indexed.positions,indexed.indices,baseY),colors=new Uint8Array(cut.positions.length);
   for(let i=0;i<colors.length;i+=3)colors.set(group.color,i);
-  builder.append(cut.positions,cut.indices,'at_grade',{material:'edge-band',colors});
+  builder.append(cut.positions,cut.indices,'at_grade',{material:'edge-band',colors,baseY:cut.baseY});
  }
 }
 
@@ -64,7 +65,7 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
     builder.finish();
     return {key:region.key,bounds:region.bounds,keys:region.tiles.map(tile=>tile.key),
       roadIndices:[...new Set(region.tiles.flatMap(tile=>[...tile.segments,...tile.joins].map(item=>item.road.auditIndex)))],
-      batches:builder.batches.map(batch=>({positions:Float32Array.from(batch.verts),indices:Uint32Array.from(batch.indices),...(batch.material?{material:batch.material,colors:Uint8Array.from(batch.colors)}:{})}))};
+      batches:builder.batches.map(batch=>({positions:Float32Array.from(batch.verts),indices:Uint32Array.from(batch.indices),...(batch.material?{material:batch.material,colors:Uint8Array.from(batch.colors),baseY:Float32Array.from(batch.baseY)}:{})}))};
   }
   const initial=deferInitial?[]:plan.initial.map(compile);
   return {

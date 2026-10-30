@@ -16,7 +16,7 @@ function setup({crossing=false}={}){
  const road={sourceFeatureId:'controlled',pts:[{x:0,z:0},{x:0,z:20}],width:8,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:evidence,transportSurfaceModel:{surveyedSurface:{...evidence},reviewedSurfacePhase:'accepted',maximumReviewedCrossfall:0}};
  const batch=[],base=(x,z)=>10+x*.03+z*.02,partition=(v,sample)=>Float32Array.from(v.map((n,i)=>i%3===1?sample(v[i-1],v[i+1]):n));
  for(const tile of prepareCarriagewayTiles([{...road,edgeBandRecipe:reviewedRoadEdgeRecipe(road)},...(crossing?[{pts:[{x:-10,z:10},{x:10,z:10}],width:6,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'}}]:[])])){const data=meshCarriagewayTile(tile,base,partition);batch.push(data);if(data.edgeBands)batch.push(data.edgeBands);}
- const meshes=batch.map(b=>({geometry:{attributes:{position:{array:b.positions}},getIndex:()=>({array:b.indices})},userData:{terrainMode:'at_grade'}})),contacts=createRegionalRoadContact(createRoadContactIndex(meshes));
+ const meshes=batch.map(b=>({geometry:{attributes:{position:{array:b.positions},...(b.baseY?{roadBaseY:{array:b.baseY}}:{})},getIndex:()=>({array:b.indices})},userData:{terrainMode:'at_grade'}})),contacts=createRegionalRoadContact(createRoadContactIndex(meshes));
  const context={METERS_PER_WORLD_UNIT:1,worldPublication:{requestId:'controlled',location:{lat:50,lon:7}},buildings:[],roadContactIndex:contacts,transportDetail:{hasReadyCoverageAt:()=>true},sampleFeatureSurfaceY:(_r,x,z)=>base(x,z),terrainMeshHeightAt:(x,z)=>base(x,z)-.18,
   buildTraversalNetworks:()=>({drive:{segments:[{feature:road,p1:road.pts[0],p2:road.pts[1],segIndex:0,sourceTStart:0,sourceTEnd:1,fromId:0,toId:1,direction:'forward'}]}}),
   SurfaceQuery:{driveAt:(x,z,o)=>{const y=contacts.sampleAt(x,z,o.currentY,'at_grade');return {kind:Number.isFinite(y)?'road':'terrain',position:{y}};}}};
@@ -81,10 +81,11 @@ test('published qualification retains a neighbour-cleared kerb through its norma
  }finally{h.contacts.dispose();}
 });
 
-test('raised profiles require the existing uncut published terrain base reader',async()=>{
+test('raised profiles require a base witness on the same selected published triangle',async()=>{
  const h=setup();try{
-  const read=h.context.terrainMeshHeightAt;let calls=0;h.context.terrainMeshHeightAt=(x,z,options)=>{assert.equal(options.ignorePortalCuts,true);calls++;return read(x,z);};
-  await collectRaceDistrict(h.context,{yieldWork:async()=>{}});assert.ok(calls>0);
-  delete h.context.terrainMeshHeightAt;await assert.rejects(collectRaceDistrict(h.context,{yieldWork:async()=>{}}),/no_qualified/);
+  const read=h.contacts.sampleProfileAt;let calls=0;h.contacts.sampleProfileAt=(...args)=>{calls++;return read(...args);};
+  h.context.terrainMeshHeightAt=()=>9999;
+  const facts=await collectRaceDistrict(h.context,{yieldWork:async()=>{}});assert.ok(calls>0);assert.ok(facts.roads[0].heightSamples.every(s=>s.lateralSamples.every(p=>p.baseY<20)),'an unrelated terrain value cannot replace the road triangle base');
+  h.contacts.sampleProfileAt=undefined;await assert.rejects(collectRaceDistrict(h.context,{yieldWork:async()=>{}}),/no_qualified/);
  }finally{h.contacts.dispose();}
 });

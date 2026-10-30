@@ -684,7 +684,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       assertCurrent();
       for(const region of detail.initial.regions){
         initialRegionKeys.add(region.key);
-        for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade',{material:batch.material,colors:batch.colors});
+        for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade',{material:batch.material,colors:batch.colors,baseY:batch.baseY});
         roadSurfaceIntegrity.carriagewayRegions+=region.keys.length;
       }
       detail.initial=null;
@@ -745,7 +745,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         targetList: stagedRoadMeshes,
         verts: batch.verts,
         indices: batch.indices,
-        colors:batch.colors||null,
+        colors:batch.colors||null,baseY:batch.baseY||null,
         material: roadMaterialForBatch(batch),
         renderOrder: 2,
         frustumCulled: true,
@@ -919,7 +919,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const schedule={current:publicationCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
       try {
         for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
-          verts:batch.positions,indices:batch.indices,colors:batch.colors||null,material:roadMaterialForBatch(batch),renderOrder:2,frustumCulled:true,
+          verts:batch.positions,indices:batch.indices,colors:batch.colors||null,baseY:batch.baseY||null,material:roadMaterialForBatch(batch),renderOrder:2,frustumCulled:true,
           userData:{isRoadBatch:true,...(batch.material?{roadSurfaceMaterial:batch.material}:{}),terrainMode:'at_grade',surfaceRanges:[{start:0,count:batch.indices.length,terrainMode:'at_grade'}],roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
         contact=await createRoadContactIndexCooperatively(meshes,16,schedule);
         // Clip dashes to this region's exact road tops. Neighboring regions own

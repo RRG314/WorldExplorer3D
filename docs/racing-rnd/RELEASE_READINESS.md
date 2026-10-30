@@ -247,7 +247,10 @@ rechecking after their pavement and kerb repairs.
 Authored kerb facts now retain a published base height alongside the raised top.
 The optional typed contract keeps the original pavement grade/crossfall limits
 and separately bounds the added lift to 100 mm and its plane gradient envelope.
-Qualification reads that base from the existing uncut terrain triangles. New
-checks pass for unsafe-data rejection, route reversal, immutable identities,
-chunk tampering, both generated runtimes and existing four-wheel contact.
+Qualification reads both values from the same selected published road triangle.
+The compiler carries its base scalar through reindexing, portal cuts, worker
+transfer and cell reloads; later terrain queries cannot substitute a different
+base. Focused checks pass for that ownership path, unsafe-data rejection, route
+reversal, immutable identities, chunk tampering, both generated runtimes and
+existing four-wheel contact.
 Native pavement geometry and the final complete venue still require acceptance.

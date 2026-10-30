@@ -22,7 +22,7 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
   if(!Number.isFinite(cellSize)||cellSize<=0)throw new RangeError('Contact cell size must be positive');
   // Numeric columns avoid allocating a string on every contact query and on
   // both construction passes. Triangle order within each cell is unchanged.
-  const cells=new Map(),sources=[],modes=[],modeCodes=new Map();
+  const cells=new Map(),sources=[],sourceBases=[],modes=[],modeCodes=new Map();
   let cellCount=0;
   const descriptors=[];
   let capacity=0;
@@ -31,6 +31,8 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
     const positions=(mesh.geometry?.getAttribute?.('position') || mesh.geometry?.attributes?.position)?.array;
     const indices=mesh.geometry?.getIndex?.()?.array;
     if(!positions)continue;
+    const baseHeights=(mesh.geometry?.getAttribute?.('roadBaseY')||mesh.geometry?.attributes?.roadBaseY)?.array;
+    if(baseHeights&&(baseHeights.length!==positions.length/3||!baseHeights.every(Number.isFinite))||mesh.userData?.roadSurfaceMaterial==='edge-band'&&!baseHeights)throw Error('invalid_road_base_witness');
     const sourceCount=Math.floor((indices?.length ?? positions.length/3)/3);
     let selected=null;
     if(bounds){
@@ -45,15 +47,15 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       selected=Uint32Array.from(selected);
     }
     const count=selected?.length ?? sourceCount;
-    if(count){descriptors.push({mesh,positions,indices,count,selected});capacity+=count;}
+    if(count){descriptors.push({mesh,positions,indices,count,selected,baseHeights});capacity+=count;}
   }
   // Five integers: source array, a, b, c, terrain mode. Float64 preserves the
   // original barycentric denominator calculation exactly.
   let records=new Uint32Array(capacity*5),denominators=new Float64Array(capacity);
   let triangleCount=0,cellReferences=0,bucketBytes=0;
   let buckets=new Uint32Array();
-  for(const {mesh,positions,indices,count,selected} of descriptors) {
-    const sourceIndex=sources.length;sources.push(positions);
+  for(const {mesh,positions,indices,count,selected,baseHeights} of descriptors) {
+    const sourceIndex=sources.length;sources.push(positions);sourceBases.push(baseHeights||null);
     const ranges=mesh.userData?.surfaceRanges || [];
     let rangeIndex=0;
     for(let triangle=0;triangle<count;triangle++) {
@@ -118,12 +120,8 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       function* supports(){for(const id of candidates){const offset=id*5;yield {positions:sources[records[offset]],a:records[offset+1],b:records[offset+2],c:records[offset+3],denominator:denominators[id]};}}
       return projectDecalPolygon(points,supports(),lift);
     }
-  return {
-    stats(){return {triangles:triangleCount,cells:cellCount,cellReferences,bucketAllocations:buckets.length ? 1 : 0,recordBytes:records.byteLength+denominators.byteLength,bucketBytes};},
-    dispose(){buckets=new Uint32Array();cells.clear();cellCount=0;sources.length=0;modes.length=0;records=new Uint32Array();denominators=new Float64Array();triangleCount=0;cellReferences=0;bucketBytes=0;},
-    // Diagnostic distance to actual uploaded tops, not an expanded collision
-    // surface. Callers supply an explicit bound and retain the measured distance.
-    nearestSurfaceAt(x,z,maxDistance,requiredTerrainMode=null) {
+  const baseAt=(source,offset)=>sourceBases[source]?.[offset/3]??sources[source][offset+1];
+  function nearestSurface(x,z,maxDistance,requiredTerrainMode=null,includeBase=false) {
       if (!Number.isFinite(maxDistance) || maxDistance < 0) throw new RangeError('Invalid surface distance bound');
       let best = null;
       for (let ix=Math.floor((x-maxDistance)/cellSize);ix<=Math.floor((x+maxDistance)/cellSize);ix++) {
@@ -136,19 +134,44 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
             const p=sources[records[offset]],a=records[offset+1],b=records[offset+2],c=records[offset+3];
             const u=((p[b+2]-p[c+2])*(x-p[c])+(p[c]-p[b])*(z-p[c+2]))/denominators[id];
             const v=((p[c+2]-p[a+2])*(x-p[c])+(p[a]-p[c])*(z-p[c+2]))/denominators[id];
-            if(u>=0&&v>=0&&u+v<=1)return {distance:0,x,z,y:u*p[a+1]+v*p[b+1]+(1-u-v)*p[c+1]};
+            if(u>=0&&v>=0&&u+v<=1)return {distance:0,x,z,y:u*p[a+1]+v*p[b+1]+(1-u-v)*p[c+1],...(includeBase?{baseY:u*baseAt(records[offset],a)+v*baseAt(records[offset],b)+(1-u-v)*baseAt(records[offset],c)}:{})};
             for(let edge=0;edge<3;edge++) {
               const from=edge===0?a:edge===1?b:c,to=edge===0?b:edge===1?c:a;
               const dx=p[to]-p[from],dz=p[to+2]-p[from+2],lengthSquared=dx*dx+dz*dz;
               const t=lengthSquared?Math.max(0,Math.min(1,((x-p[from])*dx+(z-p[from+2])*dz)/lengthSquared)):0;
               const px=p[from]+t*dx,pz=p[from+2]+t*dz,distance=Math.hypot(px-x,pz-z);
-              if(distance<=maxDistance&&(!best||distance<best.distance))best={distance,x:px,z:pz,y:p[from+1]+t*(p[to+1]-p[from+1])};
+              if(distance<=maxDistance&&(!best||distance<best.distance))best={distance,x:px,z:pz,y:p[from+1]+t*(p[to+1]-p[from+1]),...(includeBase?{baseY:baseAt(records[offset],from)+t*(baseAt(records[offset],to)-baseAt(records[offset],from))}:{})};
             }
           }
         }
       }
       return best;
-    },
+    }
+  function sampleContact(x,z,referenceY=NaN,requiredTerrainMode=null,includeBase=false) {
+      const start=cells.get(Math.floor(x/cellSize))?.get(Math.floor(z/cellSize));
+      if(start===undefined)return null;
+      let best=null,bestBase=NaN;
+      for(let i=start+1,end=i+buckets[start];i<end;i++) {
+        const id=buckets[i];
+        const offset=id*5;
+        if(requiredTerrainMode&&modes[records[offset+4]]!==requiredTerrainMode)continue;
+        const p=sources[records[offset]],a=records[offset+1],b=records[offset+2],c=records[offset+3],denominator=denominators[id];
+        const u=((p[b+2]-p[c+2])*(x-p[c])+(p[c]-p[b])*(z-p[c+2]))/denominator;
+        const v=((p[c+2]-p[a+2])*(x-p[c])+(p[a]-p[c])*(z-p[c+2]))/denominator;
+        if(u < -1e-6 || v < -1e-6 || u+v>1.000001)continue;
+        const y=u*p[a+1]+v*p[b+1]+(1-u-v)*p[c+1];
+        if(!Number.isFinite(y))continue;
+        if(best===null||(Number.isFinite(referenceY)?Math.abs(y-referenceY)<Math.abs(best-referenceY):y>best)){best=y;if(includeBase)bestBase=u*baseAt(records[offset],a)+v*baseAt(records[offset],b)+(1-u-v)*baseAt(records[offset],c);}
+      }
+      return includeBase&&best!==null?{y:best,baseY:bestBase}:best;
+    }
+  return {
+    stats(){return {triangles:triangleCount,cells:cellCount,cellReferences,bucketAllocations:buckets.length ? 1 : 0,recordBytes:records.byteLength+denominators.byteLength,bucketBytes};},
+    dispose(){buckets=new Uint32Array();cells.clear();cellCount=0;sources.length=0;sourceBases.length=0;modes.length=0;records=new Uint32Array();denominators=new Float64Array();triangleCount=0;cellReferences=0;bucketBytes=0;},
+    // Diagnostic distance to actual uploaded tops, not an expanded collision
+    // surface. Callers supply an explicit bound and retain the measured distance.
+    nearestSurfaceAt:(x,z,distance,mode=null)=>nearestSurface(x,z,distance,mode),
+    nearestProfileAt:(x,z,distance,mode=null)=>nearestSurface(x,z,distance,mode,true),
     // Compilation/qualification reader: intersections of a finite cross-section
     // with the existing published triangles. It stores no alternate road data.
     crossSectionOffsets(x,z,nx,nz,halfWidth,requiredTerrainMode=null){
@@ -176,24 +199,8 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
     },
     projectPolygon,
     projectTriangle: projectPolygon,
-    sampleAt(x,z,referenceY=NaN,requiredTerrainMode=null) {
-      const start=cells.get(Math.floor(x/cellSize))?.get(Math.floor(z/cellSize));
-      if(start===undefined)return null;
-      let best=null;
-      for(let i=start+1,end=i+buckets[start];i<end;i++) {
-        const id=buckets[i];
-        const offset=id*5;
-        if(requiredTerrainMode&&modes[records[offset+4]]!==requiredTerrainMode)continue;
-        const p=sources[records[offset]],a=records[offset+1],b=records[offset+2],c=records[offset+3],denominator=denominators[id];
-        const u=((p[b+2]-p[c+2])*(x-p[c])+(p[c]-p[b])*(z-p[c+2]))/denominator;
-        const v=((p[c+2]-p[a+2])*(x-p[c])+(p[a]-p[c])*(z-p[c+2]))/denominator;
-        if(u < -1e-6 || v < -1e-6 || u+v>1.000001)continue;
-        const y=u*p[a+1]+v*p[b+1]+(1-u-v)*p[c+1];
-        if(!Number.isFinite(y))continue;
-        if(best===null||(Number.isFinite(referenceY)?Math.abs(y-referenceY)<Math.abs(best-referenceY):y>best))best=y;
-      }
-      return best;
-    }
+    sampleAt:(x,z,referenceY=NaN,mode=null)=>sampleContact(x,z,referenceY,mode),
+    sampleProfileAt:(x,z,referenceY=NaN,mode=null)=>sampleContact(x,z,referenceY,mode,true)
   };
 }
 

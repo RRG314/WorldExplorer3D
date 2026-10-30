@@ -129,7 +129,7 @@ function buildIndexedBatchMesh({
   targetList = null,
   verts = [],
   indices = [],
-  colors = null,
+  colors = null,baseY = null,
   material = null,
   renderOrder = 0,
   userData = null,
@@ -140,9 +140,11 @@ function buildIndexedBatchMesh({
     return null;
   }
   if(colors!==null&&(!((Array.isArray(colors)||ArrayBuffer.isView(colors)))||colors.length!==verts.length||!colors.every(n=>Number.isInteger(n)&&n>=0&&n<=255)))throw Error('invalid_road_batch_colors');
+  if(baseY!==null&&(!((Array.isArray(baseY)||ArrayBuffer.isView(baseY)))||baseY.length!==verts.length/3||!baseY.every(Number.isFinite)))throw Error('invalid_road_base_witness');
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
   if(colors!==null)geometry.setAttribute('color',new THREE.BufferAttribute(new Uint8Array(colors),3,true));
+  if(baseY!==null)geometry.setAttribute('roadBaseY',new THREE.Float32BufferAttribute(baseY,1));
   const uv = [];
   for (let i = 0; i < verts.length; i += 3) uv.push(verts[i] * 1.11 / 4, verts[i + 2] * 1.11 / 4);
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));

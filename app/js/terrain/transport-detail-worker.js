@@ -3,7 +3,7 @@ let compiler=null,preparedPlan=null;
 function buffers(packet){
   const transfers=[];
   if(packet.masks)transfers.push(packet.masks.buffer);
-  for(const region of packet.regions||[packet])for(const batch of region.batches||[]) {transfers.push(batch.positions.buffer,batch.indices.buffer);if(batch.colors)transfers.push(batch.colors.buffer);}
+  for(const region of packet.regions||[packet])for(const batch of region.batches||[]) {transfers.push(batch.positions.buffer,batch.indices.buffer);if(batch.colors)transfers.push(batch.colors.buffer);if(batch.baseY)transfers.push(batch.baseY.buffer);}
   return transfers;
 }
 self.onmessage=({data})=>{

@@ -67,12 +67,13 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     if(!Number.isFinite(guide))return null;
     const contacts=context.roadContactIndex;let contact=null;
     if(contacts){
-     const y=contacts.sampleAt(x,z,guide,mode||null);
-     if(Number.isFinite(y))contact={x,z,y,distance:0};
+     if(hasEdges&&typeof contacts.sampleProfileAt!=='function')return null;
+     const profile=hasEdges?contacts.sampleProfileAt(x,z,guide,mode||null):null,y=hasEdges?profile?.y:contacts.sampleAt(x,z,guide,mode||null);
+     if(Number.isFinite(y))contact={x,z,y,distance:0,...(hasEdges?{baseY:profile.baseY}:{})};
      else {
       // Project source precision to a real uploaded triangle. Collision is
       // never expanded, and a missing road cannot be filled by this reader.
-      contact=contacts.nearestSurfaceAt?.(x,z,roadSourceCoordinateTolerance(x,z,STREET_POLYGON_GRID_WORLD),mode||null);
+      contact=hasEdges?contacts.nearestProfileAt?.(x,z,roadSourceCoordinateTolerance(x,z,STREET_POLYGON_GRID_WORLD),mode||null):contacts.nearestSurfaceAt?.(x,z,roadSourceCoordinateTolerance(x,z,STREET_POLYGON_GRID_WORLD),mode||null);
       if(!contact)return null;
       diagnostics.precisionContacts++;
       diagnostics.maximumPrecisionDistanceWorld=Math.max(diagnostics.maximumPrecisionDistanceWorld,contact.distance);
@@ -89,9 +90,9 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     // Engineered bridges/tunnels retain the independent profile/layer fence.
     if(groundOwned)diagnostics.maximumGroundProfileDepartureMeters=Math.max(diagnostics.maximumGroundProfileDepartureMeters,Math.abs(drive.position.y-guide)*metersPerUnit);
     if(hasEdges){
-     if(!groundOwned||typeof context.terrainMeshHeightAt!=='function')return null;
-     // Same uncut terrain triangles and at-grade bias used by the road compiler.
-     const baseY=context.terrainMeshHeightAt(px,pz,{ignorePortalCuts:true})+.18;
+     // The selected uploaded triangle owns both values, even where an
+     // independent approach or later terrain update differs from its base.
+     const baseY=contact?.baseY;
      if(!Number.isFinite(baseY))return null;
      return {x:px,z:pz,y:drive.position.y,baseY};
     }
