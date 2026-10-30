@@ -24,5 +24,11 @@ test('accepted sloping band pieces cannot be snapped back into flat asphalt sliv
    if(previous!==null)assert.ok(Math.abs(y-previous)<.0003,`discontinuous top at lateral ${offset}`);
    previous=y;
   }
+  const p=road.pts[4],q=road.pts[5],run=Math.hypot(q.x-p.x,q.z-p.z),fx=(q.x-p.x)/run,fz=(q.z-p.z)/run;
+  for(let i=0;i<=100;i++){
+   const offset=-3.9+i*.000005,x=(p.x+q.x)/2+fz*offset/unit,z=(p.z+q.z)/2-fx*offset/unit,y=contact.sampleAt(x,z,10,'at_grade');
+   assert.ok(Number.isFinite(y)&&y>10.035,`the accepted outer outline cannot contain a flat sliver: ${offset},${y}`);
+  }
+  const outside=-3.903;assert.equal(contact.sampleAt((p.x+q.x)/2+fz*outside/unit,(p.z+q.z)/2-fx*outside/unit,10,'at_grade'),null,'the compiler pad cannot expand the existing road footprint');
  }finally{contact.dispose();}
 });

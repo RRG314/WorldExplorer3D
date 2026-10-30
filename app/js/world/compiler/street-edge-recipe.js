@@ -3,6 +3,10 @@ import {roadWidthAtSegment} from '../road-cross-section-profile.js?v=1';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {roadMetersPerWorldUnit} from '../road-units.js';
 import {streetEdgePolygonKernel as clip} from './street-edge-bands.js';
+import {STREET_POLYGON_GRID_WORLD} from './street-coordinate-grid.js';
+// Cover the accepted rounded road outline, then clip back to that SAME owner.
+// The construction pad never expands rendered/contact pavement coverage.
+const outlinePad=STREET_POLYGON_GRID_WORLD*2;
 
 // Plain, bounded compiler input. Only the private reviewed-source adapter may
 // admit it from a live feature; provider tags cannot create physical furniture.
@@ -58,7 +62,7 @@ export function compileStreetEdgeRecipe(tile){
    const a=ordered[i-1],b=ordered[i],bands=active(s,(a+b)/2),p=point(a),q=point(b),piece={...segment,a:p,b:q,wa:p.w,wb:q.w};
    const shape=carriagewaySegmentPolygon(inset(piece,bands,unit));if(shape)inner.push(shape);
    for(const band of bands){
-    const row=(p,d)=>{const cap=liftAt(band,d),outer=p.w/2-band.side*(segment.offset||0),inside=outer-band.widthMeters/unit;return [[inside,0],[inside+band.rampMeters/unit*cap/band.heightMeters,cap/unit],[outer,cap/unit]].map(([offset,lift])=>({x:p.x+nx*offset*band.side,z:p.z+nz*offset*band.side,lift}));};
+    const row=(p,d)=>{const cap=liftAt(band,d),outer=p.w/2-band.side*(segment.offset||0),inside=outer-band.widthMeters/unit;return [[inside,0],[inside+band.rampMeters/unit*cap/band.heightMeters,cap/unit],[outer+outlinePad,cap/unit]].map(([offset,lift])=>({x:p.x+nx*offset*band.side,z:p.z+nz*offset*band.side,lift}));};
     const r=row(p,a),t=row(q,b),color=colorAt(band,(a+b)/2);
     for(let j=1;j<3;j++)quad(r[j-1],r[j],t[j-1],t[j],color);
    }
@@ -73,7 +77,7 @@ export function compileStreetEdgeRecipe(tile){
   const cap=liftAt(band,d),width=band.widthMeters/s.unit,ramp=band.rampMeters/s.unit*cap/band.heightMeters;
   for(const polygon of carriagewayJoinPolygons(join)){
    const ring=polygon[0],p=ring[1],q=ring[2];
-   const row=point=>{const vx=point[0]-join.point.x,vz=point[1]-join.point.z,radius=Math.hypot(vx,vz);return [radius-width,radius-width+ramp,radius].map((r,i)=>({x:join.point.x+vx*r/radius,z:join.point.z+vz*r/radius,lift:i?cap/s.unit:0}));};
+   const row=point=>{const vx=point[0]-join.point.x,vz=point[1]-join.point.z,radius=Math.hypot(vx,vz);return [radius-width,radius-width+ramp,radius+outlinePad].map((r,i)=>({x:join.point.x+vx*r/radius,z:join.point.z+vz*r/radius,lift:i?cap/s.unit:0}));};
    const a=row(p),b=row(q);for(let i=1;i<3;i++)quad(a[i-1],a[i],b[i-1],b[i],colorAt(band,d));
   }
  }
