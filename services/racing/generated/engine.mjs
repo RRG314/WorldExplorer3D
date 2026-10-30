@@ -1304,11 +1304,9 @@ var require_economy_authority = __commonJS({
   }
 });
 
-// app/js/world/road-units.js
-var ROAD_SOURCE_MINIMUM_SPAN_METERS = 0.01;
-
 // app/js/physics/road-plane-dynamics.js
 var BANKED_ROAD_MODEL = "banked-road-v1";
+var PROFILED_ROAD_PAVEMENT_MODEL = "profiled-road-pavement-v1";
 var AUTHORED_ROAD_EDGE_MODEL = "authored-road-edge-v1";
 var AUTHORED_ROAD_EDGE_MAXIMUM_LIFT_METERS = 0.1;
 var AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL = 0.3;
@@ -1352,6 +1350,38 @@ function roadPlaneHorizontalVelocity(forward, lateral, { pitch, roll }) {
   if (![forward, lateral, pitch, roll].every(Number.isFinite)) throw Error("invalid_road_plane_velocity");
   return { right: lateral * Math.cos(roll), forward: forward * Math.cos(pitch) + lateral * Math.sin(pitch) * Math.sin(roll) };
 }
+
+// app/js/racing/pavement-cross-section.js
+function station(segment, t) {
+  const rows = segment.heightSamples, range = segment.heightSampleRange;
+  if (range) t = range.start + (range.end - range.start) * Math.max(0, Math.min(1, t));
+  let lo = 0, hi = rows.length - 1;
+  while (hi - lo > 1) {
+    const mid = lo + hi >> 1;
+    if (rows[mid].t < t) lo = mid;
+    else hi = mid;
+  }
+  const a = rows[lo], b = rows[hi], u = Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)));
+  return { a, b, u };
+}
+function racePavementLateralOffsets(segment, t) {
+  if (segment.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL) return null;
+  const { a, b, u } = station(segment, t);
+  return a.lateralSamples.map((p, i) => p.offsetMeters + (b.lateralSamples[i].offsetMeters - p.offsetMeters) * u);
+}
+function racePavementCrossSection(segment, t) {
+  if (segment.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL) return null;
+  const { a, b, u } = station(segment, t), mix = (x, y) => x + (y - x) * u;
+  return {
+    minimumMeters: mix(a.lateralSamples[0].offsetMeters, b.lateralSamples[0].offsetMeters),
+    maximumMeters: mix(a.lateralSamples.at(-1).offsetMeters, b.lateralSamples.at(-1).offsetMeters),
+    racingOffsetMeters: mix(a.racingOffsetMeters, b.racingOffsetMeters),
+    racingWidthMeters: segment.racingWidthMeters
+  };
+}
+
+// app/js/world/road-units.js
+var ROAD_SOURCE_MINIMUM_SPAN_METERS = 0.01;
 
 // app/js/racing/venue-course-policy.js
 var fail = () => {
@@ -1491,16 +1521,16 @@ function lateralPatchHeight(lower, upper, u, offset) {
   const v = (offset - b.offsetMeters - (c.offsetMeters - b.offsetMeters) * u) / highWidth;
   return b.y * (1 - u) + c.y * (u - v) + d.y * v;
 }
-function validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, maximumCrossfall = BANKED_ROAD_MAXIMUM_CROSSFALL, maximumPlaneGradient = Infinity) {
+function validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, maximumCrossfall = BANKED_ROAD_MAXIMUM_CROSSFALL, maximumPlaneGradient = Infinity, profiled = false) {
   if (!heights.some((s) => s.lateralSamples !== void 0)) return true;
   if (model !== BANKED_ROAD_MODEL || width > 30) return false;
   let previous = null;
-  for (const station of heights) {
-    const points = station.lateralSamples;
-    if (!Array.isArray(points) || points.length < 3 || points.length > 32 || points.some((p, i) => !p || !Number.isFinite(p.offsetMeters) || !Number.isFinite(p.y) || i > 0 && (p.offsetMeters < points[i - 1].offsetMeters || (p.offsetMeters === points[i - 1].offsetMeters ? Math.abs(p.y - points[i - 1].y) * metersPerUnit > 1e-7 : Math.abs(p.y - points[i - 1].y) * metersPerUnit / (p.offsetMeters - points[i - 1].offsetMeters) > maximumCrossfall + 1e-8))) || Math.abs(points[0].offsetMeters + width / 2) > 1e-3 || Math.abs(points.at(-1).offsetMeters - width / 2) > 1e-3 || !points.some((p) => p.offsetMeters === 0 && Math.abs(p.y - station.y) * metersPerUnit <= 1e-3) || !Number.isFinite(station.leftY) || !Number.isFinite(station.rightY) || Math.abs(lateralHeight(points, -span) - station.leftY) * metersPerUnit > 1e-3 || Math.abs(lateralHeight(points, span) - station.rightY) * metersPerUnit > 1e-3) return false;
+  for (const station2 of heights) {
+    const points = station2.lateralSamples;
+    if (!Array.isArray(points) || points.length < 3 || points.length > 32 || points.some((p, i) => !p || !Number.isFinite(p.offsetMeters) || !Number.isFinite(p.y) || i > 0 && (p.offsetMeters < points[i - 1].offsetMeters || (p.offsetMeters === points[i - 1].offsetMeters ? Math.abs(p.y - points[i - 1].y) * metersPerUnit > 1e-7 : Math.abs(p.y - points[i - 1].y) * metersPerUnit / (p.offsetMeters - points[i - 1].offsetMeters) > maximumCrossfall + 1e-8))) || (profiled ? points[0].offsetMeters > -span || points.at(-1).offsetMeters < span || points.at(-1).offsetMeters - points[0].offsetMeters > 30 || Math.max(Math.abs(points[0].offsetMeters), Math.abs(points.at(-1).offsetMeters)) > 30 : Math.abs(points[0].offsetMeters + width / 2) > 1e-3 || Math.abs(points.at(-1).offsetMeters - width / 2) > 1e-3) || !points.some((p) => p.offsetMeters === 0 && Math.abs(p.y - station2.y) * metersPerUnit <= 1e-3) || !Number.isFinite(station2.leftY) || !Number.isFinite(station2.rightY) || Math.abs(lateralHeight(points, -span) - station2.leftY) * metersPerUnit > 1e-3 || Math.abs(lateralHeight(points, span) - station2.rightY) * metersPerUnit > 1e-3) return false;
     if (previous) {
       if (points.length !== previous.lateralSamples.length) return false;
-      const run = (station.t - previous.t) * length;
+      const run = (station2.t - previous.t) * length;
       for (let i = 1; i < points.length; i++) {
         const a = previous.lateralSamples[i - 1], b = previous.lateralSamples[i], c = points[i - 1], d = points[i];
         for (const [left, right, other] of [[a, b, c], [c, d, b]]) {
@@ -1511,20 +1541,21 @@ function validLateralHeights(heights, width, metersPerUnit, span, length, maximu
         }
       }
     }
-    previous = station;
+    previous = station2;
   }
   return true;
 }
-function validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, edgeBandModel) {
+function validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, edgeBandModel, pavementModel) {
+  const profiled = pavementModel === PROFILED_ROAD_PAVEMENT_MODEL;
   const authored = edgeBandModel === AUTHORED_ROAD_EDGE_MODEL;
-  if (!authored) return !heights.some((s) => Array.isArray(s.lateralSamples) && s.lateralSamples.some((p) => p?.baseY !== void 0)) && validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model);
+  if (!authored) return !heights.some((s) => Array.isArray(s.lateralSamples) && s.lateralSamples.some((p) => p?.baseY !== void 0)) && validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, void 0, void 0, profiled);
   const epsilon = AUTHORED_ROAD_EDGE_PUBLICATION_EPSILON_METERS;
   if (model !== BANKED_ROAD_MODEL || heights.some((s) => !Array.isArray(s.lateralSamples) || s.lateralSamples.some((p) => !p || !Number.isFinite(p.baseY) || !Number.isFinite(p.y) || (p.y - p.baseY) * metersPerUnit < -epsilon || (p.y - p.baseY) * metersPerUnit > AUTHORED_ROAD_EDGE_MAXIMUM_LIFT_METERS + epsilon || p.offsetMeters === 0 && Math.abs(p.y - p.baseY) * metersPerUnit > epsilon))) return false;
   const channel = (lift) => heights.map((s) => {
     const lateralSamples = s.lateralSamples.map((p) => ({ offsetMeters: p.offsetMeters, y: lift ? p.y - p.baseY : p.baseY }));
     return { t: s.t, y: lateralHeight(lateralSamples, 0), leftY: lateralHeight(lateralSamples, -span), rightY: lateralHeight(lateralSamples, span), lateralSamples };
   });
-  return validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade + AUTHORED_ROAD_EDGE_MAXIMUM_GRADE, model, BANKED_ROAD_MAXIMUM_CROSSFALL + AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL) && validLateralHeights(channel(false), width, metersPerUnit, span, length, maximumGrade, model) && validLateralHeights(channel(true), width, metersPerUnit, span, length, AUTHORED_ROAD_EDGE_MAXIMUM_GRADE, model, AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL, AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT);
+  return validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade + AUTHORED_ROAD_EDGE_MAXIMUM_GRADE, model, BANKED_ROAD_MAXIMUM_CROSSFALL + AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL, Infinity, profiled) && validLateralHeights(channel(false), width, metersPerUnit, span, length, maximumGrade, model, void 0, void 0, profiled) && validLateralHeights(channel(true), width, metersPerUnit, span, length, AUTHORED_ROAD_EDGE_MAXIMUM_GRADE, model, AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL, AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT, profiled);
 }
 function sampleRaceSegmentY(segment, t, lateralMeters = 0) {
   const samples = segment.heightSamples;
@@ -1577,7 +1608,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
       if (heights && (!Array.isArray(heights) || heights.length < 2 || heights.length > 250 || heights.some((s, i) => !Number.isFinite(s.t) || !Number.isFinite(s.y) || s.t < 0 || s.t > 1 || i > 0 && s.t <= heights[i - 1].t) || heights[0].t !== 0 || heights.at(-1).t !== 1)) throw Error("invalid_race_road_heights");
       if (heights) {
         const span = Number(road.heightSampleSpanMeters ?? 1.2);
-        if (!validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, road.surfaceModel, road.edgeBandModel) || !(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > (road.surfaceModel === BANKED_ROAD_MODEL ? BANKED_ROAD_MAXIMUM_CROSSFALL : 0.15)))) throw Error("invalid_race_road_heights");
+        if (!validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, road.surfaceModel, road.edgeBandModel, road.pavementModel) || !(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > (road.surfaceModel === BANKED_ROAD_MODEL ? BANKED_ROAD_MAXIMUM_CROSSFALL : 0.15)))) throw Error("invalid_race_road_heights");
       }
       const id = `${String(road.sourceId).slice(0, 180)}:${reverse ? "reverse" : "forward"}`, edge = {
         id,
@@ -1585,6 +1616,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
         to: b,
         length,
         widthMeters: width,
+        ...profiled ? { pavementModel: PROFILED_ROAD_PAVEMENT_MODEL, racingWidthMeters: road.racingWidthMeters } : {},
         sourceId: String(road.sourceId).slice(0, 180),
         structure: road.structure || "surface",
         clearanceMeters: Number(road.clearanceMeters) || 0
@@ -1595,6 +1627,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
           t: 1 - s.t,
           leftY: s.rightY,
           rightY: s.leftY,
+          ...profiled ? { racingOffsetMeters: -s.racingOffsetMeters || 0 } : {},
           ...s.lateralSamples ? { lateralSamples: s.lateralSamples.map((p) => ({ ...p, offsetMeters: -p.offsetMeters || 0 })).reverse() } : {}
         })).reverse() : heights.map(copyHeightSample);
         edge.heightSampleSpanMeters = Number(road.heightSampleSpanMeters) || 1.2;
@@ -1607,6 +1640,10 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
       if (!outgoing.has(a)) outgoing.set(a, []);
       outgoing.get(a).push(edge);
     };
+    const profiled = road?.pavementModel === PROFILED_ROAD_PAVEMENT_MODEL;
+    if (road?.pavementModel !== void 0 && !profiled) throw Error("invalid_race_surface_model");
+    if (!profiled && (road?.racingWidthMeters !== void 0 || Array.isArray(road?.heightSamples) && road.heightSamples.some((s) => s.racingOffsetMeters !== void 0))) throw Error("invalid_race_pavement_sections");
+    if (profiled && (road.surfaceModel !== BANKED_ROAD_MODEL || !Number.isFinite(road.racingWidthMeters) || road.racingWidthMeters < 6 || road.racingWidthMeters > 30 || !Array.isArray(road.heightSamples) || road.heightSamples.some((s) => !Number.isFinite(s.racingOffsetMeters) || !Array.isArray(s.lateralSamples) || s.lateralSamples.length < 3 || s.racingOffsetMeters - road.racingWidthMeters / 2 < s.lateralSamples[0].offsetMeters || s.racingOffsetMeters + road.racingWidthMeters / 2 > s.lateralSamples.at(-1).offsetMeters))) throw Error("invalid_race_pavement_sections");
     if (road?.surfaceModel !== void 0 && road.surfaceModel !== BANKED_ROAD_MODEL || road?.edgeBandModel !== void 0 && road.edgeBandModel !== AUTHORED_ROAD_EDGE_MODEL) throw Error("invalid_race_surface_model");
     if (road?.edgeBandModel !== void 0 && !road.heightSamples?.some((s) => s.lateralSamples)) throw Error("invalid_race_road_heights");
     if (!road?.sourceId || !finitePoint(road.a) || !finitePoint(road.b) || road.driveable !== true || road.supported !== true) continue;
@@ -1652,6 +1689,7 @@ function createRaceCourse(graph, path, settings = {}) {
       structure: edge.structure,
       clearanceMeters: edge.clearanceMeters,
       ...edge.edgeBandModel ? { edgeBandModel: edge.edgeBandModel } : {},
+      ...edge.pavementModel ? { pavementModel: edge.pavementModel, racingWidthMeters: edge.racingWidthMeters } : {},
       ...edge.heightSamples ? { heightSamples: edge.heightSamples.map(copyHeightSample), heightSampleSpanMeters: edge.heightSampleSpanMeters } : {}
     });
     points.push({ ...b });
@@ -1694,6 +1732,7 @@ function createRaceCourse(graph, path, settings = {}) {
     description: String(settings.description || "").trim().slice(0, 400),
     ...edges.some((e) => e.surfaceModel === BANKED_ROAD_MODEL) ? { surfaceModel: BANKED_ROAD_MODEL } : {},
     ...edges.some((e) => e.edgeBandModel === AUTHORED_ROAD_EDGE_MODEL) ? { edgeBandModel: AUTHORED_ROAD_EDGE_MODEL } : {},
+    ...edges.some((e) => e.pavementModel === PROFILED_ROAD_PAVEMENT_MODEL) ? { pavementModel: PROFILED_ROAD_PAVEMENT_MODEL } : {},
     locationId: clean(settings.locationId),
     locationLabel: clean(settings.locationLabel),
     anchor: settings.anchor ? { lat: Number(settings.anchor.lat), lon: Number(settings.anchor.lon) } : null,
@@ -1711,6 +1750,17 @@ function createRaceCourse(graph, path, settings = {}) {
     gateSpacingMeters: Math.min(30, Math.max(15, Number(settings.gateSpacingMeters) || 25)),
     gates: []
   };
+  const gateAt = (segment, t, distanceMeters) => {
+    const section = racePavementCrossSection(segment, t), offset = section?.racingOffsetMeters || 0, f = segment.forward;
+    return {
+      x: segment.a.x + (segment.b.x - segment.a.x) * t + f.z * offset / course.metersPerUnit,
+      y: sampleRaceSegmentY(segment, t, offset),
+      z: segment.a.z + (segment.b.z - segment.a.z) * t - f.x * offset / course.metersPerUnit,
+      forward: f,
+      halfWidthMeters: section ? section.racingWidthMeters * 0.5 : segment.widthMeters * 0.5,
+      distanceMeters
+    };
+  };
   let at = course.gateSpacingMeters;
   for (let index = 0; index < segments.length; index++) {
     const segment = segments[index], before = segments[index - 1], after = segments[index + 1];
@@ -1722,19 +1772,12 @@ function createRaceCourse(graph, path, settings = {}) {
         at += course.gateSpacingMeters;
         continue;
       }
-      course.gates.push({
-        x: segment.a.x + (segment.b.x - segment.a.x) * t,
-        y: sampleRaceSegmentY(segment, t),
-        z: segment.a.z + (segment.b.z - segment.a.z) * t,
-        forward: segment.forward,
-        halfWidthMeters: segment.widthMeters * 0.5,
-        distanceMeters: at
-      });
+      course.gates.push(gateAt(segment, t, at));
       at += course.gateSpacingMeters;
     }
   }
   const last = segments.at(-1);
-  course.gates.push({ ...last.b, forward: last.forward, halfWidthMeters: last.widthMeters * 0.5, distanceMeters: lengthMeters });
+  course.gates.push(last.pavementModel ? gateAt(last, 1, lengthMeters) : { ...last.b, forward: last.forward, halfWidthMeters: last.widthMeters * 0.5, distanceMeters: lengthMeters });
   if (!course.locationId || !course.anchor || !Number.isFinite(course.anchor.lat) || Math.abs(course.anchor.lat) > 85 || !Number.isFinite(course.anchor.lon) || Math.abs(course.anchor.lon) > 180) throw Error("invalid_race_location");
   return prepareRaceCourseGeometry(course);
 }
@@ -1748,7 +1791,7 @@ function projectRacePosition(course, pose, { minimumMeters = -Infinity, maximumM
     const x = s.a.x + dx * t, z = s.a.z + dz * t, lateral = ((pose.x - x) * s.forward.z - (pose.z - z) * s.forward.x) * course.metersPerUnit, y = sampleRaceSegmentY(s, t, lateral);
     const error = Math.hypot(pose.x - x, pose.z - z) * course.metersPerUnit, vertical = Math.abs(pose.y - y) * course.metersPerUnit;
     if (vertical > 2.5) return;
-    if (!nearest || error < nearest.error || error === nearest.error && index < nearest.index) nearest = { index, t, x, y, z, lateralMeters: lateral, error, vertical, distanceMeters: s.startMeters + s.lengthMeters * t, widthMeters: s.widthMeters };
+    if (!nearest || error < nearest.error || error === nearest.error && index < nearest.index) nearest = { index, t, x, y, z, lateralMeters: lateral, error, vertical, distanceMeters: s.startMeters + s.lengthMeters * t, widthMeters: s.widthMeters, ...s.pavementModel ? { pavement: racePavementCrossSection(s, t) } : {} };
   }
   const tree = raceSpatialIndex(course.segments);
   if (!tree) {
@@ -1779,13 +1822,19 @@ function raceGridPose(course, index = 0) {
   const distanceMeters = course.vehicleEnvelope.lengthMeters / 2 + 1 + (Math.ceil(course.participants / 2) - 1 - Math.floor(index / 2)) * 8;
   const s = raceSegmentAtDistance(course, distanceMeters);
   const forward = s.forward, along = (distanceMeters - s.startMeters) / course.metersPerUnit;
-  const lateral = (course.participants === 1 ? 0 : index % 2 === 0 ? -1.4 : 1.4) / course.metersPerUnit;
+  const lateral = ((racePavementCrossSection(s, (distanceMeters - s.startMeters) / s.lengthMeters)?.racingOffsetMeters || 0) + (course.participants === 1 ? 0 : index % 2 === 0 ? -1.4 : 1.4)) / course.metersPerUnit;
   return {
     x: s.a.x + forward.x * along + forward.z * lateral,
     y: sampleRaceSegmentY(s, along * course.metersPerUnit / s.lengthMeters, lateral * course.metersPerUnit),
     z: s.a.z + forward.z * along - forward.x * lateral,
     yaw: Math.atan2(forward.x, forward.z)
   };
+}
+function raceProjectionOutsidePavement(projection, padding = 0.5) {
+  if (!projection) return true;
+  const p = projection.pavement;
+  if (!p) return projection.error > projection.widthMeters * 0.5 + padding;
+  return projection.lateralMeters < p.minimumMeters - padding || projection.lateralMeters > p.maximumMeters + padding || Math.max(0, projection.error ** 2 - projection.lateralMeters ** 2) > (Math.max(Math.abs(p.minimumMeters), Math.abs(p.maximumMeters)) + padding) ** 2;
 }
 function createRaceProgress(pose, nowMs) {
   if (!finitePoint(pose) || !Number.isFinite(nowMs)) throw Error("invalid_race_pose");
@@ -1798,12 +1847,12 @@ function advanceRaceProgress(course, progress, pose, nowMs, { startedAtMs, maxim
   const elapsed = (nowMs - progress.lastAtMs) / 1e3, travel = distance(progress.lastPose, pose) * course.metersPerUnit;
   if (elapsed > 10 || travel > maximumMetersPerSecond * elapsed + 1.5) throw Error("implausible_race_motion");
   const projection = projectRacePosition(course, pose);
-  if (!projection || projection.error > projection.widthMeters * 0.5 + 0.5) throw Error("outside_race_course");
+  if (raceProjectionOutsidePavement(projection)) throw Error("outside_race_course");
   const sweepSteps = Math.ceil(travel / 2);
   if (sweepSteps > 750) throw Error("implausible_race_motion");
   for (let step = 1; step < sweepSteps; step++) {
     const t = step / sweepSteps, from2 = progress.lastPose, sample = projectRacePosition(course, { x: from2.x + (pose.x - from2.x) * t, y: from2.y + (pose.y - from2.y) * t, z: from2.z + (pose.z - from2.z) * t });
-    if (!sample || sample.error > sample.widthMeters * 0.5 + 0.5) throw Error("outside_race_course");
+    if (raceProjectionOutsidePavement(sample)) throw Error("outside_race_course");
   }
   const next = { ...progress, lastPose: { ...pose }, lastAtMs: nowMs, lapTimes: [...progress.lapTimes] };
   if (nowMs < startedAtMs) {
@@ -1816,7 +1865,13 @@ function advanceRaceProgress(course, progress, pose, nowMs, { startedAtMs, maxim
     const a = (from.x - gate.x) * f.x + (from.z - gate.z) * f.z, b = (pose.x - gate.x) * f.x + (pose.z - gate.z) * f.z;
     if (!(a <= 0 && b > 0)) break;
     const t = -a / (b - a), x = from.x + (pose.x - from.x) * t, z = from.z + (pose.z - from.z) * t, y = from.y + (pose.y - from.y) * t;
-    if (Math.abs((x - gate.x) * f.z - (z - gate.z) * f.x) * course.metersPerUnit > gate.halfWidthMeters || Math.abs(y - gate.y) * course.metersPerUnit > 2) break;
+    const lateral = ((x - gate.x) * f.z - (z - gate.z) * f.x) * course.metersPerUnit;
+    let gateY = gate.y;
+    if (course.pavementModel) {
+      const segment = raceSegmentAtDistance(course, gate.distanceMeters), station2 = (gate.distanceMeters - segment.startMeters) / segment.lengthMeters, section = racePavementCrossSection(segment, station2);
+      if (section) gateY = sampleRaceSegmentY(segment, station2, section.racingOffsetMeters + lateral);
+    }
+    if (Math.abs(lateral) > gate.halfWidthMeters || Math.abs(y - gateY) * course.metersPerUnit > 2) break;
     const crossedAt = progress.lastAtMs + (nowMs - progress.lastAtMs) * t;
     next.nextGate++;
     if (next.nextGate === course.gates.length) {
@@ -3555,7 +3610,20 @@ function stepRaceVehicle(course, car, actions, dt, profile) {
   if (!support) throw Error("race_surface_lost");
   const margin = Math.max(0.3, (support.widthMeters - profile.handling.width) * 0.5 - 0.2);
   let x = next.x, z = next.z;
-  if (support.error > margin) {
+  if (support.pavement) {
+    const padding = profile.handling.width * 0.5 + 0.2, minimum = support.pavement.minimumMeters + padding, maximum = support.pavement.maximumMeters - padding;
+    if (minimum > maximum) throw Error("race_vehicle_pavement_too_narrow");
+    const lateral = Math.max(minimum, Math.min(maximum, support.lateralMeters));
+    if (lateral !== support.lateralMeters) {
+      const f = course.segments[support.index].forward, correction = (lateral - support.lateralMeters) / course.metersPerUnit;
+      x += f.z * correction;
+      z -= f.x * correction;
+      car.speed *= 0.35;
+      car.vFwd *= 0.35;
+      car.vLat *= 0.2;
+      car.barrierContacts++;
+    }
+  } else if (support.error > margin) {
     const distance2 = Math.hypot(x - support.x, z - support.z), scale = margin / Math.max(1e-3, distance2 * course.metersPerUnit);
     x = support.x + (x - support.x) * scale;
     z = support.z + (z - support.z) * scale;
@@ -3640,7 +3708,8 @@ var wrap = (v) => Math.atan2(Math.sin(v), Math.cos(v));
 function pointOnRaceCourse(course, distanceMeters) {
   const distance2 = course.discipline === "circuit" ? (distanceMeters % course.lengthMeters + course.lengthMeters) % course.lengthMeters : clamp2(distanceMeters, 0, course.lengthMeters);
   const segment = raceSegmentAtDistance(course, distance2), t = clamp2((distance2 - segment.startMeters) / segment.lengthMeters, 0, 1);
-  return { x: segment.a.x + (segment.b.x - segment.a.x) * t, y: sampleRaceSegmentY(segment, t), z: segment.a.z + (segment.b.z - segment.a.z) * t, segment };
+  const offset = racePavementCrossSection(segment, t)?.racingOffsetMeters || 0, unit = course.metersPerUnit;
+  return { x: segment.a.x + (segment.b.x - segment.a.x) * t + segment.forward.z * offset / unit, y: sampleRaceSegmentY(segment, t, offset), z: segment.a.z + (segment.b.z - segment.a.z) * t - segment.forward.x * offset / unit, segment };
 }
 function raceAiActions(course, car, progress, profile, { difficulty = 0.65 } = {}) {
   if (progress.finished) return { steer: 0, throttle: 0, serviceBrake: 1 };
@@ -3980,6 +4049,7 @@ async function raceDistrictFingerprint(district) {
       b: r.b,
       width: r.widthMeters,
       ...r.surfaceModel ? { surfaceModel: r.surfaceModel } : {},
+      ...r.pavementModel ? { pavementModel: r.pavementModel, racingWidthMeters: r.racingWidthMeters } : {},
       ...r.edgeBandModel ? { edgeBandModel: r.edgeBandModel } : {},
       direction: r.direction || "both",
       structure: r.structure,
@@ -4021,6 +4091,7 @@ async function raceCourseKey(course) {
     location: course.locationId,
     anchor: course.anchor,
     ...course.surfaceModel ? { surfaceModel: course.surfaceModel } : {},
+    ...course.pavementModel ? { pavementModel: course.pavementModel } : {},
     ...course.edgeBandModel ? { edgeBandModel: course.edgeBandModel } : {},
     discipline: course.discipline,
     laps: course.laps,
@@ -4033,12 +4104,17 @@ async function raceCourseKey(course) {
 // app/js/racing/record-rules.js
 var RACE_PHYSICS_VERSION = "earth-road-2026-10-28.2";
 var RACE_BANKED_PHYSICS_VERSION = "earth-banked-road-2026-10-29.1";
+var RACE_PROFILED_PAVEMENT_PHYSICS_VERSION = "earth-profiled-pavement-2026-10-30.1";
 function racePhysicsVersion(course) {
+  if (course?.pavementModel !== void 0) {
+    if (course.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL || course.surfaceModel !== BANKED_ROAD_MODEL) throw Error("invalid_race_surface_model");
+    return RACE_PROFILED_PAVEMENT_PHYSICS_VERSION;
+  }
   if (course?.surfaceModel === void 0) return RACE_PHYSICS_VERSION;
   if (course.surfaceModel === BANKED_ROAD_MODEL) return RACE_BANKED_PHYSICS_VERSION;
   throw Error("invalid_race_surface_model");
 }
-var isCurrentRacePhysicsVersion = (version) => version === RACE_PHYSICS_VERSION || version === RACE_BANKED_PHYSICS_VERSION;
+var isCurrentRacePhysicsVersion = (version) => version === RACE_PHYSICS_VERSION || version === RACE_BANKED_PHYSICS_VERSION || version === RACE_PROFILED_PAVEMENT_PHYSICS_VERSION;
 function raceRecordConfiguration(profile, { course } = {}) {
   if (!profile?.vehicleId || !Number.isFinite(profile.conditionValue)) throw Error("invalid_race_record_profile");
   return {
@@ -4076,7 +4152,8 @@ function raceCourseProjection(course, courseId) {
     participants: course.participants,
     lengthMeters: course.lengthMeters,
     metersPerUnit: course.metersPerUnit,
-    ...course.surfaceModel ? { surfaceModel: course.surfaceModel } : {}
+    ...course.surfaceModel ? { surfaceModel: course.surfaceModel } : {},
+    ...course.pavementModel ? { pavementModel: course.pavementModel } : {}
   };
 }
 var ordered = (value) => Array.isArray(value) ? value.map(ordered) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, ordered(value[key])])) : value;
@@ -4127,6 +4204,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
       a: point(r.a),
       b: point(r.b),
       ...r.surfaceModel !== void 0 ? { surfaceModel: r.surfaceModel } : {},
+      ...r.pavementModel !== void 0 ? { pavementModel: r.pavementModel, racingWidthMeters: number(r.racingWidthMeters) } : {},
       ...r.edgeBandModel !== void 0 ? { edgeBandModel: r.edgeBandModel } : {},
       widthMeters: number(r.widthMeters),
       direction: r.direction || "both",
@@ -4136,7 +4214,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
       supported: true,
       heightSamples: samples.map((s) => {
         const height = s.lateralSamples ? roofHeight : number;
-        return { t: s.t, y: height(s.y), leftY: height(s.leftY), rightY: height(s.rightY), ...lateral(s) };
+        return { t: s.t, y: height(s.y), leftY: height(s.leftY), rightY: height(s.rightY), ...s.racingOffsetMeters !== void 0 ? { racingOffsetMeters: number(s.racingOffsetMeters) } : {}, ...lateral(s) };
       }),
       heightSampleSpanMeters: number(r.heightSampleSpanMeters)
     };
@@ -4232,13 +4310,28 @@ function assertRaceCourseInDistrict(course, localFacts) {
   if (course.locationId !== localFacts.locationId || Math.abs(course.anchor.lat - localFacts.anchor.lat) > 1e-7 || Math.abs(course.anchor.lon - localFacts.anchor.lon) > 1e-7 || course.metersPerUnit !== localFacts.metersPerUnit) throw Error("race_course_wrong_world");
   const graph = buildRaceRoadGraph(localFacts.roads, { metersPerUnit: localFacts.metersPerUnit, venueSource: localFacts.venueSource }), byId = new Map(graph.edges.map((e) => [e.id, e]));
   const local = createRaceCourse(graph, course.sourcePath, { ...course });
-  if (local.surfaceModel !== course.surfaceModel || !sameRaceVenueSource(local.venueSource, course.venueSource)) throw Error("race_roads_changed_requalify_route");
+  if (local.surfaceModel !== course.surfaceModel || local.pavementModel !== course.pavementModel || !sameRaceVenueSource(local.venueSource, course.venueSource)) throw Error("race_roads_changed_requalify_route");
   if (local.segments.length !== course.segments.length) throw Error("race_roads_changed_requalify_route");
   for (let i = 0; i < course.segments.length; i++) {
     const a = course.segments[i], b = local.segments[i];
-    if (a.structure !== b.structure || a.widthMeters > b.widthMeters + 3e-3 || a.clearanceMeters > b.clearanceMeters + 3e-3 || !byId.has(course.sourcePath[Math.min(i, course.sourcePath.length - 1)])) throw Error("race_roads_changed_requalify_route");
+    if (a.pavementModel !== b.pavementModel || a.structure !== b.structure || a.widthMeters > b.widthMeters + 3e-3 || a.clearanceMeters > b.clearanceMeters + 3e-3 || !byId.has(course.sourcePath[Math.min(i, course.sourcePath.length - 1)])) throw Error("race_roads_changed_requalify_route");
     for (const key of ["a", "b"]) if (Math.hypot(a[key].x - b[key].x, a[key].z - b[key].z) * course.metersPerUnit > 0.01) throw Error("race_roads_changed_requalify_route");
     const steps = Math.ceil(a.lengthMeters / 4);
+    if (a.pavementModel) {
+      const stations = new Set(Array.from({ length: steps + 1 }, (_, j) => j / steps));
+      for (const segment of [a, b]) {
+        const range = segment.heightSampleRange || { start: 0, end: 1 };
+        for (const row of segment.heightSamples) {
+          const t = (row.t - range.start) / (range.end - range.start);
+          if (t >= 0 && t <= 1) stations.add(t);
+        }
+      }
+      for (const t of stations) {
+        const left = racePavementCrossSection(a, t), right = racePavementCrossSection(b, t);
+        if (["minimumMeters", "maximumMeters", "racingOffsetMeters", "racingWidthMeters"].some((k) => Math.abs(left[k] - right[k]) > 3e-3)) throw Error("race_roads_changed_requalify_route");
+        for (const offset of [...racePavementLateralOffsets(a, t), ...racePavementLateralOffsets(b, t)]) if (Math.abs(sampleRaceSegmentY(a, t, offset) - sampleRaceSegmentY(b, t, offset)) * course.metersPerUnit > 0.01) throw Error("race_roads_changed_requalify_route");
+      }
+    }
     for (let j = 0; j <= steps; j++) for (const side of [-1.2, 0, 1.2]) if (Math.abs(sampleRaceSegmentY(a, j / steps, side) - sampleRaceSegmentY(b, j / steps, side)) * course.metersPerUnit > 0.01) throw Error("race_roads_changed_requalify_route");
   }
   return true;
@@ -4323,6 +4416,7 @@ export {
   RACE_DISTRICT_STORAGE_LIMITS,
   RACE_MAXIMUM_DURATION_MS,
   RACE_PHYSICS_VERSION,
+  RACE_PROFILED_PAVEMENT_PHYSICS_VERSION,
   RACING_CAREER_LIMITS,
   assertRaceCourseInDistrict,
   buildRaceRoadGraph,

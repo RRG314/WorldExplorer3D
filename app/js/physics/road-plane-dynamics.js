@@ -2,6 +2,7 @@
 // the existing YXZ chassis attitude: positive roll raises the right wheels;
 // negative pitch climbs forward. Speeds/accelerations here are SI units.
 export const BANKED_ROAD_MODEL='banked-road-v1';
+export const PROFILED_ROAD_PAVEMENT_MODEL='profiled-road-pavement-v1';
 // Authored edges retain the original pavement plane limits. Their separately
 // witnessed additive lift has its own small height and derivative envelope.
 export const AUTHORED_ROAD_EDGE_MODEL='authored-road-edge-v1';

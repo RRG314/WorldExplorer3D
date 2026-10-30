@@ -1,3 +1,4 @@
+import {racePavementCrossSection} from './pavement-cross-section.js';
 import {earthDrivingSteeringProfile}from'../controls/traversal-control-policy.js?v=9';
 import {carSpeedToMph}from'../physics/vehicle-speed-units.js?v=2';
 import {projectRacePosition,sampleRaceSegmentY,raceSegmentAtDistance}from'./course-rules.js';
@@ -7,7 +8,8 @@ const wrap=v=>Math.atan2(Math.sin(v),Math.cos(v));
 export function pointOnRaceCourse(course,distanceMeters){
  const distance=course.discipline==='circuit'?((distanceMeters%course.lengthMeters)+course.lengthMeters)%course.lengthMeters:clamp(distanceMeters,0,course.lengthMeters);
  const segment=raceSegmentAtDistance(course,distance),t=clamp((distance-segment.startMeters)/segment.lengthMeters,0,1);
- return {x:segment.a.x+(segment.b.x-segment.a.x)*t,y:sampleRaceSegmentY(segment,t),z:segment.a.z+(segment.b.z-segment.a.z)*t,segment};
+ const offset=racePavementCrossSection(segment,t)?.racingOffsetMeters||0,unit=course.metersPerUnit;
+ return {x:segment.a.x+(segment.b.x-segment.a.x)*t+segment.forward.z*offset/unit,y:sampleRaceSegmentY(segment,t,offset),z:segment.a.z+(segment.b.z-segment.a.z)*t-segment.forward.x*offset/unit,segment};
 }
 
 // Controls, never a pose path or a rubber-band speed override. The same session

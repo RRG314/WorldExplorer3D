@@ -1,3 +1,4 @@
+import {racePavementCrossSection} from './pavement-cross-section.js';
 import {sampleRaceSegmentY,raceSegmentAtDistance} from './course-rules.js';
 import {raceCourseSurfacePoint} from './course-markings.js';
 
@@ -14,6 +15,7 @@ export function buildRaceFurniture(course) {
  // controller. The upper wall recedes from the admitted chassis envelope.
  const profile=guardrail?[[.04,0],[-.14,.045],[-.2,.11],[-.14,.175],[.04,.22]]:[[-.2,0],[-.2,.18],[.06,.36],[.18,.86],[.38,.86],[.5,0]];
  const levels=guardrail?[.31,.60,.89]:[0];
+ const edgeAt=(segment,t,side)=>{const s=racePavementCrossSection(segment,t);return s?(side<0?-s.minimumMeters:s.maximumMeters):segment.widthMeters/2;},edgeAtDistance=(d,side,extra)=>{const s=raceSegmentAtDistance(course,d);return side*(edgeAt(s,(d-s.startMeters)/s.lengthMeters,side)+extra);};
  for(const segment of course.segments) {
   const count=Math.max(1,Math.ceil(segment.lengthMeters/4));
   for(let i=0;i<count;i++) {
@@ -22,27 +24,27 @@ export function buildRaceFurniture(course) {
    for(const side of [-1,1]) {
     const edge=segment.widthMeters/2;
     for(const level of levels){
-     const ring=t=>profile.map(([offset,height])=>point(segment,t,side*(edge+offset),height+level));
+     const ring=t=>profile.map(([offset,height])=>point(segment,t,side*((segment.pavementModel?edgeAt(segment,t,side):edge)+offset),height+level));
      const a=ring(t0),b=ring(t1);
      // Corrugated steel is a double-sided sheet, not a solid concrete prism.
      const faces=guardrail?profile.length-1:profile.length;
      for(let j=0;j<faces;j++){const k=(j+1)%profile.length;quad(chunk.positions,chunk.uvs,[a[j],b[j],b[k],a[k]],start/2,end/2,profile[j][1]/2,profile[k][1]/2);}
     }
     // Fence rises behind the wall, leaving the whole admitted lane unobstructed.
-    const lateral=side*(edge+(guardrail ? .75 : .36)),base=guardrail?0:.86;
-    quad(chunk.fencePositions,chunk.fenceUvs,[point(segment,t0,lateral,base),point(segment,t1,lateral,base),point(segment,t1,lateral,2.5),point(segment,t0,lateral,2.5)],start/.12,end/.12,0,(2.5-base)/.12);
+    const lateral=t=>side*((segment.pavementModel?edgeAt(segment,t,side):edge)+(guardrail ? .75 : .36)),base=guardrail?0:.86;
+    quad(chunk.fencePositions,chunk.fenceUvs,[point(segment,t0,lateral(t0),base),point(segment,t1,lateral(t1),base),point(segment,t1,lateral(t1),2.5),point(segment,t0,lateral(t0),2.5)],start/.12,end/.12,0,(2.5-base)/.12);
    }
   }
  }
- for(let d=0;d<course.lengthMeters;d+=8){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.posts.push(raceCourseSurfacePoint(course,d,side*(segment.widthMeters/2+(guardrail ? .75 : .36)),guardrail?0:.86));}
- if(guardrail)for(let d=0;d<course.lengthMeters;d+=4){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.railPosts.push(raceCourseSurfacePoint(course,d,side*(segment.widthMeters/2+.10)));}
+ for(let d=0;d<course.lengthMeters;d+=8){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.posts.push(raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,guardrail ? .75 : .36),guardrail?0:.86));}
+ if(guardrail)for(let d=0;d<course.lengthMeters;d+=4){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.railPosts.push(raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,.10)));}
  let previousTurn=-Infinity;
  for(let d=180;d<course.lengthMeters-30;d+=15) {
   const a=raceSegmentAtDistance(course,d-30).forward,b=raceSegmentAtDistance(course,d+30).forward;
   if(Math.abs(Math.atan2(a.x*b.z-a.z*b.x,a.x*b.x+a.z*b.z))<.45||d-previousTurn<180)continue;
   previousTurn=d;
   for(const distance of [150,100,50]) {
-   const at=d-distance,segment=raceSegmentAtDistance(course,at),position=raceCourseSurfacePoint(course,at,segment.widthMeters/2+1.1,1.25);
+   const at=d-distance,segment=raceSegmentAtDistance(course,at),position=raceCourseSurfacePoint(course,at,edgeAtDistance(at,1,1.1),1.25);
    boards.push({distance,at,position,yaw:Math.atan2(segment.forward.x,segment.forward.z)+Math.PI});
   }
  }
@@ -88,15 +90,16 @@ export function prepareRaceFurniture(T,context,course) {
   const material=keep(new T.MeshStandardMaterial({map:texture,roughness:.85,side:T.DoubleSide}));
   for(const board of data.boards.filter(b=>b.distance===distance)) {const mesh=new T.Mesh(boardGeometry,material);mesh.position.set(board.position.x,board.position.y,board.position.z);mesh.rotation.y=board.yaw;root.add(mesh);}
  }
- const segment=course.segments[0],start=raceCourseSurfacePoint(course,1),width=segment.widthMeters;
+ const segment=course.segments[0],section=racePavementCrossSection(segment,1/segment.lengthMeters),centerOffset=section?(section.minimumMeters+section.maximumMeters)*.5:0,start=raceCourseSurfacePoint(course,1,centerOffset),width=section?section.maximumMeters-section.minimumMeters:segment.widthMeters,
+  postBase=side=>section?raceCourseSurfacePoint(course,1,centerOffset+side*(width/2+1.1)).y-start.y:0,beamHeight=5.1/unit+(section?Math.max(postBase(-1),postBase(1)):0);
  const gantry=new T.Group();gantry.position.set(start.x,start.y,start.z);gantry.rotation.y=Math.atan2(segment.forward.x,segment.forward.z);
  const column=keep(new T.BoxGeometry(.25/unit,5.1/unit,.25/unit)),beam=keep(new T.BoxGeometry((width+2.6)/unit,.22/unit,.22/unit));
- for(const side of [-1,1]){const post=new T.Mesh(column,metal);post.position.set(side*(width/2+1.1)/unit,2.55/unit,0);gantry.add(post);}
- const top=new T.Mesh(beam,metal);top.position.y=5.1/unit;gantry.add(top);
+ for(const side of [-1,1]){const post=new T.Mesh(column,metal);const base=postBase(side),height=beamHeight-base;post.scale.y=height/(5.1/unit);post.position.set(side*(width/2+1.1)/unit,base+height*.5,0);gantry.add(post);}
+ const top=new T.Mesh(beam,metal);top.position.y=beamHeight;gantry.add(top);
  const banner=document.createElement('canvas');banner.width=1536;banner.height=192;const b=banner.getContext('2d');b.fillStyle='#142b2a';b.fillRect(0,0,1536,192);b.fillStyle='#e4c765';b.fillRect(0,174,1536,18);b.textAlign='center';b.fillStyle='#f1f0e6';b.font='bold 68px sans-serif';b.fillText('WORLD EXPLORER',768,82);b.font='36px sans-serif';b.fillText('START  /  FINISH',768,142);
  const bannerTexture=new T.CanvasTexture(banner);bannerTexture.encoding=T.sRGBEncoding;textures.push(bannerTexture);
  const bannerMaterial=keep(new T.MeshStandardMaterial({map:bannerTexture,roughness:.9,side:T.DoubleSide}));
- const bannerMesh=new T.Mesh(keep(new T.PlaneGeometry((width+2)/unit,1.3/unit)),bannerMaterial);bannerMesh.position.y=4.25/unit;gantry.add(bannerMesh);root.add(gantry);
+ const bannerMesh=new T.Mesh(keep(new T.PlaneGeometry((width+2)/unit,1.3/unit)),bannerMaterial);bannerMesh.position.y=section?beamHeight-.85/unit:4.25/unit;gantry.add(bannerMesh);root.add(gantry);
  return {root,data,
   update(position){if(disposed||!position)return;for(const chunk of chunks){const distance=Math.hypot(position.x-chunk.center.x,position.z-chunk.center.z)*unit;chunk.group.visible=distance<480;chunk.fence.visible=distance<260;}},
   dispose

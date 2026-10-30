@@ -110,3 +110,23 @@ replacement-lobby assertion reproduced the routing boundary. Six selected servic
 cases then passed, covering terminal input/receipt immutability, replay, old
 socket isolation, host/reconnect behaviour, failed-acknowledgement retry and the
 socket gateway. No accepted city race or performance minute was repeated.
+
+
+## Profiled bank and apron contract
+
+`profiled-road-pavement-v1` retains the original geographic source line while
+qualifying the entire asymmetric physical pavement from uploaded triangles.
+Each height row retains its lateral observations and bank racing-line offset;
+the road declares a separate usable racing width. Grid placement, timing,
+vehicle boundaries, AI targets, event paint and equipment use those same facts.
+Publication revalidation checks the full apron and racing line, including areas
+beyond the centre and wheel probes. Existing slope and vertical fences remain.
+
+The class uses `earth-profiled-pavement-2026-10-30.1`. Ordinary and previous
+banked-road identities and record classes retain their existing versions.
+Browser, socket-service and Functions bundles reconstruct matching courses and
+session states in the focused integration check. Canonical storage retains the
+profile. A controlled GPU journey uses the existing licensed BMW M3 racing
+visual and shared controller on an uploaded bank/apron mesh. These checks do
+not confer finished-venue admission, live deployment or final network release
+acceptance; native full-profile qualification remains a separate boundary.

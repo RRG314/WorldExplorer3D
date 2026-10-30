@@ -1,3 +1,4 @@
+import {roadPavementSectionForSegment} from '../world/road-pavement-sections.js';
 import {readPublishedLateralSection,compilePublishedLateralSpans} from './published-lateral-profile.js';
 import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import {streetEdgeStationFractions,streetEdgeLateralKnots,streetEdgeIntervalHasLift} from '../world/compiler/street-edge-recipe.js';
@@ -11,7 +12,7 @@ import {STREET_POLYGON_GRID_WORLD}from'../world/compiler/street-coordinate-grid.
 import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.js';
 import {assertReviewedSurfaceAccepted}from'../world/compiler/transport-surface-model.js?v=25';
 import {hasReviewedPavement}from'../world/compiler/reviewed-deck-profile.js';
-import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL}from'../physics/road-plane-dynamics.js';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL,PROFILED_ROAD_PAVEMENT_MODEL}from'../physics/road-plane-dynamics.js';
 import {normalizeRaceVenueSource,assertRaceVenueRoads}from'./venue-course-policy.js';
 import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
@@ -53,6 +54,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    if(venueSource&&(feature.surfaceSurveyEvidence?.venueSource!==adopted||model?.surveyedSurface?.venueSource!==adopted)){rejected('unqualified_venue_source');yield;continue;}
    const banked=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
    const edgeRecipe=reviewedRoadEdgeRecipe(feature),edgeRoad=edgeRecipe?{...feature,edgeBandRecipe:edgeRecipe}:null,hasEdges=edgeRoad&&streetEdgeIntervalHasLift(edgeRoad,segIndex,sourceTStart,sourceTEnd),sections=[];
+   const profiled=!!feature.transportRecord?.crossSection?.pavementSections,hasLateralProfile=hasEdges||profiled;
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
    const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[],surfacePoints=[];
@@ -119,7 +121,9 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     if(previous&&Math.abs(y-previous.y)*metersPerUnit/(length*(t-previous.t))>.22){failure='steep_grade';break;}
     if(Math.max(Math.abs(y-leftY),Math.abs(y-rightY))*metersPerUnit/spanMeters>
       (banked?Math.min(model.surveyedSurface.maximumCrossfall,BANKED_ROAD_MAXIMUM_CROSSFALL):.15)){failure='steep_crossfall';break;}
-    if(hasEdges)try{sections.push(readPublishedLateralSection({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:streetEdgeLateralKnots(edgeRoad,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters)}));}
+    if(hasLateralProfile)try{
+     const section=profiled?roadPavementSectionForSegment(feature,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t):null,unit=roadMetersPerWorldUnit(feature);
+     sections.push({...readPublishedLateralSection({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:profiled?[section.bankNegative*unit]:streetEdgeLateralKnots(edgeRoad,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters),...(profiled?{boundsMeters:{minimumMeters:-section.positive*unit,maximumMeters:section.negative*unit}}:{})}),...(profiled?{racingOffsetMeters:-section.bankOffset*unit}:{})});}
     catch(error){failure=error.message;break;}
     samples.push({t,y,leftY,rightY});
     surfacePoints.push({x:point.x,z:point.z,y:point.y});
@@ -128,7 +132,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    }
    if(failure){rejected(failure);continue;}
    let spans=[{first:0,last:samples.length-1}];
-   if(hasEdges)try{
+   if(hasLateralProfile)try{
     spans=compilePublishedLateralSpans(sections,metersPerUnit);
     for(const span of spans)diagnostics.maximumLateralProfileDepartureMeters=Math.max(diagnostics.maximumLateralProfileDepartureMeters,span.maximumErrorMeters);
    }catch(error){rejected(error.message);continue;}
@@ -140,9 +144,9 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    const internalLayer=i=>`source-node:${segment.fromId}:profile:${segment.toId}:${i}`;
    const a={...surfacePoints[span.first],connectionLayer:span.first===0?`source-node:${segment.fromId}`:internalLayer(span.first)},
     b={...surfacePoints[span.last],connectionLayer:span.last===samples.length-1?`source-node:${segment.toId}`:internalLayer(span.last)};
-   const heights=samples.slice(span.first,span.last+1).map((s,i)=>({...s,t:(s.t-start)/(end-start),...(hasEdges?{lateralSamples:span.profiles[i]}:{})}));
+   const heights=samples.slice(span.first,span.last+1).map((s,i)=>({...s,t:(s.t-start)/(end-start),...(hasLateralProfile?{lateralSamples:span.profiles[i]}:{}),...(profiled?{racingOffsetMeters:sections[span.first+i].racingOffsetMeters}:{})}));
    roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,
-    ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),...(hasEdges?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
+    ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),...(profiled?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL,racingWidthMeters:feature.surfaceSurveyEvidence.usableWidthMeters}:{}),...(hasEdges?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
     driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:heights,heightSampleSpanMeters:spanMeters,
     sourceAuthority:String(feature.transportRecord?.provenance?.authority||feature.sourceAuthority||'published-world-road')});
    diagnostics.eligible++;yield;

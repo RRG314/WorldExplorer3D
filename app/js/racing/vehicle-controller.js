@@ -38,7 +38,12 @@ export function stepRaceVehicle(course,car,actions,dt,profile){
  if(!support)throw Error('race_surface_lost');
  const margin=Math.max(.3,(support.widthMeters-profile.handling.width)*.5-.2);
  let x=next.x,z=next.z;
- if(support.error>margin){
+ if(support.pavement){
+  const padding=profile.handling.width*.5+.2,minimum=support.pavement.minimumMeters+padding,maximum=support.pavement.maximumMeters-padding;
+  if(minimum>maximum)throw Error('race_vehicle_pavement_too_narrow');
+  const lateral=Math.max(minimum,Math.min(maximum,support.lateralMeters));
+  if(lateral!==support.lateralMeters){const f=course.segments[support.index].forward,correction=(lateral-support.lateralMeters)/course.metersPerUnit;x+=f.z*correction;z-=f.x*correction;car.speed*=.35;car.vFwd*=.35;car.vLat*=.2;car.barrierContacts++;}
+ }else if(support.error>margin){
   const distance=Math.hypot(x-support.x,z-support.z),scale=margin/Math.max(.001,distance*course.metersPerUnit);
   x=support.x+(x-support.x)*scale;z=support.z+(z-support.z)*scale;
   car.speed*=.35;car.vFwd*=.35;car.vLat*=.2;car.barrierContacts++;

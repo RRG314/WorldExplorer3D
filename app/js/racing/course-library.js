@@ -12,7 +12,7 @@ export function normalizeRaceRouteReference(value) {
 export async function raceDistrictFingerprint(district) {
  const value=JSON.stringify({version:1,...(district.venueSource?{venueSource:normalizeRaceVenueSource(district.venueSource)}:{}),locationId:district.locationId,anchor:district.anchor,metersPerUnit:district.metersPerUnit,
   roads:[...district.roads].sort((a,b)=>a.sourceId.localeCompare(b.sourceId)).map(r=>({id:r.sourceId,a:r.a,b:r.b,width:r.widthMeters,
-   ...(r.surfaceModel?{surfaceModel:r.surfaceModel}:{}),...(r.edgeBandModel?{edgeBandModel:r.edgeBandModel}:{}),
+   ...(r.surfaceModel?{surfaceModel:r.surfaceModel}:{}),...(r.pavementModel?{pavementModel:r.pavementModel,racingWidthMeters:r.racingWidthMeters}:{}),...(r.edgeBandModel?{edgeBandModel:r.edgeBandModel}:{}),
    direction:r.direction||'both',structure:r.structure,clearance:r.clearanceMeters,heights:r.heightSamples,span:r.heightSampleSpanMeters}))});
  const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
  return 'race-district:'+Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
@@ -29,7 +29,7 @@ export function restoreRaceCourse(reference,district,graph,fingerprint) {
 }
 export async function raceCourseKey(course) {
  const data=new TextEncoder().encode(JSON.stringify({version:course.version,...(course.venueSource?{venueSource:normalizeRaceVenueSource(course.venueSource)}:{}),location:course.locationId,anchor:course.anchor,
-  ...(course.surfaceModel?{surfaceModel:course.surfaceModel}:{}),...(course.edgeBandModel?{edgeBandModel:course.edgeBandModel}:{}),
+  ...(course.surfaceModel?{surfaceModel:course.surfaceModel}:{}),...(course.pavementModel?{pavementModel:course.pavementModel}:{}),...(course.edgeBandModel?{edgeBandModel:course.edgeBandModel}:{}),
   discipline:course.discipline,laps:course.laps,segments:course.segments}));
  const hash=await crypto.subtle.digest('SHA-256',data);
  return 'road-race-'+Array.from(new Uint8Array(hash).slice(0,16),b=>b.toString(16).padStart(2,'0')).join('');

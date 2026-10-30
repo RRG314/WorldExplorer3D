@@ -1,7 +1,8 @@
+import {racePavementCrossSection} from './pavement-cross-section.js';
 // Portable race-course facts and rules. The world compiler supplies road facts;
 // this module cannot invent pavement, change a building or move a transport.
 import {ROAD_SOURCE_MINIMUM_SPAN_METERS} from '../world/road-units.js';
-import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL,AUTHORED_ROAD_EDGE_MAXIMUM_LIFT_METERS,AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MAXIMUM_GRADE,AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT,AUTHORED_ROAD_EDGE_PUBLICATION_EPSILON_METERS} from '../physics/road-plane-dynamics.js';
+import {BANKED_ROAD_MODEL,PROFILED_ROAD_PAVEMENT_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL,AUTHORED_ROAD_EDGE_MAXIMUM_LIFT_METERS,AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MAXIMUM_GRADE,AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT,AUTHORED_ROAD_EDGE_PUBLICATION_EPSILON_METERS} from '../physics/road-plane-dynamics.js';
 import {normalizeRaceVenueSource,assertRaceVenueRoads,raceVenueMaximumLength} from './venue-course-policy.js';
 export const RACE_COURSE_VERSION=1;
 export const RACE_MAX_ROUTE_EDGES=2048;
@@ -86,7 +87,7 @@ function lateralPatchHeight(lower,upper,u,offset){
  const v=(offset-b.offsetMeters-(c.offsetMeters-b.offsetMeters)*u)/highWidth;
  return b.y*(1-u)+c.y*(u-v)+d.y*v;
 }
-function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,maximumCrossfall=BANKED_ROAD_MAXIMUM_CROSSFALL,maximumPlaneGradient=Infinity){
+function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,maximumCrossfall=BANKED_ROAD_MAXIMUM_CROSSFALL,maximumPlaneGradient=Infinity,profiled=false){
  if(!heights.some(s=>s.lateralSamples!==undefined))return true;
  if(model!==BANKED_ROAD_MODEL||width>30)return false;
  let previous=null;
@@ -96,7 +97,7 @@ function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrad
     i>0&&(p.offsetMeters<points[i-1].offsetMeters||
       (p.offsetMeters===points[i-1].offsetMeters?Math.abs(p.y-points[i-1].y)*metersPerUnit>1e-7:
        Math.abs(p.y-points[i-1].y)*metersPerUnit/(p.offsetMeters-points[i-1].offsetMeters)>maximumCrossfall+1e-8)))||
-    Math.abs(points[0].offsetMeters+width/2)>.001||Math.abs(points.at(-1).offsetMeters-width/2)>.001||
+    (profiled?(points[0].offsetMeters> -span||points.at(-1).offsetMeters<span||points.at(-1).offsetMeters-points[0].offsetMeters>30||Math.max(Math.abs(points[0].offsetMeters),Math.abs(points.at(-1).offsetMeters))>30):(Math.abs(points[0].offsetMeters+width/2)>.001||Math.abs(points.at(-1).offsetMeters-width/2)>.001))||
     !points.some(p=>p.offsetMeters===0&&Math.abs(p.y-station.y)*metersPerUnit<=.001)||
     !Number.isFinite(station.leftY)||!Number.isFinite(station.rightY)||
     Math.abs(lateralHeight(points,-span)-station.leftY)*metersPerUnit>.001||Math.abs(lateralHeight(points,span)-station.rightY)*metersPerUnit>.001)return false;
@@ -117,9 +118,10 @@ function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrad
  }
  return true;
 }
-function validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,edgeBandModel){
+function validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,edgeBandModel,pavementModel){
+ const profiled=pavementModel===PROFILED_ROAD_PAVEMENT_MODEL;
  const authored=edgeBandModel===AUTHORED_ROAD_EDGE_MODEL;
- if(!authored)return !heights.some(s=>Array.isArray(s.lateralSamples)&&s.lateralSamples.some(p=>p?.baseY!==undefined))&&validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model);
+ if(!authored)return !heights.some(s=>Array.isArray(s.lateralSamples)&&s.lateralSamples.some(p=>p?.baseY!==undefined))&&validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,undefined,undefined,profiled);
  const epsilon=AUTHORED_ROAD_EDGE_PUBLICATION_EPSILON_METERS;
  if(model!==BANKED_ROAD_MODEL||heights.some(s=>!Array.isArray(s.lateralSamples)||s.lateralSamples.some(p=>!p||!Number.isFinite(p.baseY)||!Number.isFinite(p.y)||
   (p.y-p.baseY)*metersPerUnit< -epsilon||(p.y-p.baseY)*metersPerUnit>AUTHORED_ROAD_EDGE_MAXIMUM_LIFT_METERS+epsilon||p.offsetMeters===0&&Math.abs(p.y-p.baseY)*metersPerUnit>epsilon)))return false;
@@ -127,9 +129,9 @@ function validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximum
   const lateralSamples=s.lateralSamples.map(p=>({offsetMeters:p.offsetMeters,y:lift?p.y-p.baseY:p.baseY}));
   return {t:s.t,y:lateralHeight(lateralSamples,0),leftY:lateralHeight(lateralSamples,-span),rightY:lateralHeight(lateralSamples,span),lateralSamples};
  });
- return validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade+AUTHORED_ROAD_EDGE_MAXIMUM_GRADE,model,BANKED_ROAD_MAXIMUM_CROSSFALL+AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL)&&
-  validLateralHeights(channel(false),width,metersPerUnit,span,length,maximumGrade,model)&&
-  validLateralHeights(channel(true),width,metersPerUnit,span,length,AUTHORED_ROAD_EDGE_MAXIMUM_GRADE,model,AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT);
+ return validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade+AUTHORED_ROAD_EDGE_MAXIMUM_GRADE,model,BANKED_ROAD_MAXIMUM_CROSSFALL+AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL,Infinity,profiled)&&
+  validLateralHeights(channel(false),width,metersPerUnit,span,length,maximumGrade,model,undefined,undefined,profiled)&&
+  validLateralHeights(channel(true),width,metersPerUnit,span,length,AUTHORED_ROAD_EDGE_MAXIMUM_GRADE,model,AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT,profiled);
 }
 export function sampleRaceSegmentY(segment,t,lateralMeters=0){
  const samples=segment.heightSamples;
@@ -170,6 +172,10 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximum
   const id=nodes.length;nodes.push({id,...point});if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(id);return id;
  }
  for(const road of roads){
+  const profiled=road?.pavementModel===PROFILED_ROAD_PAVEMENT_MODEL;
+  if(road?.pavementModel!==undefined&&!profiled)throw Error('invalid_race_surface_model');
+  if(!profiled&&(road?.racingWidthMeters!==undefined||Array.isArray(road?.heightSamples)&&road.heightSamples.some(s=>s.racingOffsetMeters!==undefined)))throw Error('invalid_race_pavement_sections');
+  if(profiled&&(road.surfaceModel!==BANKED_ROAD_MODEL||!Number.isFinite(road.racingWidthMeters)||road.racingWidthMeters<6||road.racingWidthMeters>30||!Array.isArray(road.heightSamples)||road.heightSamples.some(s=>!Number.isFinite(s.racingOffsetMeters)||!Array.isArray(s.lateralSamples)||s.lateralSamples.length<3||s.racingOffsetMeters-road.racingWidthMeters/2<s.lateralSamples[0].offsetMeters||s.racingOffsetMeters+road.racingWidthMeters/2>s.lateralSamples.at(-1).offsetMeters)))throw Error('invalid_race_pavement_sections');
   if(road?.surfaceModel!==undefined&&road.surfaceModel!==BANKED_ROAD_MODEL||road?.edgeBandModel!==undefined&&road.edgeBandModel!==AUTHORED_ROAD_EDGE_MODEL)throw Error('invalid_race_surface_model');
   if(road?.edgeBandModel!==undefined&&!road.heightSamples?.some(s=>s.lateralSamples))throw Error('invalid_race_road_heights');
   if(!road?.sourceId||!finitePoint(road.a)||!finitePoint(road.b)||road.driveable!==true||road.supported!==true)continue;
@@ -183,14 +189,15 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximum
    if(heights&&(!Array.isArray(heights)||heights.length<2||heights.length>250||heights.some((s,i)=>!Number.isFinite(s.t)||!Number.isFinite(s.y)||s.t<0||s.t>1||i>0&&s.t<=heights[i-1].t)||heights[0].t!==0||heights.at(-1).t!==1))throw Error('invalid_race_road_heights');
    if(heights){
     const span=Number(road.heightSampleSpanMeters??1.2);
-    if(!validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,road.surfaceModel,road.edgeBandModel)||!(span>=.2&&span<=4)||Math.abs(heights[0].y-road.a.y)>.001||Math.abs(heights.at(-1).y-road.b.y)>.001||heights.some((s,i)=>
+    if(!validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,road.surfaceModel,road.edgeBandModel,road.pavementModel)||!(span>=.2&&span<=4)||Math.abs(heights[0].y-road.a.y)>.001||Math.abs(heights.at(-1).y-road.b.y)>.001||heights.some((s,i)=>
       i>0&&Math.abs(s.y-heights[i-1].y)*metersPerUnit/((s.t-heights[i-1].t)*length)>maximumGrade ||
       (s.leftY!==undefined||s.rightY!==undefined)&&(!Number.isFinite(s.leftY)||!Number.isFinite(s.rightY)||Math.max(Math.abs(s.leftY-s.y),Math.abs(s.rightY-s.y))*metersPerUnit/span>
         (road.surfaceModel===BANKED_ROAD_MODEL?BANKED_ROAD_MAXIMUM_CROSSFALL:.15))))throw Error('invalid_race_road_heights');
    }
    const id=`${String(road.sourceId).slice(0,180)}:${reverse?'reverse':'forward'}`,edge={id,from:a,to:b,length,widthMeters:width,
+    ...(profiled?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL,racingWidthMeters:road.racingWidthMeters}:{}),
     sourceId:String(road.sourceId).slice(0,180),structure:road.structure||'surface',clearanceMeters:Number(road.clearanceMeters)||0};
-   if(heights){edge.heightSamples=reverse?heights.map(s=>({...copyHeightSample(s),t:1-s.t,leftY:s.rightY,rightY:s.leftY,
+   if(heights){edge.heightSamples=reverse?heights.map(s=>({...copyHeightSample(s),t:1-s.t,leftY:s.rightY,rightY:s.leftY,...(profiled?{racingOffsetMeters:-s.racingOffsetMeters||0}:{}),
      ...(s.lateralSamples?{lateralSamples:s.lateralSamples.map(p=>({...p,offsetMeters:-p.offsetMeters||0})).reverse()}:{})})).reverse():heights.map(copyHeightSample);edge.heightSampleSpanMeters=Number(road.heightSampleSpanMeters)||1.2;}
    if(road.surfaceModel)edge.surfaceModel=road.surfaceModel;
    if(road.edgeBandModel)edge.edgeBandModel=road.edgeBandModel;
@@ -239,6 +246,7 @@ export function createRaceCourse(graph,path,settings={}){
   if(i){const previous=segments.at(-1);if(angle(previous.forward,forward)>Math.PI*.64)throw Error('race_turn_too_sharp');}
   segments.push({sourceId:edge.sourceId,a:{...a},b:{...b},forward,widthMeters:edge.widthMeters,lengthMeters:edge.length,startMeters:lengthMeters,structure:edge.structure,clearanceMeters:edge.clearanceMeters,
     ...(edge.edgeBandModel?{edgeBandModel:edge.edgeBandModel}:{}),
+    ...(edge.pavementModel?{pavementModel:edge.pavementModel,racingWidthMeters:edge.racingWidthMeters}:{}),
     ...(edge.heightSamples?{heightSamples:edge.heightSamples.map(copyHeightSample),heightSampleSpanMeters:edge.heightSampleSpanMeters}:{})});
   points.push({...b});lengthMeters+=edge.length;
  }
@@ -267,9 +275,15 @@ export function createRaceCourse(graph,path,settings={}){
  const course={version:RACE_COURSE_VERSION,...(graph.venueSource?{venueSource:graph.venueSource}:{}),sourcePath:[...path],startOffsetMeters:closed?Number(settings.startOffsetMeters??edges[0].length*.5):null,name:clean(settings.name)||'Mapped road run',description:String(settings.description||'').trim().slice(0,400),
   ...(edges.some(e=>e.surfaceModel===BANKED_ROAD_MODEL)?{surfaceModel:BANKED_ROAD_MODEL}:{}),
   ...(edges.some(e=>e.edgeBandModel===AUTHORED_ROAD_EDGE_MODEL)?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
+  ...(edges.some(e=>e.pavementModel===PROFILED_ROAD_PAVEMENT_MODEL)?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL}:{}),
   locationId:clean(settings.locationId),locationLabel:clean(settings.locationLabel),anchor:settings.anchor?{lat:Number(settings.anchor.lat),lon:Number(settings.anchor.lon)}:null,
   discipline,laps,participants,vehicleEnvelope:{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},metersPerUnit:graph.metersPerUnit,vehicleClass:settings.vehicleClass||'road',traffic:'closed-course',collision:'ghost',
   lengthMeters,segments,points,gateSpacingMeters:Math.min(30,Math.max(15,Number(settings.gateSpacingMeters)||25)),gates:[]};
+ const gateAt=(segment,t,distanceMeters)=>{
+  const section=racePavementCrossSection(segment,t),offset=section?.racingOffsetMeters||0,f=segment.forward;
+  return {x:segment.a.x+(segment.b.x-segment.a.x)*t+f.z*offset/course.metersPerUnit,y:sampleRaceSegmentY(segment,t,offset),z:segment.a.z+(segment.b.z-segment.a.z)*t-f.x*offset/course.metersPerUnit,
+   forward:f,halfWidthMeters:section?section.racingWidthMeters*.5:segment.widthMeters*.5,distanceMeters};
+ };
  let at=course.gateSpacingMeters;
  for(let index=0;index<segments.length;index++){
   const segment=segments[index],before=segments[index-1],after=segments[index+1];
@@ -279,11 +293,10 @@ export function createRaceCourse(graph,path,settings={}){
    const nearStart=before&&angle(before.forward,segment.forward)>.15&&at-segment.startMeters<5;
    const nearEnd=after&&angle(segment.forward,after.forward)>.15&&segment.startMeters+segment.lengthMeters-at<5;
    if(nearStart||nearEnd){at+=course.gateSpacingMeters;continue;}
-   course.gates.push({x:segment.a.x+(segment.b.x-segment.a.x)*t,y:sampleRaceSegmentY(segment,t),z:segment.a.z+(segment.b.z-segment.a.z)*t,
-    forward:segment.forward,halfWidthMeters:segment.widthMeters*.5,distanceMeters:at});at+=course.gateSpacingMeters;
+   course.gates.push(gateAt(segment,t,at));at+=course.gateSpacingMeters;
   }
  }
- const last=segments.at(-1);course.gates.push({...last.b,forward:last.forward,halfWidthMeters:last.widthMeters*.5,distanceMeters:lengthMeters});
+ const last=segments.at(-1);course.gates.push(last.pavementModel?gateAt(last,1,lengthMeters):{...last.b,forward:last.forward,halfWidthMeters:last.widthMeters*.5,distanceMeters:lengthMeters});
  if(!course.locationId||!course.anchor||!Number.isFinite(course.anchor.lat)||Math.abs(course.anchor.lat)>85||!Number.isFinite(course.anchor.lon)||Math.abs(course.anchor.lon)>180)throw Error('invalid_race_location');
  return prepareRaceCourseGeometry(course);
 }
@@ -298,7 +311,7 @@ export function projectRacePosition(course,pose,{minimumMeters=-Infinity,maximum
   const x=s.a.x+dx*t,z=s.a.z+dz*t,lateral=((pose.x-x)*s.forward.z-(pose.z-z)*s.forward.x)*course.metersPerUnit,y=sampleRaceSegmentY(s,t,lateral);
   const error=Math.hypot(pose.x-x,pose.z-z)*course.metersPerUnit,vertical=Math.abs(pose.y-y)*course.metersPerUnit;
   if(vertical>2.5)return;
-  if(!nearest||error<nearest.error||error===nearest.error&&index<nearest.index)nearest={index,t,x,y,z,lateralMeters:lateral,error,vertical,distanceMeters:s.startMeters+s.lengthMeters*t,widthMeters:s.widthMeters};
+  if(!nearest||error<nearest.error||error===nearest.error&&index<nearest.index)nearest={index,t,x,y,z,lateralMeters:lateral,error,vertical,distanceMeters:s.startMeters+s.lengthMeters*t,widthMeters:s.widthMeters,...(s.pavementModel?{pavement:racePavementCrossSection(s,t)}:{})};
  }
  const tree=raceSpatialIndex(course.segments);
  if(!tree){for(let index=0;index<course.segments.length;index++)sample(index);return nearest;}
@@ -318,9 +331,16 @@ export function raceGridPose(course,index=0){
  const distanceMeters=course.vehicleEnvelope.lengthMeters/2+1+(Math.ceil(course.participants/2)-1-Math.floor(index/2))*8;
  const s=raceSegmentAtDistance(course,distanceMeters);
  const forward=s.forward,along=(distanceMeters-s.startMeters)/course.metersPerUnit;
- const lateral=(course.participants===1?0:index%2===0?-1.4:1.4)/course.metersPerUnit;
+ const lateral=((racePavementCrossSection(s,(distanceMeters-s.startMeters)/s.lengthMeters)?.racingOffsetMeters||0)+(course.participants===1?0:index%2===0?-1.4:1.4))/course.metersPerUnit;
  return {x:s.a.x+forward.x*along+forward.z*lateral,y:sampleRaceSegmentY(s,along*course.metersPerUnit/s.lengthMeters,lateral*course.metersPerUnit),
   z:s.a.z+forward.z*along-forward.x*lateral,yaw:Math.atan2(forward.x,forward.z)};
+}
+
+export function raceProjectionOutsidePavement(projection,padding=.5){
+ if(!projection)return true;
+ const p=projection.pavement;if(!p)return projection.error>projection.widthMeters*.5+padding;
+ return projection.lateralMeters<p.minimumMeters-padding||projection.lateralMeters>p.maximumMeters+padding||
+  Math.max(0,projection.error**2-projection.lateralMeters**2)>(Math.max(Math.abs(p.minimumMeters),Math.abs(p.maximumMeters))+padding)**2;
 }
 
 export function createRaceProgress(pose,nowMs){
@@ -334,12 +354,12 @@ export function advanceRaceProgress(course,progress,pose,nowMs,{startedAtMs,maxi
  const elapsed=(nowMs-progress.lastAtMs)/1000,travel=distance(progress.lastPose,pose)*course.metersPerUnit;
  if(elapsed>10||travel>maximumMetersPerSecond*elapsed+1.5)throw Error('implausible_race_motion');
  const projection=projectRacePosition(course,pose);
- if(!projection||projection.error>projection.widthMeters*.5+.5)throw Error('outside_race_course');
+ if(raceProjectionOutsidePavement(projection))throw Error('outside_race_course');
  const sweepSteps=Math.ceil(travel/2);
  if(sweepSteps>750)throw Error('implausible_race_motion');
  for(let step=1;step<sweepSteps;step++){
   const t=step/sweepSteps,from=progress.lastPose,sample=projectRacePosition(course,{x:from.x+(pose.x-from.x)*t,y:from.y+(pose.y-from.y)*t,z:from.z+(pose.z-from.z)*t});
-  if(!sample||sample.error>sample.widthMeters*.5+.5)throw Error('outside_race_course');
+  if(raceProjectionOutsidePavement(sample))throw Error('outside_race_course');
  }
  const next={...progress,lastPose:{...pose},lastAtMs:nowMs,lapTimes:[...progress.lapTimes]};
  if(nowMs<startedAtMs){if(travel>.3)throw Error('race_false_start');return next;}
@@ -349,7 +369,10 @@ export function advanceRaceProgress(course,progress,pose,nowMs,{startedAtMs,maxi
   const a=(from.x-gate.x)*f.x+(from.z-gate.z)*f.z,b=(pose.x-gate.x)*f.x+(pose.z-gate.z)*f.z;
   if(!(a<=0&&b>0))break;
   const t=-a/(b-a),x=from.x+(pose.x-from.x)*t,z=from.z+(pose.z-from.z)*t,y=from.y+(pose.y-from.y)*t;
-  if(Math.abs((x-gate.x)*f.z-(z-gate.z)*f.x)*course.metersPerUnit>gate.halfWidthMeters||Math.abs(y-gate.y)*course.metersPerUnit>2)break;
+  const lateral=((x-gate.x)*f.z-(z-gate.z)*f.x)*course.metersPerUnit;
+  let gateY=gate.y;
+  if(course.pavementModel){const segment=raceSegmentAtDistance(course,gate.distanceMeters),station=(gate.distanceMeters-segment.startMeters)/segment.lengthMeters,section=racePavementCrossSection(segment,station);if(section)gateY=sampleRaceSegmentY(segment,station,section.racingOffsetMeters+lateral);}
+  if(Math.abs(lateral)>gate.halfWidthMeters||Math.abs(y-gateY)*course.metersPerUnit>2)break;
   const crossedAt=progress.lastAtMs+(nowMs-progress.lastAtMs)*t;
   next.nextGate++;
   if(next.nextGate===course.gates.length){

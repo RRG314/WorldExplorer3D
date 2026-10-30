@@ -6,10 +6,13 @@ const valueAt=(points,offset,field='y')=>{
 // Temporary qualification data comes only from existing uploaded triangles.
 // The finished course retains a common bounded set of lateral stations; arbitrary
 // per-row simplification must not connect unrelated terrain creases diagonally.
-export function readPublishedLateralSection({contacts,x,z,nx,nz,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots=[]}){
+export function readPublishedLateralSection({contacts,x,z,nx,nz,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots=[],boundsMeters}){
  if(typeof contacts?.crossSectionOffsets!=='function')throw Error('race_missing_edge_profile_reader');
- const half=widthMeters/2,fixed=[-half,-spanMeters,0,spanMeters,half],mandatory=[...fixed,...edgeKnots],
-  offsets=contacts.crossSectionOffsets(x,z,nx,nz,half/metersPerUnit,'at_grade').map(n=>n*metersPerUnit);
+ const half=widthMeters/2,minimum=boundsMeters?.minimumMeters??-half,maximum=boundsMeters?.maximumMeters??half;
+ if(boundsMeters&&(![minimum,maximum].every(Number.isFinite)||minimum> -spanMeters||maximum<spanMeters||maximum-minimum<6||maximum-minimum>30||Math.max(Math.abs(minimum),Math.abs(maximum))>30))throw Error('race_invalid_pavement_bounds');
+ const fixed=boundsMeters?[-spanMeters,0,spanMeters]:[-half,-spanMeters,0,spanMeters,half];
+ if(boundsMeters)edgeKnots=[minimum,...edgeKnots,maximum];
+ const mandatory=[...fixed,...edgeKnots],offsets=contacts.crossSectionOffsets(x,z,nx,nz,Math.max(Math.abs(minimum),Math.abs(maximum))/metersPerUnit,'at_grade').map(n=>n*metersPerUnit).filter(n=>n>=minimum&&n<=maximum);
  const points=[...offsets.filter(n=>mandatory.every(m=>Math.abs(m-n)>.00001)),...mandatory].sort((a,b)=>a-b).map(offsetMeters=>{
   const point=surface(x+nx*offsetMeters/metersPerUnit,z+nz*offsetMeters/metersPerUnit,t);
   if(!point)throw Error('race_missing_edge_profile_contact');

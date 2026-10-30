@@ -1,3 +1,4 @@
+import {racePavementCrossSection,racePavementLateralOffsets} from './pavement-cross-section.js';
 import {sameRaceVenueSource} from './venue-course-policy.js';
 import {buildRaceRoadGraph,createRaceCourse,sampleRaceSegmentY} from './course-rules.js';
 import {raceDistrictFingerprint,normalizeRaceRouteReference,restoreRaceCourse,raceCourseKey} from './course-library.js';
@@ -24,13 +25,22 @@ export function assertRaceCourseInDistrict(course,localFacts){
  // Rebuild the entire path using currently published and collision-qualified
  // spans, including direction, decks, water, width and tunnel admission.
  const local=createRaceCourse(graph,course.sourcePath,{...course});
- if(local.surfaceModel!==course.surfaceModel||!sameRaceVenueSource(local.venueSource,course.venueSource))throw Error('race_roads_changed_requalify_route');
+ if(local.surfaceModel!==course.surfaceModel||local.pavementModel!==course.pavementModel||!sameRaceVenueSource(local.venueSource,course.venueSource))throw Error('race_roads_changed_requalify_route');
  if(local.segments.length!==course.segments.length)throw Error('race_roads_changed_requalify_route');
  for(let i=0;i<course.segments.length;i++){
   const a=course.segments[i],b=local.segments[i];
-  if(a.structure!==b.structure||a.widthMeters>b.widthMeters+.003||a.clearanceMeters>b.clearanceMeters+.003||!byId.has(course.sourcePath[Math.min(i,course.sourcePath.length-1)]))throw Error('race_roads_changed_requalify_route');
+  if(a.pavementModel!==b.pavementModel||a.structure!==b.structure||a.widthMeters>b.widthMeters+.003||a.clearanceMeters>b.clearanceMeters+.003||!byId.has(course.sourcePath[Math.min(i,course.sourcePath.length-1)]))throw Error('race_roads_changed_requalify_route');
   for(const key of ['a','b'])if(Math.hypot(a[key].x-b[key].x,a[key].z-b[key].z)*course.metersPerUnit>.01)throw Error('race_roads_changed_requalify_route');
   const steps=Math.ceil(a.lengthMeters/4);
+  if(a.pavementModel){
+   const stations=new Set(Array.from({length:steps+1},(_,j)=>j/steps));
+   for(const segment of [a,b]){const range=segment.heightSampleRange||{start:0,end:1};for(const row of segment.heightSamples){const t=(row.t-range.start)/(range.end-range.start);if(t>=0&&t<=1)stations.add(t);}}
+   for(const t of stations){
+    const left=racePavementCrossSection(a,t),right=racePavementCrossSection(b,t);
+    if(['minimumMeters','maximumMeters','racingOffsetMeters','racingWidthMeters'].some(k=>Math.abs(left[k]-right[k])>.003))throw Error('race_roads_changed_requalify_route');
+    for(const offset of [...racePavementLateralOffsets(a,t),...racePavementLateralOffsets(b,t)])if(Math.abs(sampleRaceSegmentY(a,t,offset)-sampleRaceSegmentY(b,t,offset))*course.metersPerUnit>.01)throw Error('race_roads_changed_requalify_route');
+   }
+  }
   for(let j=0;j<=steps;j++)for(const side of [-1.2,0,1.2])if(Math.abs(sampleRaceSegmentY(a,j/steps,side)-sampleRaceSegmentY(b,j/steps,side))*course.metersPerUnit>.01)throw Error('race_roads_changed_requalify_route');
  }
  return true;
