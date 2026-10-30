@@ -28,7 +28,11 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  // Original game timing on the retained T13 straight, aligned to the visible
  // transverse paint in RLP DOP20. This is not a surveyed official timing marker.
  startLine:Object.freeze({sourceFeatureId:'osm:way:41395670',segment:6,fraction:.725}),
- presentationStatus:'under-construction'
+ presentationStatus:'under-construction',
+ // Wider visual relief uses the same four retained native ground artifacts.
+ // Feather inside their outer border; the physical road corridor is unchanged.
+ landscapeRefinement:Object.freeze({radiusMeters:350,fullHeightRadiusMeters:150,spacingMeters:32,coverageFadeMeters:70,
+  coverage:Object.freeze({south:50.3363798755773,north:50.38183828592638,west:6.918536857397612,east:7.0070029465777})})
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;
@@ -55,10 +59,20 @@ function reviewedStartLine(descriptor,layout){
   !Number.isFinite(line.fraction)||line.fraction<=0||line.fraction>=1)throw Error('venue_start_line_invalid');
  return Object.freeze({sourceFeatureId:line.sourceFeatureId,segment:line.segment,fraction:line.fraction});
 }
+function reviewedLandscapeRefinement(descriptor){
+ const policy=descriptor.landscapeRefinement;if(policy===undefined)return undefined;
+ const {radiusMeters,fullHeightRadiusMeters,spacingMeters,coverageFadeMeters,coverage}=policy;
+ if(![radiusMeters,fullHeightRadiusMeters,spacingMeters,coverageFadeMeters].every(Number.isFinite)||
+  radiusMeters>512||fullHeightRadiusMeters<60||radiusMeters<=fullHeightRadiusMeters||spacingMeters<8||spacingMeters>64||
+  coverageFadeMeters<20||coverageFadeMeters>fullHeightRadiusMeters||
+  !coverage||!['south','north','west','east'].every(k=>Number.isFinite(coverage[k]))||coverage.south< -90||coverage.north>90||
+  coverage.west< -180||coverage.east>180||coverage.south>=coverage.north||coverage.west>=coverage.east)throw Error('venue_landscape_policy_invalid');
+ return Object.freeze({radiusMeters,fullHeightRadiusMeters,spacingMeters,coverageFadeMeters,coverage:Object.freeze({...coverage})});
+}
 export function createRacingVenueGroundPlan(descriptor,source){
  const layout=compileMappedVenueLayout(source),requiredArtifacts=racingVenueGroundRequirements(descriptor),coverageProbes=[];
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
- const halfWidth=maximumPavementWidth(source,layout,descriptor)*.5+2,metersPerDegree=6371008.8*Math.PI/180;
+ const halfWidth=maximumPavementWidth(source,layout,descriptor)*.5+2,landscape=reviewedLandscapeRefinement(descriptor),metersPerDegree=6371008.8*Math.PI/180;
  for(let index=1;index<layout.points.length;index++){
   const a=layout.points[index-1],b=layout.points[index],length=geographicVenueDistance(a,b),steps=Math.max(1,Math.ceil(length/2));
   const east=(b.lon-a.lon)*Math.cos((a.lat+b.lat)*Math.PI/360)*metersPerDegree,north=(b.lat-a.lat)*metersPerDegree;
@@ -68,6 +82,20 @@ export function createRacingVenueGroundPlan(descriptor,source){
    for(const lateral of [-halfWidth,0,halfWidth])coverageProbes.push(Object.freeze({latitude:lat+east/magnitude*lateral/metersPerDegree,
     longitude:lon-north/magnitude*lateral/(metersPerDegree*Math.cos(lat*Math.PI/180))}));
    if(coverageProbes.length>60000)throw Error('venue_ground_probe_bound');
+  }
+ }
+ if(landscape){
+  const {coverage:c,radiusMeters}=landscape,epsilon=.000001;
+  for(let index=1;index<layout.points.length;index++){
+   const a=layout.points[index-1],b=layout.points[index],steps=Math.max(1,Math.ceil(geographicVenueDistance(a,b)/100)),
+    east=(b.lon-a.lon)*Math.cos((a.lat+b.lat)*Math.PI/360)*metersPerDegree,north=(b.lat-a.lat)*metersPerDegree,magnitude=Math.hypot(east,north);
+   if(!magnitude)continue;
+   for(let step=0;step<=steps;step++)for(const lateral of[-radiusMeters,-radiusMeters/2,0,radiusMeters/2,radiusMeters]){
+    const t=step/steps,lat=a.lat+(b.lat-a.lat)*t,lon=a.lon+(b.lon-a.lon)*t;
+    coverageProbes.push(Object.freeze({latitude:Math.max(c.south+epsilon,Math.min(c.north-epsilon,lat+east/magnitude*lateral/metersPerDegree)),
+     longitude:Math.max(c.west+epsilon,Math.min(c.east-epsilon,lon-north/magnitude*lateral/(metersPerDegree*Math.cos(lat*Math.PI/180))))}));
+    if(coverageProbes.length>60000)throw Error('venue_ground_probe_bound');
+   }
   }
  }
  return Object.freeze({requiredArtifacts,coverageProbes:Object.freeze(coverageProbes)});
@@ -82,7 +110,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  const layout=compileMappedVenueLayout(source);
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  maximumPavementWidth(source,layout,descriptor);
- const startLine=reviewedStartLine(descriptor,layout);
+ const startLine=reviewedStartLine(descriptor,layout),landscapeRefinement=reviewedLandscapeRefinement(descriptor);
  if(descriptor.routeExtent!==undefined&&descriptor.routeExtent!=='mapped-venue-v1')throw Error('venue_route_extent_invalid');
  const venueSource=descriptor.routeExtent?normalizeRaceVenueSource({version:1,id:descriptor.id,sourceSha256:descriptor.sourceSha256,
   mappedLengthMeters:layout.lengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,sourceFeatureIds:layout.wayIds.map(id=>`osm:way:${id}`)}):undefined;
@@ -125,6 +153,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({id:descriptor.id,name:descriptor.name,status:'source-prepared',
   ...(startLine?{startLine,layoutLabel:descriptor.layoutLabel||'Circuit'}:{}),
   ...(descriptor.presentationStatus?{presentationStatus:descriptor.presentationStatus}:{}),
+  ...(landscapeRefinement?{landscapeRefinement}:{}),
   ...(venueSource?{venueSource}:{}),...(descriptor.raceAdmission?{raceAdmission:descriptor.raceAdmission}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
   sourceFeatureIds:Object.freeze(layout.wayIds.map(id=>`osm:way:${id}`)),mappedLengthMeters:layout.lengthMeters,
   referenceLengthMeters:layout.referenceLengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,

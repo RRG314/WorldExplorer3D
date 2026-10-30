@@ -19,16 +19,18 @@ function distanceToBounds(s,b){
 function interval(values,n){let lo=0,hi=values.length-1;while(hi-lo>1){const mid=(lo+hi)>>1;if(values[mid]<=n)lo=mid;else hi=mid;}return lo;}
 const within=(values,a,b)=>{let i=interval(values,a);while(i<values.length&&values[i]<=a+1e-7)i++;const result=[];for(;i<values.length&&values[i]<b-1e-7;i++)result.push(values[i]);return result;};
 export async function refineReviewedCorridorCells({xValues,zValues,basePositions,segments,skipCell=()=>false,heightAt,current=()=>true,yieldWork=async()=>{},
- innerSpacing=2,outerSpacing=8,maximumLeaves=220000,maximumVertices=500000}){
+ innerSpacing=2,outerSpacing=8,landscapeSpacing=32,maximumLeaves=220000,maximumVertices=500000}){
  if(!Array.isArray(xValues)||!Array.isArray(zValues)||xValues.length<2||zValues.length<2||!Array.isArray(segments)||segments.length>5000||
-  !(innerSpacing>0&&outerSpacing>=innerSpacing)||typeof heightAt!=='function')throw Error('invalid_reviewed_terrain_refinement');
+  ![innerSpacing,outerSpacing,landscapeSpacing].every(Number.isFinite)||!(innerSpacing>0&&outerSpacing>=innerSpacing&&landscapeSpacing>=outerSpacing)||typeof heightAt!=='function')throw Error('invalid_reviewed_terrain_refinement');
  const roots=new Map(),leaves=[];let checkpoint=performance.now();
  const pause=async()=>{if(!current())throw new DOMException('Reviewed terrain refinement superseded','AbortError');if(performance.now()-checkpoint>=8){await yieldWork();checkpoint=performance.now();}};
  const rootKey=(row,column)=>row*xValues.length+column;
  for(const s of segments){
   if(![s.a?.x,s.a?.z,s.b?.x,s.b?.z,s.innerRadius,s.outerRadius].every(Number.isFinite)||Math.hypot(s.b.x-s.a.x,s.b.z-s.a.z)<=0||!(s.innerRadius>0&&s.outerRadius>s.innerRadius&&s.outerRadius<=100))throw Error('invalid_reviewed_terrain_corridor');
-  const minX=Math.max(xValues[0],Math.min(s.a.x,s.b.x)-s.outerRadius),maxX=Math.min(xValues.at(-1),Math.max(s.a.x,s.b.x)+s.outerRadius),
-   minZ=Math.max(zValues[0],Math.min(s.a.z,s.b.z)-s.outerRadius),maxZ=Math.min(zValues.at(-1),Math.max(s.a.z,s.b.z)+s.outerRadius);
+  if(s.landscapeRadius!==undefined&&(!Number.isFinite(s.landscapeRadius)||s.landscapeRadius<=s.outerRadius||s.landscapeRadius>512))throw Error('invalid_reviewed_terrain_landscape');
+  const radius=s.landscapeRadius??s.outerRadius;
+  const minX=Math.max(xValues[0],Math.min(s.a.x,s.b.x)-radius),maxX=Math.min(xValues.at(-1),Math.max(s.a.x,s.b.x)+radius),
+   minZ=Math.max(zValues[0],Math.min(s.a.z,s.b.z)-radius),maxZ=Math.min(zValues.at(-1),Math.max(s.a.z,s.b.z)+radius);
   if(minX>maxX||minZ>maxZ)continue;
   for(let row=interval(zValues,minZ);row<=Math.min(zValues.length-2,interval(zValues,maxZ));row++)for(let column=interval(xValues,minX);column<=Math.min(xValues.length-2,interval(xValues,maxX));column++){
    const id=rootKey(row,column);if(!roots.has(id))roots.set(id,[]);roots.get(id).push(s);
@@ -38,8 +40,9 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
  async function subdivide(first,candidates){
   const pending=[{cell:first,candidates}];let work=0;
   while(pending.length){
-   const {cell,candidates}=pending.pop(),nearby=candidates.filter(s=>distanceToBounds(s,cell)<=s.outerRadius),
-    inner=nearby.some(s=>distanceToBounds(s,cell)<=s.innerRadius),spacing=inner?innerSpacing:outerSpacing;
+   const {cell,candidates}=pending.pop(),nearby=candidates.filter(s=>distanceToBounds(s,cell)<=(s.landscapeRadius??s.outerRadius)),
+    inner=nearby.some(s=>distanceToBounds(s,cell)<=s.innerRadius),outer=nearby.some(s=>distanceToBounds(s,cell)<=s.outerRadius),
+    spacing=inner?innerSpacing:outer?outerSpacing:landscapeSpacing;
    if(nearby.length&&Math.max(cell.maxX-cell.minX,cell.maxZ-cell.minZ)>spacing+1e-7){
     const x=coordinate((cell.minX+cell.maxX)/2),z=coordinate((cell.minZ+cell.maxZ)/2);
     const xs=cell.maxX-cell.minX>spacing+1e-7?[[cell.minX,x],[x,cell.maxX]]:[[cell.minX,cell.maxX]],
@@ -90,5 +93,5 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
   if(trianglesByCell.has(c.root))trianglesByCell.get(c.root).push(...triangles);
   await pause();
  }
- return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size,innerSpacingWorld:innerSpacing,outerSpacingWorld:outerSpacing}};
+ return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size,innerSpacingWorld:innerSpacing,outerSpacingWorld:outerSpacing,landscapeSpacingWorld:landscapeSpacing}};
 }

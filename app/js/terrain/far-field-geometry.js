@@ -636,17 +636,17 @@ function createFarFieldGeometryPlanner(deps = {}) {
       if(reviewedRefinement)return reviewedRefinement;
       const selected=new Set(venue.sourceFeatureIds),roads=(appCtx.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
       if(roads.length!==selected.size||roads.some(r=>r.surfaceSurveyEvidence?.venueSource!==venue||r.transportSurfaceModel?.surveyedSurface?.venueSource!==venue||r.transportSurfaceModel.reviewedSurfacePhase!=='accepted'))throw Error('reviewed_terrain_source_unavailable');
-      const scale=Number(appCtx.WORLD_UNITS_PER_METER)||1,exaggeration=Number(appCtx.TERRAIN_Y_EXAGGERATION)||1,segments=[];
+      const scale=Number(appCtx.WORLD_UNITS_PER_METER)||1,exaggeration=Number(appCtx.TERRAIN_Y_EXAGGERATION)||1,landscape=pack.landscapeRefinement,segments=[];
       for(const road of roads){
         if(road.structureSemantics?.terrainMode!=='at_grade')continue;
         const half=road.width*.5;
-        for(let i=1;i<road.pts.length;i++)segments.push({a:road.pts[i-1],b:road.pts[i],innerRadius:half+8*scale,outerRadius:half+40*scale});
+        for(let i=1;i<road.pts.length;i++)segments.push({a:road.pts[i-1],b:road.pts[i],innerRadius:half+8*scale,outerRadius:half+40*scale,...(landscape?{landscapeRadius:landscape.radiusMeters*scale}:{})});
       }
       const originalCount=geometry.attributes.position.count,lines=collectDetailBoundaryLines(appCtx.terrainGroup?.children),
         oldGrid={xValues,zValues,worldYs,boundaryTriangles,detailedCoverage:spec.detailedCoverage};
       const active=()=>current()&&appCtx.worldLoadRuntimeState===runtime&&!mesh.userData?.farFieldDisposed;
       const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:positionData,segments,current:active,yieldWork,
-        innerSpacing:3*scale,outerSpacing:8*scale,
+        innerSpacing:3*scale,outerSpacing:8*scale,landscapeSpacing:(landscape?.spacingMeters??32)*scale,
         skipCell:c=>cellFullyInsideDetailedCoverage(c.minX,c.maxX,c.minZ,c.maxZ,spec.detailedCoverage),
         heightAt:(x,z,candidates)=>{
           const seam=detailHeightAt(lines,'x',x,z)??detailHeightAt(lines,'z',x,z);
@@ -657,13 +657,21 @@ function createFarFieldGeometryPlanner(deps = {}) {
           const queryX=Math.max(xValues[0],Math.min(xValues.at(-1),x)),queryZ=Math.max(zValues[0],Math.min(zValues.at(-1),z)),
             old=sampleFarFieldGridWorldY(queryX,queryZ,oldGrid);
           if(!Number.isFinite(old))throw Error(`reviewed_terrain_boundary_unavailable: ${x},${z}`);
-          let weight=0;
+          const {lat,lon}=worldToLatLon(x,z),smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
+          let weight=0,landscapeWeight=0;
           for(const segment of candidates){
             const distance=corridorSegmentDistance(x,z,segment),t=Math.max(0,Math.min(1,(distance-segment.innerRadius)/(segment.outerRadius-segment.innerRadius)));
             weight=Math.max(weight,1-t*t*(3-2*t));
+            if(landscape)landscapeWeight=Math.max(landscapeWeight,1-smooth((distance/scale-landscape.fullHeightRadiusMeters)/(landscape.radiusMeters-landscape.fullHeightRadiusMeters)));
+          }
+          if(landscapeWeight){
+            const c=landscape.coverage,metersPerDegree=6371008.8*Math.PI/180,
+              clearance=Math.min((lat-c.south)*metersPerDegree,(c.north-lat)*metersPerDegree,
+                (lon-c.west)*metersPerDegree*Math.cos(lat*Math.PI/180),(c.east-lon)*metersPerDegree*Math.cos(lat*Math.PI/180));
+            weight=Math.max(weight,landscapeWeight*smooth(clearance/landscape.coverageFadeMeters));
           }
           if(!weight)return old;
-          const {lat,lon}=worldToLatLon(x,z),meters=acceptedElevation(lat,lon);
+          const meters=acceptedElevation(lat,lon);
           if(!Number.isFinite(meters))throw Error(`reviewed_terrain_source_ground_unavailable: ${lat},${lon}`);
           const base=meters*scale*exaggeration,graded=terrainTileDeps.applyStructureTerrainCuts(x,z,base),
             ground=terrainTileDeps.resolveWaterTerrainY(x,z,graded);
