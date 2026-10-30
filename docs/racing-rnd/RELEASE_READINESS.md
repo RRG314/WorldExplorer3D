@@ -102,8 +102,19 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   required regular plane parameters and omitted those forests. Placement counts,
   clearing/road/building/water exclusions and the existing model/collision owners
   remain unchanged. A replacement far-terrain publication cancels staged trees.
-  Thirteen focused field, seam-lifetime and publication checks pass; actual-world
-  woodland presentation and its affected resource/frame checks remain pending.
+  Thirteen focused field, seam-lifetime and publication checks pass. Actual-world
+  publication uses the existing model and collision owners, but the inspected
+  woodland remains visibly sparse. Detailed woodland presentation and its
+  affected frame-budget acceptance remain open.
+- Reviewed Nordschleife landscape now retains native relief beyond the physical
+  road corridor, using the same far-terrain mesh and query owner. Original road
+  and bridge ground artifacts are unchanged. Four additional perimeter strips
+  compiled from the retained licensed DGM source extend landscape coverage;
+  their hashes, twelve adjoining seams and added coverage probes pass through
+  the existing ground authority. Actual `80f26e18` loads all eight artifacts and
+  publishes the wider relief. The sampled 150-metre roadside height difference
+  fell from 7.41 m to 0.071 m. This is an affected terrain boundary check;
+  forest density, materials and roadside detail still need visual acceptance.
 - Actual held-key Silverstone driving reproduced fixed-tick pose repeats and
   double advances independently of pulsed automation, barriers or camera-mode
   changes. Practice now samples adjacent accepted session frames for the body,
