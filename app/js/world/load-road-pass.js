@@ -90,7 +90,7 @@ export async function buildRoadGeometryPass(options = {}) {
     });
     const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
     const survey=reviewedDeckSurveyInWorld(roadSourceSurvey(way),pts,{geoToWorld:(lat,lon)=>appCtx.geoToWorld(lat,lon),
-      heightToWorld:meters=>meters*appCtx.WORLD_UNITS_PER_METER*appCtx.TERRAIN_Y_EXAGGERATION});
+      heightToWorld:meters=>meters*appCtx.WORLD_UNITS_PER_METER*appCtx.TERRAIN_Y_EXAGGERATION,metersPerWorldUnit:streetScaleForWorld(appCtx)});
     const sourceRecord = normalizeTransportSource({
       sourceId: sourceFeatureId,
       id: way.id,

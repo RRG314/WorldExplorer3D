@@ -268,7 +268,7 @@ export function compilePedestrianGraph(options = {}) {
         segment.sourceTEnd
       );
       const sidewalkOffset = width * .5;
-      const placement = roadPlacementOffsetWorld(segment.feature);
+      const placement = roadPlacementOffsetWorld(segment.feature,segment.segIndex,((segment.sourceTStart??0)+(segment.sourceTEnd??1))*.5);
       const tags = segment.feature?.transportRecord?.sourceTags || segment.feature?.transportRecord?.rawTags || {};
       // OSM roadway geometry is the source authority. Where no separately
       // mapped footway exists, publish a clearly attributed inferred sidewalk

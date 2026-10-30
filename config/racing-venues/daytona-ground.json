@@ -72,11 +72,11 @@
   ],
   "patches": [
     {
-      "id": "daytona-tri-oval-fine-v2",
-      "westMeters": -9025280,
-      "eastMeters": -9023773,
-      "southMeters": 3398337,
-      "northMeters": 3400108,
+      "id": "daytona-tri-oval-fine-v3",
+      "westMeters": -9025292,
+      "eastMeters": -9023761,
+      "southMeters": 3398325,
+      "northMeters": 3400120,
       "spacingMeters": 2,
       "quantizationMeters": 0.01
     }

@@ -1,6 +1,11 @@
 // Convert reviewed geographic deck observations once, at road compilation.
 // Rendering, support, contacts and approaches then use the shared packed model.
-export function reviewedDeckSurveyInWorld(survey,points,{geoToWorld,heightToWorld}={}){
+import {roadPavementSectionsInWorld} from './road-pavement-sections.js';
+export function reviewedDeckSurveyInWorld(survey,points,{geoToWorld,heightToWorld,metersPerWorldUnit}={}){
+ if(survey?.sourcePavementSections){
+  if(survey.geographicDeckProfile||survey.geographicPavementProfile)throw Error('reviewed_surface_profile_conflict');
+  const {sourcePavementSections,...evidence}=survey;return Object.freeze({...evidence,pavementSections:roadPavementSectionsInWorld(sourcePavementSections,points,metersPerWorldUnit)});
+ }
  const deck=survey?.geographicDeckProfile||survey?.geographicPavementProfile;if(!deck)return survey;
  if(survey.geographicDeckProfile&&survey.geographicPavementProfile)throw Error('reviewed_surface_profile_conflict');
  if(typeof geoToWorld!=='function'||typeof heightToWorld!=='function'||points?.length<2)throw Error('reviewed_deck_world_frame_missing');

@@ -2,6 +2,7 @@ import {createHeightCache} from './height-cache.js';
 import {terrainGridInterval,sampleIndexedTerrainCell} from './world-grid.js';
 import {REVIEWED_CORRIDOR_SUPPORT_METERS,hasReviewedPavementBoundary} from './reviewed-corridor-policy.js';
 import {BANKED_ROAD_MODEL} from '../physics/road-plane-dynamics.js';
+import {roadPavementSectionForSegment} from '../world/road-pavement-sections.js';
 import { streetSideEdge } from '../world/compiler/street-frontage-policy.js';
 import {
   projectPointToFeature,
@@ -20,7 +21,7 @@ function reviewedSupportPlane(feature,projected,x,z,surfaceY){
  if(!(length>1e-8))return surfaceY;
  const ox=x-projected.x,oz=z-projected.z,lateral=(ox*dz-oz*dx)/length,along=(ox*dx+oz*dz)/length,half=feature.transportSurfaceModel.width/2;
  let center;
- if(Math.abs(lateral)>half){
+ if(!feature.transportSurfaceModel.pavementHeightDeltas&&Math.abs(lateral)>half){
   center=sampleFeatureSurfaceY(feature,projected.x,projected.z,projected);
   const side=Math.sign(lateral),edge=sampleFeatureSurfaceY(feature,projected.x+dz/length*half*side,projected.z-dx/length*half*side,projected);
   surfaceY+=(edge-center)/half*(Math.abs(lateral)-half);
@@ -38,8 +39,9 @@ function reviewedBoundarySurface(feature,projected,x,z,terrainY,surfaceY,sampleN
  const a=feature.pts[projected.segIndex],b=feature.pts[projected.segIndex+1],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),half=feature.transportSurfaceModel.width/2;
  if(!(length>1e-8))return surfaceY;
  const lateral=((x-projected.x)*dz-(z-projected.z)*dx)/length;
- if(Math.abs(lateral)<=half)return reviewedSupportPlane(feature,projected,x,z,surfaceY);
- const side=Math.sign(lateral),bx=projected.x+dz/length*half*side,bz=projected.z-dx/length*half*side,
+ const section=roadPavementSectionForSegment(feature,projected.segIndex,projected.t),side=Math.sign(lateral),edgeDistance=section?(side>0?section.negative:section.positive):half;
+ if(Math.abs(lateral)<=edgeDistance)return reviewedSupportPlane(feature,projected,x,z,surfaceY);
+ const bx=projected.x+dz/length*edgeDistance*side,bz=projected.z-dx/length*edgeDistance*side,
   edge=sampleFeatureSurfaceY(feature,bx,bz,projected),native=sampleNative(bx,bz);
  if(!Number.isFinite(edge)||!Number.isFinite(native))throw Error('reviewed_terrain_boundary_ground_unavailable');
  // Beyond the physical edge retain the actual native bank/apron. Carry only
@@ -188,7 +190,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
         const p1=feature.pts[projected.segIndex],p2=feature.pts[projected.segIndex+1];
         const dx=p2.x-p1.x,dz=p2.z-p1.z;
         const sign=((worldX-projected.x)*dz-(worldZ-projected.z)*dx)>=0 ? 1 : -1;
-        const edge=streetSideEdge(feature,halfWidth,sign);
+        const edge=streetSideEdge(feature,halfWidth,sign,projected.segIndex,projected.t);
         const frontage=appCtx.streetFrontageGrading;
         const gradedEdge=frontage && projected.dist<=edge ? edge : frontage?.influenceOuterDistance
           ? frontage.influenceOuterDistance(feature,projected,worldX,worldZ,halfWidth,shoulderBlend)

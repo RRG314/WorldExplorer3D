@@ -100,7 +100,7 @@ function publishAtGradeTerrainCorridors(roads = []) {
     // it from a spatial bucket made a continuous shoulder stop at cell edges.
     paddingForRoad: road => {
       const width = Math.max(Number(road.width) || 5, Number(road.resolvedCrossSection?.sourceWidthMeters)/roadMetersPerWorldUnit(road) || 0);
-      return width * .5 + 44 / streetScaleForWorld(appCtx) + Math.max(3.5, Math.min(8, width * .65));
+      return (road.transportRecord?.crossSection?.pavementSections?.maximumExtent??width*.5) + 44 / streetScaleForWorld(appCtx) + Math.max(3.5, Math.min(8, width * .65));
     }
   });
   appCtx.transportTerrainCorridorPublication = Object.freeze({

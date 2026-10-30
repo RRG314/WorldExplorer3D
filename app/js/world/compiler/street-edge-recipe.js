@@ -84,7 +84,7 @@ export function streetEdgeStationFractions(road,index,t0=0,t1=1){
 export function streetEdgeLateralKnots(road,index,t,widthMeters){
  const state=roadState(road);if(!state)return [];
  const distance=state.distances[index]+(state.distances[index+1]-state.distances[index])*t,
-  width=roadWidthAtSegment(road,index,t)*state.unit,offset=roadPlacementOffsetWorld(road)*state.unit,points=[];
+  width=roadWidthAtSegment(road,index,t)*state.unit,offset=roadPlacementOffsetWorld(road,index,t)*state.unit,points=[];
  for(const side of [-1,1]){
   const bands=state.recipe.bands.filter(b=>b.side===side);if(!bands.length)continue;
   const band=bands.find(b=>distance>=b.startMeters&&distance<=b.endMeters)||bands[0],cap=liftAt(band,distance),inside=width/2-side*offset-band.widthMeters;

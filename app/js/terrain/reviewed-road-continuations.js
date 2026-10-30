@@ -24,7 +24,7 @@ export function reviewedRoadContinuations(roads,venue){
   const width=entry=>roadWidthAtSegment(entry.road,entry.index===0?0:entry.index-1,entry.index===0?0:1)/2,
    inside=entry=>entry.road.pts[entry.index===0?1:entry.index-1];
   const join={previous:inside(a),point,next:inside(b),halfWidth:width(a),nextHalfWidth:width(b),
-   offset:roadPlacementOffsetWorld(a.road)*(a.index===0?-1:1),nextOffset:roadPlacementOffsetWorld(b.road)*(b.index===0?1:-1),
+   offset:roadPlacementOffsetWorld(a.road,a.index===0?0:a.index-1,a.index===0?0:1)*(a.index===0?-1:1),nextOffset:roadPlacementOffsetWorld(b.road,b.index===0?0:b.index-1,b.index===0?0:1)*(b.index===0?1:-1),
    minimumTurnRadians:0,pavementContinuation:true};
   if(!result.has(a.road))result.set(a.road,[]);result.get(a.road).push(join);
  }

@@ -78,9 +78,9 @@ export function appendRoadCenterMarkings(road, points, outputVerts, outputIndice
   const dashLength = 6;
   const patternLength = 12;
   const laneCount = Math.max(1, Number(road?.transportRecord?.crossSection?.lanes) || 1);
-  const corridorOffset = roadPlacementOffsetWorld(road);
   let distanceBeforeSegment = 0;
   for (let index = 0; index < points.length - 1; index += 1) {
+      const corridorOffset = roadPlacementOffsetWorld(road,index,.5);
       const start = points[index];
       const end = points[index + 1];
       const dx = end.x - start.x;
@@ -831,7 +831,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
                 const road=baseRoads[branch.roadIdx];
                 return {...branch,name:road?.name,sourceFeatureId:road?.sourceFeatureId,
                   mode:road?.structureSemantics?.terrainMode,sharedSurface:road?.transportSurfacePresentation?.id,
-                  sourceWidth:road?.width,placementOffset:roadPlacementOffsetWorld(road)};
+                  sourceWidth:road?.width,placementOffset:roadPlacementOffsetWorld(road,branch.segIndex??branch.segIdx??0,branch.t??.5)};
               })});
           }
         }

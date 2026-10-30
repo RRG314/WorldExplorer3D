@@ -1,3 +1,4 @@
+import {roadPavementSectionForSegment} from './road-pavement-sections.js';
 // Exact retained source/junction spans must survive at centimetre scale.
 export const ROAD_SOURCE_MINIMUM_SPAN_METERS=.01;
 // Source cross sections remain in metres. Meshes and spatial queries use
@@ -7,7 +8,8 @@ export function roadMetersPerWorldUnit(feature) {
   if(!Number.isFinite(scale)||scale<=0)throw new RangeError('Invalid road coordinate scale');
   return scale;
 }
-export function roadPlacementOffsetWorld(feature) {
+export function roadPlacementOffsetWorld(feature,segmentIndex,segmentT=.5) {
+  const section=roadPavementSectionForSegment(feature,segmentIndex,segmentT);if(section)return section.offset;
   return (Number(feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters)||0)/roadMetersPerWorldUnit(feature);
 }
 export function roadDimensionsFromSource(transportRecord,metersPerWorldUnit) {

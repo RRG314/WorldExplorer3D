@@ -1,4 +1,5 @@
 import {roadPlacementOffsetWorld} from './world/road-units.js';
+import {roadPavementSectionForSegment,sampleRoadPavementSection} from './world/road-pavement-sections.js';
 import {
   attachCompiledTransportSurface,
   assertReviewedSurfaceAccepted,
@@ -620,12 +621,14 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
 
   const { distances: pointDistances, total } = polylineDistances(points);
   const profileTotal = feature.surfaceDistances?.length ? feature.surfaceDistances[feature.surfaceDistances.length - 1] : total;
-  const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const leftEdge = [];
   const rightEdge = [];
   const centerlineHeights = [];
   for (let i = 0; i < points.length; i++) {
     const point = points[i];
+    const pavementProfile=feature.transportRecord?.crossSection?.pavementSections,
+      pavement=pavementProfile?sampleRoadPavementSection(pavementProfile,profileTotal*(total>1e-6?pointDistances[i]/total:0)):null,
+      nodeHalfWidth=pavement?pavement.width/2:halfWidth,corridorCenterOffset=pavement?pavement.offset:roadPlacementOffsetWorld(feature);
     let nx;
     let nz;
     let joinFactor = 1;
@@ -699,19 +702,19 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
       : transitionedCenterY;
     centerlineHeights.push(centerY);
 
-    const leftX = point.x + nx * (halfWidth + corridorCenterOffset) * joinFactor;
-    const leftZ = point.z + nz * (halfWidth + corridorCenterOffset) * joinFactor;
-    const rightX = point.x + nx * (-halfWidth + corridorCenterOffset) * joinFactor;
-    const rightZ = point.z + nz * (-halfWidth + corridorCenterOffset) * joinFactor;
+    const leftX = point.x + nx * (nodeHalfWidth + corridorCenterOffset) * joinFactor;
+    const leftZ = point.z + nz * (nodeHalfWidth + corridorCenterOffset) * joinFactor;
+    const rightX = point.x + nx * (-nodeHalfWidth + corridorCenterOffset) * joinFactor;
+    const rightZ = point.z + nz * (-nodeHalfWidth + corridorCenterOffset) * joinFactor;
     const rawLeftY = terrainDraped
       ? Number(sampleTerrainY(leftX, leftZ)) + baseTopBias
       : model
-        ? sampleTransportSurfaceAtDistance(model, profileDistance, halfWidth)
+        ? sampleTransportSurfaceAtDistance(model, profileDistance, pavement?nodeHalfWidth+corridorCenterOffset:halfWidth)
         : centerY;
     const rawRightY = terrainDraped
       ? Number(sampleTerrainY(rightX, rightZ)) + baseTopBias
       : model
-        ? sampleTransportSurfaceAtDistance(model, profileDistance, -halfWidth)
+        ? sampleTransportSurfaceAtDistance(model, profileDistance, pavement?-nodeHalfWidth+corridorCenterOffset:-halfWidth)
         : centerY;
     const transitionedLeftY = applyJunctionTransitionY(feature, leftX, leftZ, rawLeftY);
     const transitionedRightY = applyJunctionTransitionY(feature, rightX, rightZ, rawRightY);
@@ -829,7 +832,9 @@ function roadSurfaceAttachmentThreshold(road, options = {}) {
 }
 
 function roadSurfaceLateralThreshold(road, options = {}) {
-  const halfWidth = roadWidthAtProjection(road, options?.projection) * 0.5;
+  const profile=road?.transportRecord?.crossSection?.pavementSections,projection=options?.projection,
+    pavement=profile&&Number.isInteger(projection?.segIndex)&&Number.isFinite(projection?.t)?roadPavementSectionForSegment(road,projection.segIndex,projection.t):null;
+  const halfWidth = pavement?Math.max(pavement.positive,pavement.negative):profile?.maximumExtent??roadWidthAtProjection(road, projection) * 0.5;
   const semantics = road?.structureSemantics || null;
   let padding =
     semantics?.terrainMode === 'elevated' ? 1.05 :

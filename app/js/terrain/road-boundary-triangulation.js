@@ -34,7 +34,7 @@ export function reviewedRoadBoundaryPartition(context){
 
 // Temporary topology input for the existing terrain compiler. The exact same
 // convex swept road pieces define the pavement boundary; no height is stored.
-export function createRoadBoundaryPartition(roads,venue){
+function indexRoadBoundary(roads,venue){
  const joins=reviewedRoadContinuations(roads,venue),tiles=prepareCarriagewayTiles(roads.map(r=>({...r,endpointContinuations:joins.get(r)}))),index=new Map(),cache=new Map();
  const pieces=(item,join)=>{
   if(!cache.has(item))cache.set(item,(join?carriagewayJoinPolygons(item):[carriagewaySegmentPolygon(item)]).filter(Boolean).map(p=>{
@@ -42,16 +42,35 @@ export function createRoadBoundaryPartition(roads,venue){
   }));return cache.get(item);
  };
  for(const tile of tiles)index.set(tile.key,[...tile.segments.flatMap(s=>pieces(s,false)),...tile.joins.flatMap(j=>pieces(j,true))]);
+ return index;
+}
+
+export function createRoadBoundaryPartition(roads,venue){
+ const layers=[indexRoadBoundary(roads,venue)],banks=roads.filter(r=>r.transportRecord?.crossSection?.pavementSections).map(road=>{
+  const record=road.transportRecord,section=record.crossSection,profile=section.pavementSections;
+  // A temporary bank footprint adds its derivative crease to the SAME terrain
+  // topology. It is not a road, source revision, height field or live entity.
+  const bank={...profile,samples:profile.samples.map(s=>({...s,negative:s.bankNegative}))};
+  return {...road,transportRecord:{...record,crossSection:{...section,pavementSections:bank}}};
+ });
+ if(banks.length)layers.push(indexRoadBoundary(banks,venue));
  return triangle=>{
-  const b=bounds(triangle),candidates=new Set();
-  for(let x=Math.floor(b.minX/128);x<=Math.floor(b.maxX/128);x++)for(let z=Math.floor(b.minZ/128);z<=Math.floor(b.maxZ/128);z++)for(const p of index.get(`${x}:${z}`)||[])if(overlap(b,p.bounds))candidates.add(p);
-  if(!candidates.size)return [triangle];
-  let remaining=[triangle];const inside=[];
-  for(const p of candidates){const next=[];for(const piece of remaining){
-   if(!overlap(bounds(piece),p.bounds)){next.push(piece);continue;}
-   const split=carve(piece,p.ring);if(split.inside)inside.push(split.inside);next.push(...split.outside);
-  }remaining=next;if(remaining.length+inside.length>128)throw Error('reviewed_terrain_boundary_capacity');}
-  const triangles=[];for(const piece of [...inside,...remaining])for(let i=2;i<piece.length;i++){const t=[piece[0],piece[i-1],piece[i]];if(Math.abs(area(t))>1e-10)triangles.push(t);}
+  const b=bounds(triangle);let rings=[triangle];
+  for(const index of layers){
+   const candidates=new Set();
+   for(let x=Math.floor(b.minX/128);x<=Math.floor(b.maxX/128);x++)for(let z=Math.floor(b.minZ/128);z<=Math.floor(b.maxZ/128);z++)for(const p of index.get(`${x}:${z}`)||[])if(overlap(b,p.bounds))candidates.add(p);
+   if(!candidates.size)continue;
+   const nextLayer=[];
+   for(const ring of rings){let remaining=[ring];const inside=[];
+    for(const p of candidates){const next=[];for(const piece of remaining){
+     if(!overlap(bounds(piece),p.bounds)){next.push(piece);continue;}
+     const split=carve(piece,p.ring);if(split.inside)inside.push(split.inside);next.push(...split.outside);
+    }remaining=next;if(nextLayer.length+remaining.length+inside.length>128)throw Error('reviewed_terrain_boundary_capacity');}
+    nextLayer.push(...inside,...remaining);
+   }rings=nextLayer;
+  }
+  if(rings.length===1&&rings[0]===triangle)return [triangle];
+  const triangles=[];for(const piece of rings)for(let i=2;i<piece.length;i++){const t=[piece[0],piece[i-1],piece[i]];if(Math.abs(area(t))>1e-10)triangles.push(t);}
   return triangles;
  };
 }

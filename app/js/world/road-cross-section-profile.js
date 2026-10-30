@@ -1,4 +1,5 @@
 import {roadMetersPerWorldUnit} from './road-units.js';
+import {roadPavementSectionForSegment} from './road-pavement-sections.js';
 const MIN_PUBLISHED_ROAD_WIDTH_METERS = 1.2;
 const MIN_DRIVEABLE_ROAD_WIDTH_METERS = 4.8;
 const WIDTH_TRANSITION_METERS = 8;
@@ -45,7 +46,8 @@ function smoothstep(value) {
 }
 
 function roadWidthAtSegmentMeters(feature, segmentIndex = 0, segmentT = 0.5) {
-  const sourceWidth = sourceRoadWidthMeters(feature);
+  const pavement=roadPavementSectionForSegment(feature,segmentIndex,segmentT);
+  const sourceWidth = Math.min(sourceRoadWidthMeters(feature),pavement?pavement.width*roadMetersPerWorldUnit(feature):Infinity);
   const widths = segmentWidths(feature);
   if (!widths || widths.length === 0) return sourceWidth;
 

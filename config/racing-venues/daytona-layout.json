@@ -15,7 +15,7 @@
     "responseSha256": "f2b40b9df508c5d4c62d944bf2273b1027c49496773a3481f2e717ad60e4af3c"
   },
   "layout": {
-    "name": "Daytona \u00b7 tri-oval",
+    "name": "Daytona · tri-oval",
     "closed": true,
     "wayIds": [
       11371365,
@@ -26,9 +26,9 @@
     ],
     "referenceLengthMeters": 4023.36,
     "referenceUrl": "https://www.daytonainternationalspeedway.com/about-daytona-international-speedway/",
-    "usableWidthMeters": 12,
-    "widthNote": "Authored candidate 12 m usable corridor; no measured pavement-width claim. Required full-width wheel/height support is not yet accepted.",
+    "usableWidthMeters": 6,
+    "widthNote": "Conservative 6 m racing corridor within an original asymmetric bank and apron reconstruction. Physical extents are pinned in pavement-sections.json; estimated from NAIP imagery, not an official pavement survey.",
     "timingNote": "No game start/finish line, oval rules or competitive admission accepted by source intake.",
-    "bankingNote": "Published maximum 31 degrees is a factual reference, not a substitute for measured bank geometry and transitions."
+    "bankingNote": "Original game reconstruction uses documented 31 degree turns, 18 degree tri-oval and 3 degree backstretch angles, native ground anchors and authored transition locations. It is not a surveyed engineering alignment."
   }
 }

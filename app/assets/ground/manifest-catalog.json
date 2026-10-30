@@ -7765,16 +7765,16 @@
     },
     {
       "schemaVersion": 1,
-      "artifactId": "daytona-tri-oval-fine-v2",
+      "artifactId": "daytona-tri-oval-fine-v3",
       "providerId": "usgs-3dep-best-available",
       "sourceRelease": "USGS-3DEP:FL_Peninsular_2018_D18:20221020",
-      "contentSha256": "2f50689464ecb4ba3882cb7082c5ed8839e4032e280d0b3e84d9508c0676fc68",
+      "contentSha256": "54ab1fad6a2a80f7f62178ab7d58a2433e386d6360eaea1d583fef1ae0117942",
       "spacingMeters": 2,
       "coverage": {
-        "south": 29.178117551873004,
-        "north": 29.192014877259513,
-        "west": -81.07546967458234,
-        "east": -81.06192308009781
+        "south": 29.178023432642163,
+        "north": 29.192108983654016,
+        "west": -81.07557747241646,
+        "east": -81.06181528226375
       },
       "verticalDatum": "EGM2008",
       "complete": true,
@@ -7784,7 +7784,7 @@
         "sourceClassification": "bare-earth-dtm",
         "sourceCrs": "EPSG:26917+5703",
         "targetCrs": "EPSG:9056+3855",
-        "sourceConfigurationSha256": "501018842a10051396ab4aa8720a1ca9290cddd57bc050415fd68b61e0497d1f",
+        "sourceConfigurationSha256": "47d322a1601e34f6985cb7e851e0fe5394fc2ec36612b954dd863275a36f9b30",
         "raster": {
           "filename": "daytona-native-window-v1/daytona-native-window.f32",
           "bytes": 8488800,
@@ -7917,7 +7917,7 @@
         "sourceDocument": "https://www.usgs.gov/3d-elevation-program",
         "modified": true
       },
-      "url": "./daytona/ground-artifact.json"
+      "url": "/app/assets/ground/daytona/ground-artifact.json"
     }
   ]
 }

@@ -1,0 +1,29 @@
+import {compileMappedVenueLayout} from './venue-layout.js';
+import {validateRoadPavementSections} from '../world/road-pavement-sections.js';
+
+// Verified source-load preparation shares the existing source lifetime. Neither
+// provider tags nor JSON transport can confer this private review annotation.
+const reviewedSections=Symbol('reviewed-venue-pavement-sections');
+export function annotateReviewedVenuePavementSections(source,artifact,{descriptor,requiredArtifacts,contentSha256}){
+ const fail=()=>{throw Error('venue_pavement_source_invalid');},layout=compileMappedVenueLayout(source),profiles=new Map();
+ if(descriptor.pavementWidthPolicy!=='profiled'||artifact?.type!=='ReviewedVenuePavementSections'||artifact.version!==1||
+  artifact.venueId!==descriptor.id||artifact.sourceSha256!==descriptor.sourceSha256||artifact.license!=='ODbL-1.0'||
+  !/^[a-f0-9]{64}$/.test(contentSha256)||!artifact.interpretation||!/^https:\/\//.test(artifact.observation?.url)||
+  !/^[a-f0-9]{64}$/.test(artifact.observation?.sha256)||!Array.isArray(artifact.profiles)||artifact.profiles.length!==layout.wayIds.length||
+  !Array.isArray(artifact.groundArtifacts)||artifact.groundArtifacts.length!==requiredArtifacts.length||
+  requiredArtifacts.some(r=>!artifact.groundArtifacts.some(a=>a.artifactId===r.artifactId&&a.contentSha256===r.contentSha256)))fail();
+ for(const record of artifact.profiles){
+  const id=Number(record?.sourceFeatureId?.replace(/^osm:way:/,'')),way=layout.ways.get(id);
+  if(!layout.wayIds.includes(id)||record.sourceFeatureId!==`osm:way:${id}`||profiles.has(id)||record.sourceVersion!==way.version||record.observationSha256!==artifact.observation.sha256)fail();
+  const profile=validateRoadPavementSections(record,{venueId:descriptor.id,sourceFeatureId:record.sourceFeatureId,sourceSha256:descriptor.sourceSha256,nodeIds:way.nodes});
+  if(profile.samples.some(s=>s.positiveMeters+s.bankNegativeMeters<source.layout.usableWidthMeters))fail();
+  profiles.set(id,profile);
+ }
+ Object.defineProperty(source,reviewedSections,{value:Object.freeze({contentSha256,profiles}),enumerable:false});return source;
+}
+export function reviewedVenuePavementSections(source,descriptor,wayId){
+ if(descriptor.pavementWidthPolicy!=='profiled')return null;
+ const prepared=source?.[reviewedSections];
+ if(!descriptor.reviewedPavementSections||prepared?.contentSha256!==descriptor.reviewedPavementSections.contentSha256)throw Error('venue_pavement_source_not_prepared');
+ const profile=prepared.profiles.get(wayId);if(!profile)throw Error('venue_pavement_profile_unavailable');return profile;
+}

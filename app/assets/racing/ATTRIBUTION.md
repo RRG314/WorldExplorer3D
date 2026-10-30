@@ -134,8 +134,8 @@ excluding the chicanes, road-course and pit-lane alternatives. Original node
 identity and coordinates remain intact.
 
 The mapped centreline measures 4,017.926 m against the venue's 4,023.36 m
-reference; the difference is retained. The candidate 12 m usable corridor is
-authored, not a surveyed pavement boundary. API observation time is separate
+reference; the difference is retained. The conservative 6 m racing corridor
+is separate from the wider reconstructed bank and apron. API observation time is separate
 from an Overpass replication timestamp. No official artwork or logos are used.
 Reproduce with `scripts/racing/build-venue-source.mjs` and the hash-pinned raw
 response declared by `config/racing-venues/daytona-layout.json`. This source
@@ -177,3 +177,25 @@ logos or sponsor artwork are game textures. The three seating tiers, 68 rows,
 two concourses, glazing and access-bay details are original estimates. They
 confer no interior admission or official venue endorsement. The existing
 building publication, collision and resource owners manage this exterior.
+
+
+### Daytona bank and apron reconstruction
+
+`daytona/pavement-sections.json` binds every cross-section to the exact source
+way revision, original nodes, source hash, native ground artifact and retained
+NAIP observation hash. Estimated physical edges and bank knees follow the
+orthophoto reference above. The line can sit off-centre; the physical apron is
+asymmetric. These estimates are not an official engineering survey.
+
+The original game alignment uses the documented 31° turn, 18° tri-oval and 3°
+backstretch banking in [NASCAR's track facts](https://www.nascar.com/gallery/inside-look-at-all-isc-tracks/).
+Transition locations are authored. An original 1.5° apron drainage plane is
+anchored at the native inner pavement edge. It is an estimate, not a documented
+venue specification. The existing transport compiler retains its crossfall,
+longitudinal grade and cut/fill limits across the full physical section.
+
+The ground delivery expands using the same retained USGS native pixels and
+transformation. Source and datum uncertainties remain unchanged. The image
+sample distance is not a statement of boundary accuracy. No observation imagery
+is included as a game texture. Pit/parking pavement, paint, fences, timing and
+oval gameplay remain subject to venue acceptance.

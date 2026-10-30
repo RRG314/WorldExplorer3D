@@ -433,9 +433,9 @@ const GroundHeight = {
       } else if (options.preferredRoadOnly && appCtx.car?.road) {
         const road = appCtx.car.road;
         const projection = this._projectPointToFeature(road, x, z);
-        const reuseRadius = Math.max(5, roadWidthAtProjection(road, projection) * 0.5 + 2.5);
+        const reuseRadius = Math.max(5, (road.transportRecord?.crossSection?.pavementSections?.maximumExtent??roadWidthAtProjection(road, projection) * 0.5) + 2.5);
         if (projection && projection.dist <= reuseRadius) {
-          const profileY = sampleFeatureSurfaceY(road, projection.pt.x, projection.pt.z, projection);
+          const profileY = sampleFeatureSurfaceY(road, road.transportRecord?.crossSection?.pavementSections?x:projection.pt.x, road.transportRecord?.crossSection?.pavementSections?z:projection.pt.z, projection);
           nearestRoad = {
             road,
             dist: projection.dist,

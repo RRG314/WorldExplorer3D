@@ -64,7 +64,9 @@ export function capturePublishedCell(appCtx, publication, key) {
     surface: r.transportSurfaceModel ? {
       schemaVersion: r.transportSurfaceModel.schemaVersion || 1,
       distances: r.transportSurfaceModel.distances, centerHeights: r.transportSurfaceModel.centerHeights,
-      leftHeights: r.transportSurfaceModel.leftHeights, rightHeights: r.transportSurfaceModel.rightHeights
+      leftHeights: r.transportSurfaceModel.leftHeights, rightHeights: r.transportSurfaceModel.rightHeights,
+      ...(r.transportSurfaceModel.pavementHeightDeltas?{pavementOffsets:r.transportSurfaceModel.pavementOffsets,
+        pavementHeightDeltas:r.transportSurfaceModel.pavementHeightDeltas}:{})
     } : null
   }));
   const entrances = (appCtx.buildingEntranceCatalog?.entrances || []).filter(e => ids.has(String(e.buildingSourceId)) || pointIn(e, bounds));

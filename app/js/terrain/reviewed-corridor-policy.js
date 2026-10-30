@@ -23,7 +23,7 @@ export function reviewedTerrainCorridors(context,{includeLandscape=false}={}){
  const scale=Number(context.WORLD_UNITS_PER_METER)||1,segments=[],landscape=includeLandscape?pack.landscapeRefinement:null;
  for(const road of roads){
   if(road.structureSemantics?.terrainMode!=='at_grade')continue;
-  const half=road.width*.5;
+  const half=road.transportRecord?.crossSection?.pavementSections?.maximumExtent??road.width*.5;
   for(let i=1;i<road.pts.length;i++)segments.push({a:road.pts[i-1],b:road.pts[i],innerRadius:half+REVIEWED_CORRIDOR_INNER_MARGIN_METERS*scale,outerRadius:half+REVIEWED_CORRIDOR_OUTER_MARGIN_METERS*scale,...(landscape?{landscapeRadius:landscape.radiusMeters*scale}:{})});
  }
  return {runtime,pack,venue,scale,segments};
