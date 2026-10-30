@@ -51,6 +51,16 @@ Canonical district-source normalization explicitly transfers that private
 annotation to its immutable way records before the road pass consumes them.
 Ordinary roads retain their existing planar cross-section and fitting policy.
 
+Reviewed road profiles have an explicit preparation phase while the shared
+structure compiler solves graph joins. An approach can therefore receive its
+measured bridge's height and camber before crossfall admission. The final packed
+profile handoff validates every reviewed cross-section before replacing any
+model, publishing terrain corridors or creating physical surfaces. A bank above
+the source's allowed value still rejects the group. Preparation profiles cannot
+render as road ribbons, and retained diagnostic profiles are never promoted in
+place. This changes compilation order, not the permitted surface envelope or
+the supported race controller model.
+
 The loader reads each reviewed source once, before preparing terrain. It plans
 ground probes at no more than two-metre spacing down the entire mapped route,
 including both pavement edges plus a two-metre margin. The existing accepted

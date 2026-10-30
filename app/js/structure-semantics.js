@@ -1,6 +1,7 @@
 import {roadPlacementOffsetWorld} from './world/road-units.js';
 import {
   attachCompiledTransportSurface,
+  assertReviewedSurfaceAccepted,
   compileTransportSurfaceModel,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
@@ -567,6 +568,7 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
     feature,
     compileTransportSurfaceModel(feature, sampleTerrainY, {
       publicationStorage: options.publicationStorage,
+      reviewedSurfacePhase: options.reviewedSurfacePhase,
       surfaceBias,
       width: Number.isFinite(options.width) ? Number(options.width) : undefined,
       sampleStep: surfaceSampleStep
@@ -614,6 +616,7 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
       width: halfWidth * 2
     });
   }
+  assertReviewedSurfaceAccepted(feature.transportSurfaceModel);
 
   const { distances: pointDistances, total } = polylineDistances(points);
   const profileTotal = feature.surfaceDistances?.length ? feature.surfaceDistances[feature.surfaceDistances.length - 1] : total;

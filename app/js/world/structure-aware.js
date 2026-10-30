@@ -413,7 +413,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       if (!feature) continue;
       feature.structureTransitionAnchors = [];
       updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-        publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
       });
     }
   });
@@ -436,7 +436,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       for (let i = 0; i < structureFeatures.length; i++) {
         const feature = structureFeatures[i];
         updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
     } finally {
@@ -494,7 +494,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
           feature,
           worldBaseTerrainY,
           {
-          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
           }
         );
       }
@@ -516,7 +516,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       updateFeatureSurfaceProfile(
         feature,
         worldBaseTerrainY,
-        { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+        { publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
       );
     }
 
@@ -539,7 +539,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
         );
         feature.structureTransitionAnchors.push(...replacements.values());
         updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
     }
@@ -566,7 +566,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
         updateFeatureSurfaceProfile(
           feature,
           worldBaseTerrainY,
-          { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+          { publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
         );
       }
     }
@@ -591,7 +591,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
         updateFeatureSurfaceProfile(
           feature,
           worldBaseTerrainY,
-          { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+          { publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
         );
       }
     }

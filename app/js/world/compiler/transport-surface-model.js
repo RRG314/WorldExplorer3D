@@ -47,6 +47,10 @@ const PROFILE_FIELDS = ['distances', 'pathDistances', 'groundHeights', 'offsets'
 // after reconciliation, before tunnel/collision consumers capture any views.
 // Never detach old profiles: diagnostics and prior publications may hold them.
 function packCompiledTransportSurfaces(features) {
+  // Preparation profiles are readable by the graph solver, but cannot escape
+  // into terrain, meshes or contacts before every final cross-section passes.
+  // Validate the whole group before replacing any feature/model aliases.
+  for (const feature of features) validateReviewedSurfaceCrossfall(feature?.transportSurfaceModel);
   const pending = new Map();
   const chunks = [];
   let chunk = null;
@@ -71,7 +75,7 @@ function packCompiledTransportSurfaces(features) {
     const storage = new ArrayBuffer(group.bytes);
     storageBytes += storage.byteLength;
     for (const { model, offset } of group.entries) {
-      const next = { ...model };
+      const next = { ...model, ...(model.reviewedSurfacePhase ? {reviewedSurfacePhase: 'accepted'} : {}) };
       let cursor = offset;
       for (const field of PROFILE_FIELDS) {
         const source = model[field];
@@ -95,6 +99,18 @@ function packCompiledTransportSurfaces(features) {
     if (next) attachCompiledTransportSurface(feature, next);
   }
   return Object.freeze({ profiles: pending.size, buffers: chunks.length, sourceBytes, storageBytes });
+}
+
+function validateReviewedSurfaceCrossfall(model) {
+  if (model?.surveyedSurface && (!Number.isFinite(model.maximumReviewedCrossfall) ||
+      model.maximumReviewedCrossfall > model.surveyedSurface.maximumCrossfall)) {
+    throw new Error('reviewed_road_surface_crossfall_exceeded');
+  }
+}
+
+function assertReviewedSurfaceAccepted(model) {
+  if (model?.reviewedSurfacePhase === 'preparation') throw new Error('reviewed_road_surface_not_finalized');
+  validateReviewedSurfaceCrossfall(model);
 }
 
 function featureRoadType(feature) {
@@ -568,6 +584,7 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const rightHeights = edgeStorage.subarray(centerHeights.length);
   leftHeights.set(centerHeights);
   rightHeights.set(centerHeights);
+  let maximumReviewedCrossfall = 0;
   if(surfaceSurvey){
     for(let index=0;index<sampleCount;index++){
       let leftDelta=leftGround[index]-groundHeights[index],rightDelta=rightGround[index]-groundHeights[index];
@@ -582,8 +599,12 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
           rightDelta=rightDelta*(1-influence)-anchor.reviewedDeckCrossfall*halfWidth*influence;
         }
       }
-      if(Math.max(Math.abs(leftDelta),Math.abs(rightDelta))/halfWidth>surfaceSurvey.maximumCrossfall)throw Error('reviewed_road_surface_crossfall_exceeded');
+      maximumReviewedCrossfall = Math.max(maximumReviewedCrossfall,
+        Math.max(Math.abs(leftDelta),Math.abs(rightDelta))/halfWidth);
       leftHeights[index]+=leftDelta;rightHeights[index]+=rightDelta;
+    }
+    if (options.reviewedSurfacePhase !== 'preparation' && maximumReviewedCrossfall > surfaceSurvey.maximumCrossfall) {
+      throw new Error('reviewed_road_surface_crossfall_exceeded');
     }
   }
 
@@ -600,6 +621,8 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     terrainMode: mode,
     engineeredApproach,
     surveyedSurface:surfaceSurvey?Object.freeze({...surfaceSurvey,...(reviewedDeck?{deckProfile:reviewedDeck}:{})}):null,
+    ...(surfaceSurvey ? {maximumReviewedCrossfall,
+      reviewedSurfacePhase: options.reviewedSurfacePhase === 'preparation' ? 'preparation' : 'accepted'} : {}),
     verticalGroup: String(semantics?.verticalGroup || `${mode}:0`),
     width: halfWidth * 2,
     surfaceBias,
@@ -699,6 +722,7 @@ export {
   engineeredMaximumGrade,
   TRANSPORT_SURFACE_SCHEMA_VERSION,
   attachCompiledTransportSurface,
+  assertReviewedSurfaceAccepted,
   compileTransportSurfaceModel,
   packCompiledTransportSurfaces,
   roadSkirtDepth,

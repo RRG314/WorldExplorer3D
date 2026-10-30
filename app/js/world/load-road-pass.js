@@ -162,7 +162,9 @@ export async function buildRoadGeometryPass(options = {}) {
       bounds: polylineBounds(sourceRoadPts, width * 0.5 + 18)
     };
     appCtx.roads.push(roadFeature);
-    updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { publicationStorage, surfaceBias: ROAD_SURFACE_BIAS });
+    updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, {
+      publicationStorage, surfaceBias: ROAD_SURFACE_BIAS, reviewedSurfacePhase: 'preparation'
+    });
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += sourceRoadPts.length;
     } finally {
