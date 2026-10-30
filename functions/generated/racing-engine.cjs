@@ -4178,7 +4178,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
 
 // app/js/racing/district-storage.js
 var utf8 = new TextEncoder();
-var RACE_DISTRICT_STORAGE_LIMITS = Object.freeze({ inlineBytes: 750 * 1024, chunkBytes: 384 * 1024, totalBytes: 4 * 1024 * 1024, chunks: 12, roads: 5e3 });
+var RACE_DISTRICT_STORAGE_LIMITS = Object.freeze({ inlineBytes: 750 * 1024, chunkBytes: 384 * 1024, totalBytes: 8 * 1024 * 1024, chunks: 24, roads: 5e3 });
 var size = (value) => utf8.encode(JSON.stringify(value)).byteLength;
 var hash = async (value) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", utf8.encode(JSON.stringify(value)))), (b) => b.toString(16).padStart(2, "0")).join("");
 var fail3 = () => {

@@ -229,3 +229,10 @@ with the original slope guards; ordinary profiles keep their existing values.
 A near-limit regression and both generated runtimes pass. Offline replay of
 the captured native facts removes that rounding-only rejection; ten geometry
 failures and one profile-capacity failure still block the venue.
+
+The captured valid surface subset alone exceeds 5 MB, above the old 4 MiB
+publication budget. Storage now permits at most 8 MiB in 24 existing 384 KiB
+chunks. A payload above 4 MiB passes atomic-publication component checks, hash
+round-trip through browser/service/Functions runtimes and damaged-tail rejection.
+Inline records and unsafe-size rejection retain their guards. This is component
+evidence; live multiplayer acceptance of the final complete venue remains open.

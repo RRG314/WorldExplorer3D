@@ -54,7 +54,7 @@ test('large qualified snapshots use bounded chunks without changing canonical fa
  assert.equal(await raceDistrictFingerprint(read),fingerprint);assert.deepEqual(read,prepared.facts);
  const small=await prepareRaceDistrictStorage({...raw,roads:raw.roads.slice(0,1)});
  assert.equal(small.chunks.length,0);assert.equal(await readRaceDistrictFacts(small.fields,()=>assert.fail('inline must not read children')),small.facts);
- assert.throws(()=>raceDistrictChunkPath('../users',0));assert.throws(()=>raceDistrictChunkPath(prepared.id,12));
+ assert.throws(()=>raceDistrictChunkPath('../users',0));assert.throws(()=>raceDistrictChunkPath(prepared.id,L.chunks));
 });
 test('missing, changed or malformed chunk ownership fails closed before returning any facts',async()=>{
  const rows=new Map(prepared.chunks.map(c=>[c.index,c.record]));
@@ -66,7 +66,7 @@ test('missing, changed or malformed chunk ownership fails closed before returnin
  await assert.rejects(readRaceDistrictFacts({...prepared.record,facts:prepared.facts},async()=>null),/storage_unavailable/);
 });
 test('storage capacity is bounded before publication and descriptive facts cannot change under an old geographic identity',async()=>{
- const dense={...raw,roads:raw.roads.map(road=>({...road,heightSamples:Array.from({length:25},(_,index)=>({t:index/24,y:0,leftY:0,rightY:0}))}))};
+ const dense={...raw,roads:raw.roads.map(road=>({...road,heightSamples:Array.from({length:60},(_,index)=>({t:index/59,y:0,leftY:0,rightY:0}))}))};
  await assert.rejects(prepareRaceDistrictStorage(dense),/storage_capacity/);
  const h=database();await publishPreparedRacingDistrict(h.db,prepared,1);
  const changed=await prepareRacingDistrictIntake(input({...raw,locationLabel:'A different unreviewed description'}));assert.equal(changed.id,prepared.id);
@@ -117,4 +117,21 @@ test('catalogue, trusted service reconstruction and curated ownership all consum
  await assert.rejects(readPublishedRaceCourse({id,uid:'viewer',read:async path=>h.rows.get(path)||null}),/storage_unavailable/);
  await backend.moderateRacingRoute({db:h.db,admin:h.admin,moderatorUid:'reviewer',input:{id,revision,decision:'rejected',note:'Withdraw unavailable controlled source'}});
  assert.equal(h.rows.get('racingCourses/'+id).status,'rejected','missing source cannot prevent withdrawing unsafe content');
+});
+
+
+test('a bounded full lateral-surface payload above four MiB round-trips across every storage runtime and publishes atomically',async()=>{
+ const offsets=[-4,-3.65,-3.3,-2.5,-1.2,-.6,0,.6,1.2,2.5,3.3,3.65,4],height=(base,x)=>base+x*.03+Math.max(0,Math.min(.045,(x-3.3)*.13)),snapshot={...raw,roads:raw.roads.slice(0,800).map((road,i)=>{
+  const base=350.123+(i%7)*.001;return {...road,a:{...road.a,y:base},b:{...road.b,y:base+2.5},surfaceModel:'banked-road-v1',heightSamples:Array.from({length:12},(_,j)=>{
+   const t=j/11,y=base+2.5*t;return {t,y,leftY:height(y,-1.2),rightY:height(y,1.2),lateralSamples:offsets.map(offsetMeters=>({offsetMeters,y:height(y,offsetMeters)}))};
+  })};
+ })},candidate=await prepareRacingDistrictIntake(input(snapshot)),bytes=Buffer.byteLength(JSON.stringify(candidate.facts));
+ assert.ok(bytes>4*1024*1024&&bytes<L.totalBytes,`${bytes} canonical bytes`);assert.ok(candidate.chunks.length>12&&candidate.chunks.length<=L.chunks);
+ for(const chunk of candidate.chunks)assert.ok(Buffer.byteLength(JSON.stringify(chunk.record))<1048576);
+ const h=database();await publishPreparedRacingDistrict(h.db,candidate,1);assert.equal(h.rows.size,candidate.chunks.length+2);
+ const fingerprint=await raceDistrictFingerprint(candidate.facts),engines=[{readRaceDistrictFacts},await import('../services/racing/generated/engine.mjs'),createRequire(import.meta.url)('../functions/generated/racing-engine.cjs')];
+ for(const engine of engines){const loaded=await engine.readRaceDistrictFacts(h.rows.get('racingDistricts/'+candidate.id),async index=>h.rows.get(raceDistrictChunkPath(candidate.id,index)));assert.equal(await raceDistrictFingerprint(loaded),fingerprint);assert.equal(loaded.roads.length,800);}
+ const last=candidate.chunks.at(-1),changed=structuredClone(last.record);changed.roads[0].heightSamples[0].lateralSamples.at(-1).y+=.001;
+ await assert.rejects(readRaceDistrictFacts(candidate.record,async index=>index===last.index?changed:candidate.chunks[index].record),/storage_unavailable/);
+ assert.throws(()=>raceDistrictChunkPath(candidate.id,L.chunks));
 });

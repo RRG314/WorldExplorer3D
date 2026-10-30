@@ -1,6 +1,6 @@
 import {canonicalRaceDistrict} from './district-facts.js';
 const utf8=new TextEncoder();
-export const RACE_DISTRICT_STORAGE_LIMITS=Object.freeze({inlineBytes:750*1024,chunkBytes:384*1024,totalBytes:4*1024*1024,chunks:12,roads:5000});
+export const RACE_DISTRICT_STORAGE_LIMITS=Object.freeze({inlineBytes:750*1024,chunkBytes:384*1024,totalBytes:8*1024*1024,chunks:24,roads:5000});
 const size=value=>utf8.encode(JSON.stringify(value)).byteLength;
 const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',utf8.encode(JSON.stringify(value)))),b=>b.toString(16).padStart(2,'0')).join('');
 const fail=()=>{throw Error('race_district_storage_unavailable');};
