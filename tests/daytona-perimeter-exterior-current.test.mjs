@@ -50,7 +50,9 @@ test('LOD selection reads no heights and the existing landmark owner releases ev
  globalThis.document={createElement:()=>({getContext:()=>({beginPath(){},moveTo(){},lineTo(){},closePath(){},stroke(){}})})};
  try{
   const model=createDaytonaPerimeterExterior(T,f.ctx);assert.ok(model);assert.equal(model.root.children.length,2);
-  for(const c of model.root.children){const levels=c.children[0].levels;assert.deepEqual(levels.map(l=>l.object.children.length),[4,2,0]);}
+  for(const c of model.root.children){const levels=c.children[0].levels;assert.deepEqual(levels.map(l=>l.object.children.length),[4,2,0]);
+   for(const p of [levels[0].object.children[3],levels[1].object.children[1]]){assert.equal(p.renderOrder,4);assert.equal(p.material.depthWrite,false);assert.ok(p.material.polygonOffsetFactor< -2,'paint must stay in front of the shared pavement depth bias');}
+  }
   f.ctx.buildingMeshes.push(model.root);assert.equal(createDaytonaPerimeterExterior(T,f.ctx),null);
   f.ctx.roadContactIndex.sampleAt=()=>{throw Error('live height read');};model.root.updateMatrixWorld(true);model.root.traverse(o=>{if(o.isLOD)o.update(new T.PerspectiveCamera());});
   const resources=new Set();model.root.traverse(o=>{if(o.geometry)resources.add(o.geometry);if(o.material){resources.add(o.material);if(o.material.map)resources.add(o.material.map);}});

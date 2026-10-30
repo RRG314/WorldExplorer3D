@@ -3,6 +3,7 @@ import {roadPavementFrameAtSegment} from './road-pavement-coordinate-frame.js';
 import {venueComponentCollider} from './venue-collision.js';
 import {createChainLinkTexture} from './chain-link-texture.js';
 import {finishVenueSurface} from './venue-surface-materials.js';
+import {createRoadMarkingMaterial} from '../road-render.js?v=4';
 
 const quadOrder=[0,1,2,0,2,3];
 function quad(values,points){for(const i of quadOrder)values.push(points[i].x,points[i].y,points[i].z);}
@@ -99,19 +100,19 @@ export function createDaytonaPerimeterExterior(T,ctx){
  const wall=new T.MeshStandardMaterial({color:0xd8dad2,roughness:.95,side:T.DoubleSide}),
   metal=new T.MeshStandardMaterial({color:0x747e81,metalness:.65,roughness:.6,side:T.DoubleSide}),
   fence=new T.MeshStandardMaterial({color:0x899396,map:createChainLinkTexture(T),transparent:true,opacity:.66,depthWrite:false,side:T.DoubleSide,metalness:.35,roughness:.75}),
-  paint=new T.MeshStandardMaterial({vertexColors:true,roughness:.88,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
+  paint=createRoadMarkingMaterial({color:0xffffff,emissive:0,emissiveIntensity:0,vertexColors:true,roughness:.88,side:T.DoubleSide,depthWrite:false},T);
  function mesh(values,material,center,uvs,colors){
   const g=new T.BufferGeometry(),p=new Float32Array(values.length);
   for(let i=0;i<values.length;i+=3){p[i]=values[i]-center.x;p[i+1]=values[i+1]-center.y;p[i+2]=values[i+2]-center.z;}
   g.setAttribute('position',new T.BufferAttribute(p,3));if(uvs)g.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));if(colors)g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.computeVertexNormals();g.computeBoundingSphere();
-  const m=new T.Mesh(g,material);m.receiveShadow=true;return m;
+  const m=new T.Mesh(g,material);m.receiveShadow=true;if(material===paint)m.renderOrder=4;return m;
  }
  for(const c of plan.chunks){
   const group=new T.Group();group.position.set(c.center.x,c.center.y,c.center.z);root.add(group);
   const lod=new T.LOD(),near=new T.Group(),far=new T.Group();group.add(lod);
   near.add(mesh(c.wall,wall,c.center),mesh(c.fence,fence,c.center,c.fenceUvs),mesh(c.metal,metal,c.center),mesh(c.paint,paint,c.center,null,c.colors));
   // Shared geometry is owned by this root and disposed by the world lifecycle.
-  far.add(new T.Mesh(near.children[0].geometry,wall),new T.Mesh(near.children[3].geometry,paint));
+  const distantPaint=new T.Mesh(near.children[3].geometry,paint);distantPaint.renderOrder=4;far.add(new T.Mesh(near.children[0].geometry,wall),distantPaint);
   lod.addLevel(near,0);lod.addLevel(far,650/unit);lod.addLevel(new T.Group(),1900/unit);
  }
  finishVenueSurface(T,root,wall,'../../assets/textures/earth/concrete_diffuse.jpg',2/unit);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {refineReviewedCorridorCells,corridorSegmentDistance} from '../app/js/terrain/reviewed-corridor-refinement.js';
 import {sampleFarFieldGridWorldY} from '../app/js/terrain/far-field-geometry.js?v=18';
+import {applyTerrainProfileSurfaceMaterialMix} from '../app/js/terrain/surface-material-blend.js?v=2';
 const xValues=[-320,0,320],zValues=[-320,0,320],basePositions=new Float32Array(zValues.flatMap(z=>xValues.flatMap(x=>[x,50,z]))),
  segment={a:{x:-15,z:-310},b:{x:15,z:310},innerRadius:7,outerRadius:28};
 const heightAt=(x,z,candidates)=>{
@@ -46,19 +47,20 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {createFarFieldGeometryPlanner} from '../app/js/terrain/far-field-geometry.js?v=18';
 const sandbox=vm.createContext({console});vm.runInContext(fs.readFileSync(new URL('../app/vendor/three/build/three.min.js',import.meta.url),'utf8'),sandbox);
-async function owner(t,{noninteger=false,detailed=false,landscape=false}={}){
+async function owner(t,{noninteger=false,detailed=false,landscape=false,mapped=false,detailedMapped=false}={}){
  const prior=globalThis.THREE,T=sandbox.THREE;globalThis.THREE=T;t.after(()=>{globalThis.THREE=prior;});
  const venue={id:'controlled-refinement',sourceSha256:'a'.repeat(64),sourceFeatureIds:['osm:way:one']},
   survey={venueSource:venue},road={sourceFeatureId:'osm:way:one',width:8,pts:[{x:-300,z:17},{x:300,z:17}],surfaceSurveyEvidence:survey,
    structureSemantics:{terrainMode:'at_grade'},transportSurfaceModel:{reviewedSurfacePhase:'accepted',surveyedSurface:survey}},
   appCtx={_worldLoadSequence:1,worldLoadRuntimeState:{sequence:1,venuePack:{venueSource:venue,...(landscape?{landscapeRefinement:{radiusMeters:350,fullHeightRadiusMeters:150,spacingMeters:32,coverageFadeMeters:70,coverage:{south:-200/111195.0802335329,north:200/111195.0802335329,west:-179,east:179}}}:{})}},roads:[road],terrainGroup:{children:[]},WORLD_UNITS_PER_METER:1,TERRAIN_Y_EXAGGERATION:1};
+ if(detailedMapped)appCtx.landuses=[{type:'grass',pts:[{x:-250,z:10},{x:250,z:10},{x:250,z:22},{x:-250,z:22}],bounds:{minX:-250,maxX:250,minZ:10,maxZ:22}}];
  let available=true,near=null;
  if(detailed){const positions=[];for(let z=0;z<=20;z+=10)for(let x=0;x<=20;x+=10)positions.push(x,10+.03*x+.1*(z-17),z);
   const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));near=new T.Mesh(geometry);near.userData.isTerrainMesh=true;appCtx.terrainGroup.children.push(near);t.after(()=>{near.geometry.dispose();near.material.dispose();});}
- const planner=createFarFieldGeometryPlanner({appCtx,farFieldGridIntervalMeters:320,farFieldGapFillIntervalMeters:40,worldToLatLon:(x,z)=>({lat:landscape?z/111195.0802335329:z,lon:landscape?x/111195.0802335329:x}),
+ const planner=createFarFieldGeometryPlanner({appCtx,farFieldGridIntervalMeters:320,farFieldGapFillIntervalMeters:40,worldToLatLon:(x,z)=>({lat:landscape?z/111195.0802335329:z,lon:landscape?x/111195.0802335329:x}),pointInMappedLandArea:(x,z)=>x> -250&&x<250&&z>10&&z<22,
   sampleAcceptedGroundElevationAtLatLon:(lat,lon)=>{const z=landscape?lat*111195.0802335329:lat,x=landscape?lon*111195.0802335329:lon;return available?50-40*Math.exp(-(((z-17)/(landscape?140:10))**(landscape?8:2)))+.03*x:NaN;},latLonToTileXY:()=>({x:0,y:0}),
   terrainTileDeps:{applyStructureTerrainCuts:(x,z,y)=>Math.abs(z-17)<=4?10+.03*x+.1*(z-17):y,resolveWaterTerrainY:(x,z,y)=>y}}),
-  built=await planner.buildFarFieldGeometry({outer:noninteger?{minX:-320.1,maxX:320.1,minZ:-320.1,maxZ:320.1}:{minX:-320,maxX:320,minZ:-320,maxZ:320},inner:{minX:-5,maxX:5,minZ:-5,maxZ:5},detailedCoverage:detailed?[{minX:0,maxX:20,minZ:0,maxZ:20}]:[]},new Map(),0,{contextZoom:0,waterAreas:[]}),
+  built=await planner.buildFarFieldGeometry({outer:noninteger?{minX:-320.1,maxX:320.1,minZ:-320.1,maxZ:320.1}:{minX:-320,maxX:320,minZ:-320,maxZ:320},inner:{minX:-5,maxX:5,minZ:-5,maxZ:5},detailedCoverage:detailed?[{minX:0,maxX:20,minZ:0,maxZ:20}]:[]},new Map(),0,{contextZoom:0,waterAreas:[],...(mapped?{landAreasByTile:new Map([['0/0/0',detailedMapped?[]:[{mode:'grass',tint:[.2,.45,.15]}]]]),surfaceFallbackByTile:new Map([['0/0/0',{mode:'urban',tint:[.76,.78,.8]}]])}:{})}),
   mesh=new T.Mesh(built.geometry,new T.MeshBasicMaterial());
  mesh.userData.mappedSurfaceTints=built.mappedSurfaceTints;mesh.userData.mappedSurfaceModes=built.mappedSurfaceModes;
  t.after(()=>{mesh.geometry.dispose();mesh.material.dispose();});
@@ -77,6 +79,24 @@ test('the existing geometry owner adopts refined buffers and the same height que
  assert.equal(h.mesh.userData.mappedSurfaceTints.length,count*3);assert.equal(h.mesh.userData.mappedSurfaceModes.length,count);
  assert.equal(await h.built.refineReviewedCorridors(h.mesh),result,'the immutable reviewed group is adopted once by this mesh owner');
  assert.ok(geometry.index.count>0);assert.ok(geometry.boundingSphere.radius>0);
+});
+
+test('refined surface vertices recover narrow mapped grass that the coarse urban grid missed',async t=>{
+ const h=await owner(t,{mapped:true}),before=h.mesh.geometry.attributes.position.count;
+ applyTerrainProfileSurfaceMaterialMix(h.mesh,'urban');
+ assert.equal(h.mesh.userData.mappedSurfaceModes.filter(m=>m==='grass').length,0,'the coarse mesh really misses the narrow mapped strip');
+ await h.built.refineReviewedCorridors(h.mesh);const p=h.mesh.geometry.attributes.position;let grass=0;
+ for(let i=before;i<p.count;i++){
+  const inside=p.getX(i)> -250&&p.getX(i)<250&&p.getZ(i)>10&&p.getZ(i)<22;
+  assert.equal(h.mesh.userData.mappedSurfaceModes[i],inside?'grass':'urban');if(inside){grass++;assert.equal(h.mesh.geometry.attributes.terrainSurfaceMixA.getX(i),0);assert.ok(Math.abs(h.mesh.geometry.attributes.color.getY(i)/(h.mesh.geometry.attributes.color.normalized?255:1)-.45)<.005);}
+ }
+ assert.ok(grass>100,'new fine vertices must recover the retained polygon rather than copying a coarse neighbour');
+});
+test('refined surface vertices use the existing detailed mapped-ground owner before regional urban fallback',async t=>{
+ const h=await owner(t,{mapped:true,detailedMapped:true}),before=h.mesh.geometry.attributes.position.count;
+ applyTerrainProfileSurfaceMaterialMix(h.mesh,'urban');await h.built.refineReviewedCorridors(h.mesh);const p=h.mesh.geometry.attributes.position;let grass=0;
+ for(let i=before;i<p.count;i++)if(p.getX(i)> -250&&p.getX(i)<250&&p.getZ(i)>10&&p.getZ(i)<22){assert.equal(h.mesh.userData.mappedSurfaceModes[i],'grass');assert.equal(h.mesh.geometry.attributes.terrainSurfaceMixA.getX(i),0);grass++;}
+ assert.ok(grass>100);
 });
 
 test('an unavailable native source or superseded owner leaves the previous far geometry and query intact',async t=>{

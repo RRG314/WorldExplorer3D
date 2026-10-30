@@ -11,7 +11,7 @@ for(let i=0;i<5;i++){
 }
 const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));geometry.computeVertexNormals();
 const texture=await new T.TextureLoader().loadAsync('/app/assets/textures/earth/asphalt_track_diffuse.jpg');texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.encoding=T.sRGBEncoding;texture.anisotropy=8;
-const road=new T.Mesh(geometry,new T.MeshStandardMaterial({map:texture,color:0xffffff,roughness:1,side:T.DoubleSide}));road.userData.terrainMode='at_grade';scene.add(road);
+const road=new T.Mesh(geometry,new T.MeshStandardMaterial({map:texture,color:0xffffff,roughness:1,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));road.renderOrder=2;road.userData.terrainMode='at_grade';scene.add(road);
 const index=createRoadContactIndex([road]),ctx={METERS_PER_WORLD_UNIT:1,worldLoadRuntimeState:{venuePack:{id:'daytona-tri-oval',sourceFeatureIds:roads.map(r=>r.sourceFeatureId)}},buildingMeshes:[],roads,roadContactIndex:index},exterior=createDaytonaPerimeterExterior(T,ctx);scene.add(exterior.root);
 const grass=new T.Mesh(new T.PlaneGeometry(1800,1800),new T.MeshStandardMaterial({color:0x69784d,roughness:1}));grass.rotation.x=-Math.PI/2;grass.position.y=4;scene.add(grass);
 const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1200,700);renderer.outputEncoding=T.sRGBEncoding;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;document.body.append(renderer.domElement);

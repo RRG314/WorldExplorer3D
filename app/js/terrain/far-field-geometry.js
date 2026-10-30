@@ -8,9 +8,10 @@ import {
   publishedDetailedTerrainTileKeys
 } from './far-field-coverage.js?v=2';
 import { yieldToMainThread, yieldToWorldFrame } from '../world/cooperative-scheduling.js?v=1';
-import { createNormalizedTerrainAttribute } from './surface-material-blend.js?v=2';
+import { createNormalizedTerrainAttribute,setNormalizedTerrainAttribute,setTerrainSurfaceMaterialMixAt } from './surface-material-blend.js?v=2';
 import {collectDetailBoundaryLines,detailPointsOnEdge,detailHeightAt,triangleHeightAt} from './detail-boundary.js';
 import {reviewedRoadBoundaryPartition} from './road-boundary-triangulation.js';
+import {currentMappedGroundIndex} from './mapped-ground-evidence.js';
 
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -485,6 +486,13 @@ function createFarFieldGeometryPlanner(deps = {}) {
     let maxElevationMeters = -Infinity;
     const maskStats = { waterMaskedVertices: 0 };
 
+    const mappedSurfaceAt=(x,z)=>{
+      const sample=insetFarFieldSamplePoint(x,z,spec.outer),geographic=worldToLatLon(sample.x,sample.z),tile=latLonToTileXY(geographic.lat,geographic.lon,Number(mappedContext?.contextZoom||0)),
+        key=`${mappedContext.contextZoom}/${tile.x}/${tile.y}`,spatial=mappedContext?.landAreaSpatialByTile?.get?.(key);
+      let bucket=mappedContext?.landAreasByTile?.get?.(key)||[];
+      if(spatial){const {bounds,lonSpan,latSpan,size}=spatial,cx=Math.max(0,Math.min(size-1,Math.floor((geographic.lon-bounds.minLon)/lonSpan*size))),cz=Math.max(0,Math.min(size-1,Math.floor((geographic.lat-bounds.minLat)/latSpan*size)));bucket=spatial.cells[cz*size+cx];}
+      return bucket.find(area=>typeof pointInMappedLandArea==='function'&&pointInMappedLandArea(geographic.lon,geographic.lat,area))||mappedContext?.surfaceFallbackByTile?.get?.(key)||null;
+    };
     let sliceStarted=performance.now();
     for (let row = 0; row < zValues.length; row += 1) {
       const z = zValues[row];
@@ -514,20 +522,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
         // The fixed-location LOD uses the same PBR base, WorldCover tint, and
         // built-surface shader as detailed terrain. White is the neutral vertex
         // multiplier until that shared presentation is applied to the mesh.
-        const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
-        const geographicPoint = worldToLatLon(samplePoint.x, samplePoint.z);
-        const contextTile = latLonToTileXY(
-          geographicPoint.lat,
-          geographicPoint.lon,
-          Number(mappedContext?.contextZoom || 0)
-        );
-        const contextTileKey = `${mappedContext.contextZoom}/${contextTile.x}/${contextTile.y}`;
-        const landBucket = mappedContext?.landAreasByTile?.get?.(contextTileKey) || [];
-        const mappedSurface = landBucket.find((area) => (
-          typeof pointInMappedLandArea === 'function' &&
-          pointInMappedLandArea(geographicPoint.lon, geographicPoint.lat, area)
-        ));
-        const resolvedSurface = mappedSurface || mappedContext?.surfaceFallbackByTile?.get?.(contextTileKey) || null;
+        const resolvedSurface = mappedSurfaceAt(x,z);
         const mappedTint = resolvedSurface?.tint;
         if (Array.isArray(mappedTint) && mappedTint.length >= 3) {
           colors.push(mappedTint[0], mappedTint[1], mappedTint[2]);
@@ -705,10 +700,15 @@ function createFarFieldGeometryPlanner(deps = {}) {
       let nextTints=tints,nextModes=modes;
       if(tints){nextTints=new Float32Array(count*3);nextTints.set(tints);}
       if(modes)nextModes=[...modes];
+      const color=staged.get('color'),mixA=staged.get('terrainSurfaceMixA'),mixB=staged.get('terrainSurfaceMixB'),detailedGround=currentMappedGroundIndex(appCtx);
       for(let i=originalCount;i<count;i++){
-        const weights=recipe(i),nearest=weights.reduce((a,b)=>a[1]>=b[1]?a:b)[0];
-        if(nextTints)for(let component=0;component<3;component++)nextTints[i*3+component]=tints[nearest*3+component];
-        if(nextModes)nextModes[i]=modes[nearest];
+        // New fine vertices can fall inside a narrow mapped lawn/forest that
+        // had no coarse vertex. Resolve the same retained geographic polygons
+        // again instead of copying a neighbour's urban classification.
+        const x=refined.positions[i*3],z=refined.positions[i*3+2],surface=detailedGround.sample(x,z)||mappedSurfaceAt(x,z),tint=surface?.tint,mode=String(surface?.mode||surface?.kind||'');
+        if(nextTints)for(let component=0;component<3;component++)nextTints[i*3+component]=tint?.[component]??NaN;
+        if(nextModes)nextModes[i]=mode;
+        if(tint){if(color)setNormalizedTerrainAttribute(color,i,tint);if(mixA&&mixB)setTerrainSurfaceMaterialMixAt({mixA,mixB},i,mode||'grass');}
         if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
       }
       const nextBoundaryBindings=new Map(boundaryBindings);
