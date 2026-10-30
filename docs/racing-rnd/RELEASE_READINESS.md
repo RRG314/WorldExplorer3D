@@ -34,6 +34,15 @@ Updated October 29, 2026. **Full racing is not release-ready.** No production de
   53 joins and matched retained clean approach heights within 1.6 cm. This is
   local agreement with the source data, not absolute survey accuracy, a rendered
   venue, gameplay acceptance or permission to enable the unfinished pack.
+- Actual Nordschleife world loading now adopts all four retained ground grids
+  and all 53 reviewed road models. A source-transfer cancellation error was
+  repaired in the existing street overview owner. Explicit virtual raceway
+  access preserves private real-world map tags while admitting all 1,067 mapped
+  spans to the driving graph. The latest world reached play in 27.0 seconds;
+  a controlled T13 road view was inspected. Full qualification still rejects
+  36 spans across six ways because the distant terrain-based road surface
+  departs sharply from the compiled profiles. Terrain publication, T13 timing,
+  venue detail and a full driven lap remain unfinished; the pack stays closed.
 - Full-length reviewed venues now retain bounded source membership, extent and
   identity through world qualification, canonical/chunk storage and shared
   reconstruction. Long joins and saved results carry compact metadata resolved
