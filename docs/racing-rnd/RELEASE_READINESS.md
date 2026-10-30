@@ -498,3 +498,18 @@ continuously held throttle for 2.2 seconds, retained all four wheel contacts
 No GL, page or console errors occurred. These are local publication and gameplay
 checks; final moving-scene performance, full pavement, fences, paint, pits and
 oval rules remain open, as does complete venue acceptance.
+
+
+The asymmetric Daytona pavement now uses one packed transport publication for
+bank, apron, terrain, worker meshes, camera collision and normal driving/walking
+contact. The native check retains all 127 mapped spans, with no raw or canonical
+rejections; storage round-trips all 127. Both steady held-input drives retain
+four wheel contacts and zero penetration: maximum wheel gap 6.21 mm on the bank
+and 0.095 mm on the apron. Walking across the join retains exact feet-to-road
+contact. The owned browser closes without page, console or cleanup errors.
+
+This accepts the affected physical pavement integration only. Gameplay images
+still show a jagged shaded line along parts of the bank/apron join. Paint, safety
+walls/fencing, pit context, shared asymmetric racing profiles, timing and oval
+rules remain unfinished. It does not add a completed major venue or final moving
+performance acceptance.
