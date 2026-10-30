@@ -92,7 +92,7 @@ function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrad
  let previous=null;
  for(const station of heights){
   const points=station.lateralSamples;
-  if(!Array.isArray(points)||points.length<3||points.length>8||points.some((p,i)=>!p||!Number.isFinite(p.offsetMeters)||!Number.isFinite(p.y)||
+  if(!Array.isArray(points)||points.length<3||points.length>32||points.some((p,i)=>!p||!Number.isFinite(p.offsetMeters)||!Number.isFinite(p.y)||
     i>0&&(p.offsetMeters<points[i-1].offsetMeters||
       (p.offsetMeters===points[i-1].offsetMeters?Math.abs(p.y-points[i-1].y)*metersPerUnit>1e-7:
        Math.abs(p.y-points[i-1].y)*metersPerUnit/(p.offsetMeters-points[i-1].offsetMeters)>BANKED_ROAD_MAXIMUM_CROSSFALL+1e-8)))||

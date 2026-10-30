@@ -1,6 +1,6 @@
-import {publishedLateralProfile} from './published-lateral-profile.js';
+import {readPublishedLateralSection,compilePublishedLateralProfiles} from './published-lateral-profile.js';
 import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
-import {streetEdgeStationFractions,streetEdgeLateralKnots} from '../world/compiler/street-edge-recipe.js';
+import {streetEdgeStationFractions,streetEdgeLateralKnots,streetEdgeIntervalHasLift} from '../world/compiler/street-edge-recipe.js';
 import {traversalSegmentCount,readTraversalSegment}from'../world/traversal-graph-storage.js';
 import {minimumRoadWidthOnInterval,roadSegmentIsDriveable}from'../world/road-cross-section-profile.js?v=1';
 import {roadMetersPerWorldUnit}from'../world/road-units.js';
@@ -28,7 +28,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  const selectedSources=venueSource?new Set(venueSource.sourceFeatureIds):sourceFeatureIds?new Set(sourceFeatureIds):null;
  if(selectedSources&&(!selectedSources.size||selectedSources.size>500||[...selectedSources].some(id=>typeof id!=='string'||!id||id.length>180)))throw Error('invalid_race_source_selection');
  const diagnostics={sourceSegments:traversalSegmentCount(traversal.segments),eligible:0,rejected:{},sampledPositions:0,
-  precisionContacts:0,maximumPrecisionDistanceWorld:0,maximumGroundProfileDepartureMeters:0};
+  precisionContacts:0,maximumPrecisionDistanceWorld:0,maximumGroundProfileDepartureMeters:0,maximumLateralProfileDepartureMeters:0};
  const rejected=reason=>{diagnostics.rejected[reason]=(diagnostics.rejected[reason]||0)+1;};
  const active=()=>current()&&context.worldPublication===publication&&!context.worldLoading;
  function* collect(){
@@ -52,7 +52,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    }
    if(venueSource&&(feature.surfaceSurveyEvidence?.venueSource!==adopted||model?.surveyedSurface?.venueSource!==adopted)){rejected('unqualified_venue_source');yield;continue;}
    const banked=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
-   const edgeRecipe=reviewedRoadEdgeRecipe(feature);
+   const edgeRecipe=reviewedRoadEdgeRecipe(feature),edgeRoad=edgeRecipe?{...feature,edgeBandRecipe:edgeRecipe}:null,hasEdges=edgeRoad&&streetEdgeIntervalHasLift(edgeRoad,segIndex,sourceTStart,sourceTEnd),sections=[];
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
    const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[];
@@ -90,7 +90,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     if(groundOwned)diagnostics.maximumGroundProfileDepartureMeters=Math.max(diagnostics.maximumGroundProfileDepartureMeters,Math.abs(drive.position.y-guide)*metersPerUnit);
     return {x:px,z:pz,y:drive.position.y};
    }
-   const stations=edgeRecipe?[...new Set([...Array.from({length:steps+1},(_,i)=>i/steps),...streetEdgeStationFractions({...feature,edgeBandRecipe:edgeRecipe},segIndex,sourceTStart,sourceTEnd)])].sort((a,b)=>a-b):Array.from({length:steps+1},(_,i)=>i/steps);
+   const stations=hasEdges?[...new Set([...Array.from({length:steps+1},(_,i)=>i/steps),...streetEdgeStationFractions(edgeRoad,segIndex,sourceTStart,sourceTEnd)])].sort((a,b)=>a-b):Array.from({length:steps+1},(_,i)=>i/steps);
    for(let sample=0;sample<stations.length;sample++){
     const t=stations[sample],x=p1.x+(p2.x-p1.x)*t,z=p1.z+(p2.z-p1.z)*t;diagnostics.sampledPositions++;
     if(context.transportDetail?.hasReadyCoverageAt?.({x,z},0)===false){failure='road_publication_pending';break;}
@@ -112,14 +112,18 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     if(previous&&Math.abs(y-previous.y)*metersPerUnit/(length*(t-previous.t))>.22){failure='steep_grade';break;}
     if(Math.max(Math.abs(y-leftY),Math.abs(y-rightY))*metersPerUnit/spanMeters>
       (banked?Math.min(model.surveyedSurface.maximumCrossfall,BANKED_ROAD_MAXIMUM_CROSSFALL):.15)){failure='steep_crossfall';break;}
-    let lateralSamples;
-    if(edgeRecipe)try{lateralSamples=publishedLateralProfile({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:streetEdgeLateralKnots({...feature,edgeBandRecipe:edgeRecipe},segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters)});}
+    if(hasEdges)try{sections.push(readPublishedLateralSection({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:streetEdgeLateralKnots(edgeRoad,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters)}));}
     catch(error){failure=error.message;break;}
-    samples.push({t,y,leftY,rightY,...(lateralSamples?{lateralSamples}:{})});
+    samples.push({t,y,leftY,rightY});
     // Budgeted by the same construction scheduler as the world compiler.
     yield;
    }
    if(failure){rejected(failure);continue;}
+   if(hasEdges)try{
+    const compiled=compilePublishedLateralProfiles(sections,metersPerUnit);
+    for(let i=0;i<samples.length;i++)samples[i].lateralSamples=compiled.profiles[i];
+    diagnostics.maximumLateralProfileDepartureMeters=Math.max(diagnostics.maximumLateralProfileDepartureMeters,compiled.maximumErrorMeters);
+   }catch(error){rejected(error.message);continue;}
    const key=`${sourceFeatureId}:${segIndex}:${sourceTStart.toFixed(6)}:${sourceTEnd.toFixed(6)}`;
    const a={...firstPoint,connectionLayer:`source-node:${segment.fromId}`},b={...lastPoint,connectionLayer:`source-node:${segment.toId}`};
    roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,

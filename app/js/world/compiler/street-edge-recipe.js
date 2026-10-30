@@ -100,8 +100,14 @@ export function streetEdgeLateralKnots(road,index,t,widthMeters){
   const bands=state.recipe.bands.filter(b=>b.side===side);if(!bands.length)continue;
   const band=bands.find(b=>distance>=b.startMeters&&distance<=b.endMeters)||bands[0],cap=liftAt(band,distance),inside=width/2-side*offset-band.widthMeters;
   for(const position of [inside,inside+band.rampMeters*cap/band.heightMeters]){
-   const offsetMeters=side*position;if(offsetMeters> -widthMeters/2+.001&&offsetMeters<widthMeters/2-.001)points.push(offsetMeters);
+   const offsetMeters=side*position;points.push(Math.max(-widthMeters/2,Math.min(widthMeters/2,offsetMeters)));
   }
  }
  return points;
+}
+
+export function streetEdgeIntervalHasLift(road,index,t0,t1){
+ const state=roadState(road);if(!state)return false;
+ const start=state.distances[index],length=state.distances[index+1]-start;
+ return state.recipe.bands.some(b=>Math.max(b.startMeters,start+length*t0)<Math.min(b.endMeters,start+length*t1)-1e-6);
 }

@@ -1544,7 +1544,7 @@ function validLateralHeights(heights, width, metersPerUnit, span, length, maximu
   let previous = null;
   for (const station of heights) {
     const points = station.lateralSamples;
-    if (!Array.isArray(points) || points.length < 3 || points.length > 8 || points.some((p, i) => !p || !Number.isFinite(p.offsetMeters) || !Number.isFinite(p.y) || i > 0 && (p.offsetMeters < points[i - 1].offsetMeters || (p.offsetMeters === points[i - 1].offsetMeters ? Math.abs(p.y - points[i - 1].y) * metersPerUnit > 1e-7 : Math.abs(p.y - points[i - 1].y) * metersPerUnit / (p.offsetMeters - points[i - 1].offsetMeters) > BANKED_ROAD_MAXIMUM_CROSSFALL + 1e-8))) || Math.abs(points[0].offsetMeters + width / 2) > 1e-3 || Math.abs(points.at(-1).offsetMeters - width / 2) > 1e-3 || !points.some((p) => p.offsetMeters === 0 && Math.abs(p.y - station.y) * metersPerUnit <= 1e-3) || !Number.isFinite(station.leftY) || !Number.isFinite(station.rightY) || Math.abs(lateralHeight(points, -span) - station.leftY) * metersPerUnit > 1e-3 || Math.abs(lateralHeight(points, span) - station.rightY) * metersPerUnit > 1e-3) return false;
+    if (!Array.isArray(points) || points.length < 3 || points.length > 32 || points.some((p, i) => !p || !Number.isFinite(p.offsetMeters) || !Number.isFinite(p.y) || i > 0 && (p.offsetMeters < points[i - 1].offsetMeters || (p.offsetMeters === points[i - 1].offsetMeters ? Math.abs(p.y - points[i - 1].y) * metersPerUnit > 1e-7 : Math.abs(p.y - points[i - 1].y) * metersPerUnit / (p.offsetMeters - points[i - 1].offsetMeters) > BANKED_ROAD_MAXIMUM_CROSSFALL + 1e-8))) || Math.abs(points[0].offsetMeters + width / 2) > 1e-3 || Math.abs(points.at(-1).offsetMeters - width / 2) > 1e-3 || !points.some((p) => p.offsetMeters === 0 && Math.abs(p.y - station.y) * metersPerUnit <= 1e-3) || !Number.isFinite(station.leftY) || !Number.isFinite(station.rightY) || Math.abs(lateralHeight(points, -span) - station.leftY) * metersPerUnit > 1e-3 || Math.abs(lateralHeight(points, span) - station.rightY) * metersPerUnit > 1e-3) return false;
     if (previous) {
       if (points.length !== previous.lateralSamples.length) return false;
       const run = (station.t - previous.t) * length;
@@ -4135,7 +4135,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
   };
   const lateral = (s) => {
     if (s.lateralSamples === void 0) return {};
-    if (!Array.isArray(s.lateralSamples) || s.lateralSamples.length < 3 || s.lateralSamples.length > 8) fail2();
+    if (!Array.isArray(s.lateralSamples) || s.lateralSamples.length < 3 || s.lateralSamples.length > 32) fail2();
     return { lateralSamples: s.lateralSamples.map((p) => ({ offsetMeters: number(p?.offsetMeters), y: number(p?.y) })) };
   };
   const point = (p) => ({ x: number(p?.x), y: number(p?.y), z: number(p?.z), connectionLayer: label(p?.connectionLayer, 180) });

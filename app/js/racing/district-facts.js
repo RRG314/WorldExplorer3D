@@ -12,7 +12,7 @@ export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
  const m=raw.metersPerUnit;if(!Number.isFinite(m)||m<=0||m>10)fail();
  const number=n=>{if(!Number.isFinite(n)||Math.abs(n)>1e7)fail();return Math.round(n*m*1000)/(m*1000);};
  const lateral=s=>{if(s.lateralSamples===undefined)return {};
-  if(!Array.isArray(s.lateralSamples)||s.lateralSamples.length<3||s.lateralSamples.length>8)fail();
+  if(!Array.isArray(s.lateralSamples)||s.lateralSamples.length<3||s.lateralSamples.length>32)fail();
   return {lateralSamples:s.lateralSamples.map(p=>({offsetMeters:number(p?.offsetMeters),y:number(p?.y)}))};};
  const point=p=>({x:number(p?.x),y:number(p?.y),z:number(p?.z),connectionLayer:label(p?.connectionLayer,180)});
  const anchor={lat:Number(raw.anchor?.lat),lon:Number(raw.anchor?.lon)};

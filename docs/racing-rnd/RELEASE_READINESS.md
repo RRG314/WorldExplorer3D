@@ -199,3 +199,11 @@ and outside corners, intersection clearance, cell return, paint transfers and
 published lateral profiles in the shared race graph. Actual venue visuals,
 contact fidelity and updated frame timing still require acceptance. Zero of
 twelve major packs have completed acceptance.
+
+The first native kerb build visibly publishes the authored raised edge and
+measures its 45 mm lift. Full venue admission failed because eight lateral
+points could not retain the native terrain creases. The repair uses common
+lateral stations across each affected span, up to 32 points, with measured
+3 mm row-fit error and unchanged grade/crossfall guards. It applies detailed
+profiles only to spans with authored bands. Controlled terrain, storage and
+both generated runtime checks pass; native admission must be rechecked.

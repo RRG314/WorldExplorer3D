@@ -25,7 +25,7 @@ function setup(){
 test('qualification reads actual raised tops and transfers their full profile to the shared race graph',async()=>{
  const h=setup();try{
   const district=await collectRaceDistrict(h.context,{yieldWork:async()=>{}}),road=district.roads[0];
-  assert.ok(road.heightSamples.every(s=>s.lateralSamples.length===8));
+  assert.ok(road.heightSamples.every(s=>s.lateralSamples.length>=7&&s.lateralSamples.length<=32));
   assert.ok(road.heightSamples.some(s=>Math.abs(s.t-.25)<1e-6),'the original source length is scaled only for dressing stations, not stretched into the mapped road');
   let graph;assert.doesNotThrow(()=>{graph=buildRaceRoadGraph(district.roads,{metersPerUnit:1});},JSON.stringify(road.heightSamples));assert.ok(graph.edges.length>0);
   for(let z=.2;z<20;z+=.37)for(const x of[-3.8,-1.2,0,1.2,3.29,3.32,3.4,3.6,3.9]){
@@ -49,4 +49,24 @@ test('Nordschleife bend dressing is bounded original authoring and preserves the
  assert.ok(count>50&&count<500);assert.equal(JSON.stringify(source),before);
  assert.equal(authorVenueEdgeRecipes(layout,{...descriptor,edgeBandAuthoring:undefined}).size,0);
  assert.throws(()=>authorVenueEdgeRecipes(layout,{...descriptor,edgeBandAuthoring:'provider-tag'}),/authoring/);
+});
+
+test('moving native terrain creases use common lateral stations with a measured fit bound',async()=>{
+ const {compilePublishedLateralProfiles}=await import('../app/js/racing/published-lateral-profile.js'),sections=Array.from({length:7},(_,row)=>{
+  const t=row/6,points=Array.from({length:81},(_,i)=>{const offsetMeters=-4+i/10;return {offsetMeters,y:10+t*.05+offsetMeters*.02+Math.max(0,offsetMeters+.8-t*.2)*.025-Math.max(0,offsetMeters-1.6-t*.1)*.02};});
+  return {fixed:[-4,-1.2,0,1.2,4],edgeKnots:[3.3,3.65],points};
+ }),compiled=compilePublishedLateralProfiles(sections,1);
+ assert.ok(compiled.profiles.every(p=>p.length===compiled.profiles[0].length));
+ assert.ok(compiled.profiles[0].length>8&&compiled.profiles[0].length<=32);
+ assert.ok(compiled.maximumErrorMeters<=.003);
+ assert.throws(()=>compilePublishedLateralProfiles(sections,1,{maximumPoints:7}),/capacity/);
+ const raw={sourceId:'moving-crease',sourceFeatureId:'moving-crease',a:{x:0,y:10,z:0},b:{x:0,y:10.05,z:30},widthMeters:8,structure:'surface',direction:'forward',driveable:true,supported:true,surfaceModel:'banked-road-v1',heightSampleSpanMeters:1.2,
+  heightSamples:compiled.profiles.map((lateralSamples,i)=>{const at=offset=>{let k=1;while(k<lateralSamples.length-1&&offset>lateralSamples[k].offsetMeters)k++;const a=lateralSamples[k-1],b=lateralSamples[k];return a.y+(b.y-a.y)*(offset-a.offsetMeters)/(b.offsetMeters-a.offsetMeters);};return {t:i/6,y:at(0),leftY:at(-1.2),rightY:at(1.2),lateralSamples};})};
+ raw.a.y=raw.heightSamples[0].y;raw.b.y=raw.heightSamples.at(-1).y;
+ const {canonicalRaceDistrict}=await import('../app/js/racing/district-facts.js'),{prepareRaceDistrictStorage,readRaceDistrictFacts}=await import('../app/js/racing/district-storage.js'),facts={type:'RaceDistrictFacts',version:1,locationId:'controlled',locationLabel:'Controlled',anchor:{lat:50,lon:7},metersPerUnit:1,roads:[raw]};
+ const canonical=canonicalRaceDistrict(facts),stored=await prepareRaceDistrictStorage(canonical);assert.deepEqual(await readRaceDistrictFacts(stored.fields,async i=>stored.chunks[i].record),canonical);
+ const {createRequire}=await import('node:module'),engines=[await import('../services/racing/generated/engine.mjs'),createRequire(import.meta.url)('../functions/generated/racing-engine.cjs')];
+ for(const engine of engines)assert.deepEqual(engine.canonicalRaceDistrict(facts),canonical);
+ const oversized=structuredClone(raw);for(const s of oversized.heightSamples)while(s.lateralSamples.length<33)s.lateralSamples.push({...s.lateralSamples.at(-1)});
+ assert.throws(()=>buildRaceRoadGraph([oversized],{metersPerUnit:1}),/heights/);
 });
