@@ -20,7 +20,13 @@ export function reserveDaytonaGrandstandRepresentations(ctx){
  const footprint=DAYTONA_STAND_FOOTPRINT.map(p=>ctx.geoToWorld(p.lat,p.lon));
  // Retain the current visual until the post-transport replacement succeeds,
  // but keep it out of irreversible render merges and travelling detail copies.
- for(const mesh of ctx.buildingMeshes||[])if(!mesh.userData?.reviewedVenueExterior&&isDaytonaStandRepresentation(mesh.userData,footprint))mesh.userData.deferredReviewedExterior='daytona-tri-oval';
+ const sources=new Set();
+ for(const mesh of ctx.buildingMeshes||[])if(!mesh.userData?.reviewedVenueExterior&&isDaytonaStandRepresentation(mesh.userData,footprint)){
+  mesh.userData.deferredReviewedExterior='daytona-tri-oval';if(mesh.userData.sourceBuildingId)sources.add(mesh.userData.sourceBuildingId);
+ }
+ // Generic roof details lack a footprint. Their existing stable body identity
+ // transfers custody only after that body's outline has matched this venue.
+ for(const mesh of ctx.buildingMeshes||[])if(mesh.userData?.isRoofDetail&&sources.has(mesh.userData.sourceBuildingId))mesh.userData.deferredReviewedExterior='daytona-tri-oval';
 }
 // Half-plane clipping of already triangulated source geometry preserves the
 // indented mapped outline, including disjoint concourse/access-bay slices.

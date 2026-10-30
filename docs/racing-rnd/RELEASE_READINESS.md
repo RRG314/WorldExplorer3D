@@ -479,3 +479,11 @@ facade details exclude those reserved originals; they remain visible until the
 post-transport replacement succeeds. A real mid-building batch regression covers
 body/roof retention, neighbouring batch preservation and unavailable-ground
 fallback. Native replacement must be rechecked at this publication boundary.
+
+The native follow-up removed the windowed body and exposed the seating. It
+also identified an unfootprinted generic roof detail in a second shared batch.
+The reservation now includes roof details only through a stable provider body
+identity whose outline has already matched the stand. The same deferred
+publisher retires those reserved details on successful adoption. The exact
+missing-footprint roof case fails before this correction and passes afterward;
+original visuals still survive an unavailable-ground replacement.

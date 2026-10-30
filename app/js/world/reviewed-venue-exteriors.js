@@ -213,7 +213,7 @@ export function publishReviewedVenueExteriors(ctx,THREE){
  if(standFactory&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
   if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
   const stand=standFactory(THREE,ctx);if(!stand)return;
-  const retired=new Set(ctx.buildingMeshes.filter(m=>standMatch(m.userData,stand.footprint)));
+  const retired=new Set(ctx.buildingMeshes.filter(m=>standMatch(m.userData,stand.footprint)||m.userData?.deferredReviewedExterior===venue.id));
   for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
   replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>standMatch(b,stand.footprint)),[
