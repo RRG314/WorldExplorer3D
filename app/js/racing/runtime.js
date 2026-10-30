@@ -461,7 +461,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   const fresh=!online||online.connected()&&online.isFresh(),changed=fresh!==lastUiFresh;lastUiFresh=fresh;
   if(snapshot.serverAtMs-lastUiAt<100&&snapshot.phase==='running'&&!changed)return;lastUiAt=snapshot.serverAtMs;
   const player=snapshot.players.find(p=>p.uid===controller.uid),left=Math.max(0,(snapshot.startAtMs||0)-snapshot.serverAtMs);
-  hud.querySelector('[data-race-phase]').textContent=online&&(!online.connected()||!online.isFresh())?'Reconnecting…':snapshot.phase==='countdown'?`Ready · ${Math.max(1,Math.ceil(left/1000))}`:player?.progress?.finished?'Finished · waiting for rivals':`${player?.position||1} / ${snapshot.players.length}`;
+  hud.querySelector('[data-race-phase]').textContent=online&&(!online.connected()||!online.isFresh())?'Reconnecting…':snapshot.phase==='countdown'?`${snapshot.raceControl?.start==='rolling'?'Rolling start':'Ready'} · ${Math.max(1,Math.ceil(left/1000))}`:player?.progress?.finished?'Finished · waiting for rivals':`${player?.position||1} / ${snapshot.players.length}`;
   hud.querySelector('[data-race-clock]').textContent=formatTime(player?.progress?.elapsedMs??Math.max(0,snapshot.serverAtMs-(snapshot.startAtMs||0)));
   hud.querySelector('[data-race-progress]').textContent=`Lap ${player?.progress?.lap||1}/${controller.course.laps} · Gate ${Math.min((player?.progress?.nextGate||0)+1,controller.course.gates.length)}/${controller.course.gates.length}`;
   hud.querySelector('[data-race-speed]').textContent=`${Math.round(Math.abs(carSpeedToMph(player?.speed||0)))} MPH · Condition ${Math.round((player?.condition??1)*100)}%`;

@@ -1,4 +1,5 @@
 import {racePavementCrossSection} from './pavement-cross-section.js';
+import {OVAL_FORMATION_DISTANCE_METERS} from './oval-rules.js';
 // Portable race-course facts and rules. The world compiler supplies road facts;
 // this module cannot invent pavement, change a building or move a transport.
 import {ROAD_SOURCE_MINIMUM_SPAN_METERS} from '../world/road-units.js';
@@ -10,7 +11,8 @@ export const RACE_MAX_ROUTE_EDGES=2048;
 // millimetre coordinate precision. Work is bounded by counts and route length,
 // not by dropping a short link from an otherwise connected real layout.
 export const RACE_MINIMUM_SPAN_METERS=ROAD_SOURCE_MINIMUM_SPAN_METERS;
-export const RACE_DISCIPLINES=Object.freeze(['sprint','circuit','time-trial']);
+export const RACE_DISCIPLINES=Object.freeze(['sprint','circuit','time-trial','oval']);
+export const isClosedRaceDiscipline=discipline=>discipline==='circuit'||discipline==='oval';
 const finitePoint=p=>p&&['x','y','z'].every(k=>Number.isFinite(p[k]));
 const distance=(a,b)=>Math.hypot(b.x-a.x,b.z-a.z);
 const angle=(a,b)=>Math.acos(Math.max(-1,Math.min(1,a.x*b.x+a.z*b.z)));
@@ -242,9 +244,9 @@ export function createRaceCourse(graph,path,settings={}){
  const byId=new Map(graph.edges.map(e=>[e.id,e])),edges=path.map(id=>byId.get(id));if(edges.some(e=>!e))throw Error('race_road_missing');
  const discipline=settings.discipline||'sprint';if(!RACE_DISCIPLINES.includes(discipline))throw Error('invalid_race_discipline');
  const closed=edges.at(-1).to===edges[0].from;
- if(discipline==='circuit'&&!closed)throw Error('race_circuit_not_closed');
- if(discipline!=='circuit'&&closed)throw Error('race_sprint_is_closed');
- const laps=discipline==='circuit'?Math.floor(Number(settings.laps)||1):1;if(laps<1||laps>8)throw Error('invalid_race_laps');
+ if(isClosedRaceDiscipline(discipline)&&!closed)throw Error('race_circuit_not_closed');
+ if(!isClosedRaceDiscipline(discipline)&&closed)throw Error('race_sprint_is_closed');
+ const laps=isClosedRaceDiscipline(discipline)?Math.floor(Number(settings.laps)||1):1;if(laps<1||laps>8)throw Error('invalid_race_laps');
  const points=[{...graph.nodes[edges[0].from]}],segments=[];let lengthMeters=0;
  for(let i=0;i<edges.length;i++){
   const edge=edges[i];if(i&&edges[i-1].to!==edge.from)throw Error('disconnected_race_route');
@@ -257,6 +259,9 @@ export function createRaceCourse(graph,path,settings={}){
   points.push({...b});lengthMeters+=edge.length;
  }
  if(closed&&angle(segments.at(-1).forward,segments[0].forward)>Math.PI*.64)throw Error('race_turn_too_sharp');
+ // An oval discipline needs a reviewed whole loop and an explicit bank lane.
+ // Renaming an ordinary city loop must not invent banking or apron semantics.
+ if(discipline==='oval'&&(!graph.venueSource||segments.some(s=>s.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||s.heightSamples?.some(row=>!Number.isFinite(row.racingWidthMeters)))))throw Error('race_oval_pavement_required');
  if(lengthMeters<200||lengthMeters>raceVenueMaximumLength(graph.venueSource))throw Error('race_route_length');
  if(closed){
   // Put a circuit's timing/grid line within its selected straight, never on
@@ -332,9 +337,11 @@ export function projectRacePosition(course,pose,{minimumMeters=-Infinity,maximum
  return nearest;
 }
 
-export function raceGridPose(course,index=0){
+export function raceGridPose(course,index=0,{rollingStagingMeters=course.discipline==='oval'?OVAL_FORMATION_DISTANCE_METERS:0}={}){
  if(!Number.isInteger(index)||index<0||index>=course.participants)throw Error('invalid_race_grid_slot');
- const distanceMeters=course.vehicleEnvelope.lengthMeters/2+1+(Math.ceil(course.participants/2)-1-Math.floor(index/2))*8;
+ if(!Number.isFinite(rollingStagingMeters)||rollingStagingMeters<0||rollingStagingMeters>80||rollingStagingMeters&&course.discipline!=='oval')throw Error('invalid_race_rolling_grid');
+ const gridDistance=course.vehicleEnvelope.lengthMeters/2+1+(Math.ceil(course.participants/2)-1-Math.floor(index/2))*8,
+  distanceMeters=rollingStagingMeters?((gridDistance-rollingStagingMeters)%course.lengthMeters+course.lengthMeters)%course.lengthMeters:gridDistance;
  const s=raceSegmentAtDistance(course,distanceMeters);
  const forward=s.forward,along=(distanceMeters-s.startMeters)/course.metersPerUnit;
  const lateral=((racePavementCrossSection(s,(distanceMeters-s.startMeters)/s.lengthMeters)?.racingOffsetMeters||0)+(course.participants===1?0:index%2===0?-1.4:1.4))/course.metersPerUnit;
