@@ -294,3 +294,13 @@ geometry, preserving coincident column slots and cell identities. A producer
 regression passes; the retained native snapshot reproduces and removes the
 metre-scale discontinuity with that metadata correction. Native rechecking of
 the affected surface and remaining failures is still required.
+
+The subsequent native check confirms the far-axis repair removes the affected
+Hedwigshöhe failure. Three surface failures and one missing crossfall sample
+remain. Generalized service roads beside two failed track edges are retained.
+Terrain grading now gives the accepted reviewed cross-section priority across
+its bounded pavement support cells, then blends continuously back to ordinary
+grading. A controlled overlapping access-road regression fails before this
+change and passes afterwards, including road-order independence, preserved
+source profiles and unchanged grading outside the track's support. Native
+verification of this grading change remains open.

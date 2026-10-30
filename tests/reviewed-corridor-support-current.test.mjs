@@ -19,3 +19,17 @@ test('unreviewed and elevated roads retain their existing grading ownership',()=
  const grade=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[r]}}),y=plane(6,50)-4;assert.ok(grade.applyStructureTerrainCuts(6,50,y)<plane(6,50)-.1);
  const high={...road(),structureSemantics:{terrainMode:'elevated'}};assert.equal(createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[high]}}).applyStructureTerrainCuts(6,50,y),y);
 });
+test('a generalized access road cannot distort terrain cells supporting a reviewed track',()=>{
+ const track=road(),access={sourceFeatureId:'generalized-access',pts:[{x:6,z:0},{x:6,z:100}],width:3.8,surfaceBias:.18,structureSemantics:{terrainMode:'at_grade'}};
+ updateFeatureSurfaceProfile(access,(x,z)=>plane(x,z)+.4);
+ const before=structuredClone(access),base=(x,z)=>plane(x,z)-1,
+  trackOnly=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[track]}}),
+  accessOnly=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[access]}});
+ for(const cuts of [[track,access],[access,track]]){
+  const grade=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:cuts}}),sample=x=>grade.applyStructureTerrainCuts(x,50,base(x,50));
+  for(const x of [3,4,5,6])assert.ok(Math.abs(sample(x)-trackOnly.applyStructureTerrainCuts(x,50,base(x,50)))<1e-9,'the whole support cell retains the reviewed plane');
+  assert.equal(sample(10),accessOnly.applyStructureTerrainCuts(10,50,base(10,50)),'the access road retains its ordinary grade beyond the bounded track support');
+  let prior=sample(7);for(let x=7.001;x<=10;x+=.001){const next=sample(x);assert.ok(Math.abs(next-prior)<.02,'the shoulder returns continuously to ordinary grading');prior=next;}
+ }
+ assert.deepEqual(access,before,'the source road, profile and topology remain intact');
+});
