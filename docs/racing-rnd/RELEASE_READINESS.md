@@ -105,7 +105,15 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   Thirteen focused field, seam-lifetime and publication checks pass. Actual-world
   publication uses the existing model and collision owners, but the inspected
   woodland remains visibly sparse. Detailed woodland presentation and its
-  affected frame-budget acceptance remain open.
+  affected frame-budget acceptance remain open. Detailed tiles now read forest
+  from their published world-coordinate grid, including actual float stations
+  and triangle diagonals. Relief shading preserves accepted forest cover on
+  wooded slopes. Eight field/grid checks and four affected material checks pass.
+  Actual `cae81801` confirms forest weight on the sampled wooded slope and
+  allocates 297 more supported canopy placements near the driver, keeping the
+  same 1,168 total vegetation instances. Nine placement/exclusion checks pass.
+  This verifies field and placement ownership; the inspected venue view still
+  needs denser visual continuity, circuit dressing and frame-budget acceptance.
 - Reviewed Nordschleife landscape now retains native relief beyond the physical
   road corridor, using the same far-terrain mesh and query owner. Original road
   and bridge ground artifacts are unchanged. Four additional perimeter strips
