@@ -44,7 +44,7 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
    const profile=rivals[i].profile,visual=createUrbanVehicleVisual(THREE,{id:`rival:${i}`,variant:profile.variant,condition:profile.conditionValue});
    visuals.push(visual);
    byUid.set(rivals[i].uid||`rival:${i}`,{visual,profile});
-   const ready=await attachCuratedTrafficVehicle(THREE,visual.root,{variantId:profile.variant.id,assetId:personalVehicleById(profile.vehicleId)?.assetId||undefined,color:[0xd05f39,0x6c9ed3,0xb4a080][i],signal,isCurrent:current});
+   const ready=await attachCuratedTrafficVehicle(THREE,visual.root,{variantId:profile.variant.id,assetId:personalVehicleById(profile.vehicleId)?.assetId||undefined,preserveSourcePaint:true,signal,isCurrent:current});
    if(!ready||!current())throw Error('race_rival_model_unavailable');
    root.add(visual.root);
   }

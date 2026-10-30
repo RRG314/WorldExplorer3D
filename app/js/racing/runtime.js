@@ -322,7 +322,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    const profile=createRaceVehicleProfile(vehicleId,{condition:c.car.condition??garage.vehicles[vehicleId].condition,levels});
    const count=course.discipline==='time-trial'?0:Math.min(course.participants-1,Number(el('[data-race-rivals]').value));
    const rivals=Array.from({length:count},(_,i)=>({label:['Mara · Coastline Crew','Jules · City Current','Rin · Night Survey'][i],
-    difficulty:Number(el('[data-race-difficulty]').value),profile:createRaceVehicleProfile(['bmw_m3_e92_race','bmw_m3_e46','porsche_carrera_4s'][i])}));
+    difficulty:Number(el('[data-race-difficulty]').value),profile:createRaceVehicleProfile(['bmw_m3_e92_race','porsche_carrera_4s','bmw_m3_e46'][i])}));
    recordId=await racePracticeRecordKey(course,profile);if(!currentRecords().canStart(recordId))throw Error('race_previous_result_unsaved');
    const prepared=await prepareRacePresentation(THREE,c,course,rivals,{signal:request.signal,current});scope.defer(()=>prepared.dispose(),'race-visuals');
    if(!current())throw Error('race_world_changed');

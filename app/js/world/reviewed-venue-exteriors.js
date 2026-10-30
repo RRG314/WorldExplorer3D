@@ -231,7 +231,7 @@ export function publishReviewedVenueExteriors(ctx,THREE){
    const retired=new Set(ctx.buildingMeshes.filter(m=>isDaytonaPaddockRepresentation(m.userData,exterior)||m.userData?.deferredReviewedExterior==='daytona-paddock:'+exterior.sourceBuildingId));
    for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
    ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
-   replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>isDaytonaPaddockRepresentation(b,exterior)),[
+   replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>isDaytonaPaddockRepresentation(b,exterior)),exterior.colliders||[
     venueComponentCollider(exterior.sourceBuildingId,exterior.footprint,exterior.bottom,exterior.top)
    ]);
    ctx.addEarthWorldObject(exterior.root);ctx.buildingMeshes.push(exterior.root);published.push(exterior.root.name);

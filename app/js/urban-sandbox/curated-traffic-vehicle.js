@@ -66,7 +66,7 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     materials.forEach((material) => {
       const name = String(material?.name || '');
-      if (paintNames.has(name)) {
+      if (paintNames.has(name) && options.preserveSourcePaint !== true) {
         material.color?.setHex?.(Number(options.color || 0x52697a));
         material.roughness = .5;
         material.metalness = .28;

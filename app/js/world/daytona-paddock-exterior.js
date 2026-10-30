@@ -1,6 +1,7 @@
 import {DAYTONA_PADDOCK_BUILDINGS} from './daytona-paddock-survey.js';
 import {batchOwnedStaticStructure} from './static-structure-batching.js';
 import {finishVenueSurface} from './venue-surface-materials.js';
+import {venueComponentCollider} from './venue-collision.js';
 
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
@@ -32,6 +33,48 @@ function clip(ring,distance){
   if(ia)out.push(a);if(ia!==ib){const t=da/(da-db);out.push({u:a.u+(b.u-a.u)*t,v:a.v+(b.v-a.v)*t});}
  }return out;
 }
+function pitCanopy(T,plan,{root,local,world,center,footprint,floor,bottom,groundAt}){
+ const {unit,eavesMeters,ridgeMeters}=plan,materials=[0xd2d6d3,0x59676b,0xb9b8ad,0xd0a64d].map((color,i)=>{
+  const m=new T.MeshStandardMaterial({color,roughness:i===2?.96:.65,metalness:i===1?.65:0,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;
+ }),lowU=Math.min(...local.map(p=>p.u)),highU=Math.max(...local.map(p=>p.u)),lowV=Math.min(...local.map(p=>p.v)),highV=Math.max(...local.map(p=>p.v)),colliders=[];
+ const triangles=T.ShapeUtils.triangulateShape(local.map(p=>new T.Vector2(p.u,p.v)),[]).map(ids=>ids.map(i=>local[i]));
+ // The pit-facing long edge is selected from the same mapped branch, with no
+ // authored position or competing ground query. Roofs keep their exact plan.
+ const road=plan.pitRoad,mid={u:(lowU+highU)/2,v:(lowV+highV)/2},ends=[lowV,highV].map(v=>world(mid.u,v)),distance=p=>Math.min(...road.pts.slice(1).map((b,i)=>{const a=road.pts[i],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);})),front=distance(ends[0])<distance(ends[1])?lowV:highV,back=front===lowV?highV:lowV;
+ const vertex=(p,y)=>{const w=world(p.u,p.v);return [w.x-center.x,y/unit,w.z-center.z];};
+ const box=(group,mat,u,v,width,height,depth,base,collision=false)=>{
+  const p=world(u,v),mesh=new T.Mesh(new T.BoxGeometry(width/unit,height/unit,depth/unit),materials[mat]);mesh.position.set(p.x-center.x,(base+height/2)/unit,p.z-center.z);mesh.rotation.y=-Math.atan2(plan.uz,plan.ux);mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);
+  if(collision){const pts=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,z])=>world(u+x*width/2,v+z*depth/2));colliders.push(venueComponentCollider(plan.sourceBuildingId,pts,floor+base/unit,floor+(base+height)/unit));}
+ };
+ function level(detail){const group=new T.Group(),positions=[];
+  for(const triangle of triangles)for(const y of [eavesMeters,ridgeMeters])for(const i of y===eavesMeters?[2,1,0]:[0,1,2])positions.push(...vertex(triangle[i],y));
+  for(let i=0;i<local.length;i++){const a=local[i],b=local[(i+1)%local.length];for(const [p,y]of [[a,eavesMeters],[b,eavesMeters],[b,ridgeMeters],[a,eavesMeters],[b,ridgeMeters],[a,ridgeMeters]])positions.push(...vertex(p,y));}
+  const roofGeometry=new T.BufferGeometry();roofGeometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));roofGeometry.computeVertexNormals();const roof=new T.Mesh(roofGeometry,materials[0]);roof.name='Pit canopy roof';roof.castShadow=roof.receiveShadow=true;group.add(roof);
+  const count=Math.max(2,Math.ceil((highU-lowU)/5));
+  for(let i=0;i<=count;i++){const u=lowU+.16+(highU-lowU-.32)*i/count;
+   for(const v of [front===lowV?lowV+.16:highV-.16,back===lowV?lowV+.16:highV-.16]){
+    const point=world(u,v);if(!inside(point,footprint))continue;const base=(groundAt(point.x,point.z)-floor)*unit;box(group,1,u,v,.16,eavesMeters-base,.16,base,detail);if(detail)box(group,3,u,v,.19,.5,.19,base);
+   }
+   box(group,1,u,(lowV+highV)/2,.12,.12,highV-lowV-.1,eavesMeters-.15);
+  }
+  // Low pit wall/crew counter and steel edging; the centre under the canopy
+  // remains open. These actual component volumes replace the old solid box.
+  const v=front===lowV?lowV+.22:highV-.22;
+  for(let u=lowU+.1;u<highU-.1;u+=2.5){const width=Math.min(2.5,highU-.1-u),p=world(u+width/2,v),base=(groundAt(p.x,p.z)-floor)*unit;box(group,2,u+width/2,v,width,.9,.3,base,detail);box(group,1,u+width/2,v,width,.06,.42,base+.9);}
+  if(detail)for(let u=lowU+.4;u<highU-.2;u+=.8)box(group,1,u,(lowV+highV)/2,.03,.035,highV-lowV-.1,ridgeMeters+.012);
+  batchOwnedStaticStructure(T,group);return group;
+ }
+ const lod=new T.LOD();lod.addLevel(level(true),0);lod.addLevel(level(false),240/unit);lod.addLevel(new T.Group(),900/unit);root.add(lod);
+ // One roof volume plus the exact posts and low wall; no hidden full-height
+ // facade collision or interior room is inferred from this open structure.
+ colliders.push(venueComponentCollider(plan.sourceBuildingId,footprint,floor+eavesMeters/unit,floor+ridgeMeters/unit));
+ root.userData.architecture={kind:plan.kind,garages:0,closedServiceBays:0,roofBays:1,lodLevels:3,eavesMeters,ridgeMeters,openCanopy:true,componentColliders:colliders.length};root.userData.buildingType='canopy';
+ finishVenueSurface(T,root,materials[2],'../../assets/textures/earth/concrete_diffuse.jpg',3);
+ // Reuse the accepted white perimeter finish: this concrete image supplies
+ // bump detail, so its brown source colour cannot turn a pit wall into timber.
+ materials[2].bumpMap=materials[2].map;materials[2].map=null;materials[2].bumpScale=.018/unit;materials[2].needsUpdate=true;
+ return {root,footprint,bottom,top:floor+ridgeMeters/unit,colliders,sourceBuildingId:plan.sourceBuildingId};
+}
 // Existing post-transport publication supplies all terrain observations. No
 // runtime sampler, interior admission, scheduler or second building owner.
 export function createDaytonaPaddockExteriors(T,ctx){
@@ -52,6 +95,11 @@ export function createDaytonaPaddockExteriors(T,ctx){
   const bottom=Math.min(...ground),floor=Math.max(...ground)+.08/unit,root=new T.Group();root.position.set(center.x,floor,center.z);root.name='Daytona — '+plan.label;
   root.userData={sourceBuildingId:plan.sourceBuildingId,buildingFootprint:footprint,reviewedVenueExterior:true,paddockStructure:true,paddockGarage:plan.kind==='garage',exteriorOnly:true,
    sourceClaim:'Exact OSM plan; NAIP roof observation; original estimated heights, closed service bays, roof ribs and vents; no interior admission'};
+  if(plan.kind==='pit-canopy'){
+   const pitRoad=ctx.roads?.find(r=>r.sourceFeatureId==='osm:way:352067003');if(!pitRoad?.pts?.length)continue;
+   root.userData.sourceClaim='Pinned Overture 2026-09-23.1 plan; NAIP confirms low open roof; original estimated height, posts and pit wall; no interior admission';
+   results.push(pitCanopy(T,{...plan,ux,uz,pitRoad},{root,local,world,center,footprint,floor,bottom,groundAt:ctx.elevationWorldYAtWorldXZ}));continue;
+  }
   const material=(color,roughness=.85,metalness=0)=>{const m=new T.MeshStandardMaterial({color,roughness,metalness,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;},
    wall=material(0xd5cfb7,.95),roof=material(plan.kind==='club'?0x75655b:0xc6ccca,.55,.45),dark=material(0x364147,.9),trim=material(0x818f92,.5,.45),glass=material(0x2e515b,.3,.35),yellow=material(0xc1a14f,.75),foundation=material(0xb4b3a7,.97),
    materials=[wall,roof,dark,trim,glass,yellow,foundation],lod=new T.LOD();root.add(lod);

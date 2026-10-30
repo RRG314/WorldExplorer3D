@@ -202,6 +202,16 @@ oval gameplay remain subject to venue acceptance.
 
 ### Daytona paddock garage exteriors
 
+Four pit-lane canopy plans retain the Overture Buildings 2026-09-23.1 identities
+`50bbce81-5615-4816-9900-07c84e6849bb`,
+`fd13feea-eacd-4677-948b-09034d7388c7`,
+`a4a25115-0666-4eae-8f90-b86552be6dff`, and
+`2744437e-3bb5-4411-8400-9bddbfb88885`.
+See [Overture Buildings](https://docs.overturemaps.org/guides/buildings/) and
+the existing Overture source attribution. The retained NAIP observation confirms
+low open roofs; their heights, steel posts, roof ribs and low pit walls are
+original estimates. Imagery is observation only and is not game artwork.
+
 The original garage models retain the exact outlines of OpenStreetMap ways
 [407709766](https://www.openstreetmap.org/way/407709766),
 [407709767](https://www.openstreetmap.org/way/407709767) and
