@@ -1,4 +1,5 @@
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
+import {BANKED_ROAD_MODEL} from '../physics/road-plane-dynamics.js';
 import { compileEngineeredApproachExcavation } from './compiler/engineered-approach-excavation.js';
 import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
 import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits, compileSurfaceRoadOverlapRanges} from './compiler/tunnel-obstruction-limits.js';
@@ -644,6 +645,11 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       continuity,
       junctionPasses
     });
+    const bankedIds=new Set(transportFeatures.filter(f=>f.transportSurfaceModel?.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL)
+      .map(f=>String(f.transportGraphRef?.featureId||f.sourceFeatureId||'')));
+    if(continuity.discontinuities.some(d=>bankedIds.has(d.leftFeatureId)||bankedIds.has(d.rightFeatureId))){
+      throw Error('reviewed_road_junction_discontinuity');
+    }
   });
   yield;
 

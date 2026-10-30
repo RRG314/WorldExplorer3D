@@ -4,7 +4,7 @@ import {tunnelObstructionMaximumY, tunnelRoofHalfWidth} from './tunnel-envelope.
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {validateReviewedDeckProfile,sampleReviewedDeckProfile} from './reviewed-deck-profile.js';
-import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL} from '../../physics/road-plane-dynamics.js';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,BANKED_ROAD_MAXIMUM_GRADE} from '../../physics/road-plane-dynamics.js';
 import {
   polylineDistances,
   sampleProfileAtDistance
@@ -128,6 +128,7 @@ function engineeredMaximumGrade(feature, semantics = feature?.structureSemantics
   // Preserve its established envelope; this pass changes exposed bridge and
   // elevated-road approaches only.
   if (semantics?.terrainMode === 'subgrade') return 0.135;
+  if (feature?.surfaceSurveyEvidence?.surfaceModel === BANKED_ROAD_MODEL) return BANKED_ROAD_MAXIMUM_GRADE;
   const type = featureRoadType(feature);
   if (semantics?.rampCandidate === true || /_link$/.test(type)) return 0.1;
   if (type === 'motorway' || type === 'trunk') return 0.06;
@@ -286,7 +287,9 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     ? Number(options.maximumGrade)
     : semantics?.terrainMode !== 'at_grade'
       ? engineeredMaximumGrade(feature, semantics)
-      : DEFAULT_MAX_GRADE;
+      : feature.surfaceSurveyEvidence?.surfaceModel === BANKED_ROAD_MODEL
+        ? BANKED_ROAD_MAXIMUM_GRADE
+        : DEFAULT_MAX_GRADE;
   const compiledWidth = Number.isFinite(options.width)
     ? Number(options.width)
     : finiteNumber(feature.width, 4);
@@ -458,7 +461,8 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
         sampleDistances,
         maximumGrade,
         options.verticalFitRadius,
-        allocate
+        allocate,
+        {preserveLinearTrend:surfaceSurvey?.surfaceModel===BANKED_ROAD_MODEL}
       )
     : mode === 'subgrade'
       ? smoothUpperBoundedGradeProfile(
@@ -475,12 +479,13 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
         maximumGrade,
         allocate
       );
-  if(mode==='at_grade'&&!engineeredApproach&&!surfaceSurvey){
+  if(mode==='at_grade'&&!engineeredApproach&&(!surfaceSurvey||surfaceSurvey.surfaceModel===BANKED_ROAD_MODEL)){
     const ordinaryFit=fitOrdinaryStreetProfile(sampleDistances,centerHeights,[
       {distance:0,targetSurfaceY:endpointGroundStart+surfaceBias},
       {distance:total,targetSurfaceY:endpointGroundEnd+surfaceBias},
       ...(feature.ordinaryStreetAnchors||[])
     ],maximumGrade,allocate);
+    if(surfaceSurvey&&ordinaryFit.maximumGrade>BANKED_ROAD_MAXIMUM_GRADE+1e-6)throw Error('reviewed_road_surface_grade_exceeded');
     centerHeights=ordinaryFit.heights;
     maximumGrade=ordinaryFit.maximumGrade;
   }

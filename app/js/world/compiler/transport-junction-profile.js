@@ -1,4 +1,5 @@
 import {hasReviewedDeck} from './reviewed-deck-profile.js';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_GRADE} from '../../physics/road-plane-dynamics.js';
 import {sampleTransportSurfaceAtDistance} from './transport-surface-model.js?v=25';
 
 function reviewedDeckCrossfall(group,feature,side){
@@ -41,6 +42,7 @@ function ownerScore(side, feature) {
 
 function maximumGradeFor(feature) {
   if (feature?.structureSemantics?.terrainMode === 'subgrade') return 0.135;
+  if (feature?.surfaceSurveyEvidence?.surfaceModel === BANKED_ROAD_MODEL) return BANKED_ROAD_MAXIMUM_GRADE;
   const type = String(
     feature?.transportRecord?.sourceTags?.highway ||
     feature?.transportRecord?.rawTags?.highway ||
@@ -255,6 +257,7 @@ export function auditTransportJunctionContinuity(
       { feature: rightFeature, side: connection.right }
     ].some(({ feature, side }) =>
       feature?.structureSemantics?.terrainMode !== 'at_grade' ||
+      feature?.transportSurfaceModel?.surveyedSurface?.surfaceModel === BANKED_ROAD_MODEL ||
       hasEngineeredGraphConstraintAt(feature, side)
     );
     if (!complete || !structureConnection) continue;

@@ -70,6 +70,15 @@ grant it. Canonical district facts and chunk hashes retain the model; selected
 source edges determine the resulting course controller. Player route settings
 cannot opt an ordinary road into banked handling.
 
+Reviewed banked road fitting uses the same supported 22% grade envelope as
+qualification and the graph. Its local fit preserves a linear slope instead of
+inventing endpoint ramps from a one-sided average. The existing terrain-owned
+street-node anchors also constrain banked at-grade joins; they do not turn those
+roads into bridges. Every complete banked connection enters the continuity audit,
+and a failed join blocks physical publication. Ordinary-road fitting remains
+unchanged. These are bounds and fitting rules, not permission to flatten measured
+terrain or certify a full venue without its remaining checks.
+
 The model belongs to district and course identity. Service reconstruction,
 qualification receipts, moderation, curation, network snapshots, driver profiles,
 Journal configurations, shared boards and career classes use its separate physics

@@ -3,6 +3,7 @@
 // negative pitch climbs forward. Speeds/accelerations here are SI units.
 export const BANKED_ROAD_MODEL='banked-road-v1';
 export const BANKED_ROAD_MAXIMUM_CROSSFALL=.7;
+export const BANKED_ROAD_MAXIMUM_GRADE=.22;
 export const BANKED_ROAD_MAXIMUM_ROLL=Math.atan(BANKED_ROAD_MAXIMUM_CROSSFALL);
 export const ROAD_GRAVITY_METERS_PER_SECOND_SQUARED=9.81;
 
