@@ -12,6 +12,19 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  sourceUrl:'/app/assets/racing/silverstone/source.json',sourceSha256:'c41a9f0d43e21af306fbf3261996e997a036778205acaa28df2697ef424c2b00',
  groundArtifactId:'silverstone-gp-fine-v1',groundContentSha256:'1b1f66af6f8bcbd9db84abe0b123d69bb016955d06afcb55d2a0aee782c306bd',
  maximumCrossfall:.15,qualificationRadiusWorld:1200
+}),Object.freeze({
+ id:'nurburgring-nordschleife',name:'Nürburgring · Nordschleife',anchor:Object.freeze({lat:50.359,lon:6.963}),
+ sourceUrl:'/app/assets/racing/nordschleife/source.json',sourceSha256:'0fcd281250a971a66b795850d1657541b475cba5e3ac249e21a3a0439d3a5d26',
+ groundArtifactId:'nordschleife-fine-sw-v1',groundContentSha256:'bb51f5766addeb02d59e2d6a9f68c84787b32f2e0907586b5f0ccfcd68cc82c1',
+ groundArtifacts:Object.freeze([
+  Object.freeze({artifactId:'nordschleife-fine-sw-v1',contentSha256:'bb51f5766addeb02d59e2d6a9f68c84787b32f2e0907586b5f0ccfcd68cc82c1'}),
+  Object.freeze({artifactId:'nordschleife-fine-se-v1',contentSha256:'085e6b3bf3919b20fbd7419c734a1392ddf19c28d9216c96c96185b8b0c4552d'}),
+  Object.freeze({artifactId:'nordschleife-fine-nw-v1',contentSha256:'8ef2dc7bb03787f248da570967d902cfa917f2dbce02929f5581e1a64baba428'}),
+  Object.freeze({artifactId:'nordschleife-fine-ne-v1',contentSha256:'11e185425a7ae941d59bb666a0ac14132d8e2892bb290f86a91c115897711945'})
+ ]),
+ reviewedDeckProfiles:Object.freeze({url:'/app/assets/racing/nordschleife/decks.json',contentSha256:'586ba8daef6c299170ea0a619cec2bed4b40ba57f09cec6522f4b187fdc62647'}),
+ pavementWidthPolicy:'mapped',surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:3500,
+ routeExtent:'mapped-venue-v1',raceAdmission:'pending-timing-line'
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;
@@ -97,7 +110,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   elements.set(`way:${raw.id}`,way);
  }
  return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({id:descriptor.id,name:descriptor.name,status:'source-prepared',
-  ...(venueSource?{venueSource}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
+  ...(venueSource?{venueSource}:{}),...(descriptor.raceAdmission?{raceAdmission:descriptor.raceAdmission}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
   sourceFeatureIds:Object.freeze(layout.wayIds.map(id=>`osm:way:${id}`)),mappedLengthMeters:layout.lengthMeters,
   referenceLengthMeters:layout.referenceLengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,
   groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required,retiredGeneralized})};

@@ -4,6 +4,7 @@ import {buildRaceRoadGraph,createRaceCourse} from './course-rules.js';
 // shortest-path recommendation happens to find. Missing spans keep it closed.
 export function buildVenueRaceCourses(district,venue){
  if(venue?.status!=='source-prepared'||!Array.isArray(venue.sourceFeatureIds)||!venue.sourceFeatureIds.length)throw Error('race_venue_not_prepared');
+ if(venue.raceAdmission==='pending-timing-line')throw Error('race_venue_timing_line_pending');
  const graph=buildRaceRoadGraph(district.roads,{metersPerUnit:district.metersPerUnit,venueSource:district.venueSource}),path=[],edges=new Map(graph.edges.map(e=>[e.id,e]));
  const bySource=new Map();
  for(const road of district.roads){

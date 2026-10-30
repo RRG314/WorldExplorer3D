@@ -57,7 +57,8 @@ of official circuit or championship records.
   Original varying widths, surfaces and bridge/layer tags remain intact.
 - This is a geographic source, not a released playable venue. Full ground,
   banking, vertically separated crossings, timing-line placement, presentation
-  and gameplay acceptance remain required before runtime adoption. It does not
+  and gameplay acceptance remain required before race admission. World source
+  inspection is enabled with racing explicitly closed. It does not
   substitute for the tourist, GP or combined endurance layouts.
 
 ### Reviewed bridge and approach profiles
@@ -100,3 +101,15 @@ node scripts/racing/build-venue-decks.mjs \
 
 These profiles do not enable the unfinished venue or certify official geometry,
 timing, full-width surveying or venue presentation.
+
+### Delivered Nordschleife ground
+
+`../ground/nordschleife/` contains the four retained 4 m ground grids and their
+manifests from LVermGeoRP DGM1, file-year 2025. © GeoBasis-DE / LVermGeoRP2026,
+[dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0),
+[www.lvermgeo.rlp.de](https://lvermgeo.rlp.de/geodaten-geoshop/open-data/)
+[Daten bearbeitet]. The manifests retain all original source URLs, hashes,
+normalization operation and uncertainty. Bare-earth data excludes bridge decks;
+the reviewed DOM pavement products above supply those independent surfaces.
+Delivery spacing and quantization are not source-accuracy claims. No new source
+rasters or external artwork were acquired for this delivery step.

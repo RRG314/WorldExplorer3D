@@ -216,9 +216,11 @@ One real 0.452 m span was lost by the earlier half-metre graph threshold. The
 graph and source validator now share a centimetre threshold above canonical
 millimetre precision, with the existing collapsed-node check retained. A bounded
 2,048-span reference can carry the full loop. Ordinary eight-kilometre route
-admission remains unchanged: this source is not added to the runtime adoption
-registry until complete accepted ground, banking, crossings and venue gameplay
-are supported. Both OSM `pitlane` and `pit_lane` tags reject a main-course layout.
+admission remains unchanged. The source is now available for world inspection
+at its separately defined Nordschleife anchor (50.359, 6.963), backed by all four
+retained ground artifacts and the complete reviewed pavement group. The existing
+Nürburgring GP preset is unchanged. Race admission remains explicitly closed
+pending T13 timing-line and full venue/gameplay acceptance. Both OSM `pitlane` and `pit_lane` tags reject a main-course layout.
 
 The separate `nordschleife/decks.json` source product carries all five reviewed
 bridge profiles and the nine adjoining observed pavement profiles. Its reproduction recipe pins the retained normalized observations,
