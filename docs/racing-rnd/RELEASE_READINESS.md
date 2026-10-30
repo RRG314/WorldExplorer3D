@@ -304,3 +304,19 @@ grading. A controlled overlapping access-road regression fails before this
 change and passes afterwards, including road-order independence, preserved
 source profiles and unchanged grading outside the track's support. Native
 verification of this grading change remains open.
+
+Native verification of the grading priority passes the previously failed
+Exmühle and short Pflanzgarten spans with the original qualification guards.
+The complete road and building inventories remain present. A held-input E34
+drive and walking handback were inspected at Exmühle; its missing roadside
+detail still prevents presentation acceptance. The remaining two contact
+blockers are a Mini-Karussell surface join and a Breidscheid approach-cap gap.
+
+Read-only native reconstruction isolates the approach gap to excavation:
+terrain-partitioned pavement supports the probe before portal clipping, then
+loses it afterwards. Engineered approach masks now overlap internal sections
+without extending beyond their published source caps. The same descriptors
+serve terrain rendering, queries and pavement subtraction. A regression
+reproduces the former endpoint cut and passes after the repair; existing upper
+street, bridge, wall and internal-overlap cases pass. Native rechecking remains
+required.
