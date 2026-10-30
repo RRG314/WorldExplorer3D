@@ -1,4 +1,5 @@
 import {refineReviewedCorridorCells,corridorSegmentDistance} from './reviewed-corridor-refinement.js';
+import {REVIEWED_CORRIDOR_INNER_SPACING_METERS,REVIEWED_CORRIDOR_OUTER_SPACING_METERS} from './reviewed-corridor-policy.js';
 import {mappedWaterBedMetersAt, createMappedWaterBedSampler} from './mapped-water-bed.js';
 import {
   addCoverageEdges,
@@ -646,7 +647,8 @@ function createFarFieldGeometryPlanner(deps = {}) {
         oldGrid={xValues,zValues,worldYs,boundaryTriangles,detailedCoverage:spec.detailedCoverage};
       const active=()=>current()&&appCtx.worldLoadRuntimeState===runtime&&!mesh.userData?.farFieldDisposed;
       const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:positionData,segments,current:active,yieldWork,
-        innerSpacing:3*scale,outerSpacing:8*scale,landscapeSpacing:(landscape?.spacingMeters??32)*scale,
+        edgeStations:[...lines.values()].flatMap(groups=>groups.flat()),
+        innerSpacing:REVIEWED_CORRIDOR_INNER_SPACING_METERS*scale,outerSpacing:REVIEWED_CORRIDOR_OUTER_SPACING_METERS*scale,landscapeSpacing:(landscape?.spacingMeters??32)*scale,
         skipCell:c=>cellFullyInsideDetailedCoverage(c.minX,c.maxX,c.minZ,c.maxZ,spec.detailedCoverage),
         heightAt:(x,z,candidates)=>{
           const seam=detailHeightAt(lines,'x',x,z)??detailHeightAt(lines,'z',x,z);

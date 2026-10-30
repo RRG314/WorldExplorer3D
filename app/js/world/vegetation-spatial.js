@@ -1,5 +1,5 @@
 import {triangleFieldAt} from '../terrain/detail-boundary.js';
-import {terrainGridInterval} from '../terrain/world-grid.js';
+import {terrainGridInterval,sampleIndexedTerrainField} from '../terrain/world-grid.js';
 import {cellFullyInsideDetailedCoverage} from '../terrain/far-field-coverage.js?v=2';
 
 export function vegetationIdentitySeed(identity) {
@@ -47,7 +47,7 @@ export function terrainVegetationBounds(mesh,surfaceGrid){
   const positions=mesh.geometry.attributes?.position;
   if(positions){
     const columns=p.widthSegments,rows=p.heightSegments;
-    if(!Number.isInteger(columns)||!Number.isInteger(rows)||columns<1||rows<1||positions.count!==(columns+1)*(rows+1))return null;
+    if(!Number.isInteger(columns)||!Number.isInteger(rows)||columns<1||rows<1||positions.count<(columns+1)*(rows+1)||!mesh.userData?.reviewedTerrainCells?.size&&positions.count!==(columns+1)*(rows+1))return null;
     const minX=positions.getX(0)+Number(mesh.position?.x||0),maxX=positions.getX(columns)+Number(mesh.position?.x||0),
       minZ=positions.getZ(0)+Number(mesh.position?.z||0),maxZ=positions.getZ(rows*(columns+1))+Number(mesh.position?.z||0);
     return [minX,maxX,minZ,maxZ].every(Number.isFinite)&&minX<maxX&&minZ<maxZ?{minX,maxX,minZ,maxZ}:null;
@@ -76,7 +76,7 @@ export function semanticForestWeightAt(mesh,x,z,surfaceGrid){
   }
   if(!params || !attribute || !(params.width>0) || !(params.height>0)) return 0;
   const columns=params.widthSegments, rows=params.heightSegments;
-  if(!columns || !rows || attribute.count!==(columns+1)*(rows+1)) return 0;
+  if(!columns || !rows || (mesh.userData?.reviewedTerrainCells?.size?attribute.count!==geometry.attributes?.position?.count:attribute.count!==(columns+1)*(rows+1))) return 0;
   const positions=geometry.attributes?.position;
   if(positions){
     const bounds=terrainVegetationBounds(mesh);if(!bounds||x<bounds.minX||x>bounds.maxX||z<bounds.minZ||z>bounds.maxZ||!positions.array)return 0;
@@ -84,6 +84,8 @@ export function semanticForestWeightAt(mesh,x,z,surfaceGrid){
       column=terrainGridInterval(positions.array,columns,stride,0,localX),row=terrainGridInterval(positions.array,rows,(columns+1)*stride,2,localZ),
       a=row*(columns+1)+column,b=a+1,c=a+columns+1,d=c+1,
       u=(localX-positions.getX(a))/(positions.getX(b)-positions.getX(a)),v=(localZ-positions.getZ(a))/(positions.getZ(c)-positions.getZ(a));
+    const refined=mesh.userData?.reviewedTerrainCells?.get(row*(columns+1)+column);
+    if(refined)return sampleIndexedTerrainField(positions.array,refined,localX,localZ,terrainForestAttributeWeight,attribute)??0;
     if(!Number.isFinite(u)||!Number.isFinite(v))return 0;
     const ya=terrainForestAttributeWeight(attribute,a),yb=terrainForestAttributeWeight(attribute,b),yc=terrainForestAttributeWeight(attribute,c),yd=terrainForestAttributeWeight(attribute,d);
     return u+v<=1?ya+u*(yb-ya)+v*(yc-ya):yd+(1-u)*(yc-yd)+(1-v)*(yb-yd);

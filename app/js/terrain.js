@@ -6,6 +6,7 @@ import {
   updateStructureVisualVisibility
 } from "./terrain/structure-visuals.js?v=59";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=15";
+import {refineReviewedDetailedTerrain} from './terrain/reviewed-detailed-refinement.js';
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=22";
@@ -325,12 +326,15 @@ async function applyTransportTerrainCorridors(options = {}) {
     await options.yieldBetweenTiles?.();
   }
   if(options.isCurrent?.()===false)return null;
+  const reviewedDetailedRefinement=await refineReviewedDetailedTerrain(appCtx,terrainTileDeps,{current:options.isCurrent,yieldWork:options.yieldBetweenTiles});
+  if(options.isCurrent?.()===false)return null;
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
   refreshFarTerrainBoundaryHeights();
   const reviewedCorridorRefinement=await refreshReviewedVenueTerrain({current:options.isCurrent,yieldWork:options.yieldBetweenTiles});
   if(options.isCurrent?.()===false)return null;
   clearTerrainHeightCache();
   const stats = Object.freeze({
+    reviewedDetailedRefinement,
     reviewedCorridorRefinement,
     authority: 'compiled_transport_surface',
     heightSamplingAuthority: 'rendered-triangle-barycentric',

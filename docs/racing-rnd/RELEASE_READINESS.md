@@ -269,3 +269,14 @@ must agree within 0.2 mm. The search is limited to sixteen candidate stations.
 Component checks cover ordered identities, shared topology, unchanged length,
 input immutability and continued unsafe-data rejection. The saved Kallenhard
 capacity case fits two profiles; its surface-height acceptance remains open.
+
+Detailed terrain now refines only reviewed road corridors, retaining its existing
+mesh owner and the original regular-grid vertex indices. New cell triangles
+serve terrain queries, road compilation, worker snapshots, material semantics
+and the far-terrain seam. Geometry is staged before adoption and the replaced
+geometry is disposed once. Cancellation and capacity failures retain the old
+mesh. The detailed spacing ceiling is 3.1 m; the far corridor spacing remains
+3 m. A saved native-input topology measurement adds 164,334 vertices across
+26 detailed tiles, within a 196,608-vertex publication budget. Focused geometry,
+seam, lifecycle, worker and forest-semantic checks pass. Native terrain/contact
+verification and the finished venue acceptance remain open.

@@ -19,9 +19,9 @@ function distanceToBounds(s,b){
 function interval(values,n){let lo=0,hi=values.length-1;while(hi-lo>1){const mid=(lo+hi)>>1;if(values[mid]<=n)lo=mid;else hi=mid;}return lo;}
 const within=(values,a,b)=>{let i=interval(values,a);while(i<values.length&&values[i]<=a+1e-7)i++;const result=[];for(;i<values.length&&values[i]<b-1e-7;i++)result.push(values[i]);return result;};
 export async function refineReviewedCorridorCells({xValues,zValues,basePositions,segments,skipCell=()=>false,heightAt,current=()=>true,yieldWork=async()=>{},
- innerSpacing=2,outerSpacing=8,landscapeSpacing=32,maximumLeaves=220000,maximumVertices=500000}){
+ innerSpacing=2,outerSpacing=8,landscapeSpacing=32,maximumLeaves=220000,maximumVertices=500000,edgeStations=[]}){
  if(!Array.isArray(xValues)||!Array.isArray(zValues)||xValues.length<2||zValues.length<2||!Array.isArray(segments)||segments.length>5000||
-  ![innerSpacing,outerSpacing,landscapeSpacing].every(Number.isFinite)||!(innerSpacing>0&&outerSpacing>=innerSpacing&&landscapeSpacing>=outerSpacing)||typeof heightAt!=='function')throw Error('invalid_reviewed_terrain_refinement');
+  ![innerSpacing,outerSpacing,landscapeSpacing].every(Number.isFinite)||!(innerSpacing>0&&outerSpacing>=innerSpacing&&landscapeSpacing>=outerSpacing)||typeof heightAt!=='function'||!Array.isArray(edgeStations)||edgeStations.length>65536||edgeStations.some(p=>!Number.isFinite(p?.x)||!Number.isFinite(p?.z)))throw Error('invalid_reviewed_terrain_refinement');
  const roots=new Map(),leaves=[];let checkpoint=performance.now();
  const pause=async()=>{if(!current())throw new DOMException('Reviewed terrain refinement superseded','AbortError');if(performance.now()-checkpoint>=8){await yieldWork();checkpoint=performance.now();}};
  const rootKey=(row,column)=>row*xValues.length+column;
@@ -66,6 +66,7 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
  for(const cell of leaves)for(const x of[cell.minX,cell.maxX])for(const z of[cell.minZ,cell.maxZ])edgePoint(x,z);
  // Existing detailed-tile seam points remain on the conforming perimeter.
  for(let i=0;i<basePositions.length;i+=3)edgePoint(basePositions[i],basePositions[i+2]);
+ for(const p of edgeStations)edgePoint(p.x,p.z);
  for(const map of[vertical,horizontal])for(const[k,values]of map)map.set(k,[...values].sort((a,b)=>a-b));
  const positions=Array.from(basePositions),byPoint=new Map(),updated=new Set(),trianglesByCell=new Map(),indices=[];
  for(let i=0;i<positions.length;i+=3)if(!byPoint.has(key(positions[i],positions[i+2])))byPoint.set(key(positions[i],positions[i+2]),i/3);

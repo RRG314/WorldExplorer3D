@@ -7,11 +7,17 @@ const key=(axis,value)=>`${axis}:${Math.round(value*100)}`;
 export function collectDetailBoundaryLines(meshes=[]) {
   const lines=new Map();
   for(const mesh of meshes) {
-    const p=mesh.geometry?.attributes?.position,n=Math.round(Math.sqrt(p?.count||0));
-    if(!mesh.visible || !mesh.userData?.isTerrainMesh || mesh.userData?.isFarTerrainClipmap || mesh.userData?.pendingTerrainTile || !p || n*n!==p.count)continue;
+    const p=mesh.geometry?.attributes?.position,n=Number(mesh.geometry?.parameters?.widthSegments)+1||Math.round(Math.sqrt(p?.count||0)),refined=mesh.userData?.reviewedTerrainCells?.size>0;
+    if(!mesh.visible || !mesh.userData?.isTerrainMesh || mesh.userData?.isFarTerrainClipmap || mesh.userData?.pendingTerrainTile || !p || n*n>p.count||!refined&&n*n!==p.count)continue;
     const point=i=>({x:p.getX(i)+mesh.position.x,z:p.getZ(i)+mesh.position.z,y:p.getY(i)+mesh.position.y});
-    for(const indices of [Array.from({length:n},(_,i)=>i),Array.from({length:n},(_,i)=>(n-1)*n+i),Array.from({length:n},(_,i)=>i*n),Array.from({length:n},(_,i)=>i*n+n-1)]) {
-      const points=indices.map(point),axis=Math.abs(points[0].x-points[n-1].x)<.01?'x':'z';
+    let edges=[Array.from({length:n},(_,i)=>i),Array.from({length:n},(_,i)=>(n-1)*n+i),Array.from({length:n},(_,i)=>i*n),Array.from({length:n},(_,i)=>i*n+n-1)];
+    if(refined){
+      edges=[[],[],[],[]];const minX=p.getX(0),maxX=p.getX(n-1),minZ=p.getZ(0),maxZ=p.getZ((n-1)*n);
+      for(let i=0;i<p.count;i++){if(p.getZ(i)===minZ)edges[0].push(i);if(p.getZ(i)===maxZ)edges[1].push(i);if(p.getX(i)===minX)edges[2].push(i);if(p.getX(i)===maxX)edges[3].push(i);}
+      for(let e=0;e<edges.length;e++)edges[e].sort((a,b)=>e<2?p.getX(a)-p.getX(b):p.getZ(a)-p.getZ(b));
+    }
+    for(const indices of edges) {
+      const points=indices.map(point),axis=Math.abs(points[0].x-points.at(-1).x)<.01?'x':'z';
       const id=key(axis,points[0][axis]);
       if(!lines.has(id))lines.set(id,[]);
       lines.get(id).push(points);

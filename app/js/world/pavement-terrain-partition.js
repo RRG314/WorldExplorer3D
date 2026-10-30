@@ -2,6 +2,16 @@ import {terrainGridInterval} from '../terrain/world-grid.js';
 import {createRoadContactIndex,createRoadContactIndexCooperatively} from '../terrain/road-contact-index.js?v=1';
 import {projectDecalTriangle} from '../terrain/surface-decal-projection.js';
 
+const refinedDetailed=mesh=>mesh.userData?.isTerrainMesh&&mesh.userData.reviewedTerrainCells?.size>0;
+function indexedTerrainSupports(meshes,includeFarTerrain){
+ return meshes.filter(m=>m.visible!==false&&(refinedDetailed(m)||includeFarTerrain&&m.userData?.isFarTerrainClipmap)).map(mesh=>{
+  if(!refinedDetailed(mesh))return mesh;
+  const source=mesh.geometry.attributes.position.array,positions=new Float32Array(source.length),origin=mesh.position||{};
+  for(let i=0;i<source.length;i+=3){positions[i]=source[i]+(origin.x||0);positions[i+1]=source[i+1]+(origin.y||0);positions[i+2]=source[i+2]+(origin.z||0);}
+  return {geometry:{attributes:{position:{array:positions}},getIndex:()=>mesh.geometry.getIndex()},userData:mesh.userData};
+ });
+}
+
 // Conservative separating-axis rejection before allocating support triangles.
 // A thin diagonal road can have a large grid-cell bounding box; most cells in
 // that box lie wholly outside the triangle. Keep the clipper's edge tolerance.
@@ -21,11 +31,11 @@ export function triangleMayOverlapCell(points, minX, maxX, minZ, maxZ) {
 // Split against the rendered terrain planes. This preserves creases exactly
 // without recursively multiplying skinny pavement triangles near a grid edge.
 export function createPavementTerrainPartition(meshes = [], {includeFarTerrain = false,farSupportIndex} = {}) {
-  const farMeshes=includeFarTerrain ? meshes.filter(m=>m.visible!==false && m.userData?.isFarTerrainClipmap) : [];
+  const farMeshes=indexedTerrainSupports(meshes,includeFarTerrain);
   const farIndex=farSupportIndex ?? (farMeshes.length ? createRoadContactIndex(farMeshes,64) : null);
   const grids=[];
   for(const mesh of meshes){
-    if(!mesh.userData?.isTerrainMesh || mesh.visible===false || mesh.userData.pendingTerrainTile)continue;
+    if(!mesh.userData?.isTerrainMesh || mesh.visible===false || mesh.userData.pendingTerrainTile||refinedDetailed(mesh))continue;
     const source=mesh.geometry?.attributes?.position,segments=mesh.geometry?.parameters?.widthSegments;
     if(!source || !Number.isInteger(segments)||segments<1)continue;
     // Near tiles use local Float32 vertices plus a translated origin; the far
@@ -115,7 +125,7 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
 }
 
 export async function createPavementTerrainPartitionCooperatively(meshes=[],options={}) {
-  const far=options.includeFarTerrain ? meshes.filter(m=>m.visible!==false && m.userData?.isFarTerrainClipmap) : [];
+  const far=indexedTerrainSupports(meshes,options.includeFarTerrain);
   const farSupportIndex=far.length ? await createRoadContactIndexCooperatively(far,64,options) : null;
   try {
     if(options.current?.()===false)throw new Error('Terrain support construction superseded');

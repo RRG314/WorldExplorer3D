@@ -1,5 +1,7 @@
 import {createHeightCache} from './height-cache.js';
-import {terrainGridInterval} from './world-grid.js';
+import {terrainGridInterval,sampleIndexedTerrainCell} from './world-grid.js';
+import {REVIEWED_CORRIDOR_SUPPORT_METERS} from './reviewed-corridor-policy.js';
+import {BANKED_ROAD_MODEL} from '../physics/road-plane-dynamics.js';
 import { streetSideEdge } from '../world/compiler/street-frontage-policy.js';
 import {
   projectPointToFeature,
@@ -9,6 +11,28 @@ import { roadWidthAtProjection } from '../world/road-cross-section-profile.js?v=
 import { terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=2';
 
 const MAX_HEIGHT_CACHE_ENTRIES = 65536;
+
+// Compiler support only. Continue the accepted road plane across the native
+// cell supporting its edge; clamping to the road width would flatten the bank.
+// The source path, physical pavement footprint and live sampler stay unchanged.
+function reviewedSupportPlane(feature,projected,x,z,surfaceY){
+ const a=feature.pts[projected.segIndex],b=feature.pts[projected.segIndex+1],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
+ if(!(length>1e-8))return surfaceY;
+ const ox=x-projected.x,oz=z-projected.z,lateral=(ox*dz-oz*dx)/length,along=(ox*dx+oz*dz)/length,half=feature.transportSurfaceModel.width/2;
+ let center;
+ if(Math.abs(lateral)>half){
+  center=sampleFeatureSurfaceY(feature,projected.x,projected.z,projected);
+  const side=Math.sign(lateral),edge=sampleFeatureSurfaceY(feature,projected.x+dz/length*half*side,projected.z-dx/length*half*side,projected);
+  surfaceY+=(edge-center)/half*(Math.abs(lateral)-half);
+ }
+ if(projected.segIndex===0&&projected.t===0&&along<0||projected.segIndex===feature.pts.length-2&&projected.t===1&&along>0){
+  center??=sampleFeatureSurfaceY(feature,projected.x,projected.z,projected);
+  const dt=(projected.t===0?1:-1)*Math.min(.001,1/length),t=projected.t+dt,near={segIndex:projected.segIndex,t,x:a.x+dx*t,z:a.z+dz*t},height=sampleFeatureSurfaceY(feature,near.x,near.z,near);
+  surfaceY+=(height-center)/(dt*length)*along;
+ }
+ if(!Number.isFinite(surfaceY))throw Error('reviewed_corridor_plane_unavailable');
+ return surfaceY;
+}
 
 // THREE.PlaneGeometry splits each grid cell along the bottom-left to
 // top-right diagonal. Runtime ground queries must use those same two planes;
@@ -67,6 +91,13 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
       const col = terrainGridInterval(pos.array,segs,3,0,lx);
       const row = terrainGridInterval(pos.array,segs,vps*3,2,lz);
+      const refined=mesh.userData.reviewedTerrainCells?.get(row*vps+col);
+      if(refined){
+        const y=sampleIndexedTerrainCell(pos.array,refined,lx,lz);
+        if(!Number.isFinite(y))throw Error('reviewed_terrain_cell_coverage');
+        const height=y+mesh.position.y;
+        return options.ignorePortalCuts?height:terrainHeightWithPortalCuts(mesh.userData.structureTerrainPortalDescriptors,x,z,height);
+      }
       const sx = (lx-pos.getX(col))/(pos.getX(col+1)-pos.getX(col));
       const sz = (lz-pos.getZ(row*vps))/(pos.getZ((row+1)*vps)-pos.getZ(row*vps));
 
@@ -150,8 +181,11 @@ function createTerrainHeightSamplingApi(deps = {}) {
         if(gradedEdge===null)continue;
         const influenceRadius = gradedEdge + shoulderBlend;
         if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
-        const surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
+        const model=feature.transportSurfaceModel,reviewed=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
+        const support=REVIEWED_CORRIDOR_SUPPORT_METERS/(Number(feature.metersPerWorldUnit)||1),fullGradeEdge=reviewed?Math.min(influenceRadius-.001,Math.max(gradedEdge,edge+support)):gradedEdge;
+        let surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
         if (!Number.isFinite(surfaceY)) continue;
+        if(reviewed)surfaceY=reviewedSupportPlane(feature,projected,worldX,worldZ,surfaceY);
         const targetTerrainY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
         // A depressed engineered approach has an explicit excavation, floor
         // and retaining walls. Blending that floor into the coarse terrain
@@ -159,9 +193,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
         // Keep its cut with that owner; raised approaches still need fill.
         if (feature.transportSurfaceModel?.engineeredApproach === true && targetTerrainY < terrainY) continue;
         const shoulderT = Math.max(0, Math.min(1,
-          (projected.dist - gradedEdge) / shoulderBlend
+          (projected.dist - fullGradeEdge) / (influenceRadius-fullGradeEdge)
         ));
-        const weight = projected.dist <= gradedEdge
+        const weight = projected.dist <= fullGradeEdge
           ? 1
           : 1 - (shoulderT * shoulderT * (3 - 2 * shoulderT));
         const edgeDistance=Math.max(0,projected.dist-edge);
