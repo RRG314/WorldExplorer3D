@@ -1397,6 +1397,7 @@ function prepareRaceCourseGeometry(course) {
     Object.freeze(segment.a);
     Object.freeze(segment.b);
     Object.freeze(segment.forward);
+    if (segment.heightSampleRange) Object.freeze(segment.heightSampleRange);
     if (segment.heightSamples) {
       for (const sample of segment.heightSamples) {
         if (sample.lateralSamples) {
@@ -1468,20 +1469,52 @@ function lateralHeight(samples, offset) {
   }
   return lower.y + (upper.y - lower.y) * (offset - lower.offsetMeters) / (upper.offsetMeters - lower.offsetMeters);
 }
+function lateralPatchHeight(lower, upper, u, offset) {
+  let index = 1;
+  for (let i = 1; i < lower.length; i++) {
+    const left = lower[i - 1].offsetMeters + (upper[i - 1].offsetMeters - lower[i - 1].offsetMeters) * u, right = lower[i].offsetMeters + (upper[i].offsetMeters - lower[i].offsetMeters) * u;
+    if (right - left <= 1e-10) continue;
+    index = i;
+    if (offset <= right) break;
+  }
+  const a = lower[index - 1], b = lower[index], c = upper[index - 1], d = upper[index], lowWidth = b.offsetMeters - a.offsetMeters, highWidth = d.offsetMeters - c.offsetMeters, diagonal = b.offsetMeters + (c.offsetMeters - b.offsetMeters) * u;
+  if (offset <= diagonal && lowWidth > 1e-10 || highWidth <= 1e-10) {
+    const v2 = (offset - a.offsetMeters - (c.offsetMeters - a.offsetMeters) * u) / lowWidth;
+    return a.y * (1 - u - v2) + b.y * v2 + c.y * u;
+  }
+  const v = (offset - b.offsetMeters - (c.offsetMeters - b.offsetMeters) * u) / highWidth;
+  return b.y * (1 - u) + c.y * (u - v) + d.y * v;
+}
 function validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model) {
   if (!heights.some((s) => s.lateralSamples !== void 0)) return true;
   if (model !== BANKED_ROAD_MODEL || width > 30) return false;
   let previous = null;
   for (const station of heights) {
     const points = station.lateralSamples;
-    if (!Array.isArray(points) || points.length < 3 || points.length > 8 || points.some((p, i) => !p || !Number.isFinite(p.offsetMeters) || !Number.isFinite(p.y) || i > 0 && (p.offsetMeters - points[i - 1].offsetMeters < 0.02 || Math.abs(p.y - points[i - 1].y) * metersPerUnit / (p.offsetMeters - points[i - 1].offsetMeters) > BANKED_ROAD_MAXIMUM_CROSSFALL + 1e-8)) || Math.abs(points[0].offsetMeters + width / 2) > 1e-3 || Math.abs(points.at(-1).offsetMeters - width / 2) > 1e-3 || !points.some((p) => p.offsetMeters === 0 && Math.abs(p.y - station.y) * metersPerUnit <= 1e-3) || !Number.isFinite(station.leftY) || !Number.isFinite(station.rightY) || Math.abs(lateralHeight(points, -span) - station.leftY) * metersPerUnit > 1e-3 || Math.abs(lateralHeight(points, span) - station.rightY) * metersPerUnit > 1e-3) return false;
-    if (previous && (points.length !== previous.lateralSamples.length || points.some((p, i) => p.offsetMeters !== previous.lateralSamples[i].offsetMeters || Math.abs(p.y - previous.lateralSamples[i].y) * metersPerUnit / ((station.t - previous.t) * length) > maximumGrade + 1e-8))) return false;
+    if (!Array.isArray(points) || points.length < 3 || points.length > 8 || points.some((p, i) => !p || !Number.isFinite(p.offsetMeters) || !Number.isFinite(p.y) || i > 0 && (p.offsetMeters < points[i - 1].offsetMeters || (p.offsetMeters === points[i - 1].offsetMeters ? Math.abs(p.y - points[i - 1].y) * metersPerUnit > 1e-7 : Math.abs(p.y - points[i - 1].y) * metersPerUnit / (p.offsetMeters - points[i - 1].offsetMeters) > BANKED_ROAD_MAXIMUM_CROSSFALL + 1e-8))) || Math.abs(points[0].offsetMeters + width / 2) > 1e-3 || Math.abs(points.at(-1).offsetMeters - width / 2) > 1e-3 || !points.some((p) => p.offsetMeters === 0 && Math.abs(p.y - station.y) * metersPerUnit <= 1e-3) || !Number.isFinite(station.leftY) || !Number.isFinite(station.rightY) || Math.abs(lateralHeight(points, -span) - station.leftY) * metersPerUnit > 1e-3 || Math.abs(lateralHeight(points, span) - station.rightY) * metersPerUnit > 1e-3) return false;
+    if (previous) {
+      if (points.length !== previous.lateralSamples.length) return false;
+      const run = (station.t - previous.t) * length;
+      for (let i = 1; i < points.length; i++) {
+        const a = previous.lateralSamples[i - 1], b = previous.lateralSamples[i], c = points[i - 1], d = points[i];
+        for (const [left, right, other] of [[a, b, c], [c, d, b]]) {
+          const delta = right.offsetMeters - left.offsetMeters;
+          if (delta <= 1e-10) continue;
+          const lateral = (right.y - left.y) * metersPerUnit / delta, along = ((other.y - left.y) * metersPerUnit - lateral * (other.offsetMeters - left.offsetMeters)) / run;
+          if (!Number.isFinite(along) || Math.abs(along) > maximumGrade + 1e-8) return false;
+        }
+      }
+    }
     previous = station;
   }
   return true;
 }
 function sampleRaceSegmentY(segment, t, lateralMeters = 0) {
   const samples = segment.heightSamples;
+  if (segment.heightSampleRange) {
+    const range = segment.heightSampleRange;
+    t = range.start + (range.end - range.start) * Math.max(0, Math.min(1, t));
+  }
   if (!samples?.length) return segment.a.y + (segment.b.y - segment.a.y) * t;
   let lower = samples[0], upper = samples.at(-1);
   for (let index = 1; index < samples.length; index++) if (samples[index].t >= t) {
@@ -1490,23 +1523,19 @@ function sampleRaceSegmentY(segment, t, lateralMeters = 0) {
     break;
   }
   const blend = Math.max(0, Math.min(1, (t - lower.t) / Math.max(1e-9, upper.t - lower.t))), y = lower.y + (upper.y - lower.y) * blend;
-  if (lower.lateralSamples && upper.lateralSamples) {
-    const a = lateralHeight(lower.lateralSamples, lateralMeters), b = lateralHeight(upper.lateralSamples, lateralMeters);
-    return a + (b - a) * blend;
-  }
+  if (lower.lateralSamples && upper.lateralSamples) return lateralPatchHeight(lower.lateralSamples, upper.lateralSamples, blend, lateralMeters);
   const side = lateralMeters < 0 ? "leftY" : "rightY", edge = Number.isFinite(lower[side]) && Number.isFinite(upper[side]) ? lower[side] + (upper[side] - lower[side]) * blend : y;
   return y + (edge - y) * Math.abs(lateralMeters) / Math.max(0.1, segment.heightSampleSpanMeters || 1.2);
 }
 function sliceHeights(segment, start, end) {
   if (!segment.heightSamples?.length) return null;
-  const at = (t) => ({
-    t: (t - start) / (end - start),
-    y: sampleRaceSegmentY(segment, t),
-    leftY: sampleRaceSegmentY(segment, t, -segment.heightSampleSpanMeters),
-    rightY: sampleRaceSegmentY(segment, t, segment.heightSampleSpanMeters),
-    ...segment.heightSamples[0].lateralSamples ? { lateralSamples: segment.heightSamples[0].lateralSamples.map((p) => ({ offsetMeters: p.offsetMeters, y: sampleRaceSegmentY(segment, t, p.offsetMeters) })) } : {}
-  });
+  const at = (t) => ({ t: (t - start) / (end - start), y: sampleRaceSegmentY(segment, t), leftY: sampleRaceSegmentY(segment, t, -segment.heightSampleSpanMeters), rightY: sampleRaceSegmentY(segment, t, segment.heightSampleSpanMeters) });
   return [at(start), ...segment.heightSamples.filter((s) => s.t > start && s.t < end).map((s) => ({ ...copyHeightSample(s), t: (s.t - start) / (end - start) })), at(end)];
+}
+function sliceHeightFields(segment, start, end) {
+  if (!segment.heightSamples?.[0].lateralSamples) return { heightSamples: sliceHeights(segment, start, end) };
+  const range = segment.heightSampleRange || { start: 0, end: 1 }, span = range.end - range.start;
+  return { heightSamples: segment.heightSamples.map(copyHeightSample), heightSampleRange: { start: range.start + span * start, end: range.start + span * end } };
 }
 function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximumGrade = 0.22, venueSource, partialVenue = false } = {}) {
   if (!(metersPerUnit > 0 && metersPerUnit <= 10) || !Array.isArray(roads) || roads.length > 5e4) throw Error("invalid_race_road_source");
@@ -1618,8 +1647,8 @@ function createRaceCourse(graph, path, settings = {}) {
       y: sampleRaceSegmentY(original, t),
       z: original.a.z + (original.b.z - original.a.z) * t
     };
-    segments.unshift({ ...original, a: midpoint, lengthMeters: original.lengthMeters - offset, heightSamples: sliceHeights(original, t, 1) });
-    segments.push({ ...original, b: midpoint, lengthMeters: offset, heightSamples: sliceHeights(original, 0, t) });
+    segments.unshift({ ...original, a: midpoint, lengthMeters: original.lengthMeters - offset, ...sliceHeightFields(original, t, 1) });
+    segments.push({ ...original, b: midpoint, lengthMeters: offset, ...sliceHeightFields(original, 0, t) });
     let cursor = 0;
     for (const segment of segments) {
       segment.startMeters = cursor;

@@ -124,7 +124,9 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   fell from 7.41 m to 0.071 m. This is an affected terrain boundary check;
   forest density, materials and roadside detail still need visual acceptance.
 - The portable road-height contract now supports bounded lateral breakpoints
-  on explicitly admitted banked surfaces. The same profile survives reversal,
+  on explicitly admitted banked surfaces. Moving ramp knots use the same
+  triangle planes in both directions; timing splits retain their source
+  interval. The same profile survives reversal,
   timing-line splits, immutable courses, canonical/chunk storage and both
   generated runtimes; approved geometry identities include it. Controlled
   four-wheel contact responds to a raised edge. This is shared-contract

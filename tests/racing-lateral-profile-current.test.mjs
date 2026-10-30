@@ -37,9 +37,10 @@ test('canonical, stored and approved identities retain the edge profile',async()
 test('missing stations, foreign model, discontinuous knots and unsafe lateral or longitudinal slopes fail closed',()=>{
  const changes=[r=>delete r.heightSamples[1].lateralSamples,r=>delete r.surfaceModel,r=>r.heightSamples[0].lateralSamples.reverse(),
   r=>r.heightSamples[0].lateralSamples.push({offsetMeters:5,y:.1}),r=>r.heightSamples[0].lateralSamples[2].y+=1,
-  r=>r.heightSamples[1].lateralSamples[1].offsetMeters+=.1,r=>r.heightSamples[0].lateralSamples[4].y+=1,
+  r=>r.heightSamples[1].lateralSamples.splice(1,1),r=>r.heightSamples[0].lateralSamples[1].offsetMeters=-4,r=>r.heightSamples[0].lateralSamples[4].y+=1,
   r=>r.heightSamples[1].lateralSamples[4].y+=100,r=>r.heightSamples[0].lateralSamples[4].y=NaN,
-  r=>{const middle=sample(.001,0);middle.lateralSamples.at(-1).y+=.06;r.heightSamples.splice(1,0,middle);}];
+  r=>{const middle=sample(.001,0);middle.lateralSamples.at(-1).y+=.06;r.heightSamples.splice(1,0,middle);},
+  r=>{const make=(t,y)=>({t,y,leftY:y-.036,rightY:y+.036,lateralSamples:[-4,0,3,4].map(offsetMeters=>({offsetMeters,y:y+offsetMeters*.03}))});r.heightSamples=[make(0,0),make(.001,0),make(1,4)];r.heightSamples[1].lateralSamples[2].offsetMeters=1;r.heightSamples[1].rightY=.092;}];
  for(const change of changes){const r=road();change(r);assert.throws(()=>buildRaceRoadGraph([r]),/invalid_race_road_heights/);}
 });
 
@@ -79,4 +80,19 @@ test('chunked storage binds every lateral station and rejects altered edge geome
  const recovered=await readRaceDistrictFacts(stored.fields,async i=>structuredClone(stored.chunks[i].record));
  assert.deepEqual(recovered.roads.at(-1).heightSamples[1].lateralSamples,stored.facts.roads.at(-1).heightSamples[1].lateralSamples);
  await assert.rejects(readRaceDistrictFacts(stored.fields,async i=>{const record=structuredClone(stored.chunks[i].record);if(i===0)record.roads[0].heightSamples[0].lateralSamples.at(-1).y+=.01;return record;}),/storage_unavailable/);
+});
+
+test('moving taper knots follow the same road triangles in either direction and after a timing split',async()=>{
+ const at=(t,cap)=>({t,y:0,leftY:0,rightY:0,lateralSamples:[[-4,cap],[-3.3-cap/.15,cap],[-3.3,0],[0,0],[3.3,0],[3.3+cap/.15,cap],[4,cap]].map(([offsetMeters,y])=>({offsetMeters,y}))}),
+  tapered={...road(),a:{x:0,y:0,z:0,connectionLayer:'start'},b:{x:0,y:0,z:250,connectionLayer:'end'},heightSamples:[at(0,0),at(1,.06)]},graph=buildRaceRoadGraph([tapered]),f=course(graph,['controlled-kerb:forward']),r=course(graph,['controlled-kerb:reverse']);
+ assert.ok(Math.abs(sampleRaceSegmentY(f.segments[0],.5,3.4)-.015)<1e-10,'entry roof is the actual triangle plane, not a bilinear depression');
+ assert.ok(Math.abs(sampleRaceSegmentY(r.segments[0],.5,-3.4)-.015)<1e-10);
+ const corners=[{x:0,y:0,z:0},{x:0,y:0,z:250},{x:250,y:0,z:250},{x:250,y:0,z:0}],roads=corners.map((a,i)=>({...tapered,sourceId:'taper-'+i,a:{...a,connectionLayer:'n'+i},b:{...corners[(i+1)%4],connectionLayer:'n'+((i+1)%4)},direction:'forward'})),g=buildRaceRoadGraph(roads),closed=createRaceCourse(g,roads.map(p=>p.sourceId+':forward'),{locationId:'controlled',anchor:{lat:43,lon:7},discipline:'circuit',startOffsetMeters:40});
+ for(const t of[0,.1,.3,.6,1])for(const offset of[-4,-3.5,-3.35,0,3.35,3.5,4])assert.ok(Math.abs(sampleRaceSegmentY(closed.segments[0],t,offset)-sampleRaceSegmentY(f.segments[0],.16+.84*t,offset))<1e-10);
+ assert.ok(Object.isFrozen(closed.segments[0].heightSampleRange));
+ const service=await import('../services/racing/generated/engine.mjs'),{createRequire}=await import('node:module'),functions=createRequire(import.meta.url)('../functions/generated/racing-engine.cjs');
+ for(const engine of[service,functions]){
+  const rebuilt=engine.createRaceCourse(engine.buildRaceRoadGraph(roads),roads.map(p=>p.sourceId+':forward'),{locationId:'controlled',anchor:{lat:43,lon:7},discipline:'circuit',startOffsetMeters:40});
+  assert.deepEqual(rebuilt.segments,closed.segments);assert.equal(await engine.raceCourseKey(rebuilt),await raceCourseKey(closed));
+ }
 });
