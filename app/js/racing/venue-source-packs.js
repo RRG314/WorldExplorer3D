@@ -2,6 +2,7 @@ import {compileMappedVenueLayout,geographicVenueDistance} from './venue-layout.j
 import {annotateRoadSourceSurvey} from '../world/road-source-survey.js';
 import {sha256Text} from '../terrain/ground-artifact.js?v=4';
 import {parseMeters} from '../world/compiler/transport-source-normalizer.js?v=4';
+import {annotateReviewedVenueDecks,reviewedVenueDeckProfile} from './venue-deck-source.js';
 
 // A reviewed source package is not a playable-catalogue flag. Admission still
 // requires the existing world publication and racing surface qualification.
@@ -79,11 +80,13 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   elements.set(`node:${id}`,{...old,type:'node',id,lat:point.lat,lon:point.lon});
  }
  for(const raw of source.ways){
+  const deck=layoutWays.has(raw.id)?reviewedVenueDeckProfile(source,descriptor,raw.id):null;
   const sourceFeatureId=`osm:way:${raw.id}`,way={type:'way',id:raw.id,version:raw.version,nodes:[...raw.nodes],tags:{...raw.tags,_sourceFeatureId:sourceFeatureId,_sourceCompleteness:'lossless',...(!layoutWays.has(raw.id)?{_regionalContext:'fixed-location'}:{})}};
   if(layoutWays.has(raw.id))annotateRoadSourceSurvey(way,{version:1,venueId:descriptor.id,sourceFeatureId,
    ...(descriptor.pavementWidthPolicy==='mapped'?{pavementWidthPolicy:'mapped'}:{}),
    usableWidthMeters:source.layout.usableWidthMeters,maximumCrossfall:descriptor.maximumCrossfall,
    ...(descriptor.surfaceModel?{surfaceModel:descriptor.surfaceModel}:{}),
+   ...(deck?{geographicDeckProfile:deck}:{}),
    groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required});
   elements.set(`way:${raw.id}`,way);
  }
@@ -100,5 +103,15 @@ export async function loadRacingVenueSource(descriptor,{fetchImpl=globalThis.fet
  if(signal?.aborted)throw signal.reason||new DOMException('Cancelled','AbortError');
  if(text.length>2000000||await sha256Text(text)!==descriptor.sourceSha256)throw Error('venue_source_integrity_failed');
  if(signal?.aborted)throw signal.reason||new DOMException('Cancelled','AbortError');
- return JSON.parse(text);
+ const source=JSON.parse(text),profile=descriptor.reviewedDeckProfiles;
+ if(profile){
+  if(typeof profile.url!=='string'||!/^\/app\/assets\/racing\/[A-Za-z0-9_/-]+\.json$/.test(profile.url)||!/^[a-f0-9]{64}$/.test(profile.contentSha256))throw Error('venue_deck_descriptor_invalid');
+  const response=await fetchImpl(profile.url,{signal});if(!response.ok)throw Error('venue_deck_source_fetch_failed');
+  const bytes=await response.text();
+  if(signal?.aborted)throw signal.reason||new DOMException('Cancelled','AbortError');
+  if(bytes.length>1024*1024||await sha256Text(bytes)!==profile.contentSha256)throw Error('venue_deck_source_integrity_failed');
+  if(signal?.aborted)throw signal.reason||new DOMException('Cancelled','AbortError');
+  annotateReviewedVenueDecks(source,JSON.parse(bytes),{descriptor,requiredArtifacts:racingVenueGroundRequirements(descriptor),contentSha256:profile.contentSha256});
+ }
+ return source;
 }

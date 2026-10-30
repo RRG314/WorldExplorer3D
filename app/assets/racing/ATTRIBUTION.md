@@ -59,3 +59,37 @@ of official circuit or championship records.
   banking, vertically separated crossings, timing-line placement, presentation
   and gameplay acceptance remain required before runtime adoption. It does not
   substitute for the tourist, GP or combined endurance layouts.
+
+### Reviewed bridge profiles
+
+`nordschleife/decks.json` contains five reviewed bridge profiles, derived from
+167 normalized DOM1 stations. The source observations are retained in
+`config/racing-venues/observations/nordschleife-decks.json`; the pinned source
+rasters, road digest, required ground digests and reproduction parameters are in
+`config/racing-venues/nordschleife-decks.json`.
+
+© GeoBasis-DE / LVermGeoRP, [DOM1 data](https://geobasis-rlp.de/data/dom1/current/tif/),
+under [Data licence Germany – attribution – Version 2.0](https://www.govdata.de/dl-de/by-2-0).
+The retained filenames identify 2025; this does not establish a flight date for
+every pixel. Geographic paths remain © OpenStreetMap contributors under ODbL 1.0.
+World Explorer 3D fitted a four-metre pavement core and reconstructed its planar
+camber across the wider mapped pavement. Vehicles, rails, vegetation and other
+outer DOM returns are not admitted as pavement observations.
+
+Heights are normalized from ETRS89/UTM32 with DHHN2016 heights to the existing
+EGM2008 target through the pinned GCG2016 and EGM2008 grids. The recorded PROJ
+pipeline is applied in its **inverse** direction for this conversion. The
+operation's stated 8.1 m accuracy is retained separately from the observed local
+fit residual. GCG2016: © BKG, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
+with [source information](https://cdn.proj.org/de_bkg_README.txt). EGM2008:
+[NGA grid information](https://cdn.proj.org/us_nga_README.txt).
+
+Reproduce the runtime profile from the pinned observations:
+
+```sh
+node scripts/racing/build-venue-decks.mjs \
+  --config=config/racing-venues/nordschleife-decks.json --output=/new/path/decks.json
+```
+
+These profiles do not enable the unfinished venue or certify official geometry,
+timing, full-width surveying or venue presentation.

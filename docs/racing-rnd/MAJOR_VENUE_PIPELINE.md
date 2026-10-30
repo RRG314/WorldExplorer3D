@@ -191,6 +191,16 @@ admission remains unchanged: this source is not added to the runtime adoption
 registry until complete accepted ground, banking, crossings and venue gameplay
 are supported. Both OSM `pitlane` and `pit_lane` tags reject a main-course layout.
 
+The separate `nordschleife/decks.json` source product now carries all five reviewed
+bridge profiles. Its reproduction recipe pins the retained normalized observations,
+source road digest, mapped versions and nodes, datum metadata and required ground
+group. It distinguishes the four-metre observed core from reconstructed outer
+camber. `loadRacingVenueSource` can load an explicitly hash-bound profile alongside
+the road source; missing, changed or cancelled data rejects preparation. A private
+source annotation transfers it through normal district normalization and the
+existing geographic-to-world road compilation. Provider/cache JSON cannot grant
+this annotation. No additional height sampler or venue registry entry is created.
+
 Reproduce the adapted source with the same source builder and this configuration,
 using its hash-matching captured raw response. The ODbL attribution and recipe
 are in `app/assets/racing/ATTRIBUTION.md`. No official map or venue artwork is
