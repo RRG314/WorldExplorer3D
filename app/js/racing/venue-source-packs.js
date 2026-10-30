@@ -1,5 +1,6 @@
 import {normalizeRaceVenueSource} from './venue-course-policy.js';
 import {compileMappedVenueLayout,geographicVenueDistance} from './venue-layout.js';
+import {authorVenueEdgeRecipes} from './venue-edge-authoring.js';
 import {annotateRoadSourceSurvey} from '../world/road-source-survey.js';
 import {sha256Text} from '../terrain/ground-artifact.js?v=4';
 import {parseMeters} from '../world/compiler/transport-source-normalizer.js?v=4';
@@ -34,7 +35,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  // Original game timing on the retained T13 straight, aligned to the visible
  // transverse paint in RLP DOP20. This is not a surveyed official timing marker.
  startLine:Object.freeze({sourceFeatureId:'osm:way:41395670',segment:6,fraction:.725}),
- presentationStatus:'under-construction',
+ presentationStatus:'under-construction',edgeBandAuthoring:'mapped-bend-game-dressing-v1',
  // Wider visual relief uses the same native source plus its retained perimeter tiles.
  // Feather inside the outer coverage border; the physical road corridor is unchanged.
  landscapeRefinement:Object.freeze({radiusMeters:350,fullHeightRadiusMeters:150,spacingMeters:32,coverageFadeMeters:70,
@@ -124,6 +125,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  if(descriptor.routeExtent!==undefined&&descriptor.routeExtent!=='mapped-venue-v1')throw Error('venue_route_extent_invalid');
  const venueSource=descriptor.routeExtent?normalizeRaceVenueSource({version:1,id:descriptor.id,sourceSha256:descriptor.sourceSha256,
   mappedLengthMeters:layout.lengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,sourceFeatureIds:layout.wayIds.map(id=>`osm:way:${id}`)}):undefined;
+ const edgeRecipes=authorVenueEdgeRecipes(layout,descriptor);
  const original=Array.isArray(data?.elements)?data.elements:[],existingNodes=new Map(original.filter(e=>e.type==='node').map(e=>[e.id,e]));
  const sourceWays=new Map(source.ways.map(w=>[w.id,w])),layoutWays=new Set(layout.wayIds),bounds=source.source?.coverage;
  if(!bounds||!['south','north','west','east'].every(k=>Number.isFinite(bounds[k]))||bounds.south>=bounds.north||bounds.west>=bounds.east)throw Error('venue_source_coverage_invalid');
@@ -157,6 +159,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
    ...(descriptor.motorAccess?{motorAccess:descriptor.motorAccess}:{}),
    ...(deck?{geographicDeckProfile:deck}:{}),
    ...(pavement?{geographicPavementProfile:pavement}:{}),
+   ...(!deck&&!pavement&&edgeRecipes.has(raw.id)?{edgeBandRecipe:edgeRecipes.get(raw.id)}:{}),
    groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required});
   elements.set(`way:${raw.id}`,way);
  }

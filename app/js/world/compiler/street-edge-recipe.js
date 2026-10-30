@@ -1,10 +1,13 @@
 import {carriagewaySegmentPolygon,carriagewayJoinPolygons} from './street-carriageway.js';
+import {roadWidthAtSegment} from '../road-cross-section-profile.js?v=1';
+import {roadPlacementOffsetWorld} from '../road-units.js';
 import {roadMetersPerWorldUnit} from '../road-units.js';
 import {streetPolygonKernel as clip} from './street-polygon-kernel.js';
 
 // Plain, bounded compiler input. Only the private reviewed-source adapter may
 // admit it from a live feature; provider tags cannot create physical furniture.
 export function validateStreetEdgeRecipe(recipe){
+ if(recipe?.sourceLengthMeters!==undefined&&(!Number.isFinite(recipe.sourceLengthMeters)||recipe.sourceLengthMeters<=0||recipe.sourceLengthMeters>30000))throw Error('invalid_street_edge_recipe');
  if(!recipe||recipe.version!==1||!Array.isArray(recipe.bands)||recipe.bands.length>128)throw Error('invalid_street_edge_recipe');
  for(const b of recipe.bands){
   if(!b||![b.startMeters,b.endMeters,b.widthMeters,b.heightMeters,b.rampMeters,b.taperMeters,b.stripeMeters,b.phaseMeters].every(Number.isFinite)||
@@ -21,7 +24,8 @@ function roadState(road){
  const recipe=road.edgeBandRecipe;if(!recipe)return null;validateStreetEdgeRecipe(recipe);
  const unit=roadMetersPerWorldUnit(road),distances=[0];
  for(let i=1;i<road.pts.length;i++)distances.push(distances[i-1]+Math.hypot(road.pts[i].x-road.pts[i-1].x,road.pts[i].z-road.pts[i-1].z)*unit);
- return {recipe,unit,distances};
+ const scale=recipe.sourceLengthMeters?distances.at(-1)/recipe.sourceLengthMeters:1;
+ return {recipe:scale===1?recipe:{...recipe,bands:recipe.bands.map(b=>({...b,startMeters:b.startMeters*scale,endMeters:b.endMeters*scale}))},unit,distances};
 }
 export function compileStreetEdgeRecipe(tile){
  if(!tile.segments.some(s=>s.road.edgeBandRecipe)&&!(tile.joins||[]).some(j=>j.road.edgeBandRecipe))return {faces:[],polygons:[]};
@@ -76,4 +80,28 @@ export function compileStreetEdgeRecipe(tile){
  if(!faces.length)return {faces,polygons:[]};
  const outerBounds=[[[tile.bounds.minX,tile.bounds.minZ],[tile.bounds.maxX,tile.bounds.minZ],[tile.bounds.maxX,tile.bounds.maxZ],[tile.bounds.minX,tile.bounds.maxZ],[tile.bounds.minX,tile.bounds.minZ]]];
  return {faces,polygons:inner.length?clip.intersection(clip.union(inner[0],...inner.slice(1)),outerBounds):[]};
+}
+
+export function streetEdgeStationFractions(road,index,t0=0,t1=1){
+ const state=roadState(road);if(!state)return [];
+ const start=state.distances[index],length=state.distances[index+1]-start,points=[];
+ if(!(length>0))return points;
+ for(const b of state.recipe.bands)for(const distance of [b.startMeters,b.startMeters+b.taperMeters,b.endMeters-b.taperMeters,b.endMeters,(b.startMeters+b.endMeters)/2]){
+  const t=(distance-start)/length;if(t>t0&&t<t1)points.push((t-t0)/(t1-t0));
+ }
+ return points;
+}
+
+export function streetEdgeLateralKnots(road,index,t,widthMeters){
+ const state=roadState(road);if(!state)return [];
+ const distance=state.distances[index]+(state.distances[index+1]-state.distances[index])*t,
+  width=roadWidthAtSegment(road,index,t)*state.unit,offset=roadPlacementOffsetWorld(road)*state.unit,points=[];
+ for(const side of [-1,1]){
+  const bands=state.recipe.bands.filter(b=>b.side===side);if(!bands.length)continue;
+  const band=bands.find(b=>distance>=b.startMeters&&distance<=b.endMeters)||bands[0],cap=liftAt(band,distance),inside=width/2-side*offset-band.widthMeters;
+  for(const position of [inside,inside+band.rampMeters*cap/band.heightMeters]){
+   const offsetMeters=side*position;if(offsetMeters> -widthMeters/2+.001&&offsetMeters<widthMeters/2-.001)points.push(offsetMeters);
+  }
+ }
+ return points;
 }

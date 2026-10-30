@@ -1,3 +1,4 @@
+import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import { leaseRoadOverview } from './road-overview-owner.js';
 import {captureTransportTerrain} from './transport-terrain-snapshot.js';
 import {createPavementTerrainMask} from '../world/pavement-terrain-mask.js';
@@ -100,7 +101,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   appCtx._cancelTransportPreparation=dispose;
   try {
     const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,
-      pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
+      edgeBandRecipe:reviewedRoadEdgeRecipe(road),pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
       structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
     }));
     const includeOverview=appCtx.farTerrainClipmapState?.regionalRoadCoverage?.status!=='ready';

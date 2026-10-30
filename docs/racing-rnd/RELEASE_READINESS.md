@@ -190,3 +190,12 @@ The actual two-account city race, creator publication/moderation and live record
 The owner explicitly asked to continue without waiting for hardware they do not own. Physical Apple, calibrated phone-viewer and tracked-headset results remain unverified claims to disclose, not a reason to halt implementation. Motorola results must still be distinguished from desktop viewport/emulation evidence.
 
 The fixed product finish line is `FINISH_GOAL.md`. Retain failures. Source checks, controlled integrations, actual city input and live-service verification are distinct evidence levels. No production deployment has occurred for this racing package.
+
+Physical edge work now compiles a single asphalt/kerb top through the existing
+carriageway, terrain partition, transport worker, portable cell facts, renderer
+and contact index. Bounded original bend dressing is source-bound for the
+Nordschleife; it is not an official kerb survey. Component checks cover inside
+and outside corners, intersection clearance, cell return, paint transfers and
+published lateral profiles in the shared race graph. Actual venue visuals,
+contact fidelity and updated frame timing still require acceptance. Zero of
+twelve major packs have completed acceptance.

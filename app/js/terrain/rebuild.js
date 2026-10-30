@@ -1,3 +1,4 @@
+import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import {createRoadRegionLease} from './road-region-lease.js';
 import {hasReviewedPavement} from '../world/compiler/reviewed-deck-profile.js';
 import {createTransportCellFacts,transportFromCellFacts} from '../earth-core/world-cell-facts.js';
@@ -693,7 +694,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,current:isCurrent,yieldWork:yieldToMainThread});
     try {
       trace('indexCarriageways:start',{roads:atGradeRoads.length});
-      const tiles=prepareCarriagewayTiles(atGradeRoads.map(entry=>entry.road));
+      const tiles=prepareCarriagewayTiles(atGradeRoads.map(({road})=>{const edgeBandRecipe=reviewedRoadEdgeRecipe(road);return edgeBandRecipe?{...road,edgeBandRecipe}:road;}));
       trace('indexCarriageways:end',{tiles:tiles.length});
       let sliceStartedAt=now();
       for(const [tileIndex,tile] of tiles.entries()) {

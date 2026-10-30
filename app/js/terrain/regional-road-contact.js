@@ -39,6 +39,12 @@ export function createRegionalRoadContact(base) {
       }
       return best;
     },
+    crossSectionOffsets(x,z,nx,nz,halfWidth,mode=null){
+      const offsets=[];
+      for(const index of selected(x-Math.abs(nx)*halfWidth,x+Math.abs(nx)*halfWidth,z-Math.abs(nz)*halfWidth,z+Math.abs(nz)*halfWidth))
+        offsets.push(...index.crossSectionOffsets(x,z,nx,nz,halfWidth,mode));
+      return offsets.sort((a,b)=>a-b).filter((n,i,a)=>!i||n-a[i-1]>1e-6);
+    },
     projectPolygon,projectTriangle:projectPolygon,
     dispose(){base.dispose();for(const index of regions.values())index.dispose();regions.clear();}
   };

@@ -149,6 +149,31 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       }
       return best;
     },
+    // Compilation/qualification reader: intersections of a finite cross-section
+    // with the existing published triangles. It stores no alternate road data.
+    crossSectionOffsets(x,z,nx,nz,halfWidth,requiredTerrainMode=null){
+      if(![x,z,nx,nz,halfWidth].every(Number.isFinite)||halfWidth<=0||halfWidth>30||Math.abs(Math.hypot(nx,nz)-1)>1e-6)throw Error('invalid_road_cross_section');
+      const candidates=new Set(),offsets=[-halfWidth,halfWidth];
+      for(let ix=Math.floor((x-Math.abs(nx)*halfWidth)/cellSize);ix<=Math.floor((x+Math.abs(nx)*halfWidth)/cellSize);ix++)
+        for(let iz=Math.floor((z-Math.abs(nz)*halfWidth)/cellSize);iz<=Math.floor((z+Math.abs(nz)*halfWidth)/cellSize);iz++){
+          const start=cells.get(ix)?.get(iz);if(start===undefined)continue;
+          for(let i=start+1,end=i+buckets[start];i<end;i++)candidates.add(buckets[i]);
+        }
+      for(const id of candidates){
+        const offset=id*5;if(requiredTerrainMode&&modes[records[offset+4]]!==requiredTerrainMode)continue;
+        const p=sources[records[offset]],a=records[offset+1],b=records[offset+2],c=records[offset+3],den=denominators[id],
+          u=((p[b+2]-p[c+2])*(x-p[c])+(p[c]-p[b])*(z-p[c+2]))/den,
+          v=((p[c+2]-p[a+2])*(x-p[c])+(p[a]-p[c])*(z-p[c+2]))/den,
+          du=((p[b+2]-p[c+2])*nx+(p[c]-p[b])*nz)/den,
+          dv=((p[c+2]-p[a+2])*nx+(p[a]-p[c])*nz)/den;
+        let lo=-halfWidth,hi=halfWidth;
+        for(const [value,delta]of[[u,du],[v,dv],[1-u-v,-du-dv]]){
+          if(Math.abs(delta)<1e-12){if(value< -1e-7){lo=1;hi=0;break;}}else if(delta>0)lo=Math.max(lo,-value/delta);else hi=Math.min(hi,-value/delta);
+        }
+        if(hi-lo>1e-7){offsets.push(lo,hi);if(offsets.length>4096)throw Error('road_cross_section_capacity');}
+      }
+      return offsets.sort((a,b)=>a-b).filter((n,i,a)=>!i||n-a[i-1]>1e-6);
+    },
     projectPolygon,
     projectTriangle: projectPolygon,
     sampleAt(x,z,referenceY=NaN,requiredTerrainMode=null) {

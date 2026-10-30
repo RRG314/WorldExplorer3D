@@ -1,3 +1,6 @@
+import {publishedLateralProfile} from './published-lateral-profile.js';
+import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
+import {streetEdgeStationFractions,streetEdgeLateralKnots} from '../world/compiler/street-edge-recipe.js';
 import {traversalSegmentCount,readTraversalSegment}from'../world/traversal-graph-storage.js';
 import {minimumRoadWidthOnInterval,roadSegmentIsDriveable}from'../world/road-cross-section-profile.js?v=1';
 import {roadMetersPerWorldUnit}from'../world/road-units.js';
@@ -49,6 +52,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    }
    if(venueSource&&(feature.surfaceSurveyEvidence?.venueSource!==adopted||model?.surveyedSurface?.venueSource!==adopted)){rejected('unqualified_venue_source');yield;continue;}
    const banked=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
+   const edgeRecipe=reviewedRoadEdgeRecipe(feature);
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
    const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[];
@@ -86,13 +90,14 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     if(groundOwned)diagnostics.maximumGroundProfileDepartureMeters=Math.max(diagnostics.maximumGroundProfileDepartureMeters,Math.abs(drive.position.y-guide)*metersPerUnit);
     return {x:px,z:pz,y:drive.position.y};
    }
-   for(let sample=0;sample<=steps;sample++){
-    const t=sample/steps,x=p1.x+(p2.x-p1.x)*t,z=p1.z+(p2.z-p1.z)*t;diagnostics.sampledPositions++;
+   const stations=edgeRecipe?[...new Set([...Array.from({length:steps+1},(_,i)=>i/steps),...streetEdgeStationFractions({...feature,edgeBandRecipe:edgeRecipe},segIndex,sourceTStart,sourceTEnd)])].sort((a,b)=>a-b):Array.from({length:steps+1},(_,i)=>i/steps);
+   for(let sample=0;sample<stations.length;sample++){
+    const t=stations[sample],x=p1.x+(p2.x-p1.x)*t,z=p1.z+(p2.z-p1.z)*t;diagnostics.sampledPositions++;
     if(context.transportDetail?.hasReadyCoverageAt?.({x,z},0)===false){failure='road_publication_pending';break;}
     const point=surface(x,z,t);
     if(!point){failure='surface_layer_mismatch';break;}
     const y=point.y;
-    if(sample===0)firstPoint=point;if(sample===steps)lastPoint=point;
+    if(sample===0)firstPoint=point;if(sample===stations.length-1)lastPoint=point;
     const water=context.SurfaceQuery.waterAt?.(x,z),space=tunnel?resolveTunnelSpace(feature,x,z,y+.5):null;
     if(tunnel){if(!space?.inside){failure='unqualified_tunnel';break;}minimumClearance=Math.min(minimumClearance,space.clearance*metersPerUnit);}
     if(water?.feature&&Number.isFinite(water.position?.y)&&water.position.y>y+.15&&!space?.inside){failure='submerged_road';break;}
@@ -104,10 +109,13 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     const lateral=spanMeters/metersPerUnit,leftY=surface(x-fz*lateral,z+fx*lateral,t)?.y,rightY=surface(x+fz*lateral,z-fx*lateral,t)?.y;
     if(!Number.isFinite(leftY)||!Number.isFinite(rightY)){failure='missing_crossfall';break;}
     const previous=samples.at(-1);
-    if(previous&&Math.abs(y-previous.y)*metersPerUnit/(length/steps)>.22){failure='steep_grade';break;}
+    if(previous&&Math.abs(y-previous.y)*metersPerUnit/(length*(t-previous.t))>.22){failure='steep_grade';break;}
     if(Math.max(Math.abs(y-leftY),Math.abs(y-rightY))*metersPerUnit/spanMeters>
       (banked?Math.min(model.surveyedSurface.maximumCrossfall,BANKED_ROAD_MAXIMUM_CROSSFALL):.15)){failure='steep_crossfall';break;}
-    samples.push({t,y,leftY,rightY});
+    let lateralSamples;
+    if(edgeRecipe)try{lateralSamples=publishedLateralProfile({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:streetEdgeLateralKnots({...feature,edgeBandRecipe:edgeRecipe},segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters)});}
+    catch(error){failure=error.message;break;}
+    samples.push({t,y,leftY,rightY,...(lateralSamples?{lateralSamples}:{})});
     // Budgeted by the same construction scheduler as the world compiler.
     yield;
    }
