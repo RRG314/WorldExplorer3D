@@ -7,6 +7,7 @@ import {resolveVehicleRoadContactPose}from'../engine/vehicle-road-attitude.js?v=
 import {vehicleUpgradeDynamics}from'../transport/vehicle-upgrades.js?v=1';
 import {personalVehicleById}from'../transport/vehicle-garage-rules.js';
 import {projectRacePosition}from'./course-rules.js';
+import {OVAL_AERODYNAMIC_DRAG_PER_METER} from './oval-rules.js';
 
 export function createRaceVehicleProfile(vehicleId,{condition=1,levels={},grip=1}={}){
  const definition=personalVehicleById(vehicleId);if(!definition)throw Error('race_vehicle_unknown');
@@ -24,11 +25,12 @@ export function createRaceVehicleState(pose,profile){
 // Same acceleration, steering, slip and world-unit integration as free roam.
 // A closed race has surveyed pavement boundaries and ghost competitors. Its
 // session owner supplies dt and applies this state to its owned actor only.
-export function stepRaceVehicle(course,car,actions,dt,profile){
+export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}={}){
  if(!(dt>0&&dt<=1/30))throw Error('invalid_race_physics_step');
  const frame=prepareVehicleDriveFrame(car,{...actions,boost:0},dt,profile.config);
  const driving=stepVehiclePlanarDrive(car,dt,frame,{config:profile.config,planetary:false,metersPerWorldUnit:course.metersPerUnit,
   ...(course.surfaceModel===BANKED_ROAD_MODEL?{roadPlane:{pitch:car.terrainPitch||0,roll:car.terrainRoll||0}}:{}),
+  ...(course.discipline==='oval'?{aerodynamicDrag:{coefficientPerMeter:OVAL_AERODYNAMIC_DRAG_PER_METER*Math.max(.5,Math.min(1.8,profile.handling.width*profile.handling.height/2.7)),reduction:draftReduction}}:{}),
   surfaceDynamics:profile.surface,vehicleHandling:profile.handling,vehicleCondition:profile.condition,vehicleUpgrades:profile.upgrades,
   characterVehicle:profile.character,maxSpd:Math.min(profile.config.maxSpd,mphToCarSpeed(profile.handling.topSpeedMph)),
   friction:profile.config.friction,accel:profile.config.accel*profile.handling.accelerationScale});

@@ -26,9 +26,26 @@ the wheel into the boundary and remains stopped. It proves the displayed flag
 transition, not wall recovery or native-venue smoothness. A failed screenshot
 capture was diagnosed and retained before the successful composed-HUD capture.
 
+Oval aerodynamics now apply a speed-squared drag force through the shared planar
+physics delegate. The original coefficient is 0.0004/m, scaled by the vehicle's
+width and height relative to 2.7 m². This is a game estimate, not factory data.
+A nearby aligned car on the same bank and elevation can reduce that force by
+less than 30%; wakes cannot stack, operate under yellow or grant energy while
+coasting. The session samples all actors before each tick; local prediction uses
+the same calculation. Formation, apron, caution and two-lap checks still pass
+with this force. Ordinary courses retain their exact previous calculation.
+
+Fourteen focused checks include browser/service/Functions replay, coasting,
+wake exclusions and network prediction. The three post-green render captures
+show two following licensed M3s drafting, with no contacts or WebGL errors. Input
+is held throttle with controller steering; this is not another native smoothness
+test. An initial coasting fixture hit a curved boundary after its observation
+window grew too long; the retained diagnosis separates collision braking from
+aerodynamic deceleration, and the corrected check has zero boundary contacts.
+
 These are controlled engine/presentation boundaries. Daytona remains private
-circuit practice under construction. Its pit branch, drafting, complete native
-oval gameplay and venue presentation remain open; no major pack is accepted.
+circuit practice under construction. Its pit branch, complete native oval
+gameplay and venue presentation remain open; no major pack is accepted.
 
 Three mapped Daytona garage exteriors also passed publication in the actual
 loaded world: three roots and three replacement colliders, with no remaining
@@ -38,6 +55,11 @@ The normal restore helper snapped the first two attempted north-garage views to
 a service road; those views are retained as framing failures. No pit driving or
 full venue acceptance is inferred from these placements. Nearby generic service
 buildings remained a presentation failure and are being replaced separately.
+Six additional mapped service, inspection, media and club exteriors have since
+passed actual publication: nine total roots and replacement colliders, no
+remaining matched shells or generic building centres inside those footprints,
+and six admitted walking views. Background generic buildings and existing entry
+labels remain visible; this does not accept the whole paddock presentation.
 
 ## Actual city and deployed services
 

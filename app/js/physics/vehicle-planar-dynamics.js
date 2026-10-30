@@ -95,6 +95,12 @@ export function stepVehiclePlanarDrive(car,dt,frame,environment){
   // Apply grade gravity before the service brake so a brake with adequate
   // remaining traction can hold a stopped vehicle on the incline.
   if(roadPlane)car.speed+=roadPlane.gravityForward/.22352*dt;
+  if(!planetary&&environment.aerodynamicDrag){
+    const {coefficientPerMeter,reduction=0}=environment.aerodynamicDrag;
+    if(!Number.isFinite(coefficientPerMeter)||coefficientPerMeter<0||coefficientPerMeter>.002||!Number.isFinite(reduction)||reduction<0||reduction>.3)throw Error('invalid_vehicle_aerodynamics');
+    const speed=Math.abs(carSpeedToMph(car.speed)*.44704),deceleration=coefficientPerMeter*speed*speed*(1-reduction)/.22352;
+    car.speed=Math.sign(car.speed)*Math.max(0,Math.abs(car.speed)-deceleration*dt);
+  }
   const transmission=planetary?1:stepAutomaticPowertrain(car,frame,dt,vehicleHandling);
   if (driveCommand.serviceBrake && hasGroundControl) {
     const configuredStopRate = Math.max(6, Number(planetary?PLANETARY_ROVER_CONFIG.brake:config.brake) || 18) *

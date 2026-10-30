@@ -3,7 +3,7 @@ import {createRaceVehicleProfile,stepRaceVehicle,snapshotRaceVehicle,raceVehicle
 import {racePhysicsVersion} from './record-rules.js';
 import {raceFormationActions} from './ai-controller.js';
 import {projectRacePosition} from './course-rules.js';
-import {ovalTrackZone,ovalPaceActions} from './oval-rules.js';
+import {ovalTrackZone,ovalPaceActions,ovalDraftActor,ovalDraftReduction} from './oval-rules.js';
 import {raceVehicleSpeedMetersPerSecond} from './vehicle-controller.js';
 const stopped=state=>({...state,speed:0,vFwd:0,vLat:0,vx:0,vz:0,yawRate:0,steerAngle:0,steerSm:0,rearSlip:0,throttleSm:0,engineLoad:0,engineRpm:850,driveGear:1,shiftTime:0,driftAngle:0,isDrifting:false});
 export function raceNetworkProfile(configuration,course){
@@ -19,6 +19,7 @@ export function raceNetworkProfile(configuration,course){
 export function createNetworkRaceController({context,course,connection,uid,isAdmitted=()=>true,onComplete=()=>{}}){
  const publication=context.worldPublication,vehicleId=context.car.personalVehicleId;
  const initial=connection.snapshot(),profile=raceNetworkProfile(initial.profiles[uid],course),physicsVersion=racePhysicsVersion(course);
+ const handlingByUid=course.discipline==='oval'?new Map(initial.players.map(p=>[p.uid,createRaceVehicleProfile(p.vehicleId).handling])):null;
  if(initial.physicsVersion!==physicsVersion)throw Error('race_physics_version_changed');
  let active=true,started=false,latest=initial,observed=null,previous=null,viewElapsedMs=0,frame=null,completed=false;
  const current=()=>active&&isAdmitted()&&context.worldPublication===publication&&context.car.personalVehicleId===vehicleId&&canOwnRoadRace(context);
@@ -35,8 +36,14 @@ export function createNetworkRaceController({context,course,connection,uid,isAdm
    if(player.progress?.finished||player.dnf||!connection.connected()||connection.isFresh?.()===false||!['running','countdown'].includes(latest.phase))return stopped(frame);
    connection.control(actions);
    if(latest.phase==='running'){
-    const controls=course.discipline==='oval'?ovalPaceActions(actions,raceVehicleSpeedMetersPerSecond(frame),latest.raceControl?.flag==='yellow'||ovalTrackZone(projectRacePosition(course,raceVehicleGroundPose(frame)))==='apron'):actions;
-    stepRaceVehicle(course,frame,controls,dt,profile);
+    let controls=actions,draftReduction=0;
+    if(course.discipline==='oval'){
+     const zone=ovalTrackZone(projectRacePosition(course,raceVehicleGroundPose(frame))),yellow=latest.raceControl?.flag==='yellow',subject=ovalDraftActor(uid,frame,profile.handling,zone,raceVehicleSpeedMetersPerSecond(frame));
+     controls=ovalPaceActions(actions,subject.speedMetersPerSecond,yellow||zone==='apron');
+     const actors=latest.players.filter(p=>p.uid!==uid&&p.vehicleState&&handlingByUid.has(p.uid)).map(p=>ovalDraftActor(p.uid,p.vehicleState,handlingByUid.get(p.uid),p.trackZone,raceVehicleSpeedMetersPerSecond(p.vehicleState),!p.dnf&&!p.disconnected&&!p.progress?.finished));
+     draftReduction=ovalDraftReduction(subject,actors,course.metersPerUnit,{enabled:!yellow});
+    }
+    stepRaceVehicle(course,frame,controls,dt,profile,{draftReduction});
    }
    else if(course.discipline==='oval')stepRaceVehicle(course,frame,raceFormationActions(course,frame,player.progress,profile,player.slot),dt,profile);
    return snapshotRaceVehicle(frame);

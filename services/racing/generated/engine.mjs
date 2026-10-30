@@ -1387,6 +1387,7 @@ var OVAL_FORMATION_DISTANCE_METERS = OVAL_PACE_METERS_PER_SECOND * OVAL_FORMATIO
 var OVAL_CAUTION_DURATION_MS = 5e3;
 var OVAL_ORDER_PENALTY_MS = 5e3;
 var OVAL_MERGE_CLEARANCE_METERS = 10;
+var OVAL_AERODYNAMIC_DRAG_PER_METER = 4e-4;
 function ovalTrackZone(projection) {
   const p = projection?.pavement, l = projection?.lateralMeters;
   if (!p || !Number.isFinite(l)) return "outside";
@@ -1402,6 +1403,22 @@ function ovalPaceActions(actions, speedMetersPerSecond, restricted) {
 }
 function ovalDistanceGap(from, to, length) {
   return (to - from + length * 1.5) % length - length / 2;
+}
+function ovalDraftActor(uid, car, handling, zone, speedMetersPerSecond, active = true) {
+  return { uid, x: car.x, y: car.y, z: car.z, angle: car.angle, speedMetersPerSecond, lengthMeters: handling.length, widthMeters: handling.width, zone, active };
+}
+function ovalDraftReduction(subject, actors, metersPerUnit, { enabled = true } = {}) {
+  const usable = (a) => a?.active && a.zone === "bank" && a.speedMetersPerSecond >= 12 && [a.x, a.y, a.z, a.angle, a.lengthMeters, a.widthMeters].every(Number.isFinite);
+  if (!enabled || !(metersPerUnit > 0) || !usable(subject)) return 0;
+  const fx = Math.sin(subject.angle), fz = Math.cos(subject.angle);
+  let reduction = 0;
+  for (const other of actors) {
+    if (other.uid === subject.uid || !usable(other) || Math.cos(other.angle - subject.angle) < 0.985 || Math.abs(other.y - subject.y) * metersPerUnit > 1.5) continue;
+    const dx = (other.x - subject.x) * metersPerUnit, dz = (other.z - subject.z) * metersPerUnit, gap = dx * fx + dz * fz - (subject.lengthMeters + other.lengthMeters) * 0.5, lateral = Math.abs(dx * fz - dz * fx), width = Math.min(subject.widthMeters, other.widthMeters) * 0.75;
+    if (gap <= 0 || gap >= 35 || lateral >= width) continue;
+    reduction = Math.max(reduction, 0.3 * (1 - gap / 35) * Math.min(1, gap / 3) * (1 - lateral / width));
+  }
+  return reduction;
 }
 
 // app/js/world/road-units.js
@@ -2149,6 +2166,12 @@ function stepVehiclePlanarDrive(car, dt, frame, environment) {
   const lateralAcceleration = Math.min(gripAcceleration * 0.9, Math.abs((car.yawRate || 0) * carSpeedToMph(car.speed) * 0.44704) / 0.22352);
   const availableLongitudinal = roadPlane ? roadPlane.longitudinalTractionAcceleration / 0.22352 : Math.sqrt(Math.max(0, gripAcceleration * gripAcceleration - lateralAcceleration * lateralAcceleration));
   if (roadPlane) car.speed += roadPlane.gravityForward / 0.22352 * dt;
+  if (!planetary && environment.aerodynamicDrag) {
+    const { coefficientPerMeter, reduction = 0 } = environment.aerodynamicDrag;
+    if (!Number.isFinite(coefficientPerMeter) || coefficientPerMeter < 0 || coefficientPerMeter > 2e-3 || !Number.isFinite(reduction) || reduction < 0 || reduction > 0.3) throw Error("invalid_vehicle_aerodynamics");
+    const speed = Math.abs(carSpeedToMph(car.speed) * 0.44704), deceleration = coefficientPerMeter * speed * speed * (1 - reduction) / 0.22352;
+    car.speed = Math.sign(car.speed) * Math.max(0, Math.abs(car.speed) - deceleration * dt);
+  }
   const transmission = planetary ? 1 : stepAutomaticPowertrain(car, frame, dt, vehicleHandling);
   if (driveCommand.serviceBrake && hasGroundControl) {
     const configuredStopRate = Math.max(6, Number(planetary ? PLANETARY_ROVER_CONFIG.brake : config.brake) || 18) * (planetary ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale) * characterVehicle.brakingScale * vehicleUpgrades.brakeScale;
@@ -3620,7 +3643,7 @@ function createRaceVehicleState(pose, profile) {
     barrierContacts: 0
   };
 }
-function stepRaceVehicle(course, car, actions, dt, profile) {
+function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0 } = {}) {
   if (!(dt > 0 && dt <= 1 / 30)) throw Error("invalid_race_physics_step");
   const frame = prepareVehicleDriveFrame(car, { ...actions, boost: 0 }, dt, profile.config);
   const driving = stepVehiclePlanarDrive(car, dt, frame, {
@@ -3628,6 +3651,7 @@ function stepRaceVehicle(course, car, actions, dt, profile) {
     planetary: false,
     metersPerWorldUnit: course.metersPerUnit,
     ...course.surfaceModel === BANKED_ROAD_MODEL ? { roadPlane: { pitch: car.terrainPitch || 0, roll: car.terrainRoll || 0 } } : {},
+    ...course.discipline === "oval" ? { aerodynamicDrag: { coefficientPerMeter: OVAL_AERODYNAMIC_DRAG_PER_METER * Math.max(0.5, Math.min(1.8, profile.handling.width * profile.handling.height / 2.7)), reduction: draftReduction } } : {},
     surfaceDynamics: profile.surface,
     vehicleHandling: profile.handling,
     vehicleCondition: profile.condition,
@@ -3850,7 +3874,8 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       ovalZone: null,
       ovalRestricted: false,
       ovalPassed: /* @__PURE__ */ new Set(),
-      ovalPenaltyReason: null
+      ovalPenaltyReason: null,
+      ovalDraft: 0
     };
     players.set(uid, p);
     for (const other of players.values()) if (!other.ai) other.ready = false;
@@ -3952,7 +3977,8 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
   function ovalPositions() {
     return new Map([...players.values()].filter((p) => !p.dnf && !p.progress.finished).map((p) => {
       const projection = projectRacePosition(course, raceVehicleGroundPose(p.car));
-      return [p.uid, { projection, zone: ovalTrackZone(projection), speed: Math.abs(raceVehicleSpeedMetersPerSecond(p.car)), contacts: p.car.barrierContacts }];
+      const zone = ovalTrackZone(projection), speed = raceVehicleSpeedMetersPerSecond(p.car);
+      return [p.uid, { projection, zone, speed: Math.abs(speed), contacts: p.car.barrierContacts, draftActor: ovalDraftActor(p.uid, p.car, p.profile.handling, zone, speed, p.disconnectedAt === null) }];
     }));
   }
   function ovalPenalty(p, why) {
@@ -4035,7 +4061,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     }
     while (tick < targetTick) {
       tick++;
-      const frameAt = startAtMs + tick * STEP_MS, yellow = rolling && frameAt < cautionUntilMs, before = rolling ? ovalPositions() : null;
+      const frameAt = startAtMs + tick * STEP_MS, yellow = rolling && frameAt < cautionUntilMs, before = rolling ? ovalPositions() : null, draftActors = rolling ? [...before.values()].map((row) => row.draftActor) : null;
       for (const p of players.values()) {
         if (p.dnf || p.progress.finished) continue;
         if (p.disconnectedAt !== null && frameAt - p.disconnectedAt > 1e4) {
@@ -4050,7 +4076,8 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
         let actions = p.ai ? raceAiActions(course, p.car, p.progress, p.profile, { difficulty: p.difficulty, ...rolling ? { laneOffsetMeters: course.participants === 1 ? 0 : p.slot % 2 === 0 ? -1.4 : 1.4, ...yellow ? { formation: true, paceMetersPerSecond: OVAL_PACE_METERS_PER_SECOND } : {} } : {} }) : p.disconnectedAt !== null || frameAt - p.lastControlAt > 400 ? NEUTRAL : p.actions;
         if (rolling) actions = ovalPaceActions(actions, before.get(p.uid).speed, yellow || before.get(p.uid).zone === "apron");
         p.previousFrame = snapshotRaceVehicle(p.car);
-        stepRaceVehicle(course, p.car, actions, 1 / 60, p.profile);
+        if (rolling) p.ovalDraft = ovalDraftReduction(before.get(p.uid).draftActor, draftActors, course.metersPerUnit, { enabled: !yellow });
+        stepRaceVehicle(course, p.car, actions, 1 / 60, p.profile, { draftReduction: p.ovalDraft });
         p.progress = advanceRaceProgress(course, p.progress, raceVehicleGroundPose(p.car), frameAt, { startedAtMs: startAtMs });
       }
       if (rolling) {
@@ -4117,7 +4144,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           condition: p.car?.condition ?? p.profile.conditionValue,
           barrierContacts: p.car?.barrierContacts ?? 0,
           vehicleState: frame,
-          ...rolling ? { trackZone: p.ovalZone, ovalPenaltyReason: p.ovalPenaltyReason } : {},
+          ...rolling ? { trackZone: p.ovalZone, ovalPenaltyReason: p.ovalPenaltyReason, draftingReduction: phase === "running" && !p.progress?.finished ? p.ovalDraft : 0 } : {},
           progress: p.progress ? {
             nextGate: p.progress.nextGate,
             lap: p.progress.lap,
@@ -4236,7 +4263,7 @@ async function raceCourseKey(course) {
 var RACE_PHYSICS_VERSION = "earth-road-2026-10-28.2";
 var RACE_BANKED_PHYSICS_VERSION = "earth-banked-road-2026-10-29.1";
 var RACE_PROFILED_PAVEMENT_PHYSICS_VERSION = "earth-profiled-pavement-2026-10-30.1";
-var RACE_OVAL_PHYSICS_VERSION = "earth-oval-2026-10-30.2";
+var RACE_OVAL_PHYSICS_VERSION = "earth-oval-2026-10-30.3";
 function racePhysicsVersion(course) {
   if (course?.discipline === "oval") {
     if (course.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL || course.surfaceModel !== BANKED_ROAD_MODEL) throw Error("invalid_race_surface_model");

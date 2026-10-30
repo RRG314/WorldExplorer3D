@@ -465,7 +465,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   hud.querySelector('[data-race-phase]').textContent=online&&(!online.connected()||!online.isFresh())?'Reconnecting…':snapshot.phase==='countdown'?`${snapshot.raceControl?.start==='rolling'?'Rolling start':'Ready'} · ${Math.max(1,Math.ceil(left/1000))}`:player?.progress?.finished?'Finished · waiting for rivals':flag==='yellow'?`Yellow · no passing · ${raceOrder}`:flag==='white'?`Final lap · ${raceOrder}`:raceOrder;
   hud.querySelector('[data-race-clock]').textContent=formatTime(player?.progress?.elapsedMs??Math.max(0,snapshot.serverAtMs-(snapshot.startAtMs||0)));
   hud.querySelector('[data-race-progress]').textContent=`Lap ${player?.progress?.lap||1}/${controller.course.laps} · Gate ${Math.min((player?.progress?.nextGate||0)+1,controller.course.gates.length)}/${controller.course.gates.length}${player?.progress?.penaltyMs?` · +${player.progress.penaltyMs/1000}s penalty`:''}`;
-  hud.querySelector('[data-race-speed]').textContent=`${Math.round(Math.abs(carSpeedToMph(player?.speed||0)))} MPH · Condition ${Math.round((player?.condition??1)*100)}%${flag==='yellow'||player?.trackZone==='apron'?' · 22 MPH pace · no passing':''}`;
+  hud.querySelector('[data-race-speed]').textContent=`${Math.round(Math.abs(carSpeedToMph(player?.speed||0)))} MPH · Condition ${Math.round((player?.condition??1)*100)}%${flag==='yellow'||player?.trackZone==='apron'?' · 22 MPH pace · no passing':snapshot.phase==='running'&&player?.draftingReduction>.04?' · Drafting':''}`;
   if(snapshot.phase==='cancelled') {stop(snapshot.reason);c.showToast?.('Race ended. Normal exploration is available.');}
  }
  function stop(reason='racing_closed') {

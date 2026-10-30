@@ -1,7 +1,7 @@
 import {createRaceProgress,advanceRaceProgress,raceGridPose,prepareRaceCourseGeometry,projectRacePosition}from'./course-rules.js';
 import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle,raceVehicleSpeedMetersPerSecond}from'./vehicle-controller.js';
 import {raceAiActions,raceFormationActions}from'./ai-controller.js';
-import {OVAL_FORMATION_DURATION_MS,OVAL_PACE_METERS_PER_SECOND,OVAL_CAUTION_DURATION_MS,OVAL_ORDER_PENALTY_MS,OVAL_MERGE_CLEARANCE_METERS,ovalTrackZone,ovalPaceActions,ovalDistanceGap} from './oval-rules.js';
+import {OVAL_FORMATION_DURATION_MS,OVAL_PACE_METERS_PER_SECOND,OVAL_CAUTION_DURATION_MS,OVAL_ORDER_PENALTY_MS,OVAL_MERGE_CLEARANCE_METERS,ovalTrackZone,ovalPaceActions,ovalDistanceGap,ovalDraftActor,ovalDraftReduction} from './oval-rules.js';
 import {mphToCarSpeed,METERS_PER_SECOND_PER_MPH} from '../physics/vehicle-speed-units.js?v=2';
 import {raceMaximumDurationMs} from './session-limits.js';
 export {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
@@ -34,7 +34,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   if(!handling||handling.width>envelope.widthMeters||handling.length>envelope.lengthMeters||handling.height>envelope.heightMeters)throw Error('race_vehicle_exceeds_course_envelope');
   const p={uid,label:String(label||'Explorer').slice(0,40),profile,ai:ai===true,difficulty:Math.max(0,Math.min(1,Number(difficulty)||.65)),ready:ai===true,
    slot:players.size,car:null,previousFrame:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false,
-   ovalZone:null,ovalRestricted:false,ovalPassed:new Set(),ovalPenaltyReason:null};
+   ovalZone:null,ovalRestricted:false,ovalPassed:new Set(),ovalPenaltyReason:null,ovalDraft:0};
   players.set(uid,p);for(const other of players.values())if(!other.ai)other.ready=false;return snapshot();
  }
  function setReady(uid,ready){lobby();const p=participant(uid);if(p.ai)throw Error('race_rival_control_forbidden');p.ready=ready===true;return snapshot();}
@@ -87,7 +87,8 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
  function ovalPositions(){
   return new Map([...players.values()].filter(p=>!p.dnf&&!p.progress.finished).map(p=>{
    const projection=projectRacePosition(course,raceVehicleGroundPose(p.car));
-   return [p.uid,{projection,zone:ovalTrackZone(projection),speed:Math.abs(raceVehicleSpeedMetersPerSecond(p.car)),contacts:p.car.barrierContacts}];
+   const zone=ovalTrackZone(projection),speed=raceVehicleSpeedMetersPerSecond(p.car);
+   return [p.uid,{projection,zone,speed:Math.abs(speed),contacts:p.car.barrierContacts,draftActor:ovalDraftActor(p.uid,p.car,p.profile.handling,zone,speed,p.disconnectedAt===null)}];
   }));
  }
  function ovalPenalty(p,why){
@@ -139,7 +140,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   // rather than dropping physics steps while awarding an implausible time.
   if(targetTick-tick>30){phase='cancelled';reason='race_authority_stalled';return snapshot();}
   while(tick<targetTick){
-   tick++;const frameAt=startAtMs+tick*STEP_MS,yellow=rolling&&frameAt<cautionUntilMs,before=rolling?ovalPositions():null;
+   tick++;const frameAt=startAtMs+tick*STEP_MS,yellow=rolling&&frameAt<cautionUntilMs,before=rolling?ovalPositions():null,draftActors=rolling?[...before.values()].map(row=>row.draftActor):null;
    for(const p of players.values()){
     if(p.dnf||p.progress.finished)continue;
     if(p.disconnectedAt!==null&&frameAt-p.disconnectedAt>10000){p.dnf=true;continue;}
@@ -147,7 +148,8 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     let actions=p.ai?raceAiActions(course,p.car,p.progress,p.profile,{difficulty:p.difficulty,...(rolling?{laneOffsetMeters:course.participants===1?0:p.slot%2===0?-1.4:1.4,...(yellow?{formation:true,paceMetersPerSecond:OVAL_PACE_METERS_PER_SECOND}:{})}:{})}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
     if(rolling)actions=ovalPaceActions(actions,before.get(p.uid).speed,yellow||before.get(p.uid).zone==='apron');
     p.previousFrame=snapshotRaceVehicle(p.car);
-    stepRaceVehicle(course,p.car,actions,1/60,p.profile);
+    if(rolling)p.ovalDraft=ovalDraftReduction(before.get(p.uid).draftActor,draftActors,course.metersPerUnit,{enabled:!yellow});
+    stepRaceVehicle(course,p.car,actions,1/60,p.profile,{draftReduction:p.ovalDraft});
     p.progress=advanceRaceProgress(course,p.progress,raceVehicleGroundPose(p.car),frameAt,{startedAtMs:startAtMs});
    }
    if(rolling){
@@ -190,7 +192,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     return {uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
     disconnected:p.disconnectedAt!==null,dnf:p.dnf,position,lastInputSequence:p.lastSequence,pose:frame?raceVehicleGroundPose(frame):null,
     speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,barrierContacts:p.car?.barrierContacts??0,
-    vehicleState:frame,...(rolling?{trackZone:p.ovalZone,ovalPenaltyReason:p.ovalPenaltyReason}:{}),
+    vehicleState:frame,...(rolling?{trackZone:p.ovalZone,ovalPenaltyReason:p.ovalPenaltyReason,draftingReduction:phase==='running'&&!p.progress?.finished?p.ovalDraft:0}:{}),
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
      bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null};})};
  }
