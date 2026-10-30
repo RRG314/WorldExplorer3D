@@ -8,20 +8,26 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   upgrades, condition, custody and model leases: the BMW M3 E46 road coupe,
   Neubi's BMW M3 E92 race car and Karol Miklas's Porsche 911 Carrera 4S. Original
   source licences, credits and reproducible preparation recipes accompany the
-  derivatives. The E92 and Carrera have interpreted cabins with live speed,
-  RPM and gear instruments; unavailable Porsche auxiliary values remain explicit.
+  derivatives. The E92 and Carrera have interpreted cabins; the E46 retains its source
+  interior. All three have live speed, RPM and gear instruments, with unavailable
+  auxiliary values kept explicit.
   They retain the shared 120 mph class limit. These are not factory cockpit or
   GT3 homologation claims. The E46 now retains its original four gauge bodies
   and source cap detail with authored live instrument UVs. Temperature and fuel
   values remain explicitly unavailable; this is original dial artwork. Its final
-  actual-world cabin/drive view is pending.
+  actual-world cabin/held-drive view now passes.
 - Controlled held-input acceleration/braking and model/contact checks passed
   for the added cars. Actual world controls bought all three through the existing
   device-local wallet, drove the E92 and Carrera, switched models and released
   the previous leases. Reload retained all purchases and the correct balance;
   returning to the original BMW and walking passed. This is device-local world
   evidence; changed catalogue IDs still need the coordinated account/network
-  artifact checks. No additional E46 world drive is claimed. Focused rendering
+  artifact checks. The subsequent E46 world check restored that accepted isolated device-local
+  garage fixture, selected the real M3 through the normal garage, drove with
+  held controls, displayed 35 mph / 3,800 RPM / second gear, stopped, and returned
+  to the original BMW and walking. Its model lease returned to zero. No page
+  exception occurred; twelve network-change console messages were retained, so
+  this is not an error-free network check. Focused rendering
   corrected the E92 eye/control fit and the Carrera roof lining and gauge UVs;
   the actual views and owned display-texture release passed.
 - Mounted car bodies and cabin/VR eyes now share the same ground pivot used
