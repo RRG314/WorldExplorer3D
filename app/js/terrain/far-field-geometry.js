@@ -443,7 +443,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       spec.detailedCoverage,
       'minX',
       'maxX'
-    ).filter(value => value >= spec.outer.minX && value <= spec.outer.maxX);
+    ).filter(value => value >= spec.outer.minX && value <= spec.outer.maxX).map(Math.fround);
     const zValues = addCoverageEdges(
       buildClipmapAxis(
         spec.outer.minZ,
@@ -456,7 +456,11 @@ function createFarFieldGeometryPlanner(deps = {}) {
       spec.detailedCoverage,
       'minZ',
       'maxZ'
-    ).filter(value => value >= spec.outer.minZ && value <= spec.outer.maxZ);
+    ).filter(value => value >= spec.outer.minZ && value <= spec.outer.maxZ).map(Math.fround);
+    // Cell ownership and queries use the actual published coordinate frame.
+    // A double axis a few micrometres beyond a detailed edge can select an
+    // obsolete coarse cell beside refined terrain. Retain coincident column
+    // slots: height arrays and transition-cell keys share these indices.
     const positions = [];
     const surfaceWorldYs = [];
     const colors = [];

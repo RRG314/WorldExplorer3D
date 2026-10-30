@@ -280,3 +280,17 @@ mesh. The detailed spacing ceiling is 3.1 m; the far corridor spacing remains
 26 detailed tiles, within a 196,608-vertex publication budget. Focused geometry,
 seam, lifecycle, worker and forest-semantic checks pass. Native terrain/contact
 verification and the finished venue acceptance remain open.
+
+Native verification confirms the detailed refinement's measured vertex budget
+and the repaired Kallenhard surface. A short continuously held-input drive
+retains five ground-contact samples and returns to walking. Four remaining
+surface failures and one missing crossfall sample still block the complete
+venue; presentation and final moving-frame acceptance remain open.
+
+Targeted native evidence exposed a separate far-terrain metadata defect: double
+grid axes could select an obsolete coarse-height strip beside a Float32 detail
+boundary. Grid publication now retains the same Float32 coordinates as its
+geometry, preserving coincident column slots and cell identities. A producer
+regression passes; the retained native snapshot reproduces and removes the
+metre-scale discontinuity with that metadata correction. Native rechecking of
+the affected surface and remaining failures is still required.
