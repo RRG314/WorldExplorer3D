@@ -44,16 +44,22 @@ export function detailPointsOnEdge(lines,a,b) {
   return a[along]>b[along]?points.reverse():points;
 }
 
-export function triangleHeightAt(x,z,triangles) {
+export function triangleFieldAt(x,z,triangles,valueAt) {
   for(const [a,b,c] of triangles||[]) {
     const denominator=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z);
     if(Math.abs(denominator)<1e-12)continue;
     const u=((b.z-c.z)*(x-c.x)+(c.x-b.x)*(z-c.z))/denominator;
     const v=((c.z-a.z)*(x-c.x)+(a.x-c.x)*(z-c.z))/denominator;
-    if(u>=-1e-7 && v>=-1e-7 && u+v<=1+1e-7)return u*a.y+v*b.y+(1-u-v)*c.y;
+    if(u>=-1e-7 && v>=-1e-7 && u+v<=1+1e-7){
+      const ya=valueAt(a),yb=valueAt(b),yc=valueAt(c);
+      if(Number.isFinite(ya)&&Number.isFinite(yb)&&Number.isFinite(yc))return u*ya+v*yb+(1-u-v)*yc;
+    }
   }
   return null;
 }
+
+const triangleHeightValue=p=>p.y;
+export function triangleHeightAt(x,z,triangles) {return triangleFieldAt(x,z,triangles,triangleHeightValue);}
 
 export function detailHeightAt(lines,axis,x,z) {
   const along=axis==='x'?'z':'x',value=along==='x'?x:z;

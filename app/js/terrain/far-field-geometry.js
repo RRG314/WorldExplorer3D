@@ -468,7 +468,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const boundaryBindings=new Map(),pointsByIndex=new Map();
     let positionData=positions;
     const point=index=>{
-      if(!pointsByIndex.has(index))pointsByIndex.set(index,{x:positionData[index*3],y:positionData[index*3+1],z:positionData[index*3+2]});
+      if(!pointsByIndex.has(index))pointsByIndex.set(index,{x:positionData[index*3],y:positionData[index*3+1],z:positionData[index*3+2],vertexIndex:index});
       return pointsByIndex.get(index);
     };
     const xRange = spec.outer.maxX - spec.outer.minX || 1;
@@ -590,6 +590,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
         });
         const center={x:(xValues[column]+xValues[column+1])/2,z:(zValues[row]+zValues[row+1])/2,y:corners.reduce((sum,index)=>sum+positions[index*3+1],0)/4};
         const centerIndex=appendPoint(center,a),triangles=[];
+        center.vertexIndex=centerIndex;
         perimeter.forEach((index,i)=>{
           const next=perimeter[(i+1)%perimeter.length];
           indices.push(centerIndex,index,next);triangles.push([center,point(index),point(next)]);

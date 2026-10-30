@@ -35,7 +35,13 @@ Mile conversions are arithmetic using 1609.344 m/mile; quoted circuit distances 
 6. Actual complete laps/stages with human input, AI, the longest eligible chassis and desktop/mobile presentation. Multiplayer uses the shared authenticated authority and durable result receipts; no client-reported competitive results.
 7. Bounded first playable/load time, frame pacing and resource-release evidence for the exact pack and build. Default location-based play remains available. Entire Nordschleife/high-banked oval/rally mobile acceptance has not occurred.
 
-Current adapter limits are explicit: 270 world-unit starter district (maximum request 1200), 200–8000 m routes, at least 6 m width and at most 15% crossfall. Daytona's published 31°, Talladega's 33° and Bristol's up-to-28° banks exceed that crossfall envelope. Rally can need narrower roads, varying grip and flight/landing support. Raising numeric limits alone would bypass the reason these rules exist; extend the shared surface/controller contract and prove a complete venue before admission.
+Ordinary city-adapter limits remain explicit: 270 world-unit starter district
+(maximum request 1200), 200–8000 m routes, at least 6 m width and at most 15%
+crossfall. Reviewed long venues now bind bounded source membership and extent
+through qualification, canonical storage and authority reconstruction; the
+Nordschleife world and full-loop practice journey pass. Its explicitly admitted
+banked-road model retains the shared contact/force contract and a 70% crossfall
+ceiling. These capabilities do not themselves certify an oval or rally pack. Daytona's published 31°, Talladega's 33° and Bristol's up-to-28° banks exceed that crossfall envelope. Rally can need narrower roads, varying grip and flight/landing support. Raising numeric limits alone would bypass the reason these rules exist; extend the shared surface/controller contract and prove a complete venue before admission.
 
 ## Data and asset acquisition
 

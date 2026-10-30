@@ -97,6 +97,13 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   transactions. Five affected identity/storage/connection checks also passed.
   This enables the next full-world venue work; it is not a completed Nordschleife
   pack or a production deployment check.
+- The existing vegetation reader now supports the distant terrain's published
+  triangle/material field, including adaptive venue refinement. The old reader
+  required regular plane parameters and omitted those forests. Placement counts,
+  clearing/road/building/water exclusions and the existing model/collision owners
+  remain unchanged. A replacement far-terrain publication cancels staged trees.
+  Thirteen focused field, seam-lifetime and publication checks pass; actual-world
+  woodland presentation and its affected resource/frame checks remain pending.
 - Actual held-key Silverstone driving reproduced fixed-tick pose repeats and
   double advances independently of pulsed automation, barriers or camera-mode
   changes. Practice now samples adjacent accepted session frames for the body,

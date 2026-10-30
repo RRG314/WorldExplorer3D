@@ -57,3 +57,10 @@ test('cancelled and failed vegetation replacements dispose staged roots and reta
   assert.deepEqual(f.ctx.vegetationFeatures,['old']);assert.deepEqual(f.added,[]);assert.deepEqual(f.removed,[]);assert.deepEqual(f.disposed,['partial']);
  }
 });
+test('replacing the far terrain during preparation retires staged vegetation and retains the accepted scene and collision',async()=>{
+ const f=fixture();let grid={id:'accepted-far'};f.ctx.getFarTerrainSurfaceSnapshot=()=>({grid});
+ const result=await publishVegetationCooperatively(f.ctx,{collect:async()=>[],render:async stage=>{
+  stage.vegetationMeshes.push({id:'stale-forest'});stage.replaceWorldCollection('vegetationFeatures',['stale']);grid={id:'replacement-far'};return 1;
+ },dispose:f.dispose});
+ assert.equal(result,null);assert.deepEqual(f.ctx.vegetationFeatures,['old']);assert.deepEqual(f.added,[]);assert.deepEqual(f.removed,[]);assert.deepEqual(f.disposed,['stale-forest']);
+});

@@ -2,7 +2,7 @@ import { currentMappedGroundIndex, mappedAreaContains } from '../terrain/mapped-
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=21";
-import { vegetationIdentitySeed, semanticForestWeightAt, nearbyVegetationCells } from './vegetation-spatial.js';
+import { vegetationIdentitySeed, semanticForestWeightAt, nearbyVegetationCells,terrainVegetationBounds } from './vegetation-spatial.js';
 import {renderVegetationModels} from './vegetation-models.js';
 import {terrainHeightWithPortalCuts} from '../terrain/structure-terrain-portals.js?v=2';
 
@@ -215,6 +215,8 @@ function* vegetationPlacementSteps() {
   const occupied = new Set();
   const actor=appCtx.activeTransportActor?.();
   const focus={x:Number(actor?.position?.x)||0,z:Number(actor?.position?.z)||0};
+  const farSurface=appCtx.getFarTerrainSurfaceSnapshot?.()?.grid;
+  const forestAt=(mesh,x,z)=>semanticForestWeightAt(mesh,x,z,farSurface);
   const treeNodes = Array.isArray(appCtx.osmTreeNodes) ? appCtx.osmTreeNodes : [];
   const treeRows = Array.isArray(appCtx.osmTreeRows) ? appCtx.osmTreeRows : [];
   const worldDensityScale = vegetationWorldDensityScale();
@@ -433,9 +435,8 @@ function* vegetationPlacementSteps() {
       yield;
       const mesh = semanticMeshes[meshIndex];
       const perMeshBudget = Math.min(tropicalCanopy ? 1600 : 400,maxTrees-placements.length);
-      const params=mesh.geometry.parameters;
-      if(!params?.width || !params?.height) continue;
-      const area={minX:Math.max(focus.x-900,mesh.position.x-params.width/2),maxX:Math.min(focus.x+900,mesh.position.x+params.width/2),minZ:Math.max(focus.z-900,mesh.position.z-params.height/2),maxZ:Math.min(focus.z+900,mesh.position.z+params.height/2)};
+      const bounds=terrainVegetationBounds(mesh,farSurface);if(!bounds)continue;
+      const area={minX:Math.max(focus.x-900,bounds.minX),maxX:Math.min(focus.x+900,bounds.maxX),minZ:Math.max(focus.z-900,bounds.minZ),maxZ:Math.min(focus.z+900,bounds.maxZ)};
       if(area.minX>=area.maxX || area.minZ>=area.maxZ) continue;
       const spacing=tropicalCanopy ? 12 : 18;
       let accepted = 0;
@@ -445,7 +446,7 @@ function* vegetationPlacementSteps() {
         const seed = vegetationIdentitySeed(`${cx}:${cz}:forest`);
         const x=(cx+0.15+appCtx.rand01FromInt(seed^0x7f4a7c15)*.7)*spacing;
         const z=(cz+0.15+appCtx.rand01FromInt(seed^0x165667b1)*.7)*spacing;
-        const forestWeight=semanticForestWeightAt(mesh,x,z);
+        const forestWeight=forestAt(mesh,x,z);
         if(forestWeight < (tropicalCanopy ? .6 : .7)) continue;
         const cluster=appCtx.rand01FromInt(vegetationIdentitySeed(`${Math.floor(cx/5)}:${Math.floor(cz/5)}`));
         if(appCtx.rand01FromInt(seed^0x27d4eb2f)>.6+.35*cluster) continue;
@@ -517,7 +518,7 @@ function* vegetationPlacementSteps() {
     const x=tree.x+Math.cos(seed)*1.3, z=tree.z+Math.sin(seed)*1.3;
     if (isVegetationPlacementBlocked(x,z)) continue;
     const mapped=mappedLanduseAt(x,z);
-    const supported=mapped ? mapped.mode === 'forest' : (appCtx.terrainGroup?.children||[]).some(mesh=>semanticForestWeightAt(mesh,x,z)>.7);
+    const supported=mapped ? mapped.mode === 'forest' : (appCtx.terrainGroup?.children||[]).some(mesh=>forestAt(mesh,x,z)>.7);
     if (supported) groundcover.push({x,z,scale:0.7+(seed%40)/100,rotation:seed%628/100,landuseType:'forest_groundcover',source:'supported-forest-understory'});
   }
   // Herbaceous wetland cover is not a forest. Close clumps use the same
