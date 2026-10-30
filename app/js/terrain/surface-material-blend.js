@@ -277,7 +277,9 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
         terrainSnowUvScale: { value: 0.5 },
         terrainBaseSnowNormal: { value: 0 },
         terrainColdGround: { value: 0 },
-        terrainAridWarmth: { value: 0 }
+        terrainAridWarmth: { value: 0 },
+        terrainPreferNearSurface: { value: 0 },
+        terrainNearSurfaceRange: { value: [35,140] }
       }
     };
     material.userData.terrainSurfaceMaterialBlend = state;
@@ -288,7 +290,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
       shader.fragmentShader = '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nuniform sampler2D terrainRegionalMap;\nuniform float terrainRegionalReady;\nuniform sampler2D terrainLocalMap;\nuniform float terrainLocalReady;\nuniform vec4 terrainLocalUvTransform;\nvarying vec2 vTerrainGeographicUv;\n#endif\n' + shader.fragmentShader;
       shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nvTerrainGeographicUv = terrainGeographicUv;\n#endif');
       shader.fragmentShader = '#ifdef WE3D_TERRAIN_SNOW_MAP\nuniform sampler2D terrainSnowMap;\n#endif\n' + shader.fragmentShader;
-      shader.fragmentShader = 'uniform float terrainColdGround;\nuniform float terrainSnowUvScale;\nuniform float terrainBaseSnowNormal;\n' + shader.fragmentShader;
+      shader.fragmentShader = 'uniform float terrainColdGround;\nuniform float terrainSnowUvScale;\nuniform float terrainBaseSnowNormal;\nuniform float terrainPreferNearSurface;\nuniform vec2 terrainNearSurfaceRange;\n' + shader.fragmentShader;
       // Rock on steep faces needs vertical projection, not stretched ground UVs.
       // Reuse the same rock sampler; this does not alter surface geometry.
       shader.vertexShader = 'varying vec3 vTerrainDetailPosition;\nvarying vec3 vTerrainDetailNormal;\n' + shader.vertexShader;
@@ -384,6 +386,10 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             // Deep photographic shadows contain little usable reflectance evidence.
             // Keep semantic rock/soil visible there instead of relighting black pixels.
             '  regionalWeight *= smoothstep(0.015, 0.08, regionalLuminance);',
+            // Dated imagery supplies broad geographic colour. On reviewed
+            // venues the known physical material owns the foreground; baked
+            // winter/illumination colour must not turn mapped grass blue-grey.
+            '  regionalWeight *= mix(1.0, smoothstep(terrainNearSurfaceRange.x, terrainNearSurfaceRange.y, length(vViewPosition)), terrainPreferNearSurface);',
             // Compress baked illumination before applying the scene lighting a second time.
             // This is approximate delighting, not a claim of measured reflectance.
             '  regionalColor *= (0.015 + 0.35 * sqrt(max(regionalLuminance, 0.0))) / max(regionalLuminance, 0.015);',
@@ -410,7 +416,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v15'
+      'terrain-semantic-pbr-material-mix-v16'
     ].join(':');
   }
   if (!state.uniforms.terrainRegionalMap.value) state.uniforms.terrainRegionalMap.value = material.map;
@@ -428,6 +434,8 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
   if (textureSets.snowTextureSupported && textureSets.snow?.map) material.defines.WE3D_TERRAIN_SNOW_MAP = 1;
   else delete material.defines.WE3D_TERRAIN_SNOW_MAP;
   state.uniforms.terrainAridWarmth.value = textureSets.biomeId === 'hot-desert' ? 1 : 0;
+  state.uniforms.terrainPreferNearSurface.value = textureSets.preferNearSurface ? 1 : 0;
+  state.uniforms.terrainNearSurfaceRange.value = textureSets.nearSurfaceRange || [35,140];
   material.needsUpdate = true;
   mesh.userData.terrainSurfaceMaterialBlend = {
     authority: 'single-terrain-semantic-pbr-material',

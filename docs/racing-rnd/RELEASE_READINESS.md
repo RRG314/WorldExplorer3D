@@ -351,3 +351,22 @@ Every union cell in that finite influence consumes the same geometry, regardless
 of which street owns its source attribution. A narrower-pavement regression
 fails before this extension and passes afterwards; worker parity and distant
 vertex checks also pass. Native rechecking and venue presentation remain open.
+
+Native verification of the width transition now passes all 1,081 spans, raw and
+canonical, with no collector rejections. The 5,453,345-byte district round-trips
+through 14 chunks with all spans retained. Both full-length events build at
+20.710 km with 784 gates. Actual UI qualification, grid admission, countdown,
+held-input driving and walking handback pass. The changed Hocheichen crossing
+retains five contact samples throughout. Existing full-lap evidence is reused;
+the final presentation and moving-frame budget still require acceptance.
+
+A native material comparison isolates the blue-grey verges to dated geographic
+colour overriding correctly mapped grass. Reviewed venues now retain physical
+PBR surfaces within 35 m and blend back to geographic colour by 140 m. The same
+distance rule applies across terrain cells and LODs. Ordinary worlds retain
+their previous appearance; imagery ownership, attribution and distant colour
+are preserved. A controlled GPU regression verifies the foreground change,
+unchanged ordinary/distant pixels, no GL errors and one shared program. Native
+visual verification of the implemented blend remains open. A visible wedge at
+the Hocheichen approach also needs a terrain/road visibility check; sampled
+qualification alone is not continuous coverage proof.
