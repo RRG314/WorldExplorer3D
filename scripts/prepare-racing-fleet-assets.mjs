@@ -1,7 +1,7 @@
 // Reproducible, offline derivatives. Download the credited glTF archives through
 // Sketchfab, extract each into SOURCE/<key>, and pass an EMPTY output directory.
 // The pinned Blender M3 derivative is prepared first with
-// prepare-bmw-m3-race-blend.py into SOURCE/prepared-bmw-race-v3.
+// prepare-bmw-m3-race-blend.py into SOURCE/prepared-bmw-race-v4.
 // Originals, credentials and marketplace archives never enter the web bundle.
 // After installing reviewed records/GLBs, run update-model-asset-revisions.mjs
 // so the shared bounded loader receives the exact bundled content identity.
@@ -19,8 +19,8 @@ const recipes = [
  {key:'porsche_carrera_4s',inputDirectory:'prepared-porsche-carrera-v3',prepared:true,id:'road-porsche-911-carrera-4s',variantId:'porsche_carrera_4s',license:'CC-BY-SA-4.0',licenseUrl:'https://creativecommons.org/licenses/by-sa/4.0/',attribution:'Porsche 911 Carrera 4S by Karol Miklas',sourceCredit:'Karol Miklas (https://sketchfab.com/karolmiklas)',
   sourceFiles:{'scene.glb':'c0a6aea94ced833708aaa3987fd1e9be977102fbcd367f9da14e54d60e06d511','license.txt':'807197ef352fd72292e5a0f30b7edadc93d5c916a747f902ec87795ae8201d1a','intake.json':'c74dfc44e7a8854fda8cbf4e071da4bb1d6ab02f38398d09a6892b4ae43af84e'},
   archiveSha256:'57731111fbb0d6958df64454e9ba51939fefd39ab48e55f423a0bb2d76918454'},
- {key:'bmw_m3_e92_race',inputDirectory:'prepared-bmw-race-v3',prepared:true,id:'road-bmw-m3-e92-race',variantId:'bmw_m3_e92_race',
-  sourceFiles:{'scene.glb':'aa5c50cb16fc31893bec817bc3c9dd332de791e83c65acf74089a2a6ee472da8','license.txt':'cbe923e24e81ab0e0b782f185e910bd4f027ebb9ab3272a9ca02c92e32e328ea','intake.json':'9061b94f0f60fdf6eee22a8dddfc2fc84fb98b68ab3a8891974ddfb5fd5cd715'},
+ {key:'bmw_m3_e92_race',inputDirectory:'prepared-bmw-race-v4',prepared:true,id:'road-bmw-m3-e92-race',variantId:'bmw_m3_e92_race',
+  sourceFiles:{'scene.glb':'5677903fb698ed189c4df3f312f2abfc758eb20df1745240dd4756dc753b2de8','license.txt':'cbe923e24e81ab0e0b782f185e910bd4f027ebb9ab3272a9ca02c92e32e328ea','intake.json':'b9f7cb58f26c0f9c864584d9addb167705a49bf1e751fc7b7406ee2e26de078e'},
   archiveSha256:'e2193befa1da6a7394b3eadee3704727290a1c2520108fe909827c6052e0417f'},
  {key:'bmw_m3_e46',variantId:'bmw_m3_e46',id:'road-bmw-m3-e46',label:'BMW M3 E46',uid:'f1b00ff37d504629b10031da32bc7497',author:'MMC Works',
   sourceFiles:{"scene.gltf":"6cd48944f7eb61aa439381eb38c2c8ac8229cff838e10d704e7704dac94b0106","license.txt":"236e6653004f033efca5a17d0603bfdaa731d9ff7a4d492bd6136d52e80a644e","scene.bin":"841850ea9c9be48ef2a7e830911ae33241761ec91bad5048ac63cf7348c211e4","textures/Car_Paint_-_All_Colors_metallicRoughness.png":"a6f2970c6b6ae7cd640768a9157ebbab4a892db2de7a9cddbcce12b2cede5439","textures/Alu_ext_metallicRoughness.png":"2aae3903aee43fd900d3c9eb70b6b5ae56ec5d1ddb28aced5bb91842dd0a44c1","textures/MetalStainlessSteelBrushedElongated005_2K.003_baseColor.jpeg":"ad91ea288f3df444b42a22eb8088083b461539ce62b8b1abe465e8c157cc133d","textures/MetalStainlessSteelBrushedElongated005_2K.003_metallicRoughness.png":"30ca3583f4b148b819f2782038208e76e63883b98642ca9e29db92b3a91ad7fb","textures/MetalStainlessSteelBrushedElongated005_2K.003_normal.png":"a4a00f76926ca9887481718e672c400d310c7f11e95f3f363f45175a3379f5ee","textures/MetalStainlessSteelBrushedElongated005_2K.001_normal.png":"a4a00f76926ca9887481718e672c400d310c7f11e95f3f363f45175a3379f5ee","textures/MetalStainlessSteelBrushedElongated005_2K_metallicRoughness.png":"30ca3583f4b148b819f2782038208e76e63883b98642ca9e29db92b3a91ad7fb"},

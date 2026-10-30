@@ -79,8 +79,17 @@ test('the E92 racing derivative retains its CC0 source, four wheel assemblies an
  const positions=screen.getAttribute('POSITION'),uv=screen.getAttribute('TEXCOORD_0');
  for(let i=0;i<positions.getCount();i++){
   const [x,y]=positions.getElement(i,[]),[u]=uv.getElement(i,[]);
-  assert.ok(y>.90&&y<1.02,'display remains above the steering rim');
+  assert.ok(y>.82&&y<.94,'display remains in the reviewed lower cabin envelope');
   assert.equal(u,x>.34?0:1,'seat looking forward reads text left to right');
+ }
+ const T=await import('three'),{GLTFLoader}=await import('three/examples/jsm/loaders/GLTFLoader.js');
+ const {scene}=await new Promise((resolve,reject)=>new GLTFLoader().parse(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'',resolve,reject));
+ scene.updateMatrixWorld(true);
+ for(const degrees of [0,5,10,15]){
+  const angle=degrees*Math.PI/180;
+  const ray=new T.Raycaster(new T.Vector3(...asset.driverEyeGroundMeters),new T.Vector3(0,Math.sin(angle),Math.cos(angle)),.03,2.2);
+  const obstruction=ray.intersectObject(scene,true).find(hit=>!(Array.isArray(hit.object.material)?hit.object.material[hit.face.materialIndex]:hit.object.material).transparent);
+  assert.equal(obstruction,undefined,`driver windshield aperture obstructed at ${degrees} degrees above the road`);
  }
  assert.equal(json.animations?.length||0,0);assert.equal(json.skins?.length||0,0);
  assert.ok(!json.buffers.some(b=>b.uri));assert.ok(!(json.images||[]).some(i=>i.uri));

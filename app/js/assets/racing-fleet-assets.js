@@ -147,7 +147,7 @@ export const RACING_FLEET_ASSETS = Object.freeze([
     ],
     "driverEyeGroundMeters": [
       0.34,
-      1.025,
+      0.975,
       0.02
     ],
     "sourceUpAxis": "y",
@@ -162,7 +162,7 @@ export const RACING_FLEET_ASSETS = Object.freeze([
       "timeoutMs": 20000
     },
     "budgets": {
-      "bytes": 2527488,
+      "bytes": 2527492,
       "triangles": 95434,
       "textureEdgePixels": 512,
       "maxInstances": 4

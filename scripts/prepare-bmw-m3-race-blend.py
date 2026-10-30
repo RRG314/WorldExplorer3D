@@ -229,7 +229,7 @@ for side in [-1, 1]:
 box('Harness buckle', (seat_x, .48, -.20), (.058, .027, .065), metal, .009)
 
 box('Dashboard upper padded rail', (0, .80, .77), (1.39, .14, .32), carbon, .035)
-box('Driver binnacle', (seat_x, .96, .63), (.34, .16, .10), dark_metal, .022)
+box('Driver binnacle', (seat_x, .88, .63), (.34, .16, .10), dark_metal, .022)
 display = material('Driver_Display', (1, 1, 1), .75)
 image = bpy.data.images.new('Original racing display base', width=8, height=8)
 image.pixels = [.008, .014, .018, 1] * 64
@@ -240,15 +240,15 @@ display.node_tree.links.new(tex.outputs['Color'], shader.inputs['Base Color'])
 display.node_tree.links.new(tex.outputs['Color'], shader.inputs['Emission Color'])
 shader.inputs['Emission Strength'].default_value = .45
 panel = surface('Driver telemetry display',
-                [(seat_x-.142,.903,.573),(seat_x-.142,1.017,.573),
-                 (seat_x+.142,1.017,.573),(seat_x+.142,.903,.573)], [(0,1,2,3)], display)
+                [(seat_x-.142,.823,.573),(seat_x-.142,.937,.573),
+                 (seat_x+.142,.937,.573),(seat_x+.142,.823,.573)], [(0,1,2,3)], display)
 uv = panel.data.uv_layers.new()
 # Viewed forward from the seat, positive vehicle X appears on screen left.
 for loop, value in zip(panel.data.loops, [(1,0),(1,1),(0,1),(0,0)]):
     uv.data[loop.index].uv = value
 panel['vehicleInstrumentDisplay'] = True
 
-steering_at = (.34, .76, .40)
+steering_at = (.34, .68, .40)
 bpy.ops.mesh.primitive_torus_add(major_segments=48, minor_segments=8, major_radius=.155,
                                 minor_radius=.017, location=xyz(steering_at),
                                 rotation=(math.pi/2+.16,0,0))
@@ -259,13 +259,13 @@ for polygon in rim.data.polygons:
 box('Steering wheel boss', steering_at, (.082,.082,.04), carbon, .013)
 for angle in [0, 2.1, 4.2]:
     tube('Steering wheel spoke', steering_at,
-         (.34+math.sin(angle)*.142,.76+math.cos(angle)*.142,.40), .013, dark_metal)
+         (.34+math.sin(angle)*.142,.68+math.cos(angle)*.142,.40), .013, dark_metal)
 for side in [-1, 1]:
-    box('Shift paddle', (.34+side*.105,.77,.435), (.035,.11,.012), metal, .008)
+    box('Shift paddle', (.34+side*.105,.69,.435), (.035,.11,.012), metal, .008)
     for j, mat in enumerate([red,yellow,blue]):
-        tube('Steering wheel control', (.34+side*.075,.79-j*.025,.375),
-             (.34+side*.075,.79-j*.025,.36), .008, mat)
-tube('Steering column', (.34,.76,.42), (.34,.63,.74), .025, dark_metal)
+        tube('Steering wheel control', (.34+side*.075,.71-j*.025,.375),
+             (.34+side*.075,.71-j*.025,.36), .008, mat)
+tube('Steering column', (.34,.68,.42), (.34,.55,.74), .025, dark_metal)
 box('Switch console', (-.16,.58,.43), (.27,.24,.07), carbon, .018)
 for i in range(6):
     x, y = -.23+(i%3)*.07, .52+(i//3)*.095
@@ -295,7 +295,7 @@ bpy.ops.export_scene.gltf(filepath=str(out/'scene.glb'), export_format='GLB',
     'licenseSha256': LICENSE_HASH, 'license': 'CC0-1.0',
     'sourceUrl': 'https://blendswap.com/blend/3697', 'author': 'Neubi',
     'label': 'BMW M3 E92 race car', 'lengthMeters': 4.634,
-    'wheelLayout': wheel_layout, 'driverEyeGroundMeters': [.34,1.025,.02],
+    'wheelLayout': wheel_layout, 'driverEyeGroundMeters': [.34,.975,.02],
     'modifications': 'Original racing exterior; uniform metric normalization; '
         'prepared PBR materials without source reference/logo maps; four rigid '
         'wheel assemblies and fixed calipers; original racing-cabin interpretation '

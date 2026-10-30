@@ -752,7 +752,7 @@ var require_vehicle_garage_rules = __commonJS({
         ],
         "driverEyeGroundMeters": [
           0.34,
-          1.025,
+          0.975,
           0.02
         ],
         "sourceUpAxis": "y",
@@ -767,7 +767,7 @@ var require_vehicle_garage_rules = __commonJS({
           "timeoutMs": 2e4
         },
         "budgets": {
-          "bytes": 2527488,
+          "bytes": 2527492,
           "triangles": 95434,
           "textureEdgePixels": 512,
           "maxInstances": 4
@@ -2904,7 +2904,7 @@ var RACING_FLEET_ASSETS = Object.freeze([
     ],
     "driverEyeGroundMeters": [
       0.34,
-      1.025,
+      0.975,
       0.02
     ],
     "sourceUpAxis": "y",
@@ -2919,7 +2919,7 @@ var RACING_FLEET_ASSETS = Object.freeze([
       "timeoutMs": 2e4
     },
     "budgets": {
-      "bytes": 2527488,
+      "bytes": 2527492,
       "triangles": 95434,
       "textureEdgePixels": 512,
       "maxInstances": 4

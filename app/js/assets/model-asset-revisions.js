@@ -8,7 +8,7 @@ export const MODEL_ASSET_REVISIONS = Object.freeze({
   "aircraft-cessna-172": "d030c88ce25c425f",
   "aircraft-falcon-10": "54983d108cceca3d",
   "road-bmw-m3-e46": "0a2d9c5b63c800ff",
-  "road-bmw-m3-e92-race": "7bba5e204d560b5c",
+  "road-bmw-m3-e92-race": "e3c823c3cb6243a8",
   "road-porsche-911-carrera-4s": "dd85e370b205f11c",
   "aquarium-blacktip-reef-shark": "7e96f3840c1129be",
   "aquarium-green-sea-turtle": "51ed52bec6472aa5",
