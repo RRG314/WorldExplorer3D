@@ -261,3 +261,11 @@ now discards rings narrower than its own one-micrometre coordinate grid. The
 normal street kernel retains its previous policy. The reproduced seam, resolved
 50-micrometre pieces, previous shared-edge coverage and polygon topology checks
 pass. Native verification of the repair and remaining pavement failures is open.
+
+When common lateral creases exceed one profile's capacity, qualification can
+partition the same source interval into two facts at an existing sampled
+station. Both retain the 32-point and 3 mm fit bounds; their shared boundary
+must agree within 0.2 mm. The search is limited to sixteen candidate stations.
+Component checks cover ordered identities, shared topology, unchanged length,
+input immutability and continued unsafe-data rejection. The saved Kallenhard
+capacity case fits two profiles; its surface-height acceptance remains open.

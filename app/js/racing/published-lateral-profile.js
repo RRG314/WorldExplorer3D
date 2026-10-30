@@ -31,3 +31,22 @@ export function compilePublishedLateralProfiles(sections,metersPerUnit,{maximumP
   fixed.push(worst.offset);fixed.sort((a,b)=>a-b);
  }
 }
+
+// A long source interval may need more common lateral creases than one
+// bounded profile can hold. Partition only at an already sampled station;
+// both facts retain the exact source line and the same shared boundary top.
+// Work is bounded to two spans and sixteen candidate boundaries.
+export function compilePublishedLateralSpans(sections,metersPerUnit){
+ const compile=(first,last)=>({first,last,...compilePublishedLateralProfiles(sections.slice(first,last+1),metersPerUnit)});
+ try{return [compile(0,sections.length-1)];}catch(error){if(error.message!=='race_edge_profile_capacity')throw error;}
+ const candidates=Array.from({length:Math.max(0,sections.length-2)},(_,i)=>i+1).sort((a,b)=>Math.abs(a-(sections.length-1)/2)-Math.abs(b-(sections.length-1)/2)||a-b).slice(0,16);
+ for(const boundary of candidates){
+  let left,right;
+  try{left=compile(0,boundary);right=compile(boundary,sections.length-1);}catch(error){if(error.message==='race_edge_profile_capacity')continue;throw error;}
+  const a=left.profiles.at(-1),b=right.profiles[0],fields=a[0].baseY===undefined?['y']:['y','baseY'];
+  let error=0;
+  for(const p of [...a,...b])for(const field of fields)error=Math.max(error,Math.abs(valueAt(a,p.offsetMeters,field)-valueAt(b,p.offsetMeters,field))*metersPerUnit);
+  if(error<=.0002)return [left,right];
+ }
+ throw Error('race_edge_profile_capacity');
+}

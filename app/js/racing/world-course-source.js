@@ -1,4 +1,4 @@
-import {readPublishedLateralSection,compilePublishedLateralProfiles} from './published-lateral-profile.js';
+import {readPublishedLateralSection,compilePublishedLateralSpans} from './published-lateral-profile.js';
 import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import {streetEdgeStationFractions,streetEdgeLateralKnots,streetEdgeIntervalHasLift} from '../world/compiler/street-edge-recipe.js';
 import {traversalSegmentCount,readTraversalSegment}from'../world/traversal-graph-storage.js';
@@ -55,8 +55,8 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    const edgeRecipe=reviewedRoadEdgeRecipe(feature),edgeRoad=edgeRecipe?{...feature,edgeBandRecipe:edgeRecipe}:null,hasEdges=edgeRoad&&streetEdgeIntervalHasLift(edgeRoad,segIndex,sourceTStart,sourceTEnd),sections=[];
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
-   const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[];
-   let failure='',minimumClearance=Infinity,firstPoint=null,lastPoint=null;
+   const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[],surfacePoints=[];
+   let failure='',minimumClearance=Infinity;
    const steps=Math.max(1,Math.ceil(length/4)),spanMeters=1.2;
    const mode=feature.structureSemantics?.terrainMode;
    const groundOwned=mode==='at_grade'&&feature.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(feature);
@@ -105,7 +105,6 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     const point=surface(x,z,t);
     if(!point){failure='surface_layer_mismatch';break;}
     const y=point.y;
-    if(sample===0)firstPoint=hasEdges?{x:point.x,z:point.z,y:point.y}:point;if(sample===stations.length-1)lastPoint=hasEdges?{x:point.x,z:point.z,y:point.y}:point;
     const water=context.SurfaceQuery.waterAt?.(x,z),space=tunnel?resolveTunnelSpace(feature,x,z,y+.5):null;
     if(tunnel){if(!space?.inside){failure='unqualified_tunnel';break;}minimumClearance=Math.min(minimumClearance,space.clearance*metersPerUnit);}
     if(water?.feature&&Number.isFinite(water.position?.y)&&water.position.y>y+.15&&!space?.inside){failure='submerged_road';break;}
@@ -123,22 +122,31 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     if(hasEdges)try{sections.push(readPublishedLateralSection({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:streetEdgeLateralKnots(edgeRoad,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters)}));}
     catch(error){failure=error.message;break;}
     samples.push({t,y,leftY,rightY});
+    surfacePoints.push({x:point.x,z:point.z,y:point.y});
     // Budgeted by the same construction scheduler as the world compiler.
     yield;
    }
    if(failure){rejected(failure);continue;}
+   let spans=[{first:0,last:samples.length-1}];
    if(hasEdges)try{
-    const compiled=compilePublishedLateralProfiles(sections,metersPerUnit);
-    for(let i=0;i<samples.length;i++)samples[i].lateralSamples=compiled.profiles[i];
-    diagnostics.maximumLateralProfileDepartureMeters=Math.max(diagnostics.maximumLateralProfileDepartureMeters,compiled.maximumErrorMeters);
+    spans=compilePublishedLateralSpans(sections,metersPerUnit);
+    for(const span of spans)diagnostics.maximumLateralProfileDepartureMeters=Math.max(diagnostics.maximumLateralProfileDepartureMeters,span.maximumErrorMeters);
    }catch(error){rejected(error.message);continue;}
-   const key=`${sourceFeatureId}:${segIndex}:${sourceTStart.toFixed(6)}:${sourceTEnd.toFixed(6)}`;
-   const a={...firstPoint,connectionLayer:`source-node:${segment.fromId}`},b={...lastPoint,connectionLayer:`source-node:${segment.toId}`};
+   const sourceAt=t=>sourceTStart+(sourceTEnd-sourceTStart)*t;
+   if(spans.length>1&&spans.some(s=>(samples[s.last].t-samples[s.first].t)*length<RACE_MINIMUM_SPAN_METERS||
+    Number(sourceAt(samples[s.first].t).toFixed(6))>=Number(sourceAt(samples[s.last].t).toFixed(6)))){rejected('race_edge_profile_capacity');continue;}
+   for(const span of spans){
+   const start=samples[span.first].t,end=samples[span.last].t,key=`${sourceFeatureId}:${segIndex}:${sourceAt(start).toFixed(6)}:${sourceAt(end).toFixed(6)}`;
+   const internalLayer=i=>`source-node:${segment.fromId}:profile:${segment.toId}:${i}`;
+   const a={...surfacePoints[span.first],connectionLayer:span.first===0?`source-node:${segment.fromId}`:internalLayer(span.first)},
+    b={...surfacePoints[span.last],connectionLayer:span.last===samples.length-1?`source-node:${segment.toId}`:internalLayer(span.last)};
+   const heights=samples.slice(span.first,span.last+1).map((s,i)=>({...s,t:(s.t-start)/(end-start),...(hasEdges?{lateralSamples:span.profiles[i]}:{})}));
    roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,
     ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),...(hasEdges?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
-    driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:samples,heightSampleSpanMeters:spanMeters,
+    driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:heights,heightSampleSpanMeters:spanMeters,
     sourceAuthority:String(feature.transportRecord?.provenance?.authority||feature.sourceAuthority||'published-world-road')});
    diagnostics.eligible++;yield;
+   }
   }
  }
  await drainCooperatively(collect(),{current:active,yieldWork,budgetMs:2});
