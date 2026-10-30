@@ -34,9 +34,9 @@ export function* nearbyVegetationCells(bounds, spacing, limit, focus = {x:0,z:0}
   }
 }
 
-// Terrain uses a regular PlaneGeometry grid, rotated onto XZ. Sample the
-// accepted material field again after jitter; a forest vertex is not evidence
-// for an arbitrary neighboring point outside the tile or in a clearing.
+// Sample the published material grid after jitter. Detailed tiles bake world
+// XZ coordinates into their vertices; the mesh origin is not their tile centre.
+// A forest vertex alone cannot confer cover across a neighboring clearing.
 export function terrainVegetationBounds(mesh,surfaceGrid){
   if(mesh?.userData?.isFarTerrainClipmap){
     const xs=surfaceGrid?.xValues,zs=surfaceGrid?.zValues;
@@ -44,6 +44,14 @@ export function terrainVegetationBounds(mesh,surfaceGrid){
     return {minX:xs[0],maxX:xs.at(-1),minZ:zs[0],maxZ:zs.at(-1)};
   }
   const p=mesh?.geometry?.parameters;if(!(p?.width>0&&p.height>0))return null;
+  const positions=mesh.geometry.attributes?.position;
+  if(positions){
+    const columns=p.widthSegments,rows=p.heightSegments;
+    if(!Number.isInteger(columns)||!Number.isInteger(rows)||columns<1||rows<1||positions.count!==(columns+1)*(rows+1))return null;
+    const minX=positions.getX(0)+Number(mesh.position?.x||0),maxX=positions.getX(columns)+Number(mesh.position?.x||0),
+      minZ=positions.getZ(0)+Number(mesh.position?.z||0),maxZ=positions.getZ(rows*(columns+1))+Number(mesh.position?.z||0);
+    return [minX,maxX,minZ,maxZ].every(Number.isFinite)&&minX<maxX&&minZ<maxZ?{minX,maxX,minZ,maxZ}:null;
+  }
   return {minX:Number(mesh.position?.x||0)-p.width/2,maxX:Number(mesh.position?.x||0)+p.width/2,
     minZ:Number(mesh.position?.z||0)-p.height/2,maxZ:Number(mesh.position?.z||0)+p.height/2};
 }
@@ -69,6 +77,17 @@ export function semanticForestWeightAt(mesh,x,z,surfaceGrid){
   if(!params || !attribute || !(params.width>0) || !(params.height>0)) return 0;
   const columns=params.widthSegments, rows=params.heightSegments;
   if(!columns || !rows || attribute.count!==(columns+1)*(rows+1)) return 0;
+  const positions=geometry.attributes?.position;
+  if(positions){
+    const bounds=terrainVegetationBounds(mesh);if(!bounds||x<bounds.minX||x>bounds.maxX||z<bounds.minZ||z>bounds.maxZ||!positions.array)return 0;
+    const localX=x-Number(mesh.position?.x||0),localZ=z-Number(mesh.position?.z||0),stride=positions.itemSize,
+      column=terrainGridInterval(positions.array,columns,stride,0,localX),row=terrainGridInterval(positions.array,rows,(columns+1)*stride,2,localZ),
+      a=row*(columns+1)+column,b=a+1,c=a+columns+1,d=c+1,
+      u=(localX-positions.getX(a))/(positions.getX(b)-positions.getX(a)),v=(localZ-positions.getZ(a))/(positions.getZ(c)-positions.getZ(a));
+    if(!Number.isFinite(u)||!Number.isFinite(v))return 0;
+    const ya=terrainForestAttributeWeight(attribute,a),yb=terrainForestAttributeWeight(attribute,b),yc=terrainForestAttributeWeight(attribute,c),yd=terrainForestAttributeWeight(attribute,d);
+    return u+v<=1?ya+u*(yb-ya)+v*(yc-ya):yd+(1-u)*(yc-yd)+(1-v)*(yb-yd);
+  }
   const u=(x-Number(mesh.position?.x||0))/params.width+.5;
   const v=(z-Number(mesh.position?.z||0))/params.height+.5;
   if(u<0 || u>1 || v<0 || v>1) return 0;
