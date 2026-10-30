@@ -209,8 +209,9 @@ export function applyTerrainReliefMaterialMix(mesh) {
   let exposedRockVertices = 0;
   for (let index = 0; index < positions.count; index += 1) {
     // A 23-degree slope begins exposing substrate; by roughly 44 degrees the
-    // natural terrain is predominantly rock. Explicit urban, sand and snow
-    // ownership remains authoritative over the geomorphic fallback.
+    // unclassified natural terrain is predominantly rock. Accepted forest cover
+    // remains authoritative: steep wooded ground still has a forest floor and
+    // canopy. Urban, sand and snow ownership is also preserved.
     const up = Math.max(0, Math.min(1, Math.abs(Number(normals.getY(index) || 0))));
     const slopeT = Math.max(0, Math.min(1, (0.92 - up) / 0.20));
     const slopeRock = slopeT * slopeT * (3 - 2 * slopeT);
@@ -218,8 +219,9 @@ export function applyTerrainReliefMaterialMix(mesh) {
 
     const urban = Math.max(0, terrainAttributeComponent(attributes.mixA, index, 0));
     const sand = Math.max(0, terrainAttributeComponent(attributes.mixA, index, 1));
+    const forest = Math.max(0, terrainAttributeComponent(attributes.mixA, index, 2));
     const snow = Math.max(0, terrainAttributeComponent(attributes.mixB, index, 1));
-    const protectedWeight = Math.min(1, urban + sand + snow);
+    const protectedWeight = Math.min(1, urban + sand + forest + snow);
     const available = 1 - protectedWeight;
     const previousRock = Math.min(available, Math.max(0, terrainAttributeComponent(attributes.mixB, index, 0)));
     const rock = Math.max(previousRock, slopeRock * available);
@@ -233,7 +235,7 @@ export function applyTerrainReliefMaterialMix(mesh) {
     setNormalizedTerrainAttribute(attributes.mixA, index, [
       urban,
       sand,
-      Math.max(0, terrainAttributeComponent(attributes.mixA, index, 2)) * naturalScale,
+      forest,
       Math.max(0, terrainAttributeComponent(attributes.mixA, index, 3)) * naturalScale
     ]);
     setNormalizedTerrainAttribute(attributes.mixB, index, [rock, snow]);

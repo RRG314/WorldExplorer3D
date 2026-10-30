@@ -8,6 +8,7 @@ class Attribute {
   constructor(array,itemSize,normalized=false){Object.assign(this,{array,itemSize,normalized,count:array.length/itemSize,version:0});}
   set needsUpdate(value){if(value)this.version++;}
   getX(i){return this.array[i*this.itemSize];}
+  getY(i){return this.array[i*this.itemSize+1];}
   getZ(i){return this.array[i*this.itemSize+2];}
 }
 globalThis.THREE={BufferAttribute:Attribute};
@@ -57,4 +58,17 @@ test('regional land-use colors and holes agree through spatial buckets at temper
    assert.equal(geometry.attributes.terrainSurfaceMixA.array[i*4+2],i===12?0:255);
   }
  }
+});
+
+
+test('mapped wooded slopes retain their forest floor and canopy evidence after relief shading',async()=>{
+ const {applyTerrainReliefMaterialMix}=await import('../app/js/terrain/surface-material-blend.js'),{semanticForestWeightAt}=await import('../app/js/world/vegetation-spatial.js');
+ const forest={type:'forest',pts:[{x:-2,z:-2},{x:2,z:-2},{x:2,z:2},{x:-2,z:2}],bounds:{minX:-2,maxX:2,minZ:-2,maxZ:2}};
+ Object.assign(ctx,{LOC:{lat:50.359,lon:6.963},landuses:[forest],worldToLatLon:()=>({lat:50.359,lon:6.963})});resetTerrainSurfaceProfileCache();
+ const geometry={parameters:{width:2,height:2,widthSegments:1,heightSegments:1},attributes:{position:new Attribute(new Float32Array([-1,0,-1,1,0,-1,-1,0,1,1,0,1]),3),normal:new Attribute(new Float32Array([.866,.5,0,.866,.5,0,.866,.5,0,.866,.5,0]),3)},setAttribute(name,value){this.attributes[name]=value;}};
+ const mesh={geometry,position:{x:0,z:0},material:{},userData:{}};
+ assert.equal(applyMappedSemanticVertexTints(mesh,null),4);
+ assert.equal(semanticForestWeightAt(mesh,0,0),1);
+ applyTerrainReliefMaterialMix(mesh);
+ assert.equal(semanticForestWeightAt(mesh,0,0),1,'steep ground does not erase mapped tree cover or turn its forest floor into exposed rock');
 });
