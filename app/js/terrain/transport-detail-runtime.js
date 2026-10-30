@@ -100,7 +100,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   appCtx._cancelTransportPreparation?.();
   appCtx._cancelTransportPreparation=dispose;
   try {
-    const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,sourceFeatureId:road.sourceFeatureId,
+    const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,
       edgeBandRecipe:reviewedRoadEdgeRecipe(road),pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
       structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
     }));

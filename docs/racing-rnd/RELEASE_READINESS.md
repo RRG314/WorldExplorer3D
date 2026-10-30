@@ -337,3 +337,17 @@ regression covers the seam, exact node/venue admission, untouched distant
 vertices and invalid-input/capacity rejection. Actual worker transfer and repeat
 region compilation match the synchronous output. These are construction checks;
 the full native collector and venue acceptance remain required.
+
+The subsequent native check restores all 1,081 venue spans with no missing
+crossfall rejections. The Mini-Karussell seam and Breidscheid cap pass raw and
+canonical qualification. Eight admitted joins use 440 temporary vertices. A
+held-input E34 drive crosses the Mini-Karussell join with five contact samples
+throughout and positive body clearance, followed by walking handback.
+
+One newly affected Hocheichen endpoint still fails where a narrower independent
+pavement meets an outer strip of ordinary road. The compiler now spreads that
+height difference smoothly across the existing 3.1 m cell-support distance.
+Every union cell in that finite influence consumes the same geometry, regardless
+of which street owns its source attribution. A narrower-pavement regression
+fails before this extension and passes afterwards; worker parity and distant
+vertex checks also pass. Native rechecking and venue presentation remain open.

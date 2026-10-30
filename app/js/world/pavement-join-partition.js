@@ -1,4 +1,5 @@
 import {createRoadContactIndex} from '../terrain/road-contact-index.js?v=1';
+import {REVIEWED_DETAIL_MAXIMUM_SPACING_METERS} from '../terrain/reviewed-corridor-policy.js';
 
 const boundsOf=p=>({minX:Math.min(...p.map(v=>v.x)),maxX:Math.max(...p.map(v=>v.x)),minZ:Math.min(...p.map(v=>v.z)),maxZ:Math.max(...p.map(v=>v.z))});
 const overlaps=(a,b)=>a.minX<=b.maxX&&a.maxX>=b.minX&&a.minZ<=b.maxZ&&a.maxZ>=b.minZ;
@@ -20,25 +21,29 @@ function plane(t,x,z){const p=t.positions,u=((p[t.b+2]-p[t.c+2])*(x-p[t.c])+(p[t
 
 // Reconcile a shared endpoint during the existing pavement partition. Cut the
 // ordinary triangle at actual ribbon edges; assign both sides the same edge
-// height. Outside that boundary the existing terrain vertices stay untouched.
+// height. The existing cell support distance spreads a width transition over
+// the adjoining road, rather than concentrating it in a thin outside strip.
 export function createPavementJoinPartition(joins=[]){
  if(joins.length>106)throw Error('pavement_join_capacity');
  let vertexCount=0;
  for(const join of joins){
-  if(!(join.positions instanceof Float32Array)||!(join.indices instanceof Uint16Array||join.indices instanceof Uint32Array)||!join.positions.length||join.positions.length%3||join.indices.length%3||join.positions.length/3>16384||!join.positions.every(Number.isFinite)||!join.indices.every(i=>i<join.positions.length/3)||!Array.isArray(join.neighbors)||!join.neighbors.length||join.neighbors.length>16||!join.neighbors.every(id=>typeof id==='string'&&id.length>0&&id.length<=256))throw Error('invalid_pavement_join');
+  if(!(join.positions instanceof Float32Array)||!(join.indices instanceof Uint16Array||join.indices instanceof Uint32Array)||!join.positions.length||join.positions.length%3||join.indices.length%3||join.positions.length/3>16384||!join.positions.every(Number.isFinite)||!join.indices.every(i=>i<join.positions.length/3)||!Array.isArray(join.neighbors)||!join.neighbors.length||join.neighbors.length>16||!join.neighbors.every(id=>typeof id==='string'&&id.length>0&&id.length<=256)||join.metersPerWorldUnit!==undefined&&!(Number.isFinite(join.metersPerWorldUnit)&&join.metersPerWorldUnit>0))throw Error('invalid_pavement_join');
   vertexCount+=join.positions.length/3;if(vertexCount>65536)throw Error('pavement_join_capacity');
  }
  const prepared=joins.map(join=>{
   const points=[];for(let i=0;i<join.positions.length;i+=3)points.push({x:join.positions[i],z:join.positions[i+2]});
-  return {...join,bounds:boundsOf(points),index:createRoadContactIndex([{geometry:{attributes:{position:{array:join.positions}},getIndex:()=>({array:join.indices})}}])};
+  const bounds=boundsOf(points),radius=REVIEWED_DETAIL_MAXIMUM_SPACING_METERS/(join.metersPerWorldUnit||1),influence={minX:bounds.minX-radius,maxX:bounds.maxX+radius,minZ:bounds.minZ-radius,maxZ:bounds.maxZ+radius};
+  return {...join,bounds,influence,radius,index:createRoadContactIndex([{geometry:{attributes:{position:{array:join.positions}},getIndex:()=>({array:join.indices})}}])};
  });
  function select(tile){
   if(!tile||!prepared.length)return [];
-  const ids=new Set([...(tile.segments||[]),...(tile.joins||[])].map(s=>s.road.sourceFeatureId));
-  return prepared.filter(join=>overlaps(join.bounds,tile.bounds)&&join.neighbors.some(id=>ids.has(id)));
+  // Source admission happened once at the exact physical join. Every union
+  // cell in its bounded influence must use the same geometry, including a
+  // neighboring cell whose source attribution belongs to another street.
+  return prepared.filter(join=>overlaps(join.influence,tile.bounds));
  }
  function append(vertices,start,output,sampleTop,selected){
-  const original=[0,3,6].map(i=>({x:vertices[start+i],z:vertices[start+i+2],y:sampleTop(vertices[start+i],vertices[start+i+2])})),bounds=boundsOf(original),active=selected.filter(j=>overlaps(bounds,j.bounds));
+  const original=[0,3,6].map(i=>({x:vertices[start+i],z:vertices[start+i+2],y:sampleTop(vertices[start+i],vertices[start+i+2])})),bounds=boundsOf(original),active=selected.filter(j=>overlaps(bounds,j.influence));
   if(!active.length){for(const p of original)output.push(p.x,p.y,p.z);return;}
   let remaining=[original];const fitted=[];
   for(const join of active)join.index.forEachTriangleInBounds(bounds,t=>{
@@ -46,7 +51,17 @@ export function createPavementJoinPartition(joins=[]){
    for(const polygon of remaining){const cut=subtract(polygon,t);next.push(...cut.outside);if(cut.inside.length>=3)fitted.push(cut.inside.map(p=>({...p,y:plane(t,p.x,p.z)})));}
    remaining=next;if(remaining.length+fitted.length>2048)throw Error('pavement_join_partition_capacity');
   });
-  for(const poly of remaining)for(const p of poly)for(const join of active){const y=join.index.sampleAt(p.x,p.z,p.y);if(Number.isFinite(y)){p.y=y;break;}}
+  for(const poly of remaining)for(const p of poly){
+   let strongest=0,target=p.y;
+   for(const join of active){
+    const near=join.index.nearestSurfaceAt(p.x,p.z,join.radius);if(!near)continue;
+    const t=Math.min(1,near.distance/join.radius),weight=1-t*t*(3-2*t);if(weight<=strongest)continue;
+    const ground=sampleTop(p.x,p.z),boundaryGround=sampleTop(near.x,near.z);
+    if(!Number.isFinite(ground)||!Number.isFinite(boundaryGround))throw Error('pavement_join_ground_unavailable');
+    target=ground+(near.y-boundaryGround)*weight;strongest=weight;
+   }
+   p.y=target;
+  }
   let areaSum=0;
   for(const poly of [...remaining,...fitted])for(let i=1;i<poly.length-1;i++){
    const a=poly[0],b=poly[i],c=poly[i+1],area=(b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x);if(Math.abs(area)<1e-12)continue;

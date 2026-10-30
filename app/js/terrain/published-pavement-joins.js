@@ -23,7 +23,7 @@ export function publishedPavementJoins(feature,vertices,indices,roads){
    for(const j of ids)triangles.push(positions[j*3],positions[j*3+1],positions[j*3+2]);
   }
   if(triangles.length/3>16384)throw Error('pavement_join_capacity');
-  if(triangles.length)result.push({...indexPavementPositions(triangles),neighbors});
+  if(triangles.length)result.push({...indexPavementPositions(triangles),neighbors,metersPerWorldUnit:Number(feature.metersPerWorldUnit)||1});
  }
  return result;
 }

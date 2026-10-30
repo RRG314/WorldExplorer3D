@@ -9,13 +9,13 @@ import {meshCarriagewayTile} from '../app/js/world/compiler/street-carriageway-m
 import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js';
 import {createTransportDetailCompiler} from '../app/js/terrain/transport-detail-compiler.js';
 
-function fixture(){
+function fixture({halfWidth=4,delta=.0035}={}){
  const x=1750,z=-1400,ground=(px,pz)=>500+.02*(px-x)+.04*(pz-z),top=(px,pz)=>ground(px,pz)+.18,
   pts=[{x:x-10,z},{x,z}],road={sourceFeatureId:'track',pts,width:8,sourceNodeIds:[1,2],structureSemantics:{terrainMode:'at_grade'}},
   venue={id:'controlled',sourceSha256:'a'.repeat(64),sourceFeatureIds:['track','approach']};
  road.transportSurfaceModel={reviewedSurfacePhase:'accepted',surveyedSurface:{venueSource:venue}};road.surfaceSurveyEvidence={venueSource:venue};
- const approach={sourceFeatureId:'approach',pts:[{x,z},{x:x+20,z:z+.4}],width:8,sourceNodeIds:[2,3],structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:{venueSource:venue},transportSurfaceModel:{reviewedSurfacePhase:'accepted',engineeredApproach:true,endpointPolicy:'reviewed_pavement_profile',surveyedSurface:{venueSource:venue,pavementProfile:{}}}},p=[];
- for(const [px,pz]of [[x+.08,z-4],[x-.08,z+4],[x+20.08,z-3.6],[x+19.92,z+4.4]])p.push(px,top(px,pz)+.0035,pz);
+ const approach={sourceFeatureId:'approach',pts:[{x,z},{x:x+20,z:z+.4}],width:halfWidth*2,sourceNodeIds:[2,3],structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:{venueSource:venue},transportSurfaceModel:{reviewedSurfacePhase:'accepted',engineeredApproach:true,endpointPolicy:'reviewed_pavement_profile',surveyedSurface:{venueSource:venue,pavementProfile:{}}}},p=[];
+ for(const [px,pz]of [[x+halfWidth*.02,z-halfWidth],[x-halfWidth*.02,z+halfWidth],[x+20+halfWidth*.02,z+.4-halfWidth],[x+20-halfWidth*.02,z+.4+halfWidth]])p.push(px,top(px,pz)+delta,pz);
  const positions=Float32Array.from(p),indices=Uint16Array.from([0,1,2,2,1,3]),joins=publishedPavementJoins(approach,positions,indices,[road,approach]),n=20,terrainVertices=[],terrainFaces=[];
  for(let row=0;row<=n;row++)for(let col=0;col<=n;col++){const px=x-20+col*2,pz=z-20+row*2;terrainVertices.push(px,ground(px,pz),pz);}
  for(let row=0;row<n;row++)for(let col=0;col<n;col++){const a=row*(n+1)+col,b=a+1,c=a+n+1;terrainFaces.push(a,c,b,b,c,c+1);}
@@ -36,9 +36,17 @@ test('the common pavement partition sews a reviewed ribbon cap to the terrain-ow
 test('a join requires the exact mapped endpoint, accepted venue binding and an eligible neighboring road',()=>{
  const f=fixture();assert.equal(f.joins.length,1);assert.deepEqual(f.joins[0].neighbors,['track']);
  for(const road of [{...f.road,sourceNodeIds:[1,9]},{...f.road,transportSurfaceModel:{...f.road.transportSurfaceModel,reviewedSurfacePhase:'provisional'}},{...f.road,structureSemantics:{terrainMode:'elevated'}},{...f.road,pts:[f.road.pts[0],{x:f.x+.01,z:f.z}]}])assert.deepEqual(publishedPavementJoins(f.approach,f.positions,f.indices,[road]),[]);
- const before=f.positions.slice(),join=createPavementJoinPartition(f.joins);try{assert.equal(join.select({bounds:{minX:f.x-2,maxX:f.x+2,minZ:f.z-2,maxZ:f.z+2},segments:[{road:{sourceFeatureId:'other'}}]}).length,0);}finally{join.dispose();}assert.deepEqual(f.positions,before);
+ const before=f.positions.slice(),join=createPavementJoinPartition(f.joins);try{assert.equal(join.select({bounds:{minX:f.x-100,maxX:f.x-90,minZ:f.z-2,maxZ:f.z+2},segments:[{road:f.road}]}).length,0);}finally{join.dispose();}assert.deepEqual(f.positions,before);
  assert.throws(()=>createPavementJoinPartition([{...f.joins[0],indices:Uint32Array.from([999999,0,1])}]),/invalid_pavement_join/);
  assert.throws(()=>createPavementJoinPartition(Array(107).fill(f.joins[0])),/capacity/);
+});
+test('a narrower reviewed pavement does not concentrate its height transition in a thin outside strip',()=>{
+ const f=fixture({halfWidth:3.98,delta:-.022}),partition=createPavementTerrainPartition([f.mesh],{includeFarTerrain:true,pavementJoins:f.joins});
+ try{const tile=prepareCarriagewayTiles([f.road])[0],mesh=meshCarriagewayTile(tile,f.top,partition),index=createRoadContactIndex([surface(mesh.positions,mesh.indices),surface(f.positions,f.indices)]);try{assert.ok(crossfall(index,f.x,f.z+3.98)<.2,'the existing cell support, rather than a centimetre strip, carries the join transition');}finally{index.dispose();}}finally{partition.dispose();}
+});
+test('the shared union height is independent of per-cell source attribution',()=>{
+ const f=fixture(),partition=createPavementTerrainPartition([f.mesh],{includeFarTerrain:true,pavementJoins:f.joins});
+ try{const a=meshCarriagewayTile(prepareCarriagewayTiles([f.road])[0],f.top,partition),b=meshCarriagewayTile(prepareCarriagewayTiles([{...f.road,sourceFeatureId:'adjoining-street'}])[0],f.top,partition);assert.deepEqual(a.positions,b.positions);assert.deepEqual(a.indices,b.indices);}finally{partition.dispose();}
 });
 test('the actual road worker retains the sewn boundary across transfer and region recompilation',{timeout:30000},async t=>{
  const f=fixture(),input={roads:[f.road],terrain:f.terrain,pavementJoins:f.joins,includeOverview:false},direct=createTransportDetailCompiler(input),key=direct.initial.regions[0].key,expected=direct.compile(key),worker=new Worker(`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(new URL('../app/js/terrain/transport-detail-worker.js',import.meta.url).href)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`,{eval:true});t.after(()=>worker.terminate());
