@@ -4,6 +4,16 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
 
 ## Implemented and evidenced
 
+- Frozen `f37ddb8e` completes the native Daytona oval lap and full 40-checkpoint
+  pit branch through the normal game session, Results and saved Journal, using
+  controlled analogue input with zero barrier contacts or penalties. All 139
+  native main/pit spans qualify, and the portable course/storage checks pass.
+  Thirteen paddock exteriors include four corrected low open canopies; the two
+  normal opponents now load the real M3 E92 race and Porsche Carrera 4S models
+  with their source paint. This accepts those boundaries, not a finished venue
+  pack, new live multiplayer or the final moving-scene budget. Reuse the accepted
+  lap when fixing remaining scenery and pit dressing.
+
 - Three additional real models use the existing vehicle catalogue, garage,
   upgrades, condition, custody and model leases: the BMW M3 E46 road coupe,
   Neubi's BMW M3 E92 race car and Karol Miklas's Porsche 911 Carrera 4S. Original

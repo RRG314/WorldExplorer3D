@@ -66,10 +66,28 @@ errors. Their initial fixture content limit was below the already admitted
 four-car asset budget; the same captures were rechecked against the real model
 and cabin ceiling. This is not a native moving-scene performance acceptance.
 
-These are controlled engine/presentation boundaries. Daytona remains private
-circuit practice under construction. Its native pit pavement/admission, complete
-oval gameplay and venue presentation remain open; no major pack is accepted.
-Circuit pit gameplay is still explicitly unavailable.
+Daytona now offers private oval practice under construction. Native publication
+qualifies all 139 spans: 127 main-loop spans and 12 pit spans, with no rejections.
+The 619.84 m pit branch retains 40 ordered checkpoints. Its bounded native-core
+plane fit keeps the existing crossfall/fidelity fences; ordinary exploration uses
+the same existing four-wheel solve on the privately adopted pit roads. All 369
+measured native pit-driving frames retained four contacts, no missing telemetry
+and a maximum 1.54 cm wheel-fit gap. The larger canonical facts round-trip through
+three existing storage chunks; browser, service and Functions reconstruct the
+same course and key.
+
+Frozen `f37ddb8e` completed the native 4.01 km one-lap oval, full pit branch and
+exit through the normal session, Results and Journal. Controlled analogue actions
+entered the existing input port; no pose or clock was replaced. The finish had
+161 timing gates, one pit visit, zero barrier contacts and zero penalties. Its
+3:40.08 includes an initial idle period and is not a record/benchmark claim.
+The eight-minute page guard closed after the saved finish; the subsequent trace
+export and extra grid screenshot could not run. The completed journey is retained
+and does not require another lap for that capture failure.
+
+Complete venue presentation, changed live multiplayer/catalogue acceptance and
+the final moving-scene budget remain open; no major pack is accepted. Circuit
+pit gameplay is still explicitly unavailable.
 
 Three mapped Daytona garage exteriors also passed publication in the actual
 loaded world: three roots and three replacement colliders, with no remaining
@@ -84,6 +102,17 @@ passed actual publication: nine total roots and replacement colliders, no
 remaining matched shells or generic building centres inside those footprints,
 and six admitted walking views. Background generic buildings and existing entry
 labels remain visible; this does not accept the whole paddock presentation.
+
+Four additional low pit canopies now replace the exact retained Overture blocks:
+13 reviewed paddock roots in total. Native publication retains their canonical
+canopy type, excludes interior entry, retires all four matched shells and uses
+128 post/wall/roof component colliders with open passage below the roofs. The
+controlled render caught a brown concrete texture; the repaired painted finish
+uses that image only for bump detail. Both the repaired render and native canopy
+view were inspected. Generic background buildings and remaining pit dressing are
+still presentation work. Normal practice now uses the admitted M3 E92 race car
+and Carrera 4S as its two default opponents, preserving their source paint. Native
+scene inspection confirms those actual loaded model IDs.
 
 ## Actual city and deployed services
 

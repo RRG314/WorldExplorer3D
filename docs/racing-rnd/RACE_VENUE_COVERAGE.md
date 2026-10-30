@@ -6,6 +6,13 @@ Owner decision, October 28, 2026: **balanced circuits, stock-car ovals and rally
 
 The source register is `app/js/racing/venue-catalog.js`. It contains twelve **researched layout references**, four in each group. **Zero are complete playable venue packs.** The existing Monaco district practice run is a qualified 705.99 m city route, not the Monaco Grand Prix circuit. Course names, target lengths and references do not certify geometry or provide a content licence.
 
+Daytona has since completed native private oval practice with its full reviewed
+pit branch, normal Results and a saved Journal. Main/pit publication, portable
+authority reconstruction and the changed wheel-contact boundary pass. Remaining
+pit dressing, surrounding presentation, final performance and changed shared
+release paths still prevent pack acceptance; preserve the completed gameplay
+evidence rather than repeating that lap for each scenery edit.
+
 | Group | Venue and exact layout | Reference length | Primary factual source |
 |---|---|---:|---|
 | Circuit | Nürburgring full Nordschleife, T13 timing line | 20.832 km | [Venue facts](https://www.nuerburgring.de/info/nuerburgring/race-tracks/nordschleife), [timing definitions](https://nuerburgring.de/info/nuerburgring/records) |
