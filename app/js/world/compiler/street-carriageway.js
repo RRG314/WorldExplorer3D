@@ -1,3 +1,4 @@
+import {prepareStreetEdgeClearances} from './street-edge-clearance.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {roadWidthAtSegment} from '../road-cross-section-profile.js?v=1';
 import {roadTurnFootprint} from '../../terrain/road-surface-geometry.js?v=2';
@@ -67,6 +68,7 @@ export function unionCarriageway(tile, {clipToBounds = true} = {}) {
 // Ground roads have a single horizontal owner. Elevated and underground roads
 // retain independent structure surfaces and never enter this planar union.
 export function prepareCarriagewayTiles(roads, chunkSize = 128) {
+  const stagedRoads=roads.some(road=>road.edgeBandRecipe)?roads.map(road=>road.edgeBandRecipe?{...road}:road):roads;
   const tiles=new Map(),joinOwners=new Map();
   const insert=(kind,item,polygon)=> {
     const b=boundsOf(polygon.flat().map(([x,z])=>({x,z})));
@@ -86,7 +88,7 @@ export function prepareCarriagewayTiles(roads, chunkSize = 128) {
         tiles.get(key)[kind].push(item);
       }
   };
-  for(const road of roads) {
+  for(const road of stagedRoads) {
     if(road.structureSemantics?.terrainMode!=='at_grade')continue;
     for(const segment of streetRoadSegments(road)) {
       const polygon=carriagewaySegmentPolygon(segment);if(polygon)insert('segments',segment,polygon);
@@ -96,5 +98,6 @@ export function prepareCarriagewayTiles(roads, chunkSize = 128) {
       for(const polygon of carriagewayJoinPolygons(join))insert('joins',join,polygon);
     }
   }
+  if(stagedRoads!==roads)prepareStreetEdgeClearances([...tiles.values()],carriagewaySegmentPolygon,carriagewayJoinPolygons);
   return [...tiles.values()].sort((a,b)=>a.bounds.minX-b.bounds.minX || a.bounds.minZ-b.bounds.minZ);
 }

@@ -12,10 +12,10 @@ import {compileMappedVenueLayout} from '../app/js/racing/venue-layout.js';
 import {RACING_VENUE_SOURCES} from '../app/js/racing/venue-source-packs.js';
 import {reviewedRoadEdgeRecipe} from '../app/js/world/reviewed-road-edge-source.js';
 const recipe=Object.freeze({version:1,sourceLengthMeters:22,venueId:'controlled',sourceFeatureId:'controlled',sourceSha256:'a'.repeat(64),bands:[{side:1,startMeters:0,endMeters:22,widthMeters:.7,heightMeters:.045,rampMeters:.35,taperMeters:5,stripeMeters:1,phaseMeters:0}]}),evidence={version:1,venueId:'controlled',sourceFeatureId:'controlled',surfaceModel:'banked-road-v1',maximumCrossfall:.7,venueSource:{sourceSha256:'a'.repeat(64)},edgeBandRecipe:recipe};
-function setup(){
+function setup({crossing=false}={}){
  const road={sourceFeatureId:'controlled',pts:[{x:0,z:0},{x:0,z:20}],width:8,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:evidence,transportSurfaceModel:{surveyedSurface:{...evidence},reviewedSurfacePhase:'accepted',maximumReviewedCrossfall:0}};
  const batch=[],base=(x,z)=>10+x*.03+z*.02,partition=(v,sample)=>Float32Array.from(v.map((n,i)=>i%3===1?sample(v[i-1],v[i+1]):n));
- for(const tile of prepareCarriagewayTiles([{...road,edgeBandRecipe:reviewedRoadEdgeRecipe(road)}])){const data=meshCarriagewayTile(tile,base,partition);batch.push(data);if(data.edgeBands)batch.push(data.edgeBands);}
+ for(const tile of prepareCarriagewayTiles([{...road,edgeBandRecipe:reviewedRoadEdgeRecipe(road)},...(crossing?[{pts:[{x:-10,z:10},{x:10,z:10}],width:6,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'}}]:[])])){const data=meshCarriagewayTile(tile,base,partition);batch.push(data);if(data.edgeBands)batch.push(data.edgeBands);}
  const meshes=batch.map(b=>({geometry:{attributes:{position:{array:b.positions}},getIndex:()=>({array:b.indices})},userData:{terrainMode:'at_grade'}})),contacts=createRegionalRoadContact(createRoadContactIndex(meshes));
  const context={METERS_PER_WORLD_UNIT:1,worldPublication:{requestId:'controlled',location:{lat:50,lon:7}},buildings:[],roadContactIndex:contacts,transportDetail:{hasReadyCoverageAt:()=>true},sampleFeatureSurfaceY:(_r,x,z)=>base(x,z),
   buildTraversalNetworks:()=>({drive:{segments:[{feature:road,p1:road.pts[0],p2:road.pts[1],segIndex:0,sourceTStart:0,sourceTEnd:1,fromId:0,toId:1,direction:'forward'}]}}),
@@ -69,4 +69,13 @@ test('moving native terrain creases use common lateral stations with a measured 
  for(const engine of engines)assert.deepEqual(engine.canonicalRaceDistrict(facts),canonical);
  const oversized=structuredClone(raw);for(const s of oversized.heightSamples)while(s.lateralSamples.length<33)s.lateralSamples.push({...s.lateralSamples.at(-1)});
  assert.throws(()=>buildRaceRoadGraph([oversized],{metersPerUnit:1}),/heights/);
+});
+
+
+test('published qualification retains a neighbour-cleared kerb through its normal source reader',async()=>{
+ const h=setup({crossing:true});try{
+  const district=await collectRaceDistrict(h.context,{yieldWork:async()=>{}}),road=district.roads[0];assert.ok(buildRaceRoadGraph(district.roads,{metersPerUnit:1}).edges.length);
+  let maximum=0;for(let z=.1;z<20;z+=.13)for(const x of[3.32,3.4,3.6,3.9])maximum=Math.max(maximum,Math.abs(h.contacts.sampleAt(x,z,h.base(x,z),'at_grade')-sampleRaceSegmentY(road,z/20,x)));
+  assert.ok(maximum<.01,`between-station contact difference ${maximum} metres`);
+ }finally{h.contacts.dispose();}
 });

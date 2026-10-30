@@ -236,3 +236,10 @@ chunks. A payload above 4 MiB passes atomic-publication component checks, hash
 round-trip through browser/service/Functions runtimes and damaged-tail rejection.
 Inline records and unsafe-size rejection retain their guards. This is component
 evidence; live multiplayer acceptance of the final complete venue remains open.
+
+Kerb preparation now derives clearances from other at-grade pavement footprints
+and tapers the band before a junction clearing. Source road inputs remain
+immutable. New checks cover continuous entry/exit, neighbouring cells, elevated
+road separation and qualification through the normal published-surface reader.
+These component checks pass; the remaining native geometry failures still need
+rechecking after their pavement and kerb repairs.

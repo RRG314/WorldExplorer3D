@@ -1,7 +1,8 @@
 import {carriagewaySegmentPolygon,carriagewayJoinPolygons} from './street-carriageway.js';
 import {roadWidthAtSegment} from '../road-cross-section-profile.js?v=1';
 import {roadPlacementOffsetWorld} from '../road-units.js';
-import {roadMetersPerWorldUnit} from '../road-units.js';
+import {streetEdgeRecipeState as roadState} from './street-edge-policy.js';
+export {validateStreetEdgeRecipe} from './street-edge-policy.js';
 import {streetEdgePolygonKernel as clip} from './street-edge-bands.js';
 import {STREET_POLYGON_GRID_WORLD} from './street-coordinate-grid.js';
 // Cover the accepted rounded road outline, then clip back to that SAME owner.
@@ -10,27 +11,8 @@ const outlinePad=STREET_POLYGON_GRID_WORLD*2;
 
 // Plain, bounded compiler input. Only the private reviewed-source adapter may
 // admit it from a live feature; provider tags cannot create physical furniture.
-export function validateStreetEdgeRecipe(recipe){
- if(recipe?.sourceLengthMeters!==undefined&&(!Number.isFinite(recipe.sourceLengthMeters)||recipe.sourceLengthMeters<=0||recipe.sourceLengthMeters>30000))throw Error('invalid_street_edge_recipe');
- if(!recipe||recipe.version!==1||!Array.isArray(recipe.bands)||recipe.bands.length>128)throw Error('invalid_street_edge_recipe');
- for(const b of recipe.bands){
-  if(!b||![b.startMeters,b.endMeters,b.widthMeters,b.heightMeters,b.rampMeters,b.taperMeters,b.stripeMeters,b.phaseMeters].every(Number.isFinite)||
-   ![-1,1].includes(b.side)||b.startMeters< -30000||b.endMeters>30000||b.endMeters<=b.startMeters||
-   b.widthMeters<.3||b.widthMeters>1.2||b.heightMeters<=0||b.heightMeters>.1||b.rampMeters<.2||b.rampMeters>=b.widthMeters||
-   b.heightMeters/b.rampMeters>.3||b.taperMeters<2||b.taperMeters>20||b.stripeMeters<.5||b.stripeMeters>3||Math.abs(b.phaseMeters)>30000)throw Error('invalid_street_edge_recipe');
- }
- for(let i=0;i<recipe.bands.length;i++)for(let j=0;j<i;j++)if(recipe.bands[i].side===recipe.bands[j].side&&Math.max(recipe.bands[i].startMeters,recipe.bands[j].startMeters)<Math.min(recipe.bands[i].endMeters,recipe.bands[j].endMeters)-1e-6)throw Error('overlapping_street_edge_recipe');
- return recipe;
-}
 const colorAt=(b,d)=>Math.floor((d+b.phaseMeters)/b.stripeMeters)%2===0?[174,35,27]:[214,208,192];
 const liftAt=(b,d)=>Math.max(0,Math.min(b.heightMeters,(d-b.startMeters)*b.heightMeters/b.taperMeters,(b.endMeters-d)*b.heightMeters/b.taperMeters));
-function roadState(road){
- const recipe=road.edgeBandRecipe;if(!recipe)return null;validateStreetEdgeRecipe(recipe);
- const unit=roadMetersPerWorldUnit(road),distances=[0];
- for(let i=1;i<road.pts.length;i++)distances.push(distances[i-1]+Math.hypot(road.pts[i].x-road.pts[i-1].x,road.pts[i].z-road.pts[i-1].z)*unit);
- const scale=recipe.sourceLengthMeters?distances.at(-1)/recipe.sourceLengthMeters:1;
- return {recipe:scale===1?recipe:{...recipe,bands:recipe.bands.map(b=>({...b,startMeters:b.startMeters*scale,endMeters:b.endMeters*scale}))},unit,distances};
-}
 export function compileStreetEdgeRecipe(tile){
  if(!tile.segments.some(s=>s.road.edgeBandRecipe)&&!(tile.joins||[]).some(j=>j.road.edgeBandRecipe))return {faces:[],polygons:[]};
  const states=new Map(),state=road=>{if(!states.has(road))states.set(road,roadState(road));return states.get(road);},inner=[],faces=[];
