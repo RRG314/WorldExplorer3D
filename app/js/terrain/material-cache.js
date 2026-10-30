@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import {
-  createRoadSurfaceMaterials,
+  createRoadSurfaceMaterials,createRoadEdgeBandMaterial,
   disposeRoadSurfaceMaterials,
   roadSurfaceMaterialCacheKey
 } from "../road-render.js?v=4";
@@ -15,11 +15,19 @@ function createTerrainMaterialCacheApi(deps = {}) {
     terrainState._roadMaterialCacheKey = "";
   }
 
-  function getSharedRoadMaterials() {
+  function withEdgeBandMaterial(materials,includeEdgeBands){
+    if(includeEdgeBands&&!materials.edgeBandMat){
+      const material=createRoadEdgeBandMaterial();
+      material.normalMap=appCtx.asphaltNormal||null;material.normalScale?.set(.12,.12);
+      materials.edgeBandMat=material;
+    }
+    return materials;
+  }
+  function getSharedRoadMaterials({includeEdgeBands=false}={}) {
     const key = roadSurfaceMaterialCacheKey({
       includeMarkings: true
     });
-    if (terrainState._roadMaterials && terrainState._roadMaterialCacheKey === key) return terrainState._roadMaterials;
+    if (terrainState._roadMaterials && terrainState._roadMaterialCacheKey === key) return withEdgeBandMaterial(terrainState._roadMaterials,includeEdgeBands);
 
     disposeRoadMaterialCache();
     const materials = createRoadSurfaceMaterials({
@@ -43,7 +51,7 @@ function createTerrainMaterialCacheApi(deps = {}) {
       skirtMat: materials.roadSkirtMaterial,
       markMat: materials.roadMarkMaterial
     };
-    return terrainState._roadMaterials;
+    return withEdgeBandMaterial(terrainState._roadMaterials,includeEdgeBands);
   }
 
   return {

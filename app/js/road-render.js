@@ -24,12 +24,17 @@ function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = []
   return true;
 }
 
+export function createRoadEdgeBandMaterial(T=globalThis.THREE){
+  return new T.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,side:T.DoubleSide,
+    polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2,depthWrite:true,depthTest:true});
+}
+
 function createRoadSurfaceMaterials({
   sidewalkTex = null,
   sidewalkNormal = null,
   sidewalkRoughness = null,
   includeMarkings = false,
-  includeSidewalk = false
+  includeSidewalk = false,includeEdgeBands = false
 } = {}) {
   const roadMainMaterial = new THREE.MeshStandardMaterial({
     color: 0x303236,
@@ -57,6 +62,8 @@ function createRoadSurfaceMaterials({
     roadMainMaterial,
     roadSkirtMaterial
   };
+
+  if(includeEdgeBands)materials.roadEdgeBandMaterial=createRoadEdgeBandMaterial();
 
   if (includeMarkings) {
     materials.roadMarkMaterial = createRoadMarkingMaterial();
@@ -122,6 +129,7 @@ function buildIndexedBatchMesh({
   targetList = null,
   verts = [],
   indices = [],
+  colors = null,
   material = null,
   renderOrder = 0,
   userData = null,
@@ -131,8 +139,10 @@ function buildIndexedBatchMesh({
   if (!scene || !material || !(Array.isArray(verts)||ArrayBuffer.isView(verts)) || !(Array.isArray(indices)||ArrayBuffer.isView(indices)) || !verts.length || !indices.length) {
     return null;
   }
+  if(colors!==null&&(!((Array.isArray(colors)||ArrayBuffer.isView(colors)))||colors.length!==verts.length||!colors.every(n=>Number.isInteger(n)&&n>=0&&n<=255)))throw Error('invalid_road_batch_colors');
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  if(colors!==null)geometry.setAttribute('color',new THREE.BufferAttribute(new Uint8Array(colors),3,true));
   const uv = [];
   for (let i = 0; i < verts.length; i += 3) uv.push(verts[i] * 1.11 / 4, verts[i + 2] * 1.11 / 4);
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));

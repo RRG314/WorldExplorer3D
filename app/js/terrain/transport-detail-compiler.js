@@ -5,7 +5,26 @@ import {pavementMaskLayout,rasterizePavementMask} from '../world/compiler/paveme
 import {restoreTransportTerrain} from './transport-terrain-snapshot.js';
 import {planTransportRegions,nearestTransportRegion} from './transport-detail-plan.js';
 import {createSpatialRoadBatches} from './spatial-road-batches.js';
+import {indexPavementPositions} from '../world/pavement-indexed-mesh.js';
 import {createPortalSurfaceClipper} from './portal-surface-clip.js';
+
+// Portal clipping remains with the normal road owner. Split only flat colour
+// groups before clipping; a newly cut vertex must not borrow a neighbour's paint.
+export function appendRoadEdgeBands(builder,bands,clipSurface){
+ if(!bands?.indices?.length)return;
+ const groups=new Map(),p=bands.positions,c=bands.colors;
+ for(let i=0;i<bands.indices.length;i+=3){
+  const ids=[bands.indices[i],bands.indices[i+1],bands.indices[i+2]],a=ids[0]*3,key=(c[a]<<16)|(c[a+1]<<8)|c[a+2];
+  if(!groups.has(key)){if(groups.size>=16)throw Error('street_edge_band_capacity');groups.set(key,{color:[c[a],c[a+1],c[a+2]],vertices:[]});}
+  const group=groups.get(key);
+  for(const id of ids){const at=id*3;if(group.color.some((v,j)=>v!==c[at+j]))throw Error('invalid_street_edge_band_color');group.vertices.push(p[at],p[at+1],p[at+2]);}
+ }
+ for(const group of groups.values()){
+  const indexed=indexPavementPositions(group.vertices),cut=clipSurface(indexed.positions,indexed.indices),colors=new Uint8Array(cut.positions.length);
+  for(let i=0;i<colors.length;i+=3)colors.set(group.color,i);
+  builder.append(cut.positions,cut.indices,'at_grade',{material:'edge-band',colors});
+ }
+}
 
 // The planar footprint is independent of terrain elevation. It can compile
 // while the main thread publishes the final cut/fill surface.
@@ -36,15 +55,16 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
   function compile(region){
     const builder=createSpatialRoadBatches();
     for(const tile of region.tiles){
-      const mesh=meshCarriagewayTile(tile,restored.sampleUncutTop,partition,{polygons:tile.polygons});
+      const mesh=meshCarriagewayTile(tile,restored.sampleUncutTop,partition,{polygons:tile.polygons,edgeFaces:tile.edgeFaces});
       const cut=clipSurface(mesh.positions,mesh.indices);
       builder.append(cut.positions,cut.indices,'at_grade');
+      appendRoadEdgeBands(builder,mesh.edgeBands,clipSurface);
       tile.polygons=null;
     }
     builder.finish();
     return {key:region.key,bounds:region.bounds,keys:region.tiles.map(tile=>tile.key),
       roadIndices:[...new Set(region.tiles.flatMap(tile=>[...tile.segments,...tile.joins].map(item=>item.road.auditIndex)))],
-      batches:builder.batches.map(batch=>({positions:Float32Array.from(batch.verts),indices:Uint32Array.from(batch.indices)}))};
+      batches:builder.batches.map(batch=>({positions:Float32Array.from(batch.verts),indices:Uint32Array.from(batch.indices),...(batch.material?{material:batch.material,colors:Uint8Array.from(batch.colors)}:{})}))};
   }
   const initial=deferInitial?[]:plan.initial.map(compile);
   return {

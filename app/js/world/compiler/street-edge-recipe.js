@@ -1,0 +1,79 @@
+import {carriagewaySegmentPolygon,carriagewayJoinPolygons} from './street-carriageway.js';
+import {roadMetersPerWorldUnit} from '../road-units.js';
+import {streetPolygonKernel as clip} from './street-polygon-kernel.js';
+
+// Plain, bounded compiler input. Only the private reviewed-source adapter may
+// admit it from a live feature; provider tags cannot create physical furniture.
+export function validateStreetEdgeRecipe(recipe){
+ if(!recipe||recipe.version!==1||!Array.isArray(recipe.bands)||recipe.bands.length>128)throw Error('invalid_street_edge_recipe');
+ for(const b of recipe.bands){
+  if(!b||![b.startMeters,b.endMeters,b.widthMeters,b.heightMeters,b.rampMeters,b.taperMeters,b.stripeMeters,b.phaseMeters].every(Number.isFinite)||
+   ![-1,1].includes(b.side)||b.startMeters< -30000||b.endMeters>30000||b.endMeters<=b.startMeters||
+   b.widthMeters<.3||b.widthMeters>1.2||b.heightMeters<=0||b.heightMeters>.1||b.rampMeters<.2||b.rampMeters>=b.widthMeters||
+   b.heightMeters/b.rampMeters>.3||b.taperMeters<2||b.taperMeters>20||b.stripeMeters<.5||b.stripeMeters>3||Math.abs(b.phaseMeters)>30000)throw Error('invalid_street_edge_recipe');
+ }
+ for(let i=0;i<recipe.bands.length;i++)for(let j=0;j<i;j++)if(recipe.bands[i].side===recipe.bands[j].side&&Math.max(recipe.bands[i].startMeters,recipe.bands[j].startMeters)<Math.min(recipe.bands[i].endMeters,recipe.bands[j].endMeters)-1e-6)throw Error('overlapping_street_edge_recipe');
+ return recipe;
+}
+const colorAt=(b,d)=>Math.floor((d+b.phaseMeters)/b.stripeMeters)%2===0?[174,35,27]:[214,208,192];
+const liftAt=(b,d)=>Math.max(0,Math.min(b.heightMeters,(d-b.startMeters)*b.heightMeters/b.taperMeters,(b.endMeters-d)*b.heightMeters/b.taperMeters));
+function roadState(road){
+ const recipe=road.edgeBandRecipe;if(!recipe)return null;validateStreetEdgeRecipe(recipe);
+ const unit=roadMetersPerWorldUnit(road),distances=[0];
+ for(let i=1;i<road.pts.length;i++)distances.push(distances[i-1]+Math.hypot(road.pts[i].x-road.pts[i-1].x,road.pts[i].z-road.pts[i-1].z)*unit);
+ return {recipe,unit,distances};
+}
+export function compileStreetEdgeRecipe(tile){
+ if(!tile.segments.some(s=>s.road.edgeBandRecipe)&&!(tile.joins||[]).some(j=>j.road.edgeBandRecipe))return {faces:[],polygons:[]};
+ const states=new Map(),state=road=>{if(!states.has(road))states.set(road,roadState(road));return states.get(road);},inner=[],faces=[];
+ const add=(a,b,c,color)=>{if(faces.length>=4096)throw Error('street_edge_band_capacity');faces.push({points:[a,b,c],color});};
+ const quad=(a,b,c,d,color)=>{add(a,c,b,color);add(b,c,d,color);};
+ const active=(s,d)=>s?.recipe.bands.filter(b=>d>=b.startMeters-1e-7&&d<=b.endMeters+1e-7)||[];
+ const inset=(piece,bands,unit)=>{const positive=(bands.find(b=>b.side===1)?.widthMeters||0)/unit,negative=(bands.find(b=>b.side===-1)?.widthMeters||0)/unit;return {...piece,wa:piece.wa-positive-negative,wb:piece.wb-positive-negative,halfWidth:piece.halfWidth-(positive+negative)/2,offset:(piece.offset||0)+(positive-negative)/2};};
+ for(const segment of tile.segments){
+  const s=state(segment.road);if(!s){const p=carriagewaySegmentPolygon(segment);if(p)inner.push(p);continue;}
+  const {unit,distances}=s,sourceLength=distances[segment.index+1]-distances[segment.index],start=distances[segment.index]+sourceLength*segment.t0,end=distances[segment.index]+sourceLength*segment.t1;
+  // A source span can cross many cells. Bound stations to this cell before
+  // inserting metre paint breaks; the source path and its phase stay intact.
+  const dx=segment.b.x-segment.a.x,dz=segment.b.z-segment.a.z,length=Math.hypot(dx,dz),nx=dz/length,nz=-dx/length,pad=Math.max(segment.wa,segment.wb)+1;
+  let lo=0,hi=1;
+  for(const [origin,delta,min,max] of [[segment.a.x,dx,tile.bounds.minX-pad,tile.bounds.maxX+pad],[segment.a.z,dz,tile.bounds.minZ-pad,tile.bounds.maxZ+pad]]){
+   if(Math.abs(delta)<1e-12){if(origin<min||origin>max){lo=1;hi=0;break;}continue;}
+   const a=(min-origin)/delta,b=(max-origin)/delta;lo=Math.max(lo,Math.min(a,b));hi=Math.min(hi,Math.max(a,b));
+  }
+  if(lo>=hi)continue;
+  const low=start+(end-start)*lo,high=start+(end-start)*hi,breaks=new Set([low,high]);
+  for(const b of s.recipe.bands){
+   if(b.endMeters<=low||b.startMeters>=high)continue;
+   for(const d of [b.startMeters,b.startMeters+b.taperMeters,b.endMeters-b.taperMeters,b.endMeters,(b.startMeters+b.endMeters)/2])if(d>low&&d<high)breaks.add(d);
+   const a=Math.max(low,b.startMeters),z=Math.min(high,b.endMeters);
+   for(let n=Math.ceil((a+b.phaseMeters)/b.stripeMeters);n*b.stripeMeters-b.phaseMeters<z;n++)breaks.add(n*b.stripeMeters-b.phaseMeters);
+  }
+  const ordered=[...breaks].sort((a,b)=>a-b),point=d=>{const t=(d-start)/(end-start);return {x:segment.a.x+dx*t,z:segment.a.z+dz*t,w:segment.wa+(segment.wb-segment.wa)*t};};
+  for(let i=1;i<ordered.length;i++){
+   const a=ordered[i-1],b=ordered[i],bands=active(s,(a+b)/2),p=point(a),q=point(b),piece={...segment,a:p,b:q,wa:p.w,wb:q.w};
+   const shape=carriagewaySegmentPolygon(inset(piece,bands,unit));if(shape)inner.push(shape);
+   for(const band of bands){
+    const row=(p,d)=>{const cap=liftAt(band,d),outer=p.w/2-band.side*(segment.offset||0),inside=outer-band.widthMeters/unit;return [[inside,0],[inside+band.rampMeters/unit*cap/band.heightMeters,cap/unit],[outer,cap/unit]].map(([offset,lift])=>({x:p.x+nx*offset*band.side,z:p.z+nz*offset*band.side,lift}));};
+    const r=row(p,a),t=row(q,b),color=colorAt(band,(a+b)/2);
+    for(let j=1;j<3;j++)quad(r[j-1],r[j],t[j-1],t[j],color);
+   }
+  }
+ }
+ for(const join of tile.joins||[]){
+  const s=state(join.road),index=join.road.pts.indexOf(join.point),d=s?.distances[index],bands=Number.isFinite(d)?active(s,d):[];
+  const reduced=inset(join,bands,s?.unit||1);inner.push(...carriagewayJoinPolygons(reduced));
+  if(!bands.length)continue;
+  const ax=join.point.x-join.previous.x,az=join.point.z-join.previous.z,bx=join.next.x-join.point.x,bz=join.next.z-join.point.z,cross=ax*bz-az*bx,side=cross>=0?1:-1,band=bands.find(b=>b.side===side);
+  if(!band)continue;
+  const cap=liftAt(band,d),width=band.widthMeters/s.unit,ramp=band.rampMeters/s.unit*cap/band.heightMeters;
+  for(const polygon of carriagewayJoinPolygons(join)){
+   const ring=polygon[0],p=ring[1],q=ring[2];
+   const row=point=>{const vx=point[0]-join.point.x,vz=point[1]-join.point.z,radius=Math.hypot(vx,vz);return [radius-width,radius-width+ramp,radius].map((r,i)=>({x:join.point.x+vx*r/radius,z:join.point.z+vz*r/radius,lift:i?cap/s.unit:0}));};
+   const a=row(p),b=row(q);for(let i=1;i<3;i++)quad(a[i-1],a[i],b[i-1],b[i],colorAt(band,d));
+  }
+ }
+ if(!faces.length)return {faces,polygons:[]};
+ const outerBounds=[[[tile.bounds.minX,tile.bounds.minZ],[tile.bounds.maxX,tile.bounds.minZ],[tile.bounds.maxX,tile.bounds.maxZ],[tile.bounds.minX,tile.bounds.maxZ],[tile.bounds.minX,tile.bounds.minZ]]];
+ return {faces,polygons:inner.length?clip.intersection(clip.union(inner[0],...inner.slice(1)),outerBounds):[]};
+}
