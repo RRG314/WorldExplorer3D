@@ -2,6 +2,7 @@ import {refineReviewedCorridorCells,corridorSegmentDistance} from './reviewed-co
 import {reviewedTerrainCorridors,REVIEWED_DETAIL_MAXIMUM_SPACING_METERS,REVIEWED_DETAIL_MAXIMUM_ADDED_VERTICES,REVIEWED_CORRIDOR_OUTER_SPACING_METERS} from './reviewed-corridor-policy.js';
 import {terrainGridInterval} from './world-grid.js';
 import {markGroundSurfaceChanged} from './surface-revision.js';
+import {reviewedRoadBoundaryPartition} from './road-boundary-triangulation.js';
 
 const smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
 function weightsAt(p,n,x,z){
@@ -13,7 +14,7 @@ function weightsAt(p,n,x,z){
 // Staged geometry for the existing detailed mesh. Its original regular-grid
 // vertices retain their indices; only affected cells acquire extra triangles.
 // Sampling refers to these same indices, never to a second height field.
-export async function prepareReviewedDetailedTerrainMesh(mesh,{segments,scale=1,sampleGround,gradeGround=(x,z,y)=>y,waterGround=(x,z,y)=>y,current=()=>true,yieldWork=async()=>{},maximumAddedVertices=REVIEWED_DETAIL_MAXIMUM_ADDED_VERTICES}={}){
+export async function prepareReviewedDetailedTerrainMesh(mesh,{segments,scale=1,sampleGround,gradeGround=(x,z,y)=>y,waterGround=(x,z,y)=>y,current=()=>true,yieldWork=async()=>{},maximumAddedVertices=REVIEWED_DETAIL_MAXIMUM_ADDED_VERTICES,partitionTriangle=null}={}){
  const geometry=mesh.geometry,n=geometry.parameters?.widthSegments,source=geometry.attributes.position;
  if(!Number.isInteger(n)||n<1||!source||typeof sampleGround!=='function'||!Number.isSafeInteger(maximumAddedVertices)||maximumAddedVertices<0||maximumAddedVertices>REVIEWED_DETAIL_MAXIMUM_ADDED_VERTICES)throw Error('invalid_reviewed_detailed_terrain');
  const count=(n+1)**2;if(source.count<count)throw Error('invalid_reviewed_detailed_terrain');
@@ -34,7 +35,7 @@ export async function prepareReviewedDetailedTerrainMesh(mesh,{segments,scale=1,
   if(performance.now()-checkpoint>=8){if(!current())throw new DOMException('Reviewed detailed terrain superseded','AbortError');await yieldWork();checkpoint=performance.now();}
  }
  const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:base,segments:nearby,current,yieldWork,innerSpacing:spacing,outerSpacing:REVIEWED_CORRIDOR_OUTER_SPACING_METERS*scale,
-  edgeStations,maximumVertices:count+maximumAddedVertices,heightAt:(x,z,candidates)=>{
+  edgeStations,maximumVertices:count+maximumAddedVertices,partitionTriangle,heightAt:(x,z,candidates)=>{
    const weights=weightsAt(base,n,x,z),old=weights.reduce((y,[i,w])=>y+base[i*3+1]*w,0);let weight=0;
    for(const s of candidates)weight=Math.max(weight,1-smooth((corridorSegmentDistance(x,z,s)-s.innerRadius)/(s.outerRadius-s.innerRadius)));
    if(!weight)return old;
@@ -60,12 +61,12 @@ export async function prepareReviewedDetailedTerrainMesh(mesh,{segments,scale=1,
 
 export async function refineReviewedDetailedTerrain(context,deps,{current=()=>true,yieldWork=async()=>{}}={}){
  const corridor=reviewedTerrainCorridors(context);if(!corridor)return null;
- const {runtime,venue,scale,segments}=corridor,stamp=`${runtime.sequence}:${venue.id}:${venue.sourceSha256}`,active=()=>current()&&context.worldLoadRuntimeState===runtime;
+ const {runtime,venue,scale,segments}=corridor,stamp=`${runtime.sequence}:${venue.id}:${venue.sourceSha256}`,active=()=>current()&&context.worldLoadRuntimeState===runtime,partitionTriangle=reviewedRoadBoundaryPartition(context);
  let remaining=REVIEWED_DETAIL_MAXIMUM_ADDED_VERTICES,meshes=0,addedVertices=0;
  for(const mesh of context.terrainGroup?.children||[]){
   if(!mesh.userData?.isTerrainMesh||mesh.visible===false||mesh.userData.pendingTerrainTile)continue;
   if(mesh.userData.reviewedCorridorRefinement?.stamp===stamp){remaining-=mesh.userData.reviewedCorridorRefinement.addedVertices;continue;}
-  const staged=await prepareReviewedDetailedTerrainMesh(mesh,{segments,scale,current:active,yieldWork,maximumAddedVertices:remaining,
+  const staged=await prepareReviewedDetailedTerrainMesh(mesh,{segments,scale,current:active,yieldWork,maximumAddedVertices:remaining,partitionTriangle,
    sampleGround:(x,z)=>{const {lat,lon}=context.worldToGeo(x,z),meters=deps.sampleAcceptedGroundElevationAtLatLon(lat,lon);const height=Number.isFinite(meters)&&typeof deps.clampElevationMeters==='function'?deps.clampElevationMeters(meters):meters;return Number.isFinite(height)?height*scale*(Number(context.TERRAIN_Y_EXAGGERATION)||1):NaN;},
    gradeGround:deps.applyStructureTerrainCuts,waterGround:deps.resolveWaterTerrainY});
   if(!staged)continue;

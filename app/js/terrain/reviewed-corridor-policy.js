@@ -3,6 +3,12 @@ export const REVIEWED_CORRIDOR_INNER_SPACING_METERS=3;
 export const REVIEWED_CORRIDOR_OUTER_SPACING_METERS=8;
 export const REVIEWED_CORRIDOR_INNER_MARGIN_METERS=8;
 export const REVIEWED_CORRIDOR_OUTER_MARGIN_METERS=40;
+export const REVIEWED_PAVEMENT_BOUNDARY_POLICY='fitted-pavement-boundary-v1';
+export function hasReviewedPavementBoundary(feature){
+ const model=feature?.transportSurfaceModel,survey=model?.surveyedSurface,evidence=feature?.surfaceSurveyEvidence;
+ return !!(model?.reviewedSurfacePhase==='accepted'&&survey?.surfaceModel==='banked-road-v1'&&survey.terrainEdgePolicy===REVIEWED_PAVEMENT_BOUNDARY_POLICY&&
+  evidence?.terrainEdgePolicy===REVIEWED_PAVEMENT_BOUNDARY_POLICY&&survey.venueSource&&survey.venueSource===evidence.venueSource&&survey.sourceFeatureId===feature.sourceFeatureId&&survey.venueSource.sourceFeatureIds?.includes(feature.sourceFeatureId));
+}
 // Detailed source tiles halve to about 3.04 m at this venue. A 3.1 m ceiling
 // avoids another fourfold subdivision merely to remove centimetres of spacing.
 export const REVIEWED_DETAIL_MAXIMUM_SPACING_METERS=3.1;

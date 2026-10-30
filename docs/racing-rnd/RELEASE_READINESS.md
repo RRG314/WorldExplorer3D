@@ -436,3 +436,15 @@ instead of the old 0.45 rad cap; the root no longer carries the highest-probe
 lift. The corrected bank view and walking handback were inspected. No page,
 console or cleanup errors occurred. The unchanged 127-span qualification is
 reused; unfinished pavement width and visibly uneven outer terrain remain open.
+
+A read-only native terrain audit isolates the outer ridges to road grading:
+extending the bank plane beyond its physical pavement raises some ground by
+over 3 m relative to the retained native source. The new explicitly reviewed
+Daytona policy constrains the existing terrain triangles to the same swept
+pavement edges. Outside those edges it carries only the boundary-height
+correction into the existing shoulder, preserving the native bank and apron.
+Heights, materials, queries, worker snapshots and retirement remain with their
+existing terrain owners. Earlier venue policies retain their existing geometry.
+Sixteen focused source, topology and ownership checks pass. A controlled actual
+compiler/GPU comparison removes a 2.74 m false shoulder mound, with no GL error.
+Native road/contact and visual verification of this correction remains pending.

@@ -1,6 +1,6 @@
 import {createHeightCache} from './height-cache.js';
 import {terrainGridInterval,sampleIndexedTerrainCell} from './world-grid.js';
-import {REVIEWED_CORRIDOR_SUPPORT_METERS} from './reviewed-corridor-policy.js';
+import {REVIEWED_CORRIDOR_SUPPORT_METERS,hasReviewedPavementBoundary} from './reviewed-corridor-policy.js';
 import {BANKED_ROAD_MODEL} from '../physics/road-plane-dynamics.js';
 import { streetSideEdge } from '../world/compiler/street-frontage-policy.js';
 import {
@@ -32,6 +32,20 @@ function reviewedSupportPlane(feature,projected,x,z,surfaceY){
  }
  if(!Number.isFinite(surfaceY))throw Error('reviewed_corridor_plane_unavailable');
  return surfaceY;
+}
+
+function reviewedBoundarySurface(feature,projected,x,z,terrainY,surfaceY,sampleNative){
+ const a=feature.pts[projected.segIndex],b=feature.pts[projected.segIndex+1],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),half=feature.transportSurfaceModel.width/2;
+ if(!(length>1e-8))return surfaceY;
+ const lateral=((x-projected.x)*dz-(z-projected.z)*dx)/length;
+ if(Math.abs(lateral)<=half)return reviewedSupportPlane(feature,projected,x,z,surfaceY);
+ const side=Math.sign(lateral),bx=projected.x+dz/length*half*side,bz=projected.z-dx/length*half*side,
+  edge=sampleFeatureSurfaceY(feature,bx,bz,projected),native=sampleNative(bx,bz);
+ if(!Number.isFinite(edge)||!Number.isFinite(native))throw Error('reviewed_terrain_boundary_ground_unavailable');
+ // Beyond the physical edge retain the actual native bank/apron. Carry only
+ // the boundary correction into its shoulder, rather than extrapolating a
+ // steep road plane several metres above the native ground.
+ return terrainY+edge-native;
 }
 
 // THREE.PlaneGeometry splits each grid cell along the bottom-left to
@@ -183,10 +197,11 @@ function createTerrainHeightSamplingApi(deps = {}) {
         const influenceRadius = gradedEdge + shoulderBlend;
         if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
         const model=feature.transportSurfaceModel,reviewed=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
-        const support=REVIEWED_CORRIDOR_SUPPORT_METERS/(Number(feature.metersPerWorldUnit)||1),fullGradeEdge=reviewed?Math.min(influenceRadius-.001,Math.max(gradedEdge,edge+support)):gradedEdge;
+        const boundary=reviewed&&hasReviewedPavementBoundary(feature),support=REVIEWED_CORRIDOR_SUPPORT_METERS/(Number(feature.metersPerWorldUnit)||1),fullGradeEdge=boundary?edge:reviewed?Math.min(influenceRadius-.001,Math.max(gradedEdge,edge+support)):gradedEdge;
         let surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
         if (!Number.isFinite(surfaceY)) continue;
-        if(reviewed)surfaceY=reviewedSupportPlane(feature,projected,worldX,worldZ,surfaceY);
+        if(boundary)surfaceY=reviewedBoundarySurface(feature,projected,worldX,worldZ,terrainY,surfaceY,(x,z)=>elevationWorldYAtWorldXZ?.(x,z,terrainTileDeps));
+        else if(reviewed)surfaceY=reviewedSupportPlane(feature,projected,worldX,worldZ,surfaceY);
         const targetTerrainY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
         // A depressed engineered approach has an explicit excavation, floor
         // and retaining walls. Blending that floor into the coarse terrain

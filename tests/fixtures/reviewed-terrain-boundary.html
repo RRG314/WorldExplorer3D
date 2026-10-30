@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#9bb2bd;color:#172a2d;font:15px system-ui}canvas{display:block}p{margin:8px}</style>
+<p>Controlled bank and native apron. Right switches the terrain boundary fit.</p>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script type="module">
+import {createTerrainHeightSamplingApi} from '/app/js/terrain/height-sampling.js';
+import {prepareReviewedDetailedTerrainMesh} from '/app/js/terrain/reviewed-detailed-refinement.js';
+import {createRoadBoundaryPartition} from '/app/js/terrain/road-boundary-triangulation.js';
+const x=1750,z=-1400,n=4,native=px=>500+.6*Math.max(-6,Math.min(6,px-x)),venue={sourceFeatureIds:['track']},evidence={sourceFeatureId:'track',surfaceModel:'banked-road-v1',venueSource:venue,terrainEdgePolicy:'fitted-pavement-boundary-v1'},road={sourceFeatureId:'track',sourceNodeIds:[1,2],pts:[{x,z:z-20},{x,z:z+20}],width:12,metersPerWorldUnit:1,surfaceBias:.08,structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:evidence,transportSurfaceModel:{width:12,reviewedSurfacePhase:'accepted',surveyedSurface:{...evidence}}};
+for(const [key,values]of Object.entries({distances:[0,40],pathDistances:[0,40],centerHeights:[500.08,500.08],leftHeights:[496.48,496.48],rightHeights:[503.68,503.68]}))road.transportSurfaceModel[key]=Float64Array.from(values);
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:true});renderer.setSize(800,500);document.body.append(renderer.domElement);const scene=new THREE.Scene();scene.background=new THREE.Color('#9bb2bd');scene.add(new THREE.AmbientLight(0xffffff,.7));const light=new THREE.DirectionalLight(0xffffff,.8);light.position.set(-10,30,20);scene.add(light);const camera=new THREE.PerspectiveCamera(48,1.6,.1,200);camera.position.set(22,17,22);camera.lookAt(0,1,0);const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,side:THREE.DoubleSide}),meshes=[],maximumExcess=[];
+for(const enabled of [false,true]){
+ road.surfaceSurveyEvidence.terrainEdgePolicy=road.transportSurfaceModel.surveyedSurface.terrainEdgePolicy=enabled?'fitted-pavement-boundary-v1':undefined;
+ const grade=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[road]},elevationWorldYAtWorldXZ:native}),positions=[];for(let row=0;row<=n;row++)for(let col=0;col<=n;col++){const px=x-11+col*5.5,pz=z-11+row*5.5;positions.push(px,native(px),pz);}
+ const mesh={position:{x:0,y:0,z:0},geometry:{parameters:{widthSegments:n},attributes:{position:{array:Float32Array.from(positions),count:positions.length/3}}}},staged=await prepareReviewedDetailedTerrainMesh(mesh,{segments:[{a:road.pts[0],b:road.pts[1],innerRadius:14,outerRadius:46}],sampleGround:native,gradeGround:grade.applyStructureTerrainCuts,partitionTriangle:enabled?createRoadBoundaryPartition([road],venue):null});
+ let excess=0;for(let i=0;i<staged.positions.length;i+=3)excess=Math.max(excess,staged.positions[i+1]-native(staged.positions[i]));maximumExcess.push(excess);
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(staged.positions,3));g.setIndex(new THREE.BufferAttribute(staged.indices,1));const colors=[];for(let i=0;i<staged.positions.length;i+=3){const c=new THREE.Color(Math.abs(staged.positions[i]-x)<=6?0x3c4144:0x68785a);colors.push(c.r,c.g,c.b);}g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.computeVertexNormals();const view=new THREE.Mesh(g,material);view.position.set(-x,-500,-z);scene.add(view);meshes.push(view);
+}
+if(!(maximumExcess[0]>1&&maximumExcess[1]<.0001))throw Error('The actual terrain compiler did not remove the controlled shoulder mound');let enabled=true;function draw(){meshes.forEach((m,i)=>m.visible=i===Number(enabled));renderer.render(scene,camera);}addEventListener('keydown',e=>{if(e.code==='ArrowRight'){enabled=!enabled;draw();}});window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({enabled,maximumExcess,glError:renderer.getContext().getError(),programs:renderer.info.programs.length});draw();
+</script>

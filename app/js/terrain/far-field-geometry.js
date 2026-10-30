@@ -10,6 +10,7 @@ import {
 import { yieldToMainThread, yieldToWorldFrame } from '../world/cooperative-scheduling.js?v=1';
 import { createNormalizedTerrainAttribute } from './surface-material-blend.js?v=2';
 import {collectDetailBoundaryLines,detailPointsOnEdge,detailHeightAt,triangleHeightAt} from './detail-boundary.js';
+import {reviewedRoadBoundaryPartition} from './road-boundary-triangulation.js';
 
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -650,7 +651,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       const originalCount=geometry.attributes.position.count,lines=collectDetailBoundaryLines(appCtx.terrainGroup?.children),
         oldGrid={xValues,zValues,worldYs,boundaryTriangles,detailedCoverage:spec.detailedCoverage};
       const active=()=>current()&&appCtx.worldLoadRuntimeState===runtime&&!mesh.userData?.farFieldDisposed;
-      const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:positionData,segments,current:active,yieldWork,
+      const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:positionData,segments,current:active,yieldWork,partitionTriangle:reviewedRoadBoundaryPartition(appCtx),
         edgeStations:[...lines.values()].flatMap(groups=>groups.flat()),
         innerSpacing:REVIEWED_CORRIDOR_INNER_SPACING_METERS*scale,outerSpacing:REVIEWED_CORRIDOR_OUTER_SPACING_METERS*scale,landscapeSpacing:(landscape?.spacingMeters??32)*scale,
         skipCell:c=>cellFullyInsideDetailedCoverage(c.minX,c.maxX,c.minZ,c.maxZ,spec.detailedCoverage),
