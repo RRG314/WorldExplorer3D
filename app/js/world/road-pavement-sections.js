@@ -9,6 +9,10 @@ export function validateRoadPavementSections(profile,{venueId,sourceFeatureId,so
   !/^[a-f0-9]{64}$/.test(profile.observationSha256)||!Array.isArray(nodeIds)||nodeIds.length<2||
   JSON.stringify(profile.nodeIds)!==JSON.stringify(nodeIds)||!Array.isArray(profile.samples)||profile.samples.length<2||profile.samples.length>1000)fail();
  const authoredBank=profile.samples.some(s=>s?.bankAngleDegrees!==undefined),authoredApron=profile.samples.some(s=>s?.apronAngleDegrees!==undefined);
+ const fit=profile.nativePlaneFit;
+ if(fit!==undefined&&(fit?.version!==1||authoredBank||authoredApron||!Number.isFinite(fit.halfWidthMeters)||fit.halfWidthMeters<1.5||fit.halfWidthMeters>3||
+  !Number.isFinite(fit.maximumCoreResidualMeters)||fit.maximumCoreResidualMeters<=0||fit.maximumCoreResidualMeters>.05||
+  !Number.isFinite(fit.maximumEdgeDepartureMeters)||fit.maximumEdgeDepartureMeters<=0||fit.maximumEdgeDepartureMeters>1))fail();
  if(authoredApron&&(!authoredBank||profile.apronInterpretation!=='authored-drainage-plane-native-inner-anchor'))fail();
  if(authoredBank&&(!profile.bankingReference||!/^https:\/\/[A-Za-z0-9.-]+\//.test(profile.bankingReference.url)))fail();
  let previous=-1;
@@ -23,6 +27,7 @@ export function validateRoadPavementSections(profile,{venueId,sourceFeatureId,so
  });
  if(samples[0].segment!==0||samples[0].fraction!==0||samples.at(-1).segment!==nodeIds.length-2||samples.at(-1).fraction!==1)fail();
  return Object.freeze({version:1,venueId,sourceFeatureId,sourceSha256,observationSha256:profile.observationSha256,nodeIds:Object.freeze([...nodeIds]),samples:Object.freeze(samples),
+  ...(fit?{nativePlaneFit:Object.freeze({version:1,halfWidthMeters:fit.halfWidthMeters,maximumCoreResidualMeters:fit.maximumCoreResidualMeters,maximumEdgeDepartureMeters:fit.maximumEdgeDepartureMeters})}:{}),
   ...(authoredApron?{apronInterpretation:profile.apronInterpretation}:{}),
   ...(authoredBank?{bankingReference:Object.freeze({url:profile.bankingReference.url,interpretation:'documented angles; authored transition locations'})}:{})});
 }

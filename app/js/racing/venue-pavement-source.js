@@ -16,6 +16,7 @@ export function annotateReviewedVenuePavementSections(source,artifact,{descripto
   const id=Number(record?.sourceFeatureId?.replace(/^osm:way:/,'')),way=layout.ways.get(id);
   if(!selected.includes(id)||record.sourceFeatureId!==`osm:way:${id}`||profiles.has(id)||record.sourceVersion!==way.version||record.observationSha256!==artifact.observation.sha256)fail();
   const profile=validateRoadPavementSections(record,{venueId:descriptor.id,sourceFeatureId:record.sourceFeatureId,sourceSha256:descriptor.sourceSha256,nodeIds:way.nodes});
+  if(profile.nativePlaneFit&&!pit?.wayIds.includes(id))fail();
   if(profile.samples.some(s=>s.positiveMeters+s.bankNegativeMeters<source.layout.usableWidthMeters))fail();
   profiles.set(id,profile);
  }

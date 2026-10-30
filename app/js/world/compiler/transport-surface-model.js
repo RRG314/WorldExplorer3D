@@ -114,6 +114,9 @@ function validateReviewedSurfaceCrossfall(model) {
   if(model?.surveyedSurface?.pavementProfile&&(!Number.isFinite(model.maximumReviewedPavementDepartureMeters)||
     model.maximumReviewedPavementDepartureMeters>model.surveyedSurface.pavementProfile.maximumAdjustmentMeters))throw Error('reviewed_road_pavement_conflict');
   if(model?.pavementHeightDeltas){
+    const fit=model.surveyedSurface?.pavementSections?.nativePlaneFit;
+    if(fit&&(!Number.isFinite(model.maximumReviewedNativeCoreResidualMeters)||model.maximumReviewedNativeCoreResidualMeters>fit.maximumCoreResidualMeters||
+      !Number.isFinite(model.maximumReviewedNativeEdgeDepartureMeters)||model.maximumReviewedNativeEdgeDepartureMeters>fit.maximumEdgeDepartureMeters))throw Error('reviewed_pavement_native_fit_exceeded');
     if(model.pavementHeightDeltas.length!==model.distances.length*4||model.pavementOffsets?.length!==model.pavementHeightDeltas.length||
       !Number.isFinite(model.maximumReviewedApronCrossfall)||model.maximumReviewedApronCrossfall>.15)throw Error('reviewed_pavement_apron_crossfall_exceeded');
     if(model.pavementCenterBounds?.length!==model.distances.length*2)throw Error('reviewed_pavement_cut_fill_bounds_missing');
@@ -311,6 +314,8 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
         ? BANKED_ROAD_MAXIMUM_GRADE
         : DEFAULT_MAX_GRADE;
   const pavementSections=feature.surfaceSurveyEvidence?.pavementSections;
+  const nativeFit=pavementSections?.nativePlaneFit;
+  if(nativeFit&&!feature.surfaceSurveyEvidence?.venueSource?.pitSourceFeatureIds?.includes(feature.sourceFeatureId))throw Error('reviewed_pavement_native_fit_source_required');
   const pavementCenterReferences=pavementSections?allocate(Float64Array,sampleCount):null;
   const compiledWidth = pavementSections ? feature.surfaceSurveyEvidence.usableWidthMeters/Number(feature.metersPerWorldUnit||1) : Number.isFinite(options.width)
     ? Number(options.width)
@@ -636,10 +641,21 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const rightHeights = edgeStorage.subarray(centerHeights.length);
   leftHeights.set(centerHeights);
   rightHeights.set(centerHeights);
-  let maximumReviewedCrossfall = 0,maximumReviewedPavementDepartureMeters=0;
+  let maximumReviewedCrossfall = 0,maximumReviewedPavementDepartureMeters=0,maximumReviewedNativeCoreResidualMeters=0,maximumReviewedNativeEdgeDepartureMeters=0;
+  const nativeFitSlopes=nativeFit?allocate(Float64Array,sampleCount):null,nativeCore=nativeFit?allocate(Float64Array,9):null;
   if(surfaceSurvey){
     for(let index=0;index<sampleCount;index++){
       let leftDelta=leftGround[index]-groundHeights[index],rightDelta=rightGround[index]-groundHeights[index];
+      if(nativeFit){
+        // Fit only the explicitly reviewed native pit core. The same compiler
+        // publishes this bounded plane; there is no runtime height fallback.
+        const d=sampleDistances[index],p=pointAtDistance(points,pathDistances,d),frame=roadPavementFrameAtDistance(pavementSections,d),unit=Number(feature.metersPerWorldUnit)||1,step=nativeFit.halfWidthMeters/(4*unit);
+        let moment=0;
+        for(let k=0;k<9;k++){const offset=(k-4)*step;nativeCore[k]=sampleTerrainOrThrow(sampleTerrainY,p.x+frame.x*offset,p.z+frame.z*offset)-pavementCenterReferences[index];moment+=offset*nativeCore[k];}
+        const slope=moment/(60*step*step);nativeFitSlopes[index]=slope;
+        for(let k=0;k<9;k++)maximumReviewedNativeCoreResidualMeters=Math.max(maximumReviewedNativeCoreResidualMeters,Math.abs(nativeCore[k]-slope*(k-4)*step)*unit);
+        leftDelta=slope*halfWidth;rightDelta=-slope*halfWidth;
+      }
       const authoredBank=pavementSections?sampleRoadPavementSection(pavementSections,sampleDistances[index]).bankSlope:undefined;
       if(authoredBank!==undefined){leftDelta=authoredBank*halfWidth;rightDelta=-leftDelta;}
       if(reviewedProfile){const crossfall=sampleReviewedDeckProfile(reviewedProfile,sampleDistances[index]/total).crossfall;leftDelta=crossfall*halfWidth;rightDelta=-leftDelta;}
@@ -678,7 +694,8 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     for(let i=0;i<sampleCount;i++){
       const d=sampleDistances[i],section=sampleRoadPavementSection(pavementSections,d),p=pointAtDistance(points,pathDistances,d),frame=roadPavementFrameAtDistance(pavementSections,d),
         rawAt=offset=>sampleTerrainOrThrow(sampleTerrainY,p.x+frame.x*offset,p.z+frame.z*offset)-pavementCenterReferences[i],
-        positions=[-section.negative,-section.bankNegative,0,section.positive],deltas=[section.apronSlope===undefined?rawAt(-section.negative):-section.bankSlope*section.bankNegative-section.apronSlope*(section.negative-section.bankNegative),section.bankSlope===undefined?rawAt(-section.bankNegative):-section.bankSlope*section.bankNegative,0,section.bankSlope===undefined?rawAt(section.positive):section.bankSlope*section.positive];
+        positions=[-section.negative,-section.bankNegative,0,section.positive],deltas=nativeFit?positions.map(offset=>nativeFitSlopes[i]*offset):[section.apronSlope===undefined?rawAt(-section.negative):-section.bankSlope*section.bankNegative-section.apronSlope*(section.negative-section.bankNegative),section.bankSlope===undefined?rawAt(-section.bankNegative):-section.bankSlope*section.bankNegative,0,section.bankSlope===undefined?rawAt(section.positive):section.bankSlope*section.positive];
+      if(nativeFit)for(let k=0;k<4;k++)maximumReviewedNativeEdgeDepartureMeters=Math.max(maximumReviewedNativeEdgeDepartureMeters,Math.abs(deltas[k]-rawAt(positions[k]))*(Number(feature.metersPerWorldUnit)||1));
       pavementOffsets.set(positions,i*4);pavementHeightDeltas.set(deltas,i*4);
       const terrain=positions.map(rawAt).map(y=>y+pavementCenterReferences[i]+surfaceBias);
       pavementCenterBounds.set([Math.max(...terrain.map((y,k)=>y-deltas[k]-maximumAtGradeCut)),Math.min(...terrain.map((y,k)=>y-deltas[k]+maximumAtGradeFill))],i*2);
@@ -702,6 +719,7 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     surveyedSurface:surfaceSurvey?Object.freeze({...surfaceSurvey,...(reviewedDeck?{deckProfile:reviewedDeck}:{}),...(reviewedPavement?{pavementProfile:reviewedPavement}:{})}):null,
     ...(surfaceSurvey ? {maximumReviewedCrossfall,
       reviewedSurfacePhase: options.reviewedSurfacePhase === 'preparation' ? 'preparation' : 'accepted'} : {}),
+    ...(nativeFit?{maximumReviewedNativeCoreResidualMeters,maximumReviewedNativeEdgeDepartureMeters}:{}),
     ...(reviewedPavement?{maximumReviewedPavementDepartureMeters}:{}),
     verticalGroup: String(semantics?.verticalGroup || `${mode}:0`),
     width: halfWidth * 2,

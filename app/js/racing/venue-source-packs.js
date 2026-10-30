@@ -46,7 +46,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  id:'daytona-tri-oval',name:'Daytona International Speedway',anchor:Object.freeze({lat:29.185,lon:-81.071}),
  sourceUrl:'/app/assets/racing/daytona/source.json',sourceSha256:'f0512eb33c8e4101a349d53c52dacc9ae03a7030ebff7585534328dd2f1ec5dc',
  groundArtifactId:'daytona-tri-oval-fine-v3',groundContentSha256:'54ab1fad6a2a80f7f62178ab7d58a2433e386d6360eaea1d583fef1ae0117942',
- reviewedPavementSections:Object.freeze({url:'/app/assets/racing/daytona/pavement-sections-v2.json',contentSha256:'ff0058d63f30e439f8901d5011ddc6347ce2d5766390fb7da7fe86bf2e559a29'}),
+ reviewedPavementSections:Object.freeze({url:'/app/assets/racing/daytona/pavement-sections-v3.json',contentSha256:'07dd9be2492c9cd216c43ab85dc92cb24b9e0293e44c0a69a75b90d14f077d69'}),
  pitWayIds:Object.freeze([352067003,198465568]),raceDiscipline:'oval',
  pavementWidthPolicy:'profiled',surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:1200,routeExtent:'mapped-venue-v1',
  // Original game reference on the retained frontstretch. It is deliberately
