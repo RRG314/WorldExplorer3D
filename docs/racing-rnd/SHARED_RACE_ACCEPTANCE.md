@@ -131,45 +131,33 @@ visual and shared controller on an uploaded bank/apron mesh. These checks do
 not confer finished-venue admission, live deployment or final network release
 acceptance; native full-profile qualification remains a separate boundary.
 
-Full-width qualification exposed an off-centre height discontinuity at graded
-source bends. Profiled pavement now uses shared source-node transects for both
-compiler probes and height lookup; adjoining selected ways derive their end
-transects from the same exact source nodes. This preserves the source path,
-packed height ownership, physical footprint and existing slope/fit bounds.
-A controlled bend reproduced an 8.2 cm jump before repair and passes continuity,
-coordinate round-trip and terrain agreement checks after repair. The pinned
-curved-section GPU comparison was inspected with no WebGL error. Native
-full-width qualification remains a separate required check; the failed capture
-is retained and does not count as venue acceptance.
+Profiled pavement uses shared source-node transects for compiler probes and
+height lookup. Adjoining selected ways derive their end transects from the same
+pinned nodes. Their connected continuations own grading beyond those transects,
+so an old end plane cannot flatten the next banking transition. Terrain
+construction shares equivalent existing vertices within publication precision
+and splits each incident face at every logical edge station. The source line,
+packed height owner and physical footprint remain intact.
 
-The subsequent native capture still failed full-width admission and exposed a
-second discontinuity: partitioned terrain neighbours did not always share an
-inserted edge vertex. Profiled bank/apron terrain now conforms those edges using
-the existing Float32 coordinates and compiled heights before pavement support is
-published. Original limits, other terrain paths and ordinary roads are retained.
-Both retained native knee witnesses pass through actual terrain and pavement
-compilation, with contact-height variation below 0.1 mm across the sampled
-20-micrometre interval. Focused topology, capacity, cancellation and unchanged
-boundary checks pass; the rendered curved-section comparison was inspected.
-These repairs still require whole-venue full-width qualification.
+Variable-width export collapses common knots at each row's actual boundary.
+The unraised profiled class fits on the existing canonical coordinate/height
+grid, retaining the 3 mm measured error budget, 32-point limit and crossfall
+fence. Centre and wheel witnesses retain canonical precision. A bounded grid
+search resolves rounding allocations at narrow patches; a larger discontinuity
+rejects. Ordinary roads and earlier banked/raised-edge fitting retain their
+existing paths.
 
-A larger native load exposed clustered partition cuts at floating-point
-precision. The construction pass now ignores unused vertices, shares one existing
-vertex for equivalent coordinates, and removes only collapsed faces. A merged
-height must remain within the existing 3 mm publication-fit budget; a conflicting
-surface rejects. The captured clustered polygon, both native knee contacts,
-terrain/worker/contact boundaries and two complete source-layout topology grid
-phases pass 22 affected checks. The full-layout topology cases use explicit zero
-heights and do not claim native height acceptance. The latest curved-section GPU
-comparison was inspected with no WebGL error. Native admission remains pending.
+Focused regressions cover the original 8.2 cm graded-bend jump, retained native
+knee and clustered-cut witnesses, connected-bank grading ownership, variable
+bounds, and slope preservation through canonicalisation. Thirty selected checks
+pass. Complete layout topology cases use explicit zero heights. Inspected GPU
+checks cover the curved pavement and a licensed M3 using the shared racing
+controller on the exported apron; these remain controlled component evidence.
 
-The next full-width capture still rejected spans and retained a rounded-edge
-height jump. A retained native triangle now verifies direct face splitting at
-every logical edge station: no old face may bypass the inserted knee beside a
-thin ear. Complete topology grid phases and native knee witnesses pass. A
-separate export regression demonstrated a wide station extending a narrower row
-by 2.1 m. Variable-width profiles now clamp common knots to each row's actual
-physical bounds, retaining common topology and the original fit/point limits.
-The affected profile/shared-physics cases pass and the curved render was
-inspected again. These are component repairs; native full-width admission is
-still pending, and no venue pack is complete.
+The latest actual native boundary drive used continuously held acceleration and
+braking through the repaired knee. It retained four wheel contacts and zero
+penetration over 19.3 world units; maximum rigid-body wheel gap at the crease was
+0.06153 world units (68.3 mm). Both views were inspected. The
+last whole-width capture still failed seven height profiles and eight capacity
+checks. The current connected-end and canonical-grid repairs require native
+qualification. No major venue pack or final moving-performance budget is accepted.

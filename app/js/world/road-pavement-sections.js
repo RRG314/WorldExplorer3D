@@ -43,7 +43,7 @@ export function roadPavementSectionsInWorld(profile,points,metersPerWorldUnit,{g
   if(![world?.x,world?.z].every(Number.isFinite))throw Error('reviewed_pavement_coordinates_invalid');continuations[side]=world;
  }
  const {geographicContinuations,...evidence}=profile;
- return Object.freeze({...evidence,coordinateSpace:'world',metersPerWorldUnit,nodeDistances:Object.freeze(distances),nodeFrames:roadPavementNodeFrames(points,continuations),samples:Object.freeze(samples),length:distances.at(-1),maximumExtent:Math.max(...samples.map(s=>Math.max(s.positive,s.negative)))});
+ return Object.freeze({...evidence,coordinateSpace:'world',metersPerWorldUnit,nodeDistances:Object.freeze(distances),nodeFrames:roadPavementNodeFrames(points,continuations),...(geographicContinuations?{connectedEnds:Object.freeze({start:!!continuations.start,end:!!continuations.end})}:{}),samples:Object.freeze(samples),length:distances.at(-1),maximumExtent:Math.max(...samples.map(s=>Math.max(s.positive,s.negative)))});
 }
 
 export function sampleRoadPavementSection(profile,distance){

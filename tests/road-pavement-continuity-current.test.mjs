@@ -51,3 +51,16 @@ test('swept coordinates round-trip the full asymmetric section, including adjoin
  assert.ok(Math.abs(pa.pavementAlongResidual)<1e-9);assert.ok(Math.abs(pb.pavementAlongResidual)<1e-9);
  assert.ok(Math.abs(pa.pavementLateral-pb.pavementLateral)<1e-9);
 });
+
+test('a connected source end cannot grade its old plane over the next way’s banking transition',()=>{
+ const bank=z=>Math.tan((3+28*Math.max(0,Math.min(1,(z-100)/40)))*Math.PI/180),native=(x,z)=>100+bank(z)*(6-Math.min(x,6))+apron*(15-Math.max(6,x));
+ function road(id,start,end,angles,continuations){
+  const pts=[{x:0,z:start},{x:0,z:end}],binding={venueId:'controlled-oval',sourceFeatureId:`osm:way:${id}`,sourceSha256:'a'.repeat(64),nodeIds:[id,id+1]},raw={version:1,...binding,observationSha256:'b'.repeat(64),bankingReference:{url:'https://www.nascar.com/gallery/inside-look-at-all-isc-tracks/'},apronInterpretation:'authored-drainage-plane-native-inner-anchor',samples:angles.map(([fraction,bankAngleDegrees])=>({segment:0,fraction,positiveMeters:4,negativeMeters:15,bankNegativeMeters:6,bankAngleDegrees,apronAngleDegrees:1.5}))},profile=roadPavementSectionsInWorld({...validateRoadPavementSections(raw,binding),geographicContinuations:continuations},pts,1,{geoToWorld:(lat,lon)=>({x:lon,z:lat})}),feature={sourceFeatureId:binding.sourceFeatureId,pts,width:19,surfaceBias:.18,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:{version:1,venueId:binding.venueId,sourceFeatureId:binding.sourceFeatureId,surfaceModel:'banked-road-v1',maximumCrossfall:.7,usableWidthMeters:6,groundArtifactId:'controlled-native',groundContentSha256:'c'.repeat(64),pavementSections:profile,terrainEdgePolicy:'fitted-pavement-boundary-v1'},transportRecord:{crossSection:{widthMeters:19,pavementSections:profile}}};
+  attachCompiledTransportSurface(feature,compileTransportSurfaceModel(feature,native,{surfaceBias:.18,sampleStep:2}));return feature;
+ }
+ const first=road(11,0,100,[[0,3],[1,3]],{end:{lat:200,lon:0}}),second=road(12,100,200,[[0,3],[.4,31],[1,31]],{start:{lat:0,lon:0}}),grade=roads=>createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:roads},elevationWorldYAtWorldXZ:native}).applyStructureTerrainCuts,
+  joined=grade([first,second]),nextOnly=grade([second]),openFirst={...first,transportRecord:{crossSection:{...first.transportRecord.crossSection,pavementSections:{...first.transportRecord.crossSection.pavementSections,connectedEnds:undefined}}}},old=grade([openFirst,second]);
+ assert.deepEqual(first.transportRecord.crossSection.pavementSections.connectedEnds,{start:false,end:true});
+ for(const z of [102,105,110])for(const x of [-3,0,6,12])assert.ok(Math.abs(joined(x,z,native(x,z))-nextOnly(x,z,native(x,z)))<1e-10,'the actual continuation alone owns its side of the source transect');
+ assert.ok(Math.abs(old(-3,105,native(-3,105))-nextOnly(-3,105,native(-3,105)))>.05,'the old extrapolated end plane reproduces the transition distortion');
+});

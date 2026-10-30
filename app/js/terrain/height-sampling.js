@@ -184,6 +184,15 @@ function createTerrainHeightSamplingApi(deps = {}) {
         : projectPointToFeature(feature,worldX,worldZ);
       const projected=projectRoadPavementPoint(feature,worldX,worldZ,nearest);
       if (!projected) continue;
+      const connectedEnds=feature.transportRecord?.crossSection?.pavementSections?.connectedEnds;
+      if(connectedEnds&&feature.transportSurfaceModel?.reviewedSurfacePhase==='accepted'){
+        // The privately bound continuation owns the other side of this
+        // common transect. Extending an old end plane into the next bank
+        // blended different transition angles across the real pavement.
+        const along=projected.pavementAlongResidual;
+        if(connectedEnds.start&&projected.segIndex===0&&projected.t===0&&along< -1e-7||
+          connectedEnds.end&&projected.segIndex===feature.pts.length-2&&projected.t===1&&along>1e-7)continue;
+      }
 
       if (feature?.structureSemantics?.terrainMode === 'at_grade') {
         const width = roadWidthAtProjection(feature, projected);

@@ -30,7 +30,7 @@ test('the complete changed Daytona bank/apron fits the shared compiler and every
  for(let i=0;i<features.length;i++){
   const a=features[i].transportRecord.crossSection.pavementSections,b=features[(i+1)%features.length].transportRecord.crossSection.pavementSections;
   assert.deepEqual(a.nodeFrames.at(-1),b.nodeFrames[0],'exact adjoining source ways share one lateral transect');
-  assert.equal(a.geographicContinuations,undefined,'the world DTO retains only converted coordinates');
+  assert.equal(a.geographicContinuations,undefined,'the world DTO retains only converted coordinates');assert.deepEqual(a.connectedEnds,{start:true,end:true});
  }
  // Final graph reconciliation cannot evade the physical cross-section's
  // existing cut/fill envelope by moving only its source-centre profile.

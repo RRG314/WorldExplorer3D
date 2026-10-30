@@ -1,8 +1,60 @@
+import {BANKED_ROAD_MAXIMUM_CROSSFALL} from '../physics/road-plane-dynamics.js';
+
 const valueAt=(points,offset,field='y')=>{
  let i=1;while(i<points.length-1&&offset>points[i].offsetMeters)i++;
  const a=points[i-1],b=points[i],span=b.offsetMeters-a.offsetMeters;
  return span>1e-10?a[field]+(b[field]-a[field])*(offset-a.offsetMeters)/span:a[field];
 };
+// Fit only the new unraised physical pavement class, inside its existing
+// measured error budget. Centre and wheel witnesses retain their canonical precision. Interval
+// propagation rejects an unrepresentable surface rather than raising a slope
+// limit or hiding a larger discontinuity behind another height source.
+const canonicalOffset=(n,m)=>Math.round(n*m*1000)/(m*1000);
+function constrainPavementProfile(points,section,metersPerUnit,maximumErrorMeters){
+ const scale=metersPerUnit*10000,error=maximumErrorMeters*(1-1e-6)/metersPerUnit,
+  anchors=section.fixed.map(n=>canonicalOffset(n,metersPerUnit)),targets=points.map(p=>Math.round(p.y*scale)),
+  lower=points.map((p,i)=>anchors.includes(p.offsetMeters)?targets[i]:Math.ceil((p.y-error)*scale)),
+  upper=points.map((p,i)=>anchors.includes(p.offsetMeters)?targets[i]:Math.floor((p.y+error)*scale)),
+  steps=points.map((p,i)=>i?Math.floor((p.offsetMeters-points[i-1].offsetMeters)*BANKED_ROAD_MAXIMUM_CROSSFALL*10000+1e-9):0);
+ const valid=i=>{if(lower[i]>upper[i])throw Error('race_edge_profile_fidelity');};
+ for(let i=0;i<points.length;i++)valid(i);
+ for(let i=1;i<points.length;i++){lower[i]=Math.max(lower[i],lower[i-1]-steps[i]);upper[i]=Math.min(upper[i],upper[i-1]+steps[i]);valid(i);}
+ for(let i=points.length-2;i>=0;i--){lower[i]=Math.max(lower[i],lower[i+1]-steps[i+1]);upper[i]=Math.min(upper[i],upper[i+1]+steps[i+1]);valid(i);}
+ let previous;
+ for(let i=0;i<points.length;i++){
+  const lo=i?Math.max(lower[i],previous-steps[i]):lower[i],hi=i?Math.min(upper[i],previous+steps[i]):upper[i];
+  previous=Math.max(lo,Math.min(hi,targets[i]));points[i].y=previous/scale;
+ }
+ return points;
+}
+// A near-limit patch can need a different allocation of the same rounding
+// budget. Search only the bounded canonical height grid at the current knots.
+// Each transition checks every original triangle breakpoint in that interval.
+function fitPavementRounding(points,section,metersPerUnit,maximumErrorMeters){
+ const scale=metersPerUnit*10000,error=maximumErrorMeters*(1-1e-6)*10000,anchors=section.fixed.map(n=>canonicalOffset(n,metersPerUnit)),
+  offsets=[...new Set(points.map(p=>p.offsetMeters))],targets=offsets.map(x=>valueAt(section.points,x)*scale),
+  low=targets.map((y,i)=>anchors.includes(offsets[i])?Math.round(y):Math.ceil(y-error)),
+  high=targets.map((y,i)=>anchors.includes(offsets[i])?Math.round(y):Math.floor(y+error)),intervals=offsets.map(()=>[]),layers=[];
+ for(const p of section.points){let i=1;while(i<offsets.length-1&&p.offsetMeters>offsets[i])i++;intervals[i].push(p);}
+ layers.push(Array.from({length:Math.max(0,high[0]-low[0]+1)},(_,i)=>({height:low[0]+i,parent:-1})).sort((a,b)=>Math.abs(a.height-targets[0])-Math.abs(b.height-targets[0])));
+ for(let i=1;i<offsets.length;i++){
+  const previous=layers[i-1],states=new Map(),width=offsets[i]-offsets[i-1],delta=Math.floor(width*BANKED_ROAD_MAXIMUM_CROSSFALL*10000+1e-9);
+  for(let parent=0;parent<previous.length;parent++){
+   const height=previous[parent].height;let lo=Math.max(low[i],height-delta),hi=Math.min(high[i],height+delta);
+   for(const point of intervals[i]){
+    const t=(point.offsetMeters-offsets[i-1])/width,target=point.y*scale;
+    if(Math.abs(t)<1e-12){if(Math.abs(height-target)>error){lo=1;hi=0;break;}continue;}
+    const a=(target-error-(1-t)*height)/t,b=(target+error-(1-t)*height)/t;
+    lo=Math.max(lo,Math.ceil(Math.min(a,b)-1e-9));hi=Math.min(hi,Math.floor(Math.max(a,b)+1e-9));
+    if(lo>hi)break;
+   }
+   for(let height=lo;height<=hi;height++)if(!states.has(height))states.set(height,{height,parent});
+  }
+  const next=[...states.values()].sort((a,b)=>Math.abs(a.height-targets[i])-Math.abs(b.height-targets[i]));if(!next.length)return null;layers.push(next);
+ }
+ const values=new Map();let index=0;for(let i=layers.length-1;i>=0;i--){const state=layers[i][index];values.set(offsets[i],state.height/scale);index=state.parent;}
+ return points.map(p=>({...p,y:values.get(p.offsetMeters)}));
+}
 // Temporary qualification data comes only from existing uploaded triangles.
 // The finished course retains a common bounded set of lateral stations; arbitrary
 // per-row simplification must not connect unrelated terrain creases diagonally.
@@ -28,10 +80,19 @@ export function compilePublishedLateralProfiles(sections,metersPerUnit,{maximumP
  // Keep common topology while a physical apron narrows. A crease from a
  // wider row collapses at this row's real boundary, rather than publishing
  // extrapolated pavement outside the uploaded surface.
- const profiles=()=>sections.map(s=>[...fixed.map(n=>s.boundsMeters?Math.max(s.boundsMeters.minimumMeters,Math.min(s.boundsMeters.maximumMeters,n)):n),...s.edgeKnots].sort((a,b)=>a-b).map(offsetMeters=>({offsetMeters,y:valueAt(s.points,offsetMeters),...(hasBase?{baseY:valueAt(s.points,offsetMeters,'baseY')}:{})})));
+ const profiles=()=>sections.map(s=>{
+  const offsets=[...fixed.map(n=>s.boundsMeters?Math.max(s.boundsMeters.minimumMeters,Math.min(s.boundsMeters.maximumMeters,n)):n),...s.edgeKnots],points=(s.boundsMeters&&!hasBase?offsets.map(n=>canonicalOffset(n,metersPerUnit)):offsets).sort((a,b)=>a-b).map(offsetMeters=>({offsetMeters,y:valueAt(s.points,offsetMeters),...(hasBase?{baseY:valueAt(s.points,offsetMeters,'baseY')}:{})}));
+  return s.boundsMeters&&!hasBase?constrainPavementProfile(points,s,metersPerUnit,maximumErrorMeters):points;
+ });
  for(;;){
-  const rows=profiles();let worst=null;
-  for(let i=0;i<sections.length;i++)for(const point of sections[i].points){const error=Math.max(Math.abs(valueAt(rows[i],point.offsetMeters)-point.y),hasBase?Math.abs(valueAt(rows[i],point.offsetMeters,'baseY')-point.baseY):0)*metersPerUnit;if(!worst||error>worst.error)worst={error,offset:point.offsetMeters};}
+  const rows=profiles(),retried=new Set();let worst;
+  for(;;){
+   worst=null;
+   for(let i=0;i<sections.length;i++)for(const point of sections[i].points){const error=Math.max(Math.abs(valueAt(rows[i],point.offsetMeters)-point.y),hasBase?Math.abs(valueAt(rows[i],point.offsetMeters,'baseY')-point.baseY):0)*metersPerUnit;if(!worst||error>worst.error)worst={error,offset:point.offsetMeters,row:i};}
+   if(worst.error<=maximumErrorMeters||!sections[worst.row].boundsMeters||hasBase||retried.has(worst.row)||
+     fixed.length+knots<maximumPoints&&!fixed.some(n=>canonicalOffset(n,metersPerUnit)===canonicalOffset(worst.offset,metersPerUnit)))break;
+   retried.add(worst.row);const adjusted=fitPavementRounding(rows[worst.row],sections[worst.row],metersPerUnit,maximumErrorMeters);if(!adjusted)break;rows[worst.row]=adjusted;
+  }
   if(worst.error<=maximumErrorMeters)return {profiles:rows,maximumErrorMeters:worst.error};
   if(fixed.length+knots>=maximumPoints||fixed.some(n=>Math.abs(n-worst.offset)<1e-7))throw Error('race_edge_profile_capacity');
   fixed.push(worst.offset);fixed.sort((a,b)=>a-b);

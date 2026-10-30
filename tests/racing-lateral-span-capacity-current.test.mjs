@@ -25,6 +25,20 @@ test('common knots cannot extend a variable-width published profile beyond a nar
  for(let i=0;i<raw.length;i++){assert.equal(compiled.profiles[i][0].offsetMeters,[-3,-4][i]);assert.equal(compiled.profiles[i].at(-1).offsetMeters,[15,12][i]);}
  assert.equal(compiled.profiles[0].length,compiled.profiles[1].length);assert.ok(compiled.maximumErrorMeters<=.003);
 });
+test('a profiled pavement fit respects both the existing crossfall and measured three-millimetre fidelity bounds',()=>{
+ const offsets=[-3,-1.2,0,1.2,6,6.02,6.025,6.1,15],surface=x=>10-.6*Math.min(x,6)-.026*Math.max(0,x-6),section={fixed:[-1.2,0,1.2],edgeKnots:[-3,6,15],boundsMeters:{minimumMeters:-3,maximumMeters:15},points:offsets.map(offsetMeters=>({offsetMeters,y:surface(offsetMeters)+(offsetMeters===6.02?.0035:offsetMeters===6.025?-.0035:0)}))},before=JSON.stringify(section),fit=compilePublishedLateralProfiles([section],1),p=fit.profiles[0];
+ assert.ok(fit.maximumErrorMeters<=.003);for(let i=1;i<p.length;i++)if(p[i].offsetMeters>p[i-1].offsetMeters)assert.ok(Math.abs(p[i].y-p[i-1].y)/(p[i].offsetMeters-p[i-1].offsetMeters)<=.7+1e-8);
+ for(const anchor of section.fixed)assert.equal(p.find(p=>p.offsetMeters===anchor).y,surface(anchor));
+ assert.equal(JSON.stringify(section),before);
+ const bad=structuredClone(section);bad.points.find(p=>p.offsetMeters===6.02).y+=.03;assert.throws(()=>compilePublishedLateralProfiles([bad],1),/fidelity/,'an actual large discontinuity cannot be fitted away');
+});
+test('the profiled fit survives canonical coordinate rounding without steepening a valid narrow patch',async()=>{
+ const {canonicalRaceDistrict}=await import('../app/js/racing/district-facts.js');
+ for(const m of [1,1.11,2])for(const offset of [6.02,6.041,6.046]){
+  const base=x=>(10-.6*Math.min(x,6)-.026*Math.max(0,x-6))/m,section={fixed:[-1.2,0,1.2],edgeKnots:[-3,6,15],boundsMeters:{minimumMeters:-3,maximumMeters:15},points:[-3,-1.2,0,1.2,6,offset,offset+.005,6.1,15].map(offsetMeters=>({offsetMeters,y:base(offsetMeters)+(offsetMeters===offset?.0035/m:offsetMeters===offset+.005?-.0035/m:0)}))},fit=compilePublishedLateralProfiles([section],m),row=t=>({t,y:base(0),leftY:base(-1.2),rightY:base(1.2),racingOffsetMeters:0,lateralSamples:fit.profiles[0]}),road={sourceId:'controlled',sourceFeatureId:'controlled',a:{x:0,y:base(0),z:0},b:{x:0,y:base(0),z:40},widthMeters:18,surfaceModel:'banked-road-v1',pavementModel:'profiled-road-pavement-v1',racingWidthMeters:6,heightSampleSpanMeters:1.2,heightSamples:[row(0),row(1)],structure:'surface',direction:'forward',driveable:true,supported:true},facts={type:'RaceDistrictFacts',version:1,roads:[road],anchor:{lat:50,lon:7},metersPerUnit:m};
+  assert.ok(fit.maximumErrorMeters<=.003);const canonical=canonicalRaceDistrict(facts);assert.deepEqual(canonicalRaceDistrict(canonical),canonical);
+ }
+});
 
 test('the normal collector partitions a complex published base without losing source order or graph continuity',async()=>{
  const {collectRaceDistrict}=await import('../app/js/racing/world-course-source.js'),{buildRaceRoadGraph,sampleRaceSegmentY}=await import('../app/js/racing/course-rules.js');
