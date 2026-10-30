@@ -2,6 +2,9 @@ import {canOwnRoadRace} from './road-activity-controller.js';
 import {createRaceVehicleProfile,stepRaceVehicle,snapshotRaceVehicle,raceVehicleGroundPose} from './vehicle-controller.js';
 import {racePhysicsVersion} from './record-rules.js';
 import {raceFormationActions} from './ai-controller.js';
+import {projectRacePosition} from './course-rules.js';
+import {ovalTrackZone,ovalPaceActions} from './oval-rules.js';
+import {raceVehicleSpeedMetersPerSecond} from './vehicle-controller.js';
 const stopped=state=>({...state,speed:0,vFwd:0,vLat:0,vx:0,vz:0,yawRate:0,steerAngle:0,steerSm:0,rearSlip:0,throttleSm:0,engineLoad:0,engineRpm:850,driveGear:1,shiftTime:0,driftAngle:0,isDrifting:false});
 export function raceNetworkProfile(configuration,course){
  if(configuration?.physicsVersion!==racePhysicsVersion(course))throw Error('race_physics_version_changed');
@@ -31,7 +34,10 @@ export function createNetworkRaceController({context,course,connection,uid,isAdm
    if(latest.phase==='complete'&&latest.settlement==='saved'&&!completed){completed=true;onComplete(latest);}
    if(player.progress?.finished||player.dnf||!connection.connected()||connection.isFresh?.()===false||!['running','countdown'].includes(latest.phase))return stopped(frame);
    connection.control(actions);
-   if(latest.phase==='running')stepRaceVehicle(course,frame,actions,dt,profile);
+   if(latest.phase==='running'){
+    const controls=course.discipline==='oval'?ovalPaceActions(actions,raceVehicleSpeedMetersPerSecond(frame),latest.raceControl?.flag==='yellow'||ovalTrackZone(projectRacePosition(course,raceVehicleGroundPose(frame)))==='apron'):actions;
+    stepRaceVehicle(course,frame,controls,dt,profile);
+   }
    else if(course.discipline==='oval')stepRaceVehicle(course,frame,raceFormationActions(course,frame,player.progress,profile,player.slot),dt,profile);
    return snapshotRaceVehicle(frame);
   },snapshot:()=>connection.snapshot(),presentationSnapshot(){

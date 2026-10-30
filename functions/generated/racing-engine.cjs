@@ -1439,6 +1439,25 @@ function racePavementCrossSection(segment, t) {
 var OVAL_FORMATION_DURATION_MS = 4e3;
 var OVAL_PACE_METERS_PER_SECOND = 10;
 var OVAL_FORMATION_DISTANCE_METERS = OVAL_PACE_METERS_PER_SECOND * OVAL_FORMATION_DURATION_MS / 1e3;
+var OVAL_CAUTION_DURATION_MS = 5e3;
+var OVAL_ORDER_PENALTY_MS = 5e3;
+var OVAL_MERGE_CLEARANCE_METERS = 10;
+function ovalTrackZone(projection) {
+  const p = projection?.pavement, l = projection?.lateralMeters;
+  if (!p || !Number.isFinite(l)) return "outside";
+  const low = p.racingOffsetMeters - p.racingWidthMeters / 2, high = p.racingOffsetMeters + p.racingWidthMeters / 2;
+  if (l >= low && l <= high) return "bank";
+  if (l < p.minimumMeters || l > p.maximumMeters) return "outside";
+  const innerPositive = p.maximumMeters - high > low - p.minimumMeters;
+  return (innerPositive ? l > high : l < low) ? "apron" : "outside";
+}
+function ovalPaceActions(actions, speedMetersPerSecond, restricted) {
+  if (!restricted || Math.abs(speedMetersPerSecond) <= OVAL_PACE_METERS_PER_SECOND) return actions;
+  return { ...actions, throttle: 0, reverse: 0, serviceBrake: Math.max(actions.serviceBrake || 0, Math.min(1, (Math.abs(speedMetersPerSecond) - OVAL_PACE_METERS_PER_SECOND) * 0.35)) };
+}
+function ovalDistanceGap(from, to, length) {
+  return (to - from + length * 1.5) % length - length / 2;
+}
 
 // app/js/world/road-units.js
 var ROAD_SOURCE_MINIMUM_SPAN_METERS = 0.01;
@@ -3850,7 +3869,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
   if (!Number.isFinite(maximumDurationMs) || maximumDurationMs <= 0 || maximumDurationMs > allowedDurationMs) throw Error("invalid_race_duration");
   course = prepareRaceCourseGeometry(structuredClone(course));
   const rolling = course.discipline === "oval", players = /* @__PURE__ */ new Map();
-  let phase = "lobby", leaderUid = creatorUid, startAtMs = null, tick = 0, formationTick = 0, formationComplete = false, lastNow = createdAtMs, completedAtMs = null, reason = "", outcomeEmitted = false;
+  let phase = "lobby", leaderUid = creatorUid, startAtMs = null, tick = 0, formationTick = 0, formationComplete = false, lastNow = createdAtMs, completedAtMs = null, reason = "", outcomeEmitted = false, cautionUntilMs = 0;
   const activeHumans = () => [...players.values()].filter((p) => !p.ai && !p.left);
   function participant(uid) {
     const p = players.get(uid);
@@ -3882,7 +3901,11 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       lastControlAt: -Infinity,
       disconnectedAt: null,
       left: false,
-      dnf: false
+      dnf: false,
+      ovalZone: null,
+      ovalRestricted: false,
+      ovalPassed: /* @__PURE__ */ new Set(),
+      ovalPenaltyReason: null
     };
     players.set(uid, p);
     for (const other of players.values()) if (!other.ai) other.ready = false;
@@ -3929,11 +3952,15 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     p.queue.push({ actions: normalized, at: receivedAtMs });
     return true;
   }
+  function caution(nowMs) {
+    if (rolling && phase === "running") cautionUntilMs = Math.max(cautionUntilMs, nowMs + OVAL_CAUTION_DURATION_MS);
+  }
   function disconnect(uid, nowMs) {
     const p = participant(uid);
     if (p.ai) return;
     p.disconnectedAt = nowMs;
     if (phase === "lobby") p.ready = false;
+    else if (!p.dnf && !p.progress?.finished) caution(Math.max(lastNow, nowMs));
     p.queue = [];
     p.actions = NEUTRAL;
   }
@@ -3959,6 +3986,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     } else {
       p.left = true;
       p.dnf = !p.progress?.finished;
+      if (p.dnf) caution(Math.max(lastNow, nowMs));
       p.queue = [];
       p.actions = NEUTRAL;
       p.disconnectedAt = nowMs;
@@ -3974,6 +4002,45 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
         outcomeEmitted = true;
         onComplete(snapshot());
       }
+    }
+  }
+  function ovalPositions() {
+    return new Map([...players.values()].filter((p) => !p.dnf && !p.progress.finished).map((p) => {
+      const projection = projectRacePosition(course, raceVehicleGroundPose(p.car));
+      return [p.uid, { projection, zone: ovalTrackZone(projection), speed: Math.abs(raceVehicleSpeedMetersPerSecond(p.car)), contacts: p.car.barrierContacts }];
+    }));
+  }
+  function ovalPenalty(p, why) {
+    p.ovalPenaltyReason = why;
+    p.progress = {
+      ...p.progress,
+      penaltyMs: p.progress.penaltyMs + OVAL_ORDER_PENALTY_MS,
+      ...p.progress.finished ? { elapsedMs: p.progress.elapsedMs + OVAL_ORDER_PENALTY_MS } : {}
+    };
+  }
+  function enforceOvalOrder(before, after, yellow) {
+    for (const [uid, a] of after) {
+      const p = players.get(uid), b = before.get(uid);
+      p.ovalZone = a.zone;
+      const restricted = yellow || b.zone === "apron" || a.zone === "apron";
+      if (!restricted) {
+        p.ovalRestricted = false;
+        p.ovalPassed.clear();
+        continue;
+      }
+      if (!p.ovalRestricted) p.ovalPassed.clear();
+      p.ovalRestricted = true;
+      for (const [otherUid, other] of after) {
+        if (uid === otherUid || !a.projection || !other.projection || !b.projection) continue;
+        const previous = before.get(otherUid)?.projection;
+        if (!previous) continue;
+        const gap = ovalDistanceGap(a.projection.distanceMeters, other.projection.distanceMeters, course.lengthMeters), oldGap = ovalDistanceGap(b.projection.distanceMeters, previous.distanceMeters, course.lengthMeters);
+        if (oldGap >= 0 && oldGap < 40 && gap < 0 && !p.ovalPassed.has(otherUid)) {
+          p.ovalPassed.add(otherUid);
+          ovalPenalty(p, yellow ? "passing-under-yellow" : "passing-on-apron");
+        }
+      }
+      if (b.zone === "apron" && a.zone === "bank" && [...after].some(([otherUid, other]) => otherUid !== uid && other.zone === "bank" && a.projection && other.projection && Math.abs(ovalDistanceGap(a.projection.distanceMeters, other.projection.distanceMeters, course.lengthMeters)) < OVAL_MERGE_CLEARANCE_METERS)) ovalPenalty(p, "unsafe-apron-merge");
     }
   }
   function advance(nowMs) {
@@ -4023,7 +4090,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     }
     while (tick < targetTick) {
       tick++;
-      const frameAt = startAtMs + tick * STEP_MS;
+      const frameAt = startAtMs + tick * STEP_MS, yellow = rolling && frameAt < cautionUntilMs, before = rolling ? ovalPositions() : null;
       for (const p of players.values()) {
         if (p.dnf || p.progress.finished) continue;
         if (p.disconnectedAt !== null && frameAt - p.disconnectedAt > 1e4) {
@@ -4035,10 +4102,20 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           p.actions = command.actions;
           p.lastControlAt = command.at;
         }
-        const actions = p.ai ? raceAiActions(course, p.car, p.progress, p.profile, { difficulty: p.difficulty, ...rolling ? { laneOffsetMeters: course.participants === 1 ? 0 : p.slot % 2 === 0 ? -1.4 : 1.4 } : {} }) : p.disconnectedAt !== null || frameAt - p.lastControlAt > 400 ? NEUTRAL : p.actions;
+        let actions = p.ai ? raceAiActions(course, p.car, p.progress, p.profile, { difficulty: p.difficulty, ...rolling ? { laneOffsetMeters: course.participants === 1 ? 0 : p.slot % 2 === 0 ? -1.4 : 1.4, ...yellow ? { formation: true, paceMetersPerSecond: OVAL_PACE_METERS_PER_SECOND } : {} } : {} }) : p.disconnectedAt !== null || frameAt - p.lastControlAt > 400 ? NEUTRAL : p.actions;
+        if (rolling) actions = ovalPaceActions(actions, before.get(p.uid).speed, yellow || before.get(p.uid).zone === "apron");
         p.previousFrame = snapshotRaceVehicle(p.car);
         stepRaceVehicle(course, p.car, actions, 1 / 60, p.profile);
         p.progress = advanceRaceProgress(course, p.progress, raceVehicleGroundPose(p.car), frameAt, { startedAtMs: startAtMs });
+      }
+      if (rolling) {
+        const after = ovalPositions();
+        for (const [uid] of before) if (!after.has(uid) && players.get(uid).progress.finished) {
+          const p = players.get(uid), projection = projectRacePosition(course, raceVehicleGroundPose(p.car));
+          after.set(uid, { projection, zone: ovalTrackZone(projection), speed: Math.abs(raceVehicleSpeedMetersPerSecond(p.car)), contacts: p.car.barrierContacts });
+        }
+        enforceOvalOrder(before, after, yellow);
+        if ([...after].some(([uid, a]) => a.contacts > before.get(uid).contacts && before.get(uid).speed > 5)) caution(frameAt);
       }
       finishIfComplete(frameAt);
       if (phase === "complete") break;
@@ -4063,7 +4140,11 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       serverAtMs: lastNow,
       simulationAtMs: startAtMs === null ? null : rolling && !formationComplete ? startAtMs - FORMATION_MS + formationTick * STEP_MS : startAtMs + tick * STEP_MS,
       completedAtMs,
-      ...rolling ? { raceControl: { start: "rolling", flag: phase === "countdown" ? "formation" : phase === "complete" ? "chequered" : "green", paceMetersPerSecond: OVAL_PACE_METERS_PER_SECOND } } : {},
+      ...rolling ? { raceControl: {
+        start: "rolling",
+        flag: phase === "countdown" ? "formation" : phase === "complete" ? "chequered" : phase === "cancelled" ? "red" : startAtMs !== null && startAtMs + tick * STEP_MS < cautionUntilMs ? "yellow" : [...players.values()].some((p) => p.progress?.lap >= course.laps) ? "white" : "green",
+        paceMetersPerSecond: phase === "countdown" || startAtMs !== null && startAtMs + tick * STEP_MS < cautionUntilMs ? OVAL_PACE_METERS_PER_SECOND : null
+      } } : {},
       players: ordered2.map((p, index) => {
         const previous = ordered2[index - 1], tied = !p.dnf && p.progress?.finished && previous?.progress?.finished && p.progress.elapsedMs === previous.progress.elapsedMs;
         const position = tied ? previousPosition : index + 1;
@@ -4091,6 +4172,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           condition: p.car?.condition ?? p.profile.conditionValue,
           barrierContacts: p.car?.barrierContacts ?? 0,
           vehicleState: frame,
+          ...rolling ? { trackZone: p.ovalZone, ovalPenaltyReason: p.ovalPenaltyReason } : {},
           progress: p.progress ? {
             nextGate: p.progress.nextGate,
             lap: p.progress.lap,
@@ -4209,7 +4291,7 @@ async function raceCourseKey(course) {
 var RACE_PHYSICS_VERSION = "earth-road-2026-10-28.2";
 var RACE_BANKED_PHYSICS_VERSION = "earth-banked-road-2026-10-29.1";
 var RACE_PROFILED_PAVEMENT_PHYSICS_VERSION = "earth-profiled-pavement-2026-10-30.1";
-var RACE_OVAL_PHYSICS_VERSION = "earth-oval-2026-10-30.1";
+var RACE_OVAL_PHYSICS_VERSION = "earth-oval-2026-10-30.2";
 function racePhysicsVersion(course) {
   if (course?.discipline === "oval") {
     if (course.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL || course.surfaceModel !== BANKED_ROAD_MODEL) throw Error("invalid_race_surface_model");

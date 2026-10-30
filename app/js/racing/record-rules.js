@@ -8,7 +8,7 @@ export const RACE_PHYSICS_VERSION='earth-road-2026-10-28.2';
 // keep their existing qualification receipts and comparable record identities.
 export const RACE_BANKED_PHYSICS_VERSION='earth-banked-road-2026-10-29.1';
 export const RACE_PROFILED_PAVEMENT_PHYSICS_VERSION='earth-profiled-pavement-2026-10-30.1';
-export const RACE_OVAL_PHYSICS_VERSION='earth-oval-2026-10-30.1';
+export const RACE_OVAL_PHYSICS_VERSION='earth-oval-2026-10-30.2';
 export function racePhysicsVersion(course){
  if(course?.discipline==='oval'){
   if(course.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||course.surfaceModel!==BANKED_ROAD_MODEL)throw Error('invalid_race_surface_model');

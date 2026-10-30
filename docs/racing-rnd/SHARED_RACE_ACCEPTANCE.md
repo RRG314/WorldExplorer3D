@@ -4,6 +4,32 @@ The fixed finish line remains `FINISH_GOAL.md`. These accepted checks do not
 need another complete race unless their owning code changes. This is staging
 evidence; the racing package has not been deployed to production.
 
+## Controlled oval format — October 30
+
+Reviewed profiled courses can now retain a station-varying bank lane separately
+from their physical apron. The new oval format rolls four shared vehicles in
+two columns before green through the existing fixed-step session. Ordinary
+standing starts keep their previous rules and record classes. Oval records use
+a separate, versioned rolling-start class.
+
+Controlled gameplay checks cover lane holding over two laps, formation input
+isolation, practice staging, network interpolation, impact/disconnect cautions,
+brake-based pace control, one penalty per passed rival during a restriction,
+and clear versus occupied apron merges. Browser, socket-service and Functions
+rules reproduce the same caution and penalty results. White and chequered flags
+follow actual lap/completion state. These are original game rules: 10 m/s apron
+and caution pace, five-second cautions and five-second order penalties.
+
+The moving four-car render uses the licensed M3 race asset. A separate deliberate
+wall-impact render visibly changes yellow to green; its driver continues holding
+the wheel into the boundary and remains stopped. It proves the displayed flag
+transition, not wall recovery or native-venue smoothness. A failed screenshot
+capture was diagnosed and retained before the successful composed-HUD capture.
+
+These are controlled engine/presentation boundaries. Daytona remains private
+circuit practice under construction. Its pit branch, drafting, complete native
+oval gameplay and venue presentation remain open; no major pack is accepted.
+
 ## Actual city and deployed services
 
 Frozen browser build: `5.6.1+f2d621309ecd.1b27b746bce01a83.staging`.

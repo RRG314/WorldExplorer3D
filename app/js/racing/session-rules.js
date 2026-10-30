@@ -1,7 +1,7 @@
-import {createRaceProgress,advanceRaceProgress,raceGridPose,prepareRaceCourseGeometry}from'./course-rules.js';
-import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle}from'./vehicle-controller.js';
+import {createRaceProgress,advanceRaceProgress,raceGridPose,prepareRaceCourseGeometry,projectRacePosition}from'./course-rules.js';
+import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle,raceVehicleSpeedMetersPerSecond}from'./vehicle-controller.js';
 import {raceAiActions,raceFormationActions}from'./ai-controller.js';
-import {OVAL_FORMATION_DURATION_MS,OVAL_PACE_METERS_PER_SECOND} from './oval-rules.js';
+import {OVAL_FORMATION_DURATION_MS,OVAL_PACE_METERS_PER_SECOND,OVAL_CAUTION_DURATION_MS,OVAL_ORDER_PENALTY_MS,OVAL_MERGE_CLEARANCE_METERS,ovalTrackZone,ovalPaceActions,ovalDistanceGap} from './oval-rules.js';
 import {mphToCarSpeed,METERS_PER_SECOND_PER_MPH} from '../physics/vehicle-speed-units.js?v=2';
 import {raceMaximumDurationMs} from './session-limits.js';
 export {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
@@ -24,7 +24,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
  maximumDurationMs??=allowedDurationMs;
  if(!Number.isFinite(maximumDurationMs)||maximumDurationMs<=0||maximumDurationMs>allowedDurationMs)throw Error('invalid_race_duration');
  course=prepareRaceCourseGeometry(structuredClone(course));
- const rolling=course.discipline==='oval',players=new Map();let phase='lobby',leaderUid=creatorUid,startAtMs=null,tick=0,formationTick=0,formationComplete=false,lastNow=createdAtMs,completedAtMs=null,reason='',outcomeEmitted=false;
+ const rolling=course.discipline==='oval',players=new Map();let phase='lobby',leaderUid=creatorUid,startAtMs=null,tick=0,formationTick=0,formationComplete=false,lastNow=createdAtMs,completedAtMs=null,reason='',outcomeEmitted=false,cautionUntilMs=0;
  const activeHumans=()=>[...players.values()].filter(p=>!p.ai&&!p.left);
  function participant(uid){const p=players.get(uid);if(!p)throw Error('race_not_joined');return p;}
  function lobby(){if(phase!=='lobby')throw Error('race_roster_locked');}
@@ -33,7 +33,8 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   const envelope=course.vehicleEnvelope||{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},handling=profile?.handling;
   if(!handling||handling.width>envelope.widthMeters||handling.length>envelope.lengthMeters||handling.height>envelope.heightMeters)throw Error('race_vehicle_exceeds_course_envelope');
   const p={uid,label:String(label||'Explorer').slice(0,40),profile,ai:ai===true,difficulty:Math.max(0,Math.min(1,Number(difficulty)||.65)),ready:ai===true,
-   slot:players.size,car:null,previousFrame:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false};
+   slot:players.size,car:null,previousFrame:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false,
+   ovalZone:null,ovalRestricted:false,ovalPassed:new Set(),ovalPenaltyReason:null};
   players.set(uid,p);for(const other of players.values())if(!other.ai)other.ready=false;return snapshot();
  }
  function setReady(uid,ready){lobby();const p=participant(uid);if(p.ai)throw Error('race_rival_control_forbidden');p.ready=ready===true;return snapshot();}
@@ -68,11 +69,12 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   if(p.queue.length>=32)throw Error('race_controls_rate_limited');
   p.lastSequence=sequence;p.queue.push({actions:normalized,at:receivedAtMs});return true;
  }
- function disconnect(uid,nowMs){const p=participant(uid);if(p.ai)return;p.disconnectedAt=nowMs;if(phase==='lobby')p.ready=false;p.queue=[];p.actions=NEUTRAL;}
+ function caution(nowMs){if(rolling&&phase==='running')cautionUntilMs=Math.max(cautionUntilMs,nowMs+OVAL_CAUTION_DURATION_MS);}
+ function disconnect(uid,nowMs){const p=participant(uid);if(p.ai)return;p.disconnectedAt=nowMs;if(phase==='lobby')p.ready=false;else if(!p.dnf&&!p.progress?.finished)caution(Math.max(lastNow,nowMs));p.queue=[];p.actions=NEUTRAL;}
  function reconnect(uid,nowMs){const p=participant(uid);if(p.progress?.finished)return snapshot();if(p.left||p.dnf||p.disconnectedAt!==null&&nowMs-p.disconnectedAt>10000)throw Error('race_reconnect_expired');p.disconnectedAt=null;p.queue=[];p.actions=NEUTRAL;return snapshot();}
  function leave(uid,nowMs){
   const p=participant(uid);if(phase==='lobby'){players.delete(uid);for(const [index,row]of [...players.values()].entries())row.slot=index;if(uid===leaderUid)leaderUid=activeHumans()[0]?.uid||'';if(!activeHumans().length){phase='cancelled';reason='race_empty';}}
-  else{p.left=true;p.dnf=!p.progress?.finished;p.queue=[];p.actions=NEUTRAL;p.disconnectedAt=nowMs;}
+  else{p.left=true;p.dnf=!p.progress?.finished;if(p.dnf)caution(Math.max(lastNow,nowMs));p.queue=[];p.actions=NEUTRAL;p.disconnectedAt=nowMs;}
   return snapshot();
  }
  function finishIfComplete(nowMs){
@@ -80,6 +82,34 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
    for(const p of players.values())if(!p.progress?.finished)p.dnf=true;
    phase='complete';completedAtMs=nowMs;
    if(!outcomeEmitted){outcomeEmitted=true;onComplete(snapshot());}
+  }
+ }
+ function ovalPositions(){
+  return new Map([...players.values()].filter(p=>!p.dnf&&!p.progress.finished).map(p=>{
+   const projection=projectRacePosition(course,raceVehicleGroundPose(p.car));
+   return [p.uid,{projection,zone:ovalTrackZone(projection),speed:Math.abs(raceVehicleSpeedMetersPerSecond(p.car)),contacts:p.car.barrierContacts}];
+  }));
+ }
+ function ovalPenalty(p,why){
+  p.ovalPenaltyReason=why;p.progress={...p.progress,penaltyMs:p.progress.penaltyMs+OVAL_ORDER_PENALTY_MS,
+   ...(p.progress.finished?{elapsedMs:p.progress.elapsedMs+OVAL_ORDER_PENALTY_MS}:{})};
+ }
+ function enforceOvalOrder(before,after,yellow){
+  for(const [uid,a]of after){
+   const p=players.get(uid),b=before.get(uid);p.ovalZone=a.zone;
+   const restricted=yellow||b.zone==='apron'||a.zone==='apron';
+   if(!restricted){p.ovalRestricted=false;p.ovalPassed.clear();continue;}
+   if(!p.ovalRestricted)p.ovalPassed.clear();p.ovalRestricted=true;
+   for(const [otherUid,other]of after){
+    if(uid===otherUid||!a.projection||!other.projection||!b.projection)continue;
+    const previous=before.get(otherUid)?.projection;if(!previous)continue;
+    const gap=ovalDistanceGap(a.projection.distanceMeters,other.projection.distanceMeters,course.lengthMeters),
+     oldGap=ovalDistanceGap(b.projection.distanceMeters,previous.distanceMeters,course.lengthMeters);
+    if(oldGap>=0&&oldGap<40&&gap<0&&!p.ovalPassed.has(otherUid)){
+     p.ovalPassed.add(otherUid);ovalPenalty(p,yellow?'passing-under-yellow':'passing-on-apron');
+    }
+   }
+   if(b.zone==='apron'&&a.zone==='bank'&&[...after].some(([otherUid,other])=>otherUid!==uid&&other.zone==='bank'&&a.projection&&other.projection&&Math.abs(ovalDistanceGap(a.projection.distanceMeters,other.projection.distanceMeters,course.lengthMeters))<OVAL_MERGE_CLEARANCE_METERS))ovalPenalty(p,'unsafe-apron-merge');
   }
  }
  function advance(nowMs){
@@ -109,15 +139,26 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   // rather than dropping physics steps while awarding an implausible time.
   if(targetTick-tick>30){phase='cancelled';reason='race_authority_stalled';return snapshot();}
   while(tick<targetTick){
-   tick++;const frameAt=startAtMs+tick*STEP_MS;
+   tick++;const frameAt=startAtMs+tick*STEP_MS,yellow=rolling&&frameAt<cautionUntilMs,before=rolling?ovalPositions():null;
    for(const p of players.values()){
     if(p.dnf||p.progress.finished)continue;
     if(p.disconnectedAt!==null&&frameAt-p.disconnectedAt>10000){p.dnf=true;continue;}
     while(p.queue.length&&p.queue[0].at<=frameAt){const command=p.queue.shift();p.actions=command.actions;p.lastControlAt=command.at;}
-    const actions=p.ai?raceAiActions(course,p.car,p.progress,p.profile,{difficulty:p.difficulty,...(rolling?{laneOffsetMeters:course.participants===1?0:p.slot%2===0?-1.4:1.4}:{})}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
+    let actions=p.ai?raceAiActions(course,p.car,p.progress,p.profile,{difficulty:p.difficulty,...(rolling?{laneOffsetMeters:course.participants===1?0:p.slot%2===0?-1.4:1.4,...(yellow?{formation:true,paceMetersPerSecond:OVAL_PACE_METERS_PER_SECOND}:{})}:{})}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
+    if(rolling)actions=ovalPaceActions(actions,before.get(p.uid).speed,yellow||before.get(p.uid).zone==='apron');
     p.previousFrame=snapshotRaceVehicle(p.car);
     stepRaceVehicle(course,p.car,actions,1/60,p.profile);
     p.progress=advanceRaceProgress(course,p.progress,raceVehicleGroundPose(p.car),frameAt,{startedAtMs:startAtMs});
+   }
+   if(rolling){
+    // Use the same pre-tick flag for every actor. An incident starts a caution
+    // on the next tick, independent of roster iteration order.
+    const after=ovalPositions();
+    // Include a car that crossed the finish this tick so its last-frame order
+    // violation is applied before the existing completion receipt is emitted.
+    for(const [uid]of before)if(!after.has(uid)&&players.get(uid).progress.finished){const p=players.get(uid),projection=projectRacePosition(course,raceVehicleGroundPose(p.car));after.set(uid,{projection,zone:ovalTrackZone(projection),speed:Math.abs(raceVehicleSpeedMetersPerSecond(p.car)),contacts:p.car.barrierContacts});}
+    enforceOvalOrder(before,after,yellow);
+    if([...after].some(([uid,a])=>a.contacts>before.get(uid).contacts&&before.get(uid).speed>5))caution(frameAt);
    }
    finishIfComplete(frameAt);if(phase==='complete')break;
   }
@@ -129,7 +170,8 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   let previousPosition=0;
   return {id,phase,reason,courseName:course.name,discipline:course.discipline,laps:course.laps,creatorUid,leaderUid,createdAtMs,startAtMs,maximumDurationMs,
    serverAtMs:lastNow,simulationAtMs:startAtMs===null?null:rolling&&!formationComplete?startAtMs-FORMATION_MS+formationTick*STEP_MS:startAtMs+tick*STEP_MS,completedAtMs,
-   ...(rolling?{raceControl:{start:'rolling',flag:phase==='countdown'?'formation':phase==='complete'?'chequered':'green',paceMetersPerSecond:OVAL_PACE_METERS_PER_SECOND}}:{}),
+   ...(rolling?{raceControl:{start:'rolling',flag:phase==='countdown'?'formation':phase==='complete'?'chequered':phase==='cancelled'?'red':startAtMs!==null&&startAtMs+tick*STEP_MS<cautionUntilMs?'yellow':[...players.values()].some(p=>p.progress?.lap>=course.laps)?'white':'green',
+    paceMetersPerSecond:phase==='countdown'||startAtMs!==null&&startAtMs+tick*STEP_MS<cautionUntilMs?OVAL_PACE_METERS_PER_SECOND:null}}:{}),
    players:ordered.map((p,index)=>{const previous=ordered[index-1],tied=!p.dnf&&p.progress?.finished&&previous?.progress?.finished&&p.progress.elapsedMs===previous.progress.elapsedMs;
     const position=tied?previousPosition:index+1;previousPosition=position;
     const frame=snapshotRaceVehicle(p.car);
@@ -148,7 +190,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     return {uid:p.uid,label:p.label,ai:p.ai,vehicleId:p.profile.vehicleId,slot:p.slot,ready:p.ready,
     disconnected:p.disconnectedAt!==null,dnf:p.dnf,position,lastInputSequence:p.lastSequence,pose:frame?raceVehicleGroundPose(frame):null,
     speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,barrierContacts:p.car?.barrierContacts??0,
-    vehicleState:frame,
+    vehicleState:frame,...(rolling?{trackZone:p.ovalZone,ovalPenaltyReason:p.ovalPenaltyReason}:{}),
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
      bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null};})};
  }

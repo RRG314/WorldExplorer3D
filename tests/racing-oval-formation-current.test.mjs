@@ -52,11 +52,12 @@ test('practice admission uses the same rolling staging pose and network presenta
 });
 test('oval rivals retain distinct columns after green and use actual turn radius beyond the city pace cap',()=>{
  const {course}=createOvalFormatFixture(),s=createRaceSession({id:'controlled-oval-laps',course,creatorUid:'driver',createdAtMs:0});s.add({uid:'driver',profile});for(const [i,uid]of ['rival:one','rival:two','rival:three'].entries())s.add({uid,profile,ai:true,difficulty:.8});s.setReady('driver',true);s.start('driver',0);
- let state=s.snapshot(),maximumSpeed=0;
+ let state=s.snapshot(),maximumSpeed=0,sawWhite=false;
  for(let now=50,sequence=0;now<=300000;now+=50,sequence++){
   const me=state.players.find(p=>p.uid==='driver');if(!me.progress.finished)s.control('driver',sequence,raceAiActions(course,me.vehicleState,me.progress,profile,{difficulty:.8,laneOffsetMeters:-1.4}),now);
-  state=s.advance(now);maximumSpeed=Math.max(maximumSpeed,...state.players.map(p=>p.speed));if(state.phase==='complete')break;
+  state=s.advance(now);maximumSpeed=Math.max(maximumSpeed,...state.players.map(p=>p.speed));sawWhite||=state.raceControl.flag==='white';if(state.phase==='complete')break;
  }
  assert.equal(state.phase,'complete');assert.ok(state.players.every(p=>p.progress.finished&&!p.dnf));assert.ok(maximumSpeed*.22352>26,'wide oval bends must not inherit the 23 m/s city cap');
  assert.ok(state.players.every(p=>p.barrierContacts===0),'the faster controls must still stay inside the qualified physical pavement');
+ assert.ok(sawWhite);assert.equal(state.raceControl.flag,'chequered');
 });
