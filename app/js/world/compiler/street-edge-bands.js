@@ -2,7 +2,7 @@ import {createStreetPolygonKernel} from './street-polygon-kernel.js';
 import {BANKED_ROAD_MAXIMUM_CROSSFALL} from '../../physics/road-plane-dynamics.js';
 // Match the existing accepted-surface output precision. Reusing the 1 mm
 // design grid for each face folds sloping shared seams into asphalt slivers.
-export const streetEdgePolygonKernel=createStreetPolygonKernel({grid:.000001});
+export const streetEdgePolygonKernel=createStreetPolygonKernel({grid:.000001,minimumRingWidth:.000001});
 const clip=streetEdgePolygonKernel;
 
 const overlaps=(a,b)=>a.minX<=b.maxX&&a.maxX>=b.minX&&a.minZ<=b.maxZ&&a.maxZ>=b.minZ;

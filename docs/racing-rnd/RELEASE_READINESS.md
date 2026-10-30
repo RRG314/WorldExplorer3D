@@ -254,3 +254,10 @@ base. Focused checks pass for that ownership path, unsafe-data rejection, route
 reversal, immutable identities, chunk tampering, both generated runtimes and
 existing four-wheel contact.
 Native pavement geometry and the final complete venue still require acceptance.
+
+A native kerb seam was reproduced offline: sub-grid clipping remnants expanded
+into overlapping raised tops at Float32 render precision. The fine edge kernel
+now discards rings narrower than its own one-micrometre coordinate grid. The
+normal street kernel retains its previous policy. The reproduced seam, resolved
+50-micrometre pieces, previous shared-edge coverage and polygon topology checks
+pass. Native verification of the repair and remaining pavement failures is open.

@@ -3,8 +3,9 @@ import {STREET_POLYGON_GRID_WORLD} from './street-coordinate-grid.js';
 export {STREET_POLYGON_GRID_WORLD} from './street-coordinate-grid.js';
 const C = bundle.default || globalThis.ClipperLib;
 // Explicit integer coordinate grid shared with independent replay checks.
-export function createStreetPolygonKernel({grid = STREET_POLYGON_GRID_WORLD} = {}) {
+export function createStreetPolygonKernel({grid = STREET_POLYGON_GRID_WORLD,minimumRingWidth=0} = {}) {
 if (!Number.isFinite(grid) || grid <= 0) throw new RangeError('Polygon grid must be positive');
+if (!Number.isFinite(minimumRingWidth) || minimumRingWidth < 0 || minimumRingWidth > grid) throw new RangeError('Polygon remnant width exceeds its coordinate grid');
 const SCALE = 1 / grid;
 const multi = shape => typeof shape?.[0]?.[0]?.[0] === 'number' ? [shape] : shape;
 function paths(shape, origin) {
@@ -38,7 +39,16 @@ function polygonResult(solution, origin) {
       const key=`${point.X}:${point.Y}`,seen=indices.get(key);
       if(seen!==undefined){
         const ring=stack.slice(seen);
-        if(ring.length>=3&&C.Clipper.Area(ring)!==0)rings.push(ring);
+        if(ring.length>=3){
+          const area=Math.abs(C.Clipper.Area(ring));
+          // Integer clipping can retain a nearly collinear closed remnant
+          // narrower than its own grid. Float32 publication can enlarge it
+          // over a different roof. Discard only these unresolved rings;
+          // ordinary street clipping keeps its existing zero-area policy.
+          let perimeter=0;
+          if(minimumRingWidth)for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length];perimeter+=Math.hypot(b.X-a.X,b.Y-a.Y);}
+          if(area>0&&(!minimumRingWidth||2*area/perimeter>minimumRingWidth*SCALE))rings.push(ring);
+        }
         for(let i=seen+1;i<stack.length;i++)indices.delete(`${stack[i].X}:${stack[i].Y}`);
         stack.length=seen+1;
       }else{indices.set(key,stack.length);stack.push(point);}
