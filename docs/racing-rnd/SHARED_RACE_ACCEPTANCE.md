@@ -162,3 +162,14 @@ terrain/worker/contact boundaries and two complete source-layout topology grid
 phases pass 22 affected checks. The full-layout topology cases use explicit zero
 heights and do not claim native height acceptance. The latest curved-section GPU
 comparison was inspected with no WebGL error. Native admission remains pending.
+
+The next full-width capture still rejected spans and retained a rounded-edge
+height jump. A retained native triangle now verifies direct face splitting at
+every logical edge station: no old face may bypass the inserted knee beside a
+thin ear. Complete topology grid phases and native knee witnesses pass. A
+separate export regression demonstrated a wide station extending a narrower row
+by 2.1 m. Variable-width profiles now clamp common knots to each row's actual
+physical bounds, retaining common topology and the original fit/point limits.
+The affected profile/shared-physics cases pass and the curved render was
+inspected again. These are component repairs; native full-width admission is
+still pending, and no venue pack is complete.

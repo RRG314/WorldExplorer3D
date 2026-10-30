@@ -18,14 +18,17 @@ export function readPublishedLateralSection({contacts,x,z,nx,nz,widthMeters,mete
   if(!point)throw Error('race_missing_edge_profile_contact');
   return {offsetMeters,y:point.y,...(Number.isFinite(point.baseY)?{baseY:point.baseY}:{})};
  });
- return {points,edgeKnots,fixed};
+ return {points,edgeKnots,fixed,...(boundsMeters?{boundsMeters:{minimumMeters:minimum,maximumMeters:maximum}}:{})};
 }
 export function compilePublishedLateralProfiles(sections,metersPerUnit,{maximumPoints=32,maximumErrorMeters=.003}={}){
  if(!sections.length||maximumPoints>32||maximumPoints<3||maximumErrorMeters<=0||maximumErrorMeters>.003)throw Error('race_invalid_edge_profile_bound');
  const fixed=[...sections[0].fixed],knots=sections[0].edgeKnots.length,hasBase=sections.some(s=>s.points.some(p=>p.baseY!==undefined));
  if(hasBase&&sections.some(s=>s.points.some(p=>!Number.isFinite(p.baseY))))throw Error('race_missing_edge_base');
  if(sections.some(s=>s.edgeKnots.length!==knots||s.fixed.some((n,i)=>n!==fixed[i])))throw Error('race_edge_profile_station_mismatch');
- const profiles=()=>sections.map(s=>[...fixed,...s.edgeKnots].sort((a,b)=>a-b).map(offsetMeters=>({offsetMeters,y:valueAt(s.points,offsetMeters),...(hasBase?{baseY:valueAt(s.points,offsetMeters,'baseY')}:{})})));
+ // Keep common topology while a physical apron narrows. A crease from a
+ // wider row collapses at this row's real boundary, rather than publishing
+ // extrapolated pavement outside the uploaded surface.
+ const profiles=()=>sections.map(s=>[...fixed.map(n=>s.boundsMeters?Math.max(s.boundsMeters.minimumMeters,Math.min(s.boundsMeters.maximumMeters,n)):n),...s.edgeKnots].sort((a,b)=>a-b).map(offsetMeters=>({offsetMeters,y:valueAt(s.points,offsetMeters),...(hasBase?{baseY:valueAt(s.points,offsetMeters,'baseY')}:{})})));
  for(;;){
   const rows=profiles();let worst=null;
   for(let i=0;i<sections.length;i++)for(const point of sections[i].points){const error=Math.max(Math.abs(valueAt(rows[i],point.offsetMeters)-point.y),hasBase?Math.abs(valueAt(rows[i],point.offsetMeters,'baseY')-point.baseY):0)*metersPerUnit;if(!worst||error>worst.error)worst={error,offset:point.offsetMeters};}

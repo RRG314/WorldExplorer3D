@@ -28,6 +28,12 @@ test('retained native clustered cuts share an existing precision-equivalent vert
  const bad=Float32Array.from([0,0,0,1,0,0,0,0,1,.000001,.01,0]);
  await assert.rejects(conformPartitionEdges(bad,[[0,1,2],[3,1,2]]),/vertex_mismatch/,'conflicting heights cannot be hidden by a coordinate weld');
 });
+test('the retained native rounded knee cut splits the bank face instead of adding a steep microscopic ear',async()=>{
+ const p=Float32Array.from([532.7886962890625,8.065505027770996,-638.8687744140625,531.8768310546875,8.449684143066406,-639.7806396484375,531.3724975585938,8.074186325073242,-639.2554321289062,531.7565307617188,8.065435409545898,-639.1505737304688,531.660400390625,8.052347183227539,-638.6586303710938,531.3685913085938,8.065422058105469,-639.2413330078125]),triangles=[[0,1,2],[4,0,3],[5,4,3]],r=await conformPartitionEdges(p,triangles),bank=r.replacements.get(triangles[0]);
+ assert.ok(bank.length>1);assert.ok(bank.every(t=>t.includes(3)),'every replacement bank triangle must reference the inserted knee, with no original face bypass');
+ const index=createRoadContactIndex([{geometry:{attributes:{position:{array:p}},getIndex:()=>({array:Uint32Array.from(triangles.flatMap(t=>(r.replacements.get(t)||[t]).flat()))})},userData:{terrainMode:'at_grade'}}]);
+ try{assert.ok(Math.abs(index.sampleAt(p[9],p[11])-p[10])<.000001,'both sides retain the same knee height');}finally{index.dispose();}
+});
 test('both retained native knee failures are continuous through actual terrain and pavement publication',async()=>{
  const fetchImpl=async url=>({ok:true,text:()=>fs.readFile(new URL('..'+url,import.meta.url),'utf8')});
  for(const config of [{sourceFeatureId:'osm:way:352070316',windowOrigin:{x:640,z:-512},windowSize:128,tileKeys:['5:-4'],segment:16,offset:6.040334},{sourceFeatureId:'osm:way:352067004',windowOrigin:{x:-384,z:384},tileKeys:['-2:4'],segment:19,offset:6.012592}]){

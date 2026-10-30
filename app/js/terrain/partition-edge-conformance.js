@@ -2,19 +2,21 @@
 // existing triangle edge. Both neighbours must reference it, including its
 // already compiled height, before the terrain is used as pavement support.
 const cross=(p,a,b,c)=>(p[b*3]-p[a*3])*(p[c*3+2]-p[a*3+2])-(p[b*3+2]-p[a*3+2])*(p[c*3]-p[a*3]);
-function triangulate(p,ring,sign){
- const result=[],remaining=[...ring];
- while(remaining.length>3){
-  let ear=-1;
-  for(let i=0;i<remaining.length;i++){
-   const a=remaining[(i+remaining.length-1)%remaining.length],b=remaining[i],c=remaining[(i+1)%remaining.length];
-   if(cross(p,a,b,c)*sign<=1e-12)continue;
-   if(remaining.some(v=>v!==a&&v!==b&&v!==c&&cross(p,a,b,v)*sign>=-1e-12&&cross(p,b,c,v)*sign>=-1e-12&&cross(p,c,a,v)*sign>=-1e-12))continue;
-   result.push([a,b,c]);ear=i;break;
+function splitEdges(p,triangle,cuts){
+ const sign=Math.sign(cross(p,...triangle)),pieces=[triangle];
+ for(let edge=0;edge<3;edge++){
+  let previous=triangle[edge];const end=triangle[(edge+1)%3];
+  for(const id of cuts[edge]){
+   const index=pieces.findIndex(t=>t.includes(previous)&&t.includes(end));
+   if(index<0)throw Object.assign(Error('reviewed_terrain_partition_edge_invalid'),{partitionRing:triangle.map(i=>[p[i*3],p[i*3+2]])});
+   const other=pieces[index].find(v=>v!==previous&&v!==end),next=[[previous,id,other],[id,end,other]];
+   pieces.splice(index,1,...next);previous=id;
   }
-  if(ear<0)throw Object.assign(Error('reviewed_terrain_partition_edge_invalid'),{partitionRing:ring.map(i=>[p[i*3],p[i*3+2]])});remaining.splice(ear,1);
  }
- if(Math.abs(cross(p,...remaining))>1e-12)result.push(remaining);return result;
+ // Insert each boundary point into its incident face, even if independent
+ // Float32 rounding bends the logical edge slightly. Polygon ear clipping
+ // could bypass it by keeping the old face beside a microscopic sliver.
+ return pieces.filter(t=>cross(p,...t)!==0).map(t=>cross(p,...t)*sign<0?[t[0],t[2],t[1]]:t);
 }
 export async function conformPartitionEdges(positions,triangles,{cellSize=8,maximumTriangles=2000000,maximumHeightMergeErrorWorld=.003,pause=async()=>{}}={}){
  const columns=new Map(),replacements=new Map(),used=new Uint8Array(positions.length/3),aliases=new Uint32Array(used.length);
@@ -51,7 +53,7 @@ export async function conformPartitionEdges(positions,triangles,{cellSize=8,maxi
   const ids=found.sort((a,b)=>a.t-b.t||a.id-b.id).map(p=>p.id);edges.set(key,ids);return a<b?ids:[...ids].reverse();
  };
  for(let i=0;i<triangles.length;i++){
-  const source=triangles[i],triangle=source.map(id=>aliases[id]),ring=[],selected=new Map();
+  const source=triangles[i],triangle=source.map(id=>aliases[id]),selected=new Map();
   if(new Set(triangle).size<3||cross(positions,...triangle)===0){replacements.set(source,[]);collapsedTriangles++;count--;continue;}
   // A thin Float32 sliver can put its own third corner within one coordinate
   // unit of another edge. Corners are already in the ring. Other near-corner
@@ -61,10 +63,11 @@ export async function conformPartitionEdges(positions,triangles,{cellSize=8,maxi
    const a=triangle[j],b=triangle[(j+1)%3],distance=Math.abs(cross(positions,a,b,id))/Math.hypot(positions[b*3]-positions[a*3],positions[b*3+2]-positions[a*3+2]);
    if(!selected.has(id)||selected.get(id).distance>distance)selected.set(id,{edge:j,distance});
   }
-  for(let j=0;j<3;j++){const a=triangle[j],b=triangle[(j+1)%3];ring.push(a,...edgePoints(a,b).filter(id=>selected.get(id)?.edge===j));}
-  if(ring.length>3){
-   const next=triangulate(positions,ring,Math.sign(cross(positions,...triangle)));count+=next.length-1;if(count>maximumTriangles)throw Error('reviewed_terrain_boundary_triangle_capacity');
-   replacements.set(source,next);conformedTriangles++;insertedEdgeVertices+=ring.length-3;
+  const cuts=triangle.map((a,j)=>edgePoints(a,triangle[(j+1)%3]).filter(id=>selected.get(id)?.edge===j));
+  const inserted=cuts.reduce((sum,ids)=>sum+ids.length,0);
+  if(inserted){
+   const next=splitEdges(positions,triangle,cuts);count+=next.length-1;if(count>maximumTriangles)throw Error('reviewed_terrain_boundary_triangle_capacity');
+   replacements.set(source,next);conformedTriangles++;insertedEdgeVertices+=inserted;
   }else if(triangle.some((id,j)=>id!==source[j]))replacements.set(source,[triangle]);
   if(i%128===0)await pause();
  }

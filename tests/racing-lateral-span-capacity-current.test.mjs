@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {compilePublishedLateralProfiles,compilePublishedLateralSpans} from '../app/js/racing/published-lateral-profile.js';
+import {readPublishedLateralSection,compilePublishedLateralProfiles,compilePublishedLateralSpans} from '../app/js/racing/published-lateral-profile.js';
 const sections=()=>Array.from({length:19},(_,i)=>({fixed:[-4,-1.2,0,1.2,4],edgeKnots:[],points:Array.from({length:161},(_,j)=>{const offsetMeters=-4+j*.05,baseY=10+offsetMeters*.01,y=baseY+Math.max(0,.03-Math.abs(offsetMeters-(-3+i/3))*.1);return {offsetMeters,y,baseY};})}));
 const at=(points,offset,field)=>{let i=1;while(i<points.length-1&&offset>points[i].offsetMeters)i++;const a=points[i-1],b=points[i];return a[field]+(b[field]-a[field])*(offset-a.offsetMeters)/(b.offsetMeters-a.offsetMeters);};
 test('an over-capacity source interval can retain two bounded profiles at an existing continuous station',()=>{
@@ -14,6 +14,16 @@ test('ordinary fitting stays a single span and unresolved data retains the capac
  assert.equal(compilePublishedLateralSpans(sections().slice(0,3),1).length,1);
  const bad=sections().slice(0,2);bad[0].points=bad[0].points.map((p,i)=>({...p,y:10+(i%2)*.03}));assert.throws(()=>compilePublishedLateralSpans(bad,1),/capacity/);
  const missing=sections();delete missing[0].points[0].baseY;assert.throws(()=>compilePublishedLateralSpans(missing,1),/missing_edge_base/);
+});
+
+test('common knots cannot extend a variable-width published profile beyond a narrower station',()=>{
+ const raw=[[-3,15],[-4,12]].map(([minimumMeters,maximumMeters],row)=>readPublishedLateralSection({
+  contacts:{crossSectionOffsets:()=>[minimumMeters,6,13.9,14,14.1,maximumMeters]},x:0,z:row,nx:1,nz:0,widthMeters:maximumMeters-minimumMeters,metersPerUnit:1,spanMeters:1.2,t:row,
+  edgeKnots:[6],boundsMeters:{minimumMeters,maximumMeters},surface:x=>({y:10+x*.01+(row?0:Math.max(0,.03-Math.abs(x-14)*.3))})
+ })),compiled=compilePublishedLateralProfiles(raw,1);
+ assert.ok(compiled.profiles[0].some(p=>Math.abs(p.offsetMeters-14)<.001),'the wide station retains its actual extra crease');
+ for(let i=0;i<raw.length;i++){assert.equal(compiled.profiles[i][0].offsetMeters,[-3,-4][i]);assert.equal(compiled.profiles[i].at(-1).offsetMeters,[15,12][i]);}
+ assert.equal(compiled.profiles[0].length,compiled.profiles[1].length);assert.ok(compiled.maximumErrorMeters<=.003);
 });
 
 test('the normal collector partitions a complex published base without losing source order or graph continuity',async()=>{
