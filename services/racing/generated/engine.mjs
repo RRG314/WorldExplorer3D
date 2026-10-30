@@ -1376,7 +1376,7 @@ function racePavementCrossSection(segment, t) {
     minimumMeters: mix(a.lateralSamples[0].offsetMeters, b.lateralSamples[0].offsetMeters),
     maximumMeters: mix(a.lateralSamples.at(-1).offsetMeters, b.lateralSamples.at(-1).offsetMeters),
     racingOffsetMeters: mix(a.racingOffsetMeters, b.racingOffsetMeters),
-    racingWidthMeters: segment.racingWidthMeters
+    racingWidthMeters: mix(a.racingWidthMeters ?? segment.racingWidthMeters, b.racingWidthMeters ?? segment.racingWidthMeters)
   };
 }
 
@@ -1642,8 +1642,14 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
     };
     const profiled = road?.pavementModel === PROFILED_ROAD_PAVEMENT_MODEL;
     if (road?.pavementModel !== void 0 && !profiled) throw Error("invalid_race_surface_model");
-    if (!profiled && (road?.racingWidthMeters !== void 0 || Array.isArray(road?.heightSamples) && road.heightSamples.some((s) => s.racingOffsetMeters !== void 0))) throw Error("invalid_race_pavement_sections");
-    if (profiled && (road.surfaceModel !== BANKED_ROAD_MODEL || !Number.isFinite(road.racingWidthMeters) || road.racingWidthMeters < 6 || road.racingWidthMeters > 30 || !Array.isArray(road.heightSamples) || road.heightSamples.some((s) => !Number.isFinite(s.racingOffsetMeters) || !Array.isArray(s.lateralSamples) || s.lateralSamples.length < 3 || s.racingOffsetMeters - road.racingWidthMeters / 2 < s.lateralSamples[0].offsetMeters || s.racingOffsetMeters + road.racingWidthMeters / 2 > s.lateralSamples.at(-1).offsetMeters))) throw Error("invalid_race_pavement_sections");
+    if (!profiled && (road?.racingWidthMeters !== void 0 || Array.isArray(road?.heightSamples) && road.heightSamples.some((s) => s.racingOffsetMeters !== void 0 || s.racingWidthMeters !== void 0))) throw Error("invalid_race_pavement_sections");
+    if (profiled) {
+      const samples = road.heightSamples, variable = Array.isArray(samples) && samples.some((s) => s.racingWidthMeters !== void 0);
+      if (road.surfaceModel !== BANKED_ROAD_MODEL || !Number.isFinite(road.racingWidthMeters) || road.racingWidthMeters < 6 || road.racingWidthMeters > 30 || !Array.isArray(samples) || samples.some((s) => {
+        const width2 = variable ? s.racingWidthMeters : road.racingWidthMeters;
+        return !Number.isFinite(width2) || width2 < road.racingWidthMeters || width2 > 30 || !Number.isFinite(s.racingOffsetMeters) || !Array.isArray(s.lateralSamples) || s.lateralSamples.length < 3 || s.racingOffsetMeters - width2 / 2 < s.lateralSamples[0].offsetMeters || s.racingOffsetMeters + width2 / 2 > s.lateralSamples.at(-1).offsetMeters;
+      })) throw Error("invalid_race_pavement_sections");
+    }
     if (road?.surfaceModel !== void 0 && road.surfaceModel !== BANKED_ROAD_MODEL || road?.edgeBandModel !== void 0 && road.edgeBandModel !== AUTHORED_ROAD_EDGE_MODEL) throw Error("invalid_race_surface_model");
     if (road?.edgeBandModel !== void 0 && !road.heightSamples?.some((s) => s.lateralSamples)) throw Error("invalid_race_road_heights");
     if (!road?.sourceId || !finitePoint(road.a) || !finitePoint(road.b) || road.driveable !== true || road.supported !== true) continue;
@@ -4214,7 +4220,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
       supported: true,
       heightSamples: samples.map((s) => {
         const height = s.lateralSamples ? roofHeight : number;
-        return { t: s.t, y: height(s.y), leftY: height(s.leftY), rightY: height(s.rightY), ...s.racingOffsetMeters !== void 0 ? { racingOffsetMeters: number(s.racingOffsetMeters) } : {}, ...lateral(s) };
+        return { t: s.t, y: height(s.y), leftY: height(s.leftY), rightY: height(s.rightY), ...s.racingOffsetMeters !== void 0 ? { racingOffsetMeters: number(s.racingOffsetMeters) } : {}, ...s.racingWidthMeters !== void 0 ? { racingWidthMeters: number(s.racingWidthMeters) } : {}, ...lateral(s) };
       }),
       heightSampleSpanMeters: number(r.heightSampleSpanMeters)
     };

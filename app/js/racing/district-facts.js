@@ -26,7 +26,7 @@ export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
   return {sourceId:label(r.sourceId,180),sourceFeatureId:label(r.sourceFeatureId,180),label:label(r.label,100),a:point(r.a),b:point(r.b),
    ...(r.surfaceModel!==undefined?{surfaceModel:r.surfaceModel}:{}),...(r.pavementModel!==undefined?{pavementModel:r.pavementModel,racingWidthMeters:number(r.racingWidthMeters)}:{}),...(r.edgeBandModel!==undefined?{edgeBandModel:r.edgeBandModel}:{}),
    widthMeters:number(r.widthMeters),direction:r.direction||'both',structure:r.structure,clearanceMeters:number(r.clearanceMeters||0),driveable:true,supported:true,
-   heightSamples:samples.map(s=>{const height=s.lateralSamples?roofHeight:number;return {t:s.t,y:height(s.y),leftY:height(s.leftY),rightY:height(s.rightY),...(s.racingOffsetMeters!==undefined?{racingOffsetMeters:number(s.racingOffsetMeters)}:{}),...lateral(s)};}),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
+   heightSamples:samples.map(s=>{const height=s.lateralSamples?roofHeight:number;return {t:s.t,y:height(s.y),leftY:height(s.leftY),rightY:height(s.rightY),...(s.racingOffsetMeters!==undefined?{racingOffsetMeters:number(s.racingOffsetMeters)}:{}),...(s.racingWidthMeters!==undefined?{racingWidthMeters:number(s.racingWidthMeters)}:{}),...lateral(s)};}),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
  }).sort((a,b)=>a.sourceId.localeCompare(b.sourceId));
  const facts={type:'RaceDistrictFacts',version:1,...(venueSource?{venueSource}:{}),locationId,locationLabel:label(raw.locationLabel,80),anchor,metersPerUnit:m,roads};
  const graph=buildRaceRoadGraph(roads,{metersPerUnit:m,venueSource,partialVenue});if(graph.edges.length<roads.length)fail();return facts;

@@ -174,8 +174,14 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximum
  for(const road of roads){
   const profiled=road?.pavementModel===PROFILED_ROAD_PAVEMENT_MODEL;
   if(road?.pavementModel!==undefined&&!profiled)throw Error('invalid_race_surface_model');
-  if(!profiled&&(road?.racingWidthMeters!==undefined||Array.isArray(road?.heightSamples)&&road.heightSamples.some(s=>s.racingOffsetMeters!==undefined)))throw Error('invalid_race_pavement_sections');
-  if(profiled&&(road.surfaceModel!==BANKED_ROAD_MODEL||!Number.isFinite(road.racingWidthMeters)||road.racingWidthMeters<6||road.racingWidthMeters>30||!Array.isArray(road.heightSamples)||road.heightSamples.some(s=>!Number.isFinite(s.racingOffsetMeters)||!Array.isArray(s.lateralSamples)||s.lateralSamples.length<3||s.racingOffsetMeters-road.racingWidthMeters/2<s.lateralSamples[0].offsetMeters||s.racingOffsetMeters+road.racingWidthMeters/2>s.lateralSamples.at(-1).offsetMeters)))throw Error('invalid_race_pavement_sections');
+  if(!profiled&&(road?.racingWidthMeters!==undefined||Array.isArray(road?.heightSamples)&&road.heightSamples.some(s=>s.racingOffsetMeters!==undefined||s.racingWidthMeters!==undefined)))throw Error('invalid_race_pavement_sections');
+  if(profiled){
+   const samples=road.heightSamples,variable=Array.isArray(samples)&&samples.some(s=>s.racingWidthMeters!==undefined);
+   if(road.surfaceModel!==BANKED_ROAD_MODEL||!Number.isFinite(road.racingWidthMeters)||road.racingWidthMeters<6||road.racingWidthMeters>30||!Array.isArray(samples)||samples.some(s=>{
+    const width=variable?s.racingWidthMeters:road.racingWidthMeters;
+    return !Number.isFinite(width)||width<road.racingWidthMeters||width>30||!Number.isFinite(s.racingOffsetMeters)||!Array.isArray(s.lateralSamples)||s.lateralSamples.length<3||s.racingOffsetMeters-width/2<s.lateralSamples[0].offsetMeters||s.racingOffsetMeters+width/2>s.lateralSamples.at(-1).offsetMeters;
+   }))throw Error('invalid_race_pavement_sections');
+  }
   if(road?.surfaceModel!==undefined&&road.surfaceModel!==BANKED_ROAD_MODEL||road?.edgeBandModel!==undefined&&road.edgeBandModel!==AUTHORED_ROAD_EDGE_MODEL)throw Error('invalid_race_surface_model');
   if(road?.edgeBandModel!==undefined&&!road.heightSamples?.some(s=>s.lateralSamples))throw Error('invalid_race_road_heights');
   if(!road?.sourceId||!finitePoint(road.a)||!finitePoint(road.b)||road.driveable!==true||road.supported!==true)continue;

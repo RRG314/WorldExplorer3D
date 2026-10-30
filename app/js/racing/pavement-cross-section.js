@@ -17,5 +17,5 @@ export function racePavementCrossSection(segment,t){
  const {a,b,u}=station(segment,t),mix=(x,y)=>x+(y-x)*u;
  return {minimumMeters:mix(a.lateralSamples[0].offsetMeters,b.lateralSamples[0].offsetMeters),
   maximumMeters:mix(a.lateralSamples.at(-1).offsetMeters,b.lateralSamples.at(-1).offsetMeters),
-  racingOffsetMeters:mix(a.racingOffsetMeters,b.racingOffsetMeters),racingWidthMeters:segment.racingWidthMeters};
+  racingOffsetMeters:mix(a.racingOffsetMeters,b.racingOffsetMeters),racingWidthMeters:mix(a.racingWidthMeters??segment.racingWidthMeters,b.racingWidthMeters??segment.racingWidthMeters)};
 }

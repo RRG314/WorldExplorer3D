@@ -123,7 +123,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
       (banked?Math.min(model.surveyedSurface.maximumCrossfall,BANKED_ROAD_MAXIMUM_CROSSFALL):.15)){failure='steep_crossfall';break;}
     if(hasLateralProfile)try{
      const section=profiled?roadPavementSectionForSegment(feature,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t):null,unit=roadMetersPerWorldUnit(feature);
-     sections.push({...readPublishedLateralSection({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:profiled?[section.bankNegative*unit]:streetEdgeLateralKnots(edgeRoad,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters),...(profiled?{boundsMeters:{minimumMeters:-section.positive*unit,maximumMeters:section.negative*unit}}:{})}),...(profiled?{racingOffsetMeters:-section.bankOffset*unit}:{})});}
+     sections.push({...readPublishedLateralSection({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:profiled?[section.bankNegative*unit]:streetEdgeLateralKnots(edgeRoad,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters),...(profiled?{boundsMeters:{minimumMeters:-section.positive*unit,maximumMeters:section.negative*unit}}:{})}),...(profiled?{racingOffsetMeters:-section.bankOffset*unit,racingWidthMeters:section.bankWidth*unit-.1}:{})});}
     catch(error){failure=error.message;break;}
     samples.push({t,y,leftY,rightY});
     surfacePoints.push({x:point.x,z:point.z,y:point.y});
@@ -144,7 +144,10 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    const internalLayer=i=>`source-node:${segment.fromId}:profile:${segment.toId}:${i}`;
    const a={...surfacePoints[span.first],connectionLayer:span.first===0?`source-node:${segment.fromId}`:internalLayer(span.first)},
     b={...surfacePoints[span.last],connectionLayer:span.last===samples.length-1?`source-node:${segment.toId}`:internalLayer(span.last)};
-   const heights=samples.slice(span.first,span.last+1).map((s,i)=>({...s,t:(s.t-start)/(end-start),...(hasLateralProfile?{lateralSamples:span.profiles[i]}:{}),...(profiled?{racingOffsetMeters:sections[span.first+i].racingOffsetMeters}:{})}));
+   // The six-metre chassis admission floor is separate from the actual bank
+   // lane. Retain its variable source width with five centimetres of inset at
+   // each painted edge; the independently published apron remains physical.
+   const heights=samples.slice(span.first,span.last+1).map((s,i)=>({...s,t:(s.t-start)/(end-start),...(hasLateralProfile?{lateralSamples:span.profiles[i]}:{}),...(profiled?{racingOffsetMeters:sections[span.first+i].racingOffsetMeters,racingWidthMeters:sections[span.first+i].racingWidthMeters}:{})}));
    roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,
     ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),...(profiled?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL,racingWidthMeters:feature.surfaceSurveyEvidence.usableWidthMeters}:{}),...(hasEdges?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
     driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:heights,heightSampleSpanMeters:spanMeters,
