@@ -103,5 +103,8 @@ export function createDaytonaPerimeterExterior(T,ctx){
   lod.addLevel(near,0);lod.addLevel(far,650/unit);lod.addLevel(new T.Group(),1900/unit);
  }
  finishVenueSurface(T,root,wall,'../../assets/textures/earth/concrete_diffuse.jpg',2/unit);
+ // Keep the painted white finish. The existing concrete image supplies only
+ // subtle surface relief; multiplying its brown colour made the wall unpainted.
+ if(wall.map){wall.bumpMap=wall.map;wall.bumpScale=.012/unit;wall.map=null;wall.needsUpdate=true;}
  return {root,colliders:plan.colliders};
 }
