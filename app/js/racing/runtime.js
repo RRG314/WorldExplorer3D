@@ -172,7 +172,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
     const edge=graph.edges.find(e=>e.sourceId===road.sourceId);if(edge){for(const id of [edge.from,edge.to]){if(!labels.has(id))labels.set(id,new Set());labels.get(id).add(road.label);}}
    }
    nodeSelect.replaceChildren(...graph.nodes.map(n=>new Option(`${[...(labels.get(n.id)||[])].slice(0,2).join(' / ')||'Mapped junction'} · ${n.id+1}`,String(n.id))));
-   status(derived.events.length?`${events.length} routes available`:'No suggested routes here. Create a route or change location.');
+   status(derived.events.length?`${venue?.presentationStatus==='under-construction'?'Venue in progress · ':''}${events.length} routes available`:'No suggested routes here. Create a route or change location.');
    // Store the identity on the local scope projection, not the world owner.
    loadPublication=publication;
   } catch(error){if(current())status(message(error));}

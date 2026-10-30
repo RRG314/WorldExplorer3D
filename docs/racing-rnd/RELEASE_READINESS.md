@@ -1,6 +1,6 @@
 # Racing release readiness
 
-Updated October 29, 2026. **Full racing is not release-ready.** No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
+Updated October 30, 2026. **Full racing is not release-ready.** No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
 
 ## Implemented and evidenced
 
@@ -34,15 +34,23 @@ Updated October 29, 2026. **Full racing is not release-ready.** No production de
   53 joins and matched retained clean approach heights within 1.6 cm. This is
   local agreement with the source data, not absolute survey accuracy, a rendered
   venue, gameplay acceptance or permission to enable the unfinished pack.
-- Actual Nordschleife world loading now adopts all four retained ground grids
-  and all 53 reviewed road models. A source-transfer cancellation error was
-  repaired in the existing street overview owner. Explicit virtual raceway
-  access preserves private real-world map tags while admitting all 1,067 mapped
-  spans to the driving graph. The latest world reached play in 27.0 seconds;
-  a controlled T13 road view was inspected. Full qualification still rejects
-  36 spans across six ways because the distant terrain-based road surface
-  departs sharply from the compiled profiles. Terrain publication, T13 timing,
-  venue detail and a full driven lap remain unfinished; the pack stays closed.
+- Actual Nordschleife world loading adopts all four retained ground grids and
+  all 53 reviewed road models. Bounded local refinement now grades the distant
+  terrain through the existing owner, preserving its material attributes,
+  detailed-tile holes and seam queries. The current actual-world run qualifies
+  all 1,081 spans with no grade/crossfall rejection, and its complete ordered
+  driving graph has no breaks. The largest ground/profile departure fell from
+  35.4 m to 0.164 m. Canonical storage and four-chunk reconstruction retain that
+  connected loop. A held-key acceleration/braking check passed on the repaired
+  Lauda-Links/Bergwerk approach. This is supported geometry and a short drive;
+  venue detail, full-lap acceptance and performance remain unfinished.
+- T13 private practice now has a bounded authored timing reference on the retained
+  straight, with full source-path rotation and the existing four-car grid. Focused
+  cases cover a later junction split, saved-route reconstruction and unavailable
+  or invalid line support. It is an original game line aligned to orthophoto
+  paint, not an independently surveyed official timing marker. The event uses
+  the T13 label and explicitly describes the venue as in progress; actual-world
+  start and full-lap verification remain pending. The catalogue is still researched.
 - Full-length reviewed venues now retain bounded source membership, extent and
   identity through world qualification, canonical/chunk storage and shared
   reconstruction. Long joins and saved results carry compact metadata resolved

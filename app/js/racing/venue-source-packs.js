@@ -24,7 +24,11 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  ]),
  reviewedDeckProfiles:Object.freeze({url:'/app/assets/racing/nordschleife/decks.json',contentSha256:'586ba8daef6c299170ea0a619cec2bed4b40ba57f09cec6522f4b187fdc62647'}),
  pavementWidthPolicy:'mapped',surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:3500,
- routeExtent:'mapped-venue-v1',motorAccess:'virtual-raceway-v1',raceAdmission:'pending-timing-line'
+ routeExtent:'mapped-venue-v1',motorAccess:'virtual-raceway-v1',raceAdmission:'practice',layoutLabel:'T13',
+ // Original game timing on the retained T13 straight, aligned to the visible
+ // transverse paint in RLP DOP20. This is not a surveyed official timing marker.
+ startLine:Object.freeze({sourceFeatureId:'osm:way:41395670',segment:6,fraction:.725}),
+ presentationStatus:'under-construction'
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;
@@ -43,6 +47,13 @@ function maximumPavementWidth(source,layout,descriptor){
  const widths=layout.wayIds.map(id=>parseMeters(layout.ways.get(id).tags.width));
  if(widths.some(width=>!Number.isFinite(width)||width<usable||width>24))throw Error('venue_mapped_pavement_width_invalid');
  return Math.max(...widths);
+}
+function reviewedStartLine(descriptor,layout){
+ const line=descriptor.startLine;if(line===undefined)return undefined;
+ const id=Number(String(line?.sourceFeatureId).replace(/^osm:way:/,'')),way=layout.ways.get(id);
+ if(!layout.wayIds.includes(id)||line.sourceFeatureId!==`osm:way:${id}`||!Number.isInteger(line.segment)||line.segment<0||line.segment>=way.nodes.length-1||
+  !Number.isFinite(line.fraction)||line.fraction<=0||line.fraction>=1)throw Error('venue_start_line_invalid');
+ return Object.freeze({sourceFeatureId:line.sourceFeatureId,segment:line.segment,fraction:line.fraction});
 }
 export function createRacingVenueGroundPlan(descriptor,source){
  const layout=compileMappedVenueLayout(source),requiredArtifacts=racingVenueGroundRequirements(descriptor),coverageProbes=[];
@@ -71,6 +82,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  const layout=compileMappedVenueLayout(source);
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  maximumPavementWidth(source,layout,descriptor);
+ const startLine=reviewedStartLine(descriptor,layout);
  if(descriptor.routeExtent!==undefined&&descriptor.routeExtent!=='mapped-venue-v1')throw Error('venue_route_extent_invalid');
  const venueSource=descriptor.routeExtent?normalizeRaceVenueSource({version:1,id:descriptor.id,sourceSha256:descriptor.sourceSha256,
   mappedLengthMeters:layout.lengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,sourceFeatureIds:layout.wayIds.map(id=>`osm:way:${id}`)}):undefined;
@@ -111,6 +123,8 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   elements.set(`way:${raw.id}`,way);
  }
  return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({id:descriptor.id,name:descriptor.name,status:'source-prepared',
+  ...(startLine?{startLine,layoutLabel:descriptor.layoutLabel||'Circuit'}:{}),
+  ...(descriptor.presentationStatus?{presentationStatus:descriptor.presentationStatus}:{}),
   ...(venueSource?{venueSource}:{}),...(descriptor.raceAdmission?{raceAdmission:descriptor.raceAdmission}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
   sourceFeatureIds:Object.freeze(layout.wayIds.map(id=>`osm:way:${id}`)),mappedLengthMeters:layout.lengthMeters,
   referenceLengthMeters:layout.referenceLengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,

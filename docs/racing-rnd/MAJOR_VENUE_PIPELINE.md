@@ -193,6 +193,28 @@ metadata/status fence rather than downloading a full survey every five seconds.
 by their geometry. Deploy this supporting configuration with the coordinated
 backend candidate. No public client write or read permission is added.
 
+### Published long-venue terrain and navigation
+
+Reviewed source corridors refine the existing distant terrain mesh locally,
+using the accepted ground and the same structure grading and water owners.
+Adaptive cells share edge vertices; material attributes, detailed-tile holes
+and later seam-height refreshes remain with the same mesh. Unavailable ground,
+world replacement or the geometry budget reject preparation before adoption.
+The current Nord world uses 144,924 vertices and 240,581 triangles for this far
+mesh, within the unchanged 220,000-leaf / 500,000-vertex preparation caps. Its
+surrounding venue presentation remains unfinished.
+
+Final world publication retires an early navigation cache for a current
+reviewed venue before rebuilding from the already finalized transport model.
+This preserves its existing bridge connections rather than inferring new
+crossings. Lossless source spans between certified node/junction aliases retain
+the shared centimetre floor; generalized roads keep the legacy proximity policy.
+The current 1,067 mapped spans become 1,081 qualified navigation spans after
+certified junction splits. Actual initial navigation, canonical four-chunk
+storage and the portable ordered graph now retain one complete connected loop.
+The canonical XZ length is 20,710.455 m; the source geodesic and venue reference
+lengths remain separate. This does not establish full-lap or venue acceptance.
+
 ## Full Nordschleife source
 
 The Nordschleife descriptor explicitly grants virtual motor access to its
@@ -229,8 +251,23 @@ millimetre precision, with the existing collapsed-node check retained. A bounded
 admission remains unchanged. The source is now available for world inspection
 at its separately defined Nordschleife anchor (50.359, 6.963), backed by all four
 retained ground artifacts and the complete reviewed pavement group. The existing
-Nürburgring GP preset is unchanged. Race admission remains explicitly closed
-pending T13 timing-line and full venue/gameplay acceptance. Both OSM `pitlane` and `pit_lane` tags reject a main-course layout.
+Nürburgring GP preset is unchanged. Both OSM `pitlane` and `pit_lane` tags reject
+a main-course layout.
+
+Private practice now uses an original game timing line on the retained T13
+straight: way 41395670, segment 6, fraction 0.725 (approximately 50.337833,
+6.950706). Its placement follows the visible transverse paint in the official
+Rheinland-Pfalz DOP20 orthophotography; the imagery is source review material,
+not a bundled texture. This is not an independently surveyed official timing
+marker. The complete source path rotates to that interval, retaining every
+span; the existing course owner applies the line offset, four-car grid and
+finish gates. Certified interval splits preserve the same geographic position.
+Missing or ambiguous line support rejects assembly instead of moving the line
+to another road. Existing route references retain the rotated path and offset.
+The one- and two-lap events use the T13 label rather than GP, and the Racing
+panel and event description identify the unfinished venue. The reference
+catalogue remains researched; no completed pack or official comparable record
+is implied. Full gameplay and detailed presentation remain required.
 
 The separate `nordschleife/decks.json` source product carries all five reviewed
 bridge profiles and the nine adjoining observed pavement profiles. Its reproduction recipe pins the retained normalized observations,

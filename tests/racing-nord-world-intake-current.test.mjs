@@ -5,7 +5,7 @@ import {RACING_VENUE_SOURCES,racingVenueSourceAt,racingVenueGroundRequirements,l
 import {buildVenueRaceCourses} from '../app/js/racing/venue-courses.js';
 import {raceVenueById} from '../app/js/racing/venue-catalog.js';
 const pack=RACING_VENUE_SOURCES.find(p=>p.id==='nurburgring-nordschleife'),catalog=JSON.parse(fs.readFileSync(new URL('../app/assets/ground/manifest-catalog.json',import.meta.url)));
-test('Nord world inspection uses all four retained ground products while ordinary GP location and unfinished race admission remain separate',async()=>{
+test('Nord world inspection keeps the ground group, T13 practice and unfinished catalogue distinct from the ordinary GP location',async()=>{
  assert.equal(racingVenueSourceAt(pack.anchor),pack);assert.equal(racingVenueSourceAt({lat:50.3356,lon:6.9475}),null);
  const group=racingVenueGroundRequirements(pack);assert.equal(group.length,4);
  for(const item of group){const entry=catalog.manifests.find(m=>m.artifactId===item.artifactId);assert.equal(entry.contentSha256,item.contentSha256);
@@ -13,6 +13,7 @@ test('Nord world inspection uses all four retained ground products while ordinar
  const source=await loadRacingVenueSource(pack,{fetchImpl:async url=>new Response(fs.readFileSync(new URL('..'+url,import.meta.url)))}),
   prepared=prepareVenueSourceMerge({},source,pack,{status:'accepted',artifactIds:group.map(g=>g.artifactId),contentSha256s:group.map(g=>g.contentSha256)});
  assert.equal(prepared.metadata.sourceFeatureIds.length,53);assert.equal(prepared.metadata.venueSource.sourceFeatureIds.length,53);
- assert.equal(prepared.metadata.raceAdmission,'pending-timing-line');assert.equal(raceVenueById(pack.id).status,'researched');
- assert.throws(()=>buildVenueRaceCourses({roads:[]},prepared.metadata),/timing_line_pending/);
+ assert.equal(prepared.metadata.raceAdmission,'practice');assert.equal(raceVenueById(pack.id).status,'researched');
+ assert.deepEqual(prepared.metadata.startLine,pack.startLine);assert.equal(prepared.metadata.presentationStatus,'under-construction');
+ assert.throws(()=>buildVenueRaceCourses({roads:[]},prepared.metadata),/surface_incomplete/);
 });
