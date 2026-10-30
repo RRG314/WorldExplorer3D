@@ -415,3 +415,16 @@ the world. Geometry, contact limits and refinement distances are unchanged.
 The exact native failure point and every new probe now have finite support;
 the changed preflight also fits the already accepted Nord ground manifests.
 Native rechecking remains pending, with the failed load retained.
+
+The repaired Daytona world now loads in 27.5 seconds, retaining 17,954 roads,
+2,321 buildings and all five reviewed oval ways. All 127 spans pass raw and
+canonical qualification, with no collector rejections or junction coverage
+gaps. Normal held-key driving on the high bank retains five support samples.
+The actual view exposes the ordinary contact owner's 0.45-radian roll cap and
+highest-probe root lifting the car above the bank. That path now reuses the
+existing racing/presentation four-wheel solver only for matching, accepted
+reviewed banked roads. Ordinary, provisional, mismatched and missing-support
+cases retain their previous fallback. Three focused cases pass, including the
+reproduced high-bank fit; native verification of the correction is pending.
+The oval still needs its timing/rules, full-width pavement, smooth trackside
+presentation, pits and completed gameplay. No pack acceptance is claimed.
