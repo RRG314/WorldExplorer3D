@@ -11,15 +11,22 @@ test('a partition vertex splits both neighbours using its existing height and ex
  try{const y=index.sampleAt(p[12],p[14]);assert.ok(Math.abs(y-p[13])<.000001,'the split bank and apron reference the same original published vertex');}finally{index.dispose();}
 });
 test('conforming all three edges preserves winding, bounds, cancellation and construction capacity',async()=>{
- const p=Float32Array.from([0,0,0,10,0,0,0,0,10,5,-.1,0,5,-.1,5,0,-.1,5]),triangle=[0,2,1],result=await conformPartitionEdges(p,[triangle]),pieces=result.replacements.get(triangle);
+ const p=Float32Array.from([0,0,0,10,0,0,0,0,10,5,-.1,0,5,-.1,5,0,-.1,5,5,0,-5,10,0,10,-5,0,5]),triangle=[0,2,1],result=await conformPartitionEdges(p,[triangle,[0,3,6],[1,7,4],[0,8,5]]),pieces=result.replacements.get(triangle);
  assert.equal(pieces.length,4);assert.ok(pieces.every(t=>{const [a,b,c]=t.map(i=>i*3);return (p[b]-p[a])*(p[c+2]-p[a+2])-(p[b+2]-p[a+2])*(p[c]-p[a])<0;}));
  assert.deepEqual([...new Set(pieces.flat())].sort(),[0,1,2,3,4,5]);
- await assert.rejects(conformPartitionEdges(p,[triangle],{maximumTriangles:1}),/capacity/);
+ await assert.rejects(conformPartitionEdges(p,[triangle,[0,3,6],[1,7,4],[0,8,5]],{maximumTriangles:1}),/capacity/);
  await assert.rejects(conformPartitionEdges(p,[triangle],{pause:()=>{throw Error('superseded');}}),/superseded/);
 });
 test('a thin Float32 triangle does not insert its own opposite corner into an edge or duplicate its surface',async()=>{
  const p=Float32Array.from([0,0,0,10,0,0,5,0,.000001]),triangle=[0,1,2],result=await conformPartitionEdges(p,[triangle]);
  assert.equal(result.conformedTriangles,0);assert.equal(result.replacements.has(triangle),false);
+});
+test('retained native clustered cuts share an existing precision-equivalent vertex, without changing input coordinates or heights',async()=>{
+ const p=Float32Array.from([118.97595977783203,0,-491.6759338378906,119.73458862304688,0,-491.7931823730469,119.73468780517578,0,-491.7932434082031,119.7347412109375,0,-491.79327392578125,119.73466491699219,0,-491.793212890625]),before=p.slice(),triangles=[[0,1,3],[0,2,4]],r=await conformPartitionEdges(p,triangles);
+ assert.deepEqual(p,before);assert.equal(r.mergedVertices,1);assert.equal(r.collapsedTriangles,1);assert.ok(r.replacements.get(triangles[0]).every(t=>new Set(t).size===3));
+ const unused=await conformPartitionEdges(p,[triangles[0]]);assert.equal(unused.conformedTriangles,0,'unused cuts from discarded or detailed-hole faces cannot split a surface');
+ const bad=Float32Array.from([0,0,0,1,0,0,0,0,1,.000001,.01,0]);
+ await assert.rejects(conformPartitionEdges(bad,[[0,1,2],[3,1,2]]),/vertex_mismatch/,'conflicting heights cannot be hidden by a coordinate weld');
 });
 test('both retained native knee failures are continuous through actual terrain and pavement publication',async()=>{
  const fetchImpl=async url=>({ok:true,text:()=>fs.readFile(new URL('..'+url,import.meta.url),'utf8')});
@@ -33,10 +40,10 @@ test('both retained native knee failures are continuous through actual terrain a
   }finally{index.dispose();}
  }
 });
-test('full native pavement partitioning remains bounded on different detailed-grid phases',async()=>{
+test('full native XZ pavement partitioning remains bounded on different detailed-grid phases, with zero topology-only heights',async()=>{
  const fetchImpl=async url=>({ok:true,text:()=>fs.readFile(new URL('..'+url,import.meta.url),'utf8')});
  for(const phase of [0,.5]){
-  const f=await createDaytonaPavementSection({fetchImpl,windowOrigin:{x:-392+phase,z:-704+phase},windowSize:1184-2*phase,windowHeight:1392-2*phase,terrainSegments:64,terrainOnly:true});
+  const f=await createDaytonaPavementSection({fetchImpl,windowOrigin:{x:-392+phase,z:-704+phase},windowSize:1184-2*phase,windowHeight:1392-2*phase,terrainSegments:64,terrainOnly:true,topologyOnly:true});
   assert.equal(f.refinementStats.sourceSegments,127);assert.ok(f.refinementStats.conformedTriangles>0);assert.ok(f.refinementStats.vertices<196608);assert.ok(f.refinementStats.triangles<196608*4);
   assert.ok(f.terrain.positions.every(Number.isFinite));
  }

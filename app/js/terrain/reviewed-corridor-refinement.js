@@ -106,9 +106,9 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
  }
  let conformance;
  if(partitionTriangles){
-  conformance=await conformPartitionEdges(positions,partitionTriangles,{cellSize:outerSpacing,maximumTriangles:maximumVertices*4,pause});
+  conformance=await conformPartitionEdges(positions,partitionTriangles,{cellSize:outerSpacing,maximumTriangles:maximumVertices*4,maximumHeightMergeErrorWorld:partitionTriangle.maximumHeightMergeErrorWorld,pause});
   indices.length=0;for(const triangle of partitionTriangles)for(const next of conformance.replacements.get(triangle)||[triangle])indices.push(...next);
   for(const [root,triangles]of trianglesByCell)trianglesByCell.set(root,triangles.flatMap(t=>conformance.replacements.get(t)||[t]));
  }
- return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size,innerSpacingWorld:innerSpacing,outerSpacingWorld:outerSpacing,landscapeSpacingWorld:landscapeSpacing,...(conformance?{conformedTriangles:conformance.conformedTriangles,insertedEdgeVertices:conformance.insertedEdgeVertices}:{})}};
+ return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size,innerSpacingWorld:innerSpacing,outerSpacingWorld:outerSpacing,landscapeSpacingWorld:landscapeSpacing,...(conformance?{conformedTriangles:conformance.conformedTriangles,insertedEdgeVertices:conformance.insertedEdgeVertices,mergedPartitionVertices:conformance.mergedVertices,collapsedPartitionTriangles:conformance.collapsedTriangles}:{})}};
 }

@@ -152,3 +152,13 @@ compilation, with contact-height variation below 0.1 mm across the sampled
 20-micrometre interval. Focused topology, capacity, cancellation and unchanged
 boundary checks pass; the rendered curved-section comparison was inspected.
 These repairs still require whole-venue full-width qualification.
+
+A larger native load exposed clustered partition cuts at floating-point
+precision. The construction pass now ignores unused vertices, shares one existing
+vertex for equivalent coordinates, and removes only collapsed faces. A merged
+height must remain within the existing 3 mm publication-fit budget; a conflicting
+surface rejects. The captured clustered polygon, both native knee contacts,
+terrain/worker/contact boundaries and two complete source-layout topology grid
+phases pass 22 affected checks. The full-layout topology cases use explicit zero
+heights and do not claim native height acceptance. The latest curved-section GPU
+comparison was inspected with no WebGL error. Native admission remains pending.

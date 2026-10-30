@@ -73,5 +73,8 @@ export function createRoadBoundaryPartition(roads,venue){
   const triangles=[];for(const piece of rings)for(let i=2;i<piece.length;i++){const t=[piece[0],piece[i-1],piece[i]];if(Math.abs(area(t))>1e-10)triangles.push(t);}
   return triangles;
  };
- partition.conformEdges=banks.length>0;return partition;
+ partition.conformEdges=banks.length>0;
+ // A duplicate vertex may retain one existing height only within the same
+ // three-millimetre fit budget used by publication, converted once to world.
+ partition.maximumHeightMergeErrorWorld=.003/(Number(roads[0]?.metersPerWorldUnit)||1);return partition;
 }
