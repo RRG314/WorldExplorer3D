@@ -28,3 +28,20 @@ export function sampleNativeRaster(raster,easting,northing,errorPrefix='ground')
  }
  return value;
 }
+
+// A bounded, unchanged native pixel window is an offline source product, not a
+// resampled DEM. Its exact source window and affine are required for decoding.
+export function decodeNativeRasterWindow(metadata,bytes,{horizontalEpsg,sourceDimensions,errorPrefix='ground'}={}){
+ const fail=()=>{throw Error(`${errorPrefix}_native_window_invalid`);},m=metadata,w=m?.sourceWindow,r=m?.resolution,o=m?.sourceOrigin;
+ if(m?.schemaVersion!==1||m.encoding!=='float32-native-window-v1'||m.byteOrder!=='little-endian'||m.nativeValuesUnchanged!==true||
+  m.keys?.ProjectedCSTypeGeoKey!==horizontalEpsg||m.keys?.GTRasterTypeGeoKey!==1||
+  !Array.isArray(sourceDimensions)||sourceDimensions.length!==2||sourceDimensions.some(n=>!Number.isSafeInteger(n)||n<1)||
+  !Array.isArray(w)||w.length!==4||w.some(n=>!Number.isSafeInteger(n)||n<0)||w[2]>sourceDimensions[0]||w[3]>sourceDimensions[1]||
+  !Array.isArray(r)||r.length!==2||r[0]!==1||r[1]!==-1||!Array.isArray(o)||o.length!==3||!o.slice(0,2).every(Number.isFinite)||
+  m.width!==w[2]-w[0]||m.height!==w[3]-w[1]||m.width<=0||m.height<=0||m.width*m.height>3000000||
+  !Array.isArray(m.origin)||m.origin.length!==2||m.origin.some((n,i)=>!Number.isFinite(n)||Math.abs(n-(o[i]+w[i]*r[i]))>1e-9)||
+  !(bytes instanceof Uint8Array)||bytes.byteLength!==m.width*m.height*4||m.bytes!==bytes.byteLength||!Number.isFinite(m.nodata))fail();
+ const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),data=new Float32Array(m.width*m.height);
+ for(let i=0;i<data.length;i++)data[i]=view.getFloat32(i*4,true);
+ return {origin:m.origin,resolution:r,width:m.width,height:m.height,nodata:m.nodata,data};
+}

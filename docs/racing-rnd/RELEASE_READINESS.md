@@ -384,3 +384,25 @@ worker cases pass; both GPU views were inspected. The far terrain also refreshes
 its existing material uniforms after venue adoption, guarded against world
 replacement. Native verification of the corner remains pending. No venue pack
 is accepted by these component checks.
+
+Native verification of the exact-node corner now passes. All 1,081 spans remain
+raw/canonical valid, with no collector rejections; 43 source continuations use
+the same road owner. Canonical storage retains all spans in 14 chunks. The
+settled Hocheichen view shows the notch closed, and all ten former gap rays hit
+actual road triangles. All 43 semantic terrain materials have the intended
+near-surface preference. A real held-key crossing retains five contacts and
+positive body clearance, followed by walking with a zero-speed HUD. No page,
+console or cleanup error occurred. One cancelled geographic request is retained
+separately. This accepts the affected geometry/material boundary, not a finished
+venue pack or the final moving-frame budget.
+
+Daytona now has an exact five-way tri-oval source and a compact one-metre-source
+ground product through the existing world/ground pipeline. The unchanged native
+window and reproduction recipe retain source identity, affine, hashes, datum
+grids and licensing. The 632,448-sample artifact is 1,687,500 bytes; all 2,196
+two-metre route stations retain centre and both 6 m edge samples, including
+varying high banks. Five source/ground cases pass. Unknown source vertical
+accuracy remains explicit. Native road publication and driving are not yet
+accepted, and race admission remains pending the timing line. Oval rules, pits,
+presentation and the completed pack remain open; this does not increase the
+accepted-pack count.

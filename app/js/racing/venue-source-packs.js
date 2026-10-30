@@ -40,6 +40,14 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  // Feather inside the outer coverage border; the physical road corridor is unchanged.
  landscapeRefinement:Object.freeze({radiusMeters:350,fullHeightRadiusMeters:150,spacingMeters:32,coverageFadeMeters:70,
   coverage:Object.freeze({south:50.33179264672786,north:50.38642068124047,west:6.911350335124666,east:7.014189468850645})})
+}),Object.freeze({
+ id:'daytona-tri-oval',name:'Daytona International Speedway',anchor:Object.freeze({lat:29.185,lon:-81.071}),
+ sourceUrl:'/app/assets/racing/daytona/source.json',sourceSha256:'6add37bd68a3f9c6c8fc7aaad4da0ecd47d024b959add83b366065842247c773',
+ groundArtifactId:'daytona-tri-oval-fine-v1',groundContentSha256:'253120fe32cd96247c3d5a52a1f10298e95bf2182128d1ad31ec37f57655576b',
+ surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:1200,routeExtent:'mapped-venue-v1',
+ // The surveyed source/ground can load through the ordinary world owner.
+ // Timing, oval rules and presentation have not yet passed pack acceptance.
+ raceAdmission:'pending-timing-line',presentationStatus:'under-construction',layoutLabel:'Tri-oval'
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;
@@ -168,7 +176,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   ...(descriptor.presentationStatus?{presentationStatus:descriptor.presentationStatus}:{}),
   ...(landscapeRefinement?{landscapeRefinement}:{}),
   ...(descriptor.landscapeGroundArtifacts?{landscapeGroundArtifacts:descriptor.landscapeGroundArtifacts}:{}),
-  ...(venueSource?{venueSource}:{}),...(descriptor.raceAdmission?{raceAdmission:descriptor.raceAdmission}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
+  ...(venueSource?{venueSource}:{}),...(descriptor.raceAdmission?{raceAdmission:descriptor.raceAdmission}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase||source.source.observedAt,layoutWayIds:Object.freeze([...layout.wayIds]),
   sourceFeatureIds:Object.freeze(layout.wayIds.map(id=>`osm:way:${id}`)),mappedLengthMeters:layout.lengthMeters,
   referenceLengthMeters:layout.referenceLengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,
   groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required,retiredGeneralized})};

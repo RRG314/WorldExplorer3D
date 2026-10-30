@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "daytona-tri-oval-fine-v1",
+  "providerId": "usgs-3dep-best-available",
+  "sourceRelease": "USGS-3DEP:FL_Peninsular_2018_D18:20221020",
+  "contentSha256": "253120fe32cd96247c3d5a52a1f10298e95bf2182128d1ad31ec37f57655576b",
+  "spacingMeters": 2,
+  "coverage": {
+    "south": 29.178305790075743,
+    "north": 29.191842348645327,
+    "west": -81.07527204521983,
+    "east": -81.06213867576605
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "bare-earth-dtm",
+    "sourceCrs": "EPSG:26917+5703",
+    "targetCrs": "EPSG:9056+3855",
+    "sourceConfigurationSha256": "1efe15bf8d033ff85421af186a72dff081b2e767c6ad3e45ea188452944213f1",
+    "raster": {
+      "filename": "daytona-native-window-v1/daytona-native-window.f32",
+      "bytes": 8488800,
+      "sha256": "b1fb449aba41639d5b83915b5d6054ca0bb82d88e1e98037e104e9a7981d89bb",
+      "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/TIFF/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.tif",
+      "sourceEtag": "\"405e3dc1e0383cbba06009224e92a2b8-81\"",
+      "sourceDimensions": [
+        10012,
+        10012
+      ],
+      "metadata": {
+        "filename": "daytona-native-window-v1/metadata.json",
+        "bytes": 1247,
+        "sha256": "d043db12d0e6451a2931e6cf211f37fb2b66d244570fc065893a7fae9901cd83"
+      },
+      "authorityMetadata": {
+        "filename": "daytona-usgs-x49y323-metadata-v1.xml",
+        "bytes": 13586,
+        "sha256": "ef864de604d532a4d484b3a51eb4970b93a04dfab4f071b1ed027032db2bef4a",
+        "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/metadata/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.xml"
+      }
+    },
+    "nativeWindow": {
+      "schemaVersion": 1,
+      "encoding": "float32-native-window-v1",
+      "byteOrder": "little-endian",
+      "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/TIFF/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.tif",
+      "sourceEtag": "\"405e3dc1e0383cbba06009224e92a2b8-81\"",
+      "sourceFileBytes": 420717177,
+      "sourceWindow": [
+        2651,
+        727,
+        4001,
+        2299
+      ],
+      "sourceOrigin": [
+        489994.0000368088,
+        3230005.999995777,
+        0
+      ],
+      "origin": [
+        492645.0000368088,
+        3229278.999995777
+      ],
+      "resolution": [
+        1,
+        -1
+      ],
+      "width": 1350,
+      "height": 1572,
+      "keys": {
+        "GTModelTypeGeoKey": 1,
+        "GTRasterTypeGeoKey": 1,
+        "GTCitationGeoKey": "NAD83 / UTM zone 17N",
+        "GeogCitationGeoKey": "NAD83",
+        "GeogAngularUnitsGeoKey": 9102,
+        "ProjectedCSTypeGeoKey": 26917,
+        "ProjLinearUnitsGeoKey": 9001
+      },
+      "nodata": -999999,
+      "filename": "daytona-native-window.f32",
+      "bytes": 8488800,
+      "sha256": "b1fb449aba41639d5b83915b5d6054ca0bb82d88e1e98037e104e9a7981d89bb",
+      "minimum": 1.691146731376648,
+      "maximum": 16.714155197143555,
+      "missing": 0,
+      "nativeValuesUnchanged": true,
+      "sourceClassification": "bare-earth-dtm",
+      "sourceCrs": "EPSG:26917+5703"
+    },
+    "resampling": "bilinear at native one-metre pixel centres; every contributor required; no nodata or edge fill",
+    "sourceVerticalAccuracyMeters": null,
+    "sourceAccuracyStatement": "USGS tile metadata identifies one-metre bare-earth data acquired 2018-12-04 through 2019-04-25 and published 2022-10-20. It does not state a vertical RMSE. The reported datum-operation uncertainty excludes that unknown source accuracy; no total terrain accuracy is claimed.",
+    "normalizationUncertaintyIncludesSourceAccuracy": false,
+    "quantization": {
+      "scaleMeters": 0.01,
+      "maximumErrorMeters": 0.0049999966080758185
+    },
+    "normalization": {
+      "source": "EPSG:9056+3855",
+      "target": "EPSG:26917+5703",
+      "definition": "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad step proj=vgridshift grids=us_nga_egm08_25.tif multiplier=1 step proj=cart ellps=WGS84 step proj=helmert x=0.99343 y=-1.90331 z=-0.52655 rx=0.02591467 ry=0.00942644999999999 rz=0.01159935 s=0.00171504 dx=0.00079 dy=-0.0006 dz=-0.00134 drx=6.667e-05 dry=-0.00075744 drz=-5.133e-05 ds=-0.00010201 t_epoch=1997 convention=coordinate_frame step inv proj=cart ellps=GRS80 step inv proj=vgridshift grids=us_noaa_g2018u0.tif multiplier=1 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=17 ellps=GRS80",
+      "description": "axis order change (2D) + Inverse of WGS 84 to EGM2008 height (1) using WGS 84 to WGS 84 (G1674) + Inverse of Conversion from WGS 84 (G1674) (geocentric) to WGS 84 (G1674) (geog3D) + WGS 84 (G1674) to ITRF2008 (1) + ITRF2008 to NAD83(2011) (1) + Inverse of Conversion from NAD83(2011) (geog3D) to NAD83(2011) (geocentric) + NAD83(2011) to NAVD88 height (3) + Inverse of NAD83 to NAD83(2011) (NADCON5, CONUS) + UTM zone 17N",
+      "accuracyMeters": 5.125,
+      "pyprojVersion": "3.7.2",
+      "projVersion": "9.5.1",
+      "grids": [
+        {
+          "filename": "grids/us_nga_egm08_25.tif",
+          "bytes": 80585622,
+          "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
+          "url": "https://cdn.proj.org/us_nga_egm08_25.tif"
+        },
+        {
+          "filename": "grids/us_noaa_g2018u0.tif",
+          "url": "https://cdn.proj.org/us_noaa_g2018u0.tif",
+          "bytes": 16742155,
+          "sha256": "fa9a407ac7ee3f5a3694008e4bcd09ce9cc250452f0c3b11700a4960340abce2"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+          "bytes": 3522682,
+          "sha256": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+          "bytes": 39965338,
+          "sha256": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+          "bytes": 42709110,
+          "sha256": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+          "bytes": 9111570,
+          "sha256": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff"
+        }
+      ]
+    }
+  },
+  "attribution": {
+    "notice": "U.S. Geological Survey, 3D Elevation Program (3DEP); World Explorer 3D extracted unchanged native pixels, resampled and normalized heights, and quantized the delivery grid. No USGS endorsement.",
+    "licenseDocument": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/metadata/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.xml",
+    "sourceDocument": "https://www.usgs.gov/3d-elevation-program",
+    "modified": true
+  }
+}

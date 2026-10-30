@@ -41,7 +41,14 @@ crossfall. Reviewed long venues now bind bounded source membership and extent
 through qualification, canonical storage and authority reconstruction; the
 Nordschleife world and full-loop practice journey pass. Its explicitly admitted
 banked-road model retains the shared contact/force contract and a 70% crossfall
-ceiling. These capabilities do not themselves certify an oval or rally pack. Daytona's published 31°, Talladega's 33° and Bristol's up-to-28° banks exceed that crossfall envelope. Rally can need narrower roads, varying grip and flight/landing support. Raising numeric limits alone would bypass the reason these rules exist; extend the shared surface/controller contract and prove a complete venue before admission.
+ceiling. These capabilities do not themselves certify an oval or rally pack.
+Daytona's published 31°, Talladega's 33° and Bristol's up-to-28° banks exceed the
+ordinary 15% envelope; their crossfalls, approximately 60.1%, 64.9% and 53.2%,
+fit the reviewed model's 70% ceiling. That arithmetic is not evidence of their
+actual surface geometry, banking transitions or appropriate oval rules. Rally
+can need narrower roads, varying grip and flight/landing support. Extend the
+shared surface/controller contract where needed and prove a complete venue
+before admission.
 
 ## Data and asset acquisition
 

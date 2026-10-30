@@ -122,3 +122,39 @@ normalization operation and uncertainty. Bare-earth data excludes bridge decks;
 the reviewed DOM pavement products above supply those independent surfaces.
 Delivery spacing and quantization are not source-accuracy claims. No new source
 rasters or external artwork were acquired for this delivery step.
+
+### Daytona tri-oval geographic source
+
+`daytona/source.json` retains 26 raceway ways from one bounded native
+[OpenStreetMap API](https://api.openstreetmap.org/api/0.6/map.json?bbox=-81.087,29.175,-81.055,29.197)
+observation on October 30, 2026. © OpenStreetMap contributors, under
+[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). Mapper account and
+changeset metadata are omitted. The five selected ways form the tri-oval,
+excluding the chicanes, road-course and pit-lane alternatives. Original node
+identity and coordinates remain intact.
+
+The mapped centreline measures 4,017.926 m against the venue's 4,023.36 m
+reference; the difference is retained. The candidate 12 m usable corridor is
+authored, not a surveyed pavement boundary. API observation time is separate
+from an Overpass replication timestamp. No official artwork or logos are used.
+Reproduce with `scripts/racing/build-venue-source.mjs` and the hash-pinned raw
+response declared by `config/racing-venues/daytona-layout.json`. This source
+does not enable the unfinished venue or certify banking, timing or oval rules.
+
+### Daytona ground
+
+`../ground/daytona/` derives from public-domain USGS 3DEP one-metre bare-earth
+data, project FL_Peninsular_2018_D18, tile 17 x49y323, acquired December 2018–April
+2019 and published October 20, 2022. The
+[official tile metadata](https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/metadata/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.xml)
+records its limitations. World Explorer 3D extracted unchanged native pixels,
+resampled at native pixel centres, normalized the datum and quantized delivery.
+No USGS endorsement is implied. Unknown source vertical accuracy remains
+separate from the datum operation and delivery precision.
+
+The manifests pin NOAA GEOID18 and NADCON5 transformation grids, and the NGA
+EGM2008 grid. [NOAA grid information](https://cdn.proj.org/us_noaa_README.txt),
+[NGA grid information](https://cdn.proj.org/us_nga_README.txt). The source window
+is reproduced by `scripts/racing/extract-native-ground-window.mjs`; the shared
+ground product is reproduced by `scripts/build-usgs-venue-ground.mjs` with
+`config/racing-venues/daytona-ground.json` and the retained hash-pinned inputs.

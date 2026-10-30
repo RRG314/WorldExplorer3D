@@ -1,5 +1,43 @@
 # Major venue source pipeline
 
+## Daytona source and native ground
+
+The exact five-way tri-oval is retained in `daytona/source.json`, alongside all
+26 raceways from the finite native OpenStreetMap API observation. The original
+Overpass attempts failed upstream; the successful response is independently
+hash-bound in `config/racing-venues/daytona-layout.json`. The source recipe now
+supports complete native API node geometry as well as the preserved Overpass
+format. It rejects missing nodes and mismatched coverage, strips mapper accounts
+and keeps API observation time separate from replication-base time. Rebuilding
+the existing Silverstone source produces its exact accepted bytes and digest.
+
+`config/racing-venues/daytona-ground.json` pins an unchanged 1,350 × 1,572 pixel
+window of USGS one-metre bare-earth data. Thirteen bounded byte ranges delivered
+9,502,720 bytes from the 420,717,177-byte source object; the full raster was not
+downloaded. Source ETag, window affine, pixel digest and official tile metadata
+remain bound. `scripts/racing/extract-native-ground-window.mjs` reproduces that
+window; a replay of the retained source ranges reproduces its exact pixel and
+metadata digests. No nodata or edge filling is permitted.
+
+The existing datum preparation, global ground grid, quantizer and accepted-ground
+compiler deliver 632,448 samples in 1,687,500 bytes. Delivery spacing is 2 m in
+Web Mercator, with one-centimetre quantization. The source is EPSG:26917 with
+NAVD88 heights; the target remains WGS84(G1674)/EGM2008. Pinned GEOID18, NADCON5
+and EGM2008 grids provide one non-ballpark PROJ operation with stated uncertainty
+5.125 m. The tile metadata does not publish a vertical RMSE, so source accuracy
+remains unknown and is excluded from the reported normalization uncertainty.
+Neither delivery precision nor that operation establishes total terrain accuracy.
+Acquisition spans December 2018 through April 2019; publication is October 2022.
+
+All 2,196 two-metre route stations have finite centre and ±6 m support. Their
+observed crossfall varies approximately 4.4–57.4%; 273 stations exceed 50%.
+This is actual normalized source coverage, not native road/contact publication
+or permission to substitute a constant 31-degree tilt. The existing world and
+ground owners now admit the pinned source at its anchor. Race admission remains
+explicitly pending its timing line; oval starts/flags, pit access, detailed
+presentation and complete gameplay acceptance are still required. The catalogue
+continues to report zero finished packs.
+
 The owner confirmed on October 29 that the release must wait for the circuit,
 oval and rally packs. The accepted city core remains reusable evidence. No
 production deployment or purchase is part of source intake.

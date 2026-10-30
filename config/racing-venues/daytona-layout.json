@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "venueId": "daytona-tri-oval",
+  "source": {
+    "provider": "OpenStreetMap native API",
+    "format": "osm-api-map-json-v1",
+    "endpoint": "https://api.openstreetmap.org/api/0.6/map.json?bbox=-81.087,29.175,-81.055,29.197",
+    "observedAt": "2026-10-30T13:16:12Z",
+    "coverage": {
+      "south": 29.175,
+      "west": -81.087,
+      "north": 29.197,
+      "east": -81.055
+    },
+    "responseSha256": "f2b40b9df508c5d4c62d944bf2273b1027c49496773a3481f2e717ad60e4af3c"
+  },
+  "layout": {
+    "name": "Daytona \u00b7 tri-oval",
+    "closed": true,
+    "wayIds": [
+      11371365,
+      352067004,
+      352070311,
+      352070309,
+      352070316
+    ],
+    "referenceLengthMeters": 4023.36,
+    "referenceUrl": "https://www.daytonainternationalspeedway.com/about-daytona-international-speedway/",
+    "usableWidthMeters": 12,
+    "widthNote": "Authored candidate 12 m usable corridor; no measured pavement-width claim. Required full-width wheel/height support is not yet accepted.",
+    "timingNote": "No game start/finish line, oval rules or competitive admission accepted by source intake.",
+    "bankingNote": "Published maximum 31 degrees is a factual reference, not a substitute for measured bank geometry and transitions."
+  }
+}
