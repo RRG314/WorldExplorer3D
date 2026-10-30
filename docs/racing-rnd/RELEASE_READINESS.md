@@ -428,3 +428,11 @@ cases retain their previous fallback. Three focused cases pass, including the
 reproduced high-bank fit; native verification of the correction is pending.
 The oval still needs its timing/rules, full-width pavement, smooth trackside
 presentation, pits and completed gameplay. No pack acceptance is claimed.
+
+Native verification of the free-driving fit now passes on the same bank. All
+133 held-input frames retain four wheel contacts, with zero sampled penetration
+and a maximum sampled gap of 1.83 cm. Body roll follows approximately 0.522 rad
+instead of the old 0.45 rad cap; the root no longer carries the highest-probe
+lift. The corrected bank view and walking handback were inspected. No page,
+console or cleanup errors occurred. The unchanged 127-span qualification is
+reused; unfinished pavement width and visibly uneven outer terrain remain open.
