@@ -3851,7 +3851,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     for (const p of players.values()) {
       p.car = createRaceVehicleState(raceGridPose(course, p.slot), p.profile);
       stepRaceVehicle(course, p.car, NEUTRAL, 1 / 60, p.profile);
-      if (rolling) p.car.speed = p.car.vFwd = mphToCarSpeed2(OVAL_PACE_METERS_PER_SECOND / METERS_PER_SECOND_PER_MPH2);
+      if (rolling) p.car.speed = p.car.vFwd = mphToCarSpeed(OVAL_PACE_METERS_PER_SECOND / METERS_PER_SECOND_PER_MPH);
       p.previousFrame = snapshotRaceVehicle(p.car);
       p.progress = createRaceProgress(raceVehicleGroundPose(p.car), startAtMs);
     }

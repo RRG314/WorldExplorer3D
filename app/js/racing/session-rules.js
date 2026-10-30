@@ -2,7 +2,7 @@ import {createRaceProgress,advanceRaceProgress,raceGridPose,prepareRaceCourseGeo
 import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle}from'./vehicle-controller.js';
 import {raceAiActions,raceFormationActions}from'./ai-controller.js';
 import {OVAL_FORMATION_DURATION_MS,OVAL_PACE_METERS_PER_SECOND} from './oval-rules.js';
-import {mphToCarSpeed,METERS_PER_SECOND_PER_MPH} from '../physics/vehicle-speed-units.js';
+import {mphToCarSpeed,METERS_PER_SECOND_PER_MPH} from '../physics/vehicle-speed-units.js?v=2';
 import {raceMaximumDurationMs} from './session-limits.js';
 export {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
 const STEP_MS=1000/60,NEUTRAL=Object.freeze({steer:0,throttle:0,reverse:0,brake:0,serviceBrake:1});
