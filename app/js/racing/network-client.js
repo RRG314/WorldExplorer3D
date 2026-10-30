@@ -1,10 +1,12 @@
-import {RACE_PHYSICS_VERSION} from './record-rules.js';
+import {RACE_PHYSICS_VERSION,isCurrentRacePhysicsVersion} from './record-rules.js';
 
 // A connection belongs to one account, world and room. Retry is pumped by the
 // existing gameplay update; there is no additional browser frame/timer loop.
 export function createRaceConnection({uid,endpoint,credentials,join,isCurrent,WebSocketClass=globalThis.WebSocket,
+ physicsVersion=RACE_PHYSICS_VERSION,
  now=()=>Date.now(),onSnapshot=()=>{},onError=()=>{},onConnection=()=>{}}) {
  const url=new URL(endpoint);
+ if(!isCurrentRacePhysicsVersion(physicsVersion))throw Error('race_physics_version_changed');
  const loopback=['127.0.0.1','localhost','[::1]'].includes(url.hostname);
  if(url.pathname!=='/race'||url.search||url.hash||url.username||url.password||!(url.protocol==='wss:'||url.protocol==='ws:'&&loopback))throw Error('race_secure_service_required');
  let socket=null,revision=0,disposed=false,connecting=false,nextAttempt=0,attempts=0,latest=null,receivedAt=0,joined=false,sequence=0,lastSent=-Infinity;
@@ -32,7 +34,7 @@ export function createRaceConnection({uid,endpoint,credentials,join,isCurrent,We
      if(message.type==='error'){onError(message.reason);return;}
      if(!['joined','snapshot'].includes(message.type))return;
      const state=message.snapshot;
-     if(state?.physicsVersion!==RACE_PHYSICS_VERSION||state.courseId!==join.courseId||!Array.isArray(state.players)||state.players.length>4||!state.players.some(p=>p.uid===uid)||
+     if(state?.physicsVersion!==physicsVersion||state.courseId!==join.courseId||!Array.isArray(state.players)||state.players.length>4||!state.players.some(p=>p.uid===uid)||
       !Number.isFinite(state.serverAtMs)||latest&&state.id===latest.id&&state.serverAtMs<latest.serverAtMs)throw Error('invalid_race_snapshot');
      if(latest&&latest.id!==state.id)throw Error('race_session_replaced');
      const newlyJoined=!joined;latest=state;receivedAt=now();joined=true;connecting=false;attempts=0;sequence=Math.max(sequence,(state.players.find(p=>p.uid===uid).lastInputSequence||0)+1);

@@ -14,7 +14,7 @@ import {createActivityCompletionStore} from '../activity-discovery/completion.js
 import {personalVehicleById,personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 import {getCurrentUser} from '../../../js/auth-ui.js?v=56';
 import {getCurrentRoom} from '../multiplayer/rooms.js?v=67';
-import {racePracticeRecordKey,RACE_PHYSICS_VERSION,raceRecordConfiguration,raceCompetitiveRecordConfiguration} from './record-rules.js';
+import {racePracticeRecordKey,racePhysicsVersion,raceRecordConfiguration,raceCompetitiveRecordConfiguration} from './record-rules.js';
 import {racingPracticeStorage} from './practice-storage.js';
 import {racingCollectionSummary,racePracticeFeedback,racePracticeMetadata,raceOnlineMetadata,raceQualificationMetadata} from './driver-progress.js';
 import {carSpeedToMph} from '../physics/vehicle-speed-units.js?v=2';
@@ -381,7 +381,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    if(!current())throw Error('race_world_changed');if(!lease?.ok)throw Error(lease?.reason||'race_personal_car_lease_required');
    assertRaceCourseInDistrict(course,district);
    const options=await racingServiceOptions(owner,request.signal),courseId=await raceCourseKey(course);if(!current())throw Error('race_world_changed');
-   const connection=createRaceConnection({...options,uid:owner,join:{roomCode:room.code,worldSeed:room.world.seed,courseId,vehicleId:c.car.personalVehicleId},isCurrent:current,
+   const connection=createRaceConnection({...options,physicsVersion:racePhysicsVersion(course),uid:owner,join:{roomCode:room.code,worldSeed:room.world.seed,courseId,vehicleId:c.car.personalVehicleId},isCurrent:current,
     onError:reason=>{if(current()){if(!online?.snapshot()){stop('race_join_rejected');renderOnline();}else if(['race_reconnect_expired','race_account_changed','race_session_replaced','invalid_race_snapshot'].includes(reason)){stop(reason);c.clearControlInputState?.('race-ended');c.showToast?.(onlineMessage(reason));}status(onlineMessage(reason));}},onConnection:state=>{if(current()){if(state==='reconnecting')status('Reconnecting to the same race…');if(state==='connected')status(`Room ${room.code} · shared timing`);}},
     onSnapshot:(state,serverCourse)=>{if(!current())return;void acceptOnlineSnapshot(state,serverCourse,scope,current,owner).catch(error=>{if(current()){stop('race_start_failed');status(onlineMessage(error.message));renderOnline();}});}
    });
@@ -401,13 +401,13 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   if(state.phase==='complete'&&state.settlement==='saved'&&!controller){
    // A committed result may arrive before a local actor was adopted. Review
    // the receipt without moving/spawning a car at its finishing position.
-   if(lastResult?.id!==state.id)complete(state,{course:onlineCourse,profile:raceNetworkProfile(state.profiles[owner]),uid:owner});
+   if(lastResult?.id!==state.id)complete(state,{course:onlineCourse,profile:raceNetworkProfile(state.profiles[owner],onlineCourse),uid:owner});
    return;
   }
   const signature=state.players.map(p=>`${p.uid}:${p.vehicleId}`).join('|');
   if(signature!==onlineRoster){
    const revision=++onlineVisualRevision;onlineRoster=signature;onlinePreparing=true;renderOnline();
-   const rivals=state.players.filter(p=>p.uid!==owner).map(p=>({uid:p.uid,label:p.label,profile:raceNetworkProfile(state.profiles[p.uid])}));
+   const rivals=state.players.filter(p=>p.uid!==owner).map(p=>({uid:p.uid,label:p.label,profile:raceNetworkProfile(state.profiles[p.uid],onlineCourse)}));
    const pending=new AbortController();scope.defer(()=>pending.abort(),'online-model-preparation');let prepared;
    try{prepared=await prepareRacePresentation(THREE,c,onlineCourse,rivals,{signal:pending.signal,current:()=>current()&&revision===onlineVisualRevision});}
    catch(error){if(!current()||revision!==onlineVisualRevision)return;throw error;}
@@ -443,8 +443,8 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   saving=true;const result=lastResult,player=result.players.find(p=>p.uid===lastResultUid),id=recordId,course=lastResultCourse;
   el('[data-race-save-state]').textContent='Saving your result in the Journal…';el('[data-race-retry-save]').hidden=true;
   try {if(!player?.progress?.finished){resultSaved=true;el('[data-race-save-state]').textContent='Run ended without a finishing time. Your exploration progress is preserved.';return;}
-   const metadata=(result.receipt?.purpose==='qualification'?raceQualificationMetadata:result.receipt?raceOnlineMetadata:racePracticeMetadata)(result,player,{courseId:await raceCourseKey(course),recordKey:id,physicsVersion:RACE_PHYSICS_VERSION});
-   metadata.racingOwnerUid=lastResultOwner;metadata.raceConfiguration=result.receipt?raceCompetitiveRecordConfiguration(lastResultProfile,{slot:player.slot,participants:course.participants}):raceRecordConfiguration(lastResultProfile);
+   const metadata=(result.receipt?.purpose==='qualification'?raceQualificationMetadata:result.receipt?raceOnlineMetadata:racePracticeMetadata)(result,player,{courseId:await raceCourseKey(course),recordKey:id,physicsVersion:racePhysicsVersion(course)});
+   metadata.racingOwnerUid=lastResultOwner;metadata.raceConfiguration=result.receipt?raceCompetitiveRecordConfiguration(lastResultProfile,{slot:player.slot,participants:course.participants,course}):raceRecordConfiguration(lastResultProfile,{course});
    if(lastResult!==result)return;
    if((getCurrentUser()?.uid||'')!==lastResultOwner)throw Error('race_account_changed');
    const saved=await currentRecords().complete({id,title:course.name,sourceType:'creator'},player.progress.elapsedMs,player.pose,

@@ -6,6 +6,8 @@ import {resolveTunnelSpace}from'../world/compiler/tunnel-space-query.js';
 import {drainCooperatively,yieldToWorldFrame}from'../world/cooperative-scheduling.js?v=1';
 import {STREET_POLYGON_GRID_WORLD}from'../world/compiler/street-coordinate-grid.js';
 import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.js';
+import {assertReviewedSurfaceAccepted}from'../world/compiler/transport-surface-model.js?v=25';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL}from'../physics/road-plane-dynamics.js';
 import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
 // Read published world facts through their existing owners. Qualification never
@@ -35,6 +37,12 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    const widthMeters=minimumRoadWidthOnInterval(feature,segIndex,sourceTStart,sourceTEnd)*roadMetersPerWorldUnit(feature);
    if(length<RACE_MINIMUM_SPAN_METERS||widthMeters<6||!roadSegmentIsDriveable(feature,segIndex,sourceTStart,sourceTEnd)){rejected('width_or_access');yield;continue;}
    if(!sourceFeatureId){rejected('unstable_source');yield;continue;}
+   const model=feature.transportSurfaceModel;
+   if(feature.surfaceSurveyEvidence){
+    try{if(!model?.surveyedSurface)throw Error('missing_reviewed_surface');assertReviewedSurfaceAccepted(model);}
+    catch{rejected('unqualified_reviewed_surface');yield;continue;}
+   }
+   const banked=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
    const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[];
@@ -91,7 +99,8 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     if(!Number.isFinite(leftY)||!Number.isFinite(rightY)){failure='missing_crossfall';break;}
     const previous=samples.at(-1);
     if(previous&&Math.abs(y-previous.y)*metersPerUnit/(length/steps)>.22){failure='steep_grade';break;}
-    if(Math.max(Math.abs(y-leftY),Math.abs(y-rightY))*metersPerUnit/spanMeters>.15){failure='steep_crossfall';break;}
+    if(Math.max(Math.abs(y-leftY),Math.abs(y-rightY))*metersPerUnit/spanMeters>
+      (banked?Math.min(model.surveyedSurface.maximumCrossfall,BANKED_ROAD_MAXIMUM_CROSSFALL):.15)){failure='steep_crossfall';break;}
     samples.push({t,y,leftY,rightY});
     // Budgeted by the same construction scheduler as the world compiler.
     yield;
@@ -100,6 +109,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    const key=`${sourceFeatureId}:${segIndex}:${sourceTStart.toFixed(6)}:${sourceTEnd.toFixed(6)}`;
    const a={...firstPoint,connectionLayer:`source-node:${segment.fromId}`},b={...lastPoint,connectionLayer:`source-node:${segment.toId}`};
    roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,
+    ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),
     driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:samples,heightSampleSpanMeters:spanMeters,
     sourceAuthority:String(feature.transportRecord?.provenance?.authority||feature.sourceAuthority||'published-world-road')});
    diagnostics.eligible++;yield;

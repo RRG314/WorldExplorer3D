@@ -37,6 +37,14 @@ and car setup. Course, vehicle,
 upgrades, starting condition, grip and physics version remain part of the record
 identity. Rows are personal bests, not ranks across unlike setups.
 
+An explicitly qualified `banked-road-v1` course uses the separate
+`earth-banked-road-2026-10-29.1` physics class. Its source model is bound into
+district and course identity and reconstructed by the service. Network
+prediction, receipts, practice configurations and shared/career boards require
+that course's version. Ordinary courses retain `earth-road-2026-10-28.2` and
+their existing identities and history. No unfinished venue is enabled by this
+class distinction.
+
 New racing event IDs include owner scope and the stable run identity. Pending save
 retries keep that ID. Clearing a completion cache cannot cause a later run to reuse
 an earlier event. Account changes reject late reads/saves; guest results remain

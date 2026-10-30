@@ -1,6 +1,6 @@
 'use strict';
 const {createHash}=require('node:crypto');
-const {RACING_CAREER_LIMITS:L,verifiedCareerFinish,careerFinishEligible,racingSeriesStandings,racingRivalOutcome,RACE_PHYSICS_VERSION}=require('./generated/racing-engine.cjs');
+const {RACING_CAREER_LIMITS:L,verifiedCareerFinish,careerFinishEligible,racingSeriesStandings,racingRivalOutcome,RACE_PHYSICS_VERSION,isCurrentRacePhysicsVersion}=require('./generated/racing-engine.cjs');
 const fail=(message,status=422)=>{throw Object.assign(Error(message),{status});};
 const value=s=>s.exists?s.data():null;
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -45,7 +45,7 @@ async function knownPeer(io,uid,targetUid,roomCode,nowMs){
 async function unblocked(io,a,b){if(a===b)return;const [one,two,closingA,closingB]=await Promise.all([io.read(`users/${a}/blockedPlayers/${b}`),io.read(`users/${b}/blockedPlayers/${a}`),io.read(`captureAccountDeletions/${a}`),io.read(`captureAccountDeletions/${b}`)]);if(one||two||closingA||closingB)fail('racing_player_unavailable',403);}
 async function sharedClass(io,id){
  boardId(id);const board=await io.read(`racingBoards/${id}`),course=board&&await io.read(`racingCourses/${board.courseId}`);
- if(!board||course?.status!=='approved'||board.configuration?.physicsVersion!==RACE_PHYSICS_VERSION)fail('racing_class_unavailable',409);
+ if(!board||course?.status!=='approved'||!isCurrentRacePhysicsVersion(board.configuration?.physicsVersion)||board.configuration.physicsVersion!==(course.physicsVersion??RACE_PHYSICS_VERSION))fail('racing_class_unavailable',409);
  return {boardId:id,courseId:board.courseId,courseName:board.courseName,configuration:board.configuration};
 }
 function notify(io,uid,id,titleText,nowMs){io.set(`users/${uid}/notifications/racing-${id}`,{type:'racing_invite',title:titleText,inviteId:id,createdAtMs:nowMs});}

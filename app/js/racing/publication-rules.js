@@ -1,5 +1,6 @@
 import {buildRaceRoadGraph,createRaceCourse,sampleRaceSegmentY} from './course-rules.js';
 import {raceDistrictFingerprint,normalizeRaceRouteReference,restoreRaceCourse,raceCourseKey} from './course-library.js';
+import {racePhysicsVersion,RACE_PHYSICS_VERSION} from './record-rules.js';
 
 export {canonicalRaceDistrict} from './district-facts.js';
 import {readRaceDistrictFacts,raceDistrictChunkPath} from './district-storage.js';
@@ -22,6 +23,7 @@ export function assertRaceCourseInDistrict(course,localFacts){
  // Rebuild the entire path using currently published and collision-qualified
  // spans, including direction, decks, water, width and tunnel admission.
  const local=createRaceCourse(graph,course.sourcePath,{...course});
+ if(local.surfaceModel!==course.surfaceModel)throw Error('race_roads_changed_requalify_route');
  if(local.segments.length!==course.segments.length)throw Error('race_roads_changed_requalify_route');
  for(let i=0;i<course.segments.length;i++){
   const a=course.segments[i],b=local.segments[i];
@@ -46,6 +48,7 @@ export async function readPublishedRaceCourse({read,id,uid}){
  const pointer=await read(`racingLocations/${await raceLocationKey(facts.locationId)}`);
  if(pointer?.districtId!==record.districtId)throw Error('race_roads_changed_requalify_route');
  const course=await reconstructPublishedRace(record.reference,facts);
+ if((record.physicsVersion??RACE_PHYSICS_VERSION)!==racePhysicsVersion(course))throw Error('race_physics_version_changed');
  if(await raceCourseKey(course)!==id)throw Error('race_course_changed');
  return {...course,publication:{status:record.status,ownerUid:record.ownerUid,revision:record.revision,districtId:record.districtId,
   purpose:record.status==='approved'?(course.discipline==='time-trial'?'time-trial':'competition'):'qualification'}};

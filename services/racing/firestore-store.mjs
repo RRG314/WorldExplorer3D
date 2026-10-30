@@ -1,7 +1,7 @@
 import {Timestamp} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
 import {createRaceVehicleProfile,raceVehicleWorldPose,normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById,
- raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,RACE_PHYSICS_VERSION,prepareExplorerCreditAward,racingCareerContext} from './generated/engine.mjs';
+ raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,racePhysicsVersion,RACE_PHYSICS_VERSION,prepareExplorerCreditAward,racingCareerContext} from './generated/engine.mjs';
 import {digest} from './authority.mjs';
 const time=v=>v?.toMillis?.()??0;
 const entityId=(uid,id)=>`personal:${uid}:${id}`;
@@ -20,7 +20,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
   const [r,d,l]=await Promise.all([tx.get(db.collection('racingCourses').doc(race.courseId)),tx.get(db.collection('racingDistricts').doc(p.districtId)),
    tx.get(db.collection('racingLocations').doc(digest(String(race.course.locationId))))]);
   const current=value(r);
-  if(current?.revision!==p.revision||current.status!==p.status||value(d)?.status!=='approved'||value(l)?.districtId!==p.districtId)fail('race_course_changed');
+  if(current?.revision!==p.revision||current.status!==p.status||(current.physicsVersion??RACE_PHYSICS_VERSION)!==racePhysicsVersion(race.course)||value(d)?.status!=='approved'||value(l)?.districtId!==p.districtId)fail('race_course_changed');
  }
  function requireSeat(race,uid,roomData,player,consent,nowMs){
   if(!roomData||roomData.world?.kind!=='earth'||roomData.world?.seed!==race.worldSeed)fail('race_room_world_changed');
@@ -110,10 +110,11 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
   await db.runTransaction(async tx=>{const ref=lock(race),current=value(await tx.get(ref));if(current?.id===race.id&&current.instanceId===instanceId)tx.update(ref,{expiresAt:ts(nowMs)});});
  }
  async function settle({race,snapshot,instanceId,nowMs}){
+  const physicsVersion=racePhysicsVersion(race.course);
   const purpose=race.course.publication?.purpose||(race.course.discipline==='time-trial'?'time-trial':'competition'),qualification=purpose==='qualification';
   if(snapshot.id!==race.id||snapshot.phase!=='complete'||snapshot.players.length<(purpose==='competition'?2:1)||snapshot.players.some(p=>p.ai)||
    qualification&&(snapshot.players.length!==1||snapshot.players[0].uid!==race.course.publication.ownerUid))fail('race_result_unverified');
-  const resultRef=db.collection('racingResults').doc(race.id),fingerprint=digest({snapshot,courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION});
+  const resultRef=db.collection('racingResults').doc(race.id),fingerprint=digest({snapshot,courseId:race.courseId,physicsVersion});
   return db.runTransaction(async tx=>{
    const saved=value(await tx.get(resultRef));if(saved){if(saved.fingerprint!==fingerprint)fail('race_result_conflict');return saved.receipt;}
    requireLock(value(await tx.get(lock(race))),race,instanceId,nowMs);
@@ -121,28 +122,28 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    if(qualification){
     const p=snapshot.players[0],finished=!!p.progress?.finished&&!p.dnf&&Number.isFinite(p.progress.elapsedMs)&&p.progress.elapsedMs>0;
     if((await tx.get(db.collection('captureAccountDeletions').doc(p.uid))).exists)fail('race_account_closed');
-    const receipt={id:race.id,purpose,courseId:race.courseId,courseRevision:race.course.publication.revision,physicsVersion:RACE_PHYSICS_VERSION,
+    const receipt={id:race.id,purpose,courseId:race.courseId,courseRevision:race.course.publication.revision,physicsVersion,
      players:[{uid:p.uid,finished,timeMs:finished?p.progress.elapsedMs:null,credits:0}]};
-    if(finished)tx.update(db.collection('racingCourses').doc(race.courseId),{qualification:{resultId:race.id,revision:race.course.publication.revision,physicsVersion:RACE_PHYSICS_VERSION,timeMs:p.progress.elapsedMs,completedAt:ts(nowMs)}});
+    if(finished)tx.update(db.collection('racingCourses').doc(race.courseId),{qualification:{resultId:race.id,revision:race.course.publication.revision,physicsVersion,timeMs:p.progress.elapsedMs,completedAt:ts(nowMs)}});
     tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
-     profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),physicsVersion:RACE_PHYSICS_VERSION,createdAt:ts(nowMs)});
+     profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile,{course:race.course})])),physicsVersion,createdAt:ts(nowMs)});
     return receipt;
    }
    const rows=[],dayKey=new Date(nowMs).toISOString().slice(0,10),finishers=snapshot.players.filter(p=>!p.dnf&&p.progress?.finished).length;
    for(const p of snapshot.players){
     if((await tx.get(db.collection('captureAccountDeletions').doc(p.uid))).exists)fail('race_account_closed');
-    const profile=race.roster.get(p.uid).profile,configuration=raceCompetitiveRecordConfiguration(profile,{slot:p.slot,participants:race.course.participants}),boardId=digest({courseId:race.courseId,...configuration});
+    const profile=race.roster.get(p.uid).profile,configuration=raceCompetitiveRecordConfiguration(profile,{slot:p.slot,participants:race.course.participants,course:race.course}),boardId=digest({courseId:race.courseId,...configuration});
     const board=db.collection('racingBoards').doc(boardId),entry=board.collection('entries').doc(p.uid),career=user(p.uid).collection('racing').doc('career');
     const walletRef=user(p.uid).collection('economy').doc('wallet');
     const [previous,progress,wallet]=await Promise.all([tx.get(entry),tx.get(career),tx.get(walletRef)]);rows.push({p,configuration,boardId,board,entry,career,walletRef,wallet:value(wallet)||{},previous:value(previous),progress:value(progress)||{}});
    }
-   const receipt={id:race.id,purpose,courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION,players:[]};
+   const receipt={id:race.id,purpose,courseId:race.courseId,physicsVersion,players:[]};
    for(const row of rows){const {p,configuration,boardId,board,entry,career,previous,progress}=row;
     const finished=p.progress?.finished&&!p.dnf,eligible=finished&&Number.isFinite(p.progress.elapsedMs)&&p.progress.elapsedMs>0;
     let credits=0;
     if(eligible){
      const record={uid:p.uid,player:p.label,timeMs:p.progress.elapsedMs,runId:race.id,courseId:race.courseId,courseName:race.course.name,
-      location:race.course.locationLabel,configuration,physicsVersion:RACE_PHYSICS_VERSION,verified:true,createdAt:ts(nowMs)};
+      location:race.course.locationLabel,configuration,physicsVersion,verified:true,createdAt:ts(nowMs)};
      if(!previous||previous.timeMs>record.timeMs){
       tx.set(entry,record);
       // A paged read projection of the same accepted personal best. It never
@@ -163,7 +164,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    }
    tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
     careerContexts:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,p.careerContext||racingCareerContext({},nowMs)])),
-    profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),physicsVersion:RACE_PHYSICS_VERSION,createdAt:ts(nowMs)});
+    profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile,{course:race.course})])),physicsVersion,createdAt:ts(nowMs)});
    return receipt;
   });
  }

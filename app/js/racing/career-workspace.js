@@ -1,6 +1,6 @@
 import {readRacingCareer,commitRacingCareer,readOnlineRacingRecords} from './service-client.js';
 import {personalVehicleById} from '../transport/vehicle-garage-rules.js';
-import {RACE_PHYSICS_VERSION} from './record-rules.js';
+import {isCurrentRacePhysicsVersion} from './record-rules.js';
 
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const time=ms=>Number.isFinite(ms)?`${(ms/1000).toFixed(2)} s`:'No time';
@@ -73,7 +73,7 @@ export function mountRacingCareer(host,{ownerUid,roomCode,isCurrent=()=>true,isR
   if(historyCursor)host.append(button('More results',()=>void loadHistory(historyCursor)));
  }
  async function loadHistory(cursor){if(!active()||busy)return;const token=++historyRevision;try{const result=await api.readRacingCareer(ownerUid,{view:'history',kind:historyKind,...(cursor?{cursor}:{})},abort.signal);if(!active()||token!==historyRevision)return;historyRows=cursor?[...historyRows,...result.items]:result.items;historyCursor=result.nextCursor;render();}catch(error){if(active()&&token===historyRevision){notice=error.message;render();}}}
- async function loadClasses(reset=false){if(!active()||busy)return;const token=++classRevision;try{const result=await api.readOnlineRacingRecords({ownerUid,cursor:reset?undefined:classCursor||undefined,signal:abort.signal});if(!active()||token!==classRevision)return;for(const row of result.entries||[])if(row.configuration?.physicsVersion===RACE_PHYSICS_VERSION&&!classes.some(c=>c.id===row.id))classes.push(row);classCursor=result.nextCursor;render();}catch(error){if(active()&&token===classRevision){notice=error.message;render();}}}
+ async function loadClasses(reset=false){if(!active()||busy)return;const token=++classRevision;try{const result=await api.readOnlineRacingRecords({ownerUid,cursor:reset?undefined:classCursor||undefined,signal:abort.signal});if(!active()||token!==classRevision)return;for(const row of result.entries||[])if(isCurrentRacePhysicsVersion(row.configuration?.physicsVersion)&&!classes.some(c=>c.id===row.id))classes.push(row);classCursor=result.nextCursor;render();}catch(error){if(active()&&token===classRevision){notice=error.message;render();}}}
  async function load(showLoading=true){
   if(!active()||showLoading&&busy)return;const token=++dataRevision;if(showLoading){notice='Loading…';render();}
   try{const result=await api.readRacingCareer(ownerUid,roomCode?{roomCode}:{},abort.signal);if(!active()||token!==dataRevision)return;data=result;notice='';render();

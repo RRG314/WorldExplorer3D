@@ -16,6 +16,7 @@ export function canonicalRaceDistrict(raw){
   if(!r.sourceId||r.sourceId.length>180||!['surface','bridge','tunnel'].includes(r.structure)||!['both','forward','reverse',undefined].includes(r.direction)||r.driveable!==true||r.supported!==true)fail();
   const samples=r.heightSamples;if(!Array.isArray(samples)||samples.length<2||samples.length>250)fail();
   return {sourceId:label(r.sourceId,180),sourceFeatureId:label(r.sourceFeatureId,180),label:label(r.label,100),a:point(r.a),b:point(r.b),
+   ...(r.surfaceModel!==undefined?{surfaceModel:r.surfaceModel}:{}),
    widthMeters:number(r.widthMeters),direction:r.direction||'both',structure:r.structure,clearanceMeters:number(r.clearanceMeters||0),driveable:true,supported:true,
    heightSamples:samples.map(s=>({t:s.t,y:number(s.y),leftY:number(s.leftY),rightY:number(s.rightY)})),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
  }).sort((a,b)=>a.sourceId.localeCompare(b.sourceId));

@@ -4,6 +4,7 @@ import {tunnelObstructionMaximumY, tunnelRoofHalfWidth} from './tunnel-envelope.
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {validateReviewedDeckProfile,sampleReviewedDeckProfile} from './reviewed-deck-profile.js';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL} from '../../physics/road-plane-dynamics.js';
 import {
   polylineDistances,
   sampleProfileAtDistance
@@ -315,7 +316,10 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
   const reviewedDeck=validateReviewedDeckProfile(surfaceSurvey,mode,total,maximumGrade);
   if(surfaceSurvey&&(surfaceSurvey.version!==1||(mode!=='at_grade'&&(!reviewedDeck||!semantics.isBridge))||
     surfaceSurvey.sourceFeatureId!==String(feature.sourceFeatureId)||!surfaceSurvey.groundArtifactId||
-    !/^[a-f0-9]{64}$/.test(surfaceSurvey.groundContentSha256)||!(surfaceSurvey.maximumCrossfall>0&&surfaceSurvey.maximumCrossfall<=.7)))throw Error('invalid_reviewed_road_surface');
+    !/^[a-f0-9]{64}$/.test(surfaceSurvey.groundContentSha256)||
+    surfaceSurvey.surfaceModel!==undefined&&surfaceSurvey.surfaceModel!==BANKED_ROAD_MODEL||
+    !(surfaceSurvey.maximumCrossfall>0&&surfaceSurvey.maximumCrossfall<=
+      (surfaceSurvey.surfaceModel===BANKED_ROAD_MODEL?BANKED_ROAD_MAXIMUM_CROSSFALL:.15))))throw Error('invalid_reviewed_road_surface');
   if(reviewedDeck&&reviewedDeck.reconstructedWidthMeters+.02<compiledWidth*(Number(feature.metersPerWorldUnit)||1))throw Error('reviewed_deck_width_unavailable');
   const minimumStructureSurfaceY = Number(feature.minimumStructureSurfaceY);
   const maximumAtGradeCut = Math.max(

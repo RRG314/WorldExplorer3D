@@ -1312,6 +1312,7 @@ var require_economy_authority = __commonJS({
 // services/racing/engine-entry.mjs
 var engine_entry_exports = {};
 __export(engine_entry_exports, {
+  RACE_BANKED_PHYSICS_VERSION: () => RACE_BANKED_PHYSICS_VERSION,
   RACE_DISTRICT_STORAGE_LIMITS: () => RACE_DISTRICT_STORAGE_LIMITS,
   RACE_MAXIMUM_DURATION_MS: () => RACE_MAXIMUM_DURATION_MS,
   RACE_PHYSICS_VERSION: () => RACE_PHYSICS_VERSION,
@@ -1323,6 +1324,7 @@ __export(engine_entry_exports, {
   createRaceCourse: () => createRaceCourse,
   createRaceSession: () => createRaceSession,
   createRaceVehicleProfile: () => createRaceVehicleProfile,
+  isCurrentRacePhysicsVersion: () => isCurrentRacePhysicsVersion,
   normalizeRaceActions: () => normalizeRaceActions,
   normalizeRaceRouteReference: () => normalizeRaceRouteReference,
   normalizeVehicleGarage: () => normalizeVehicleGarage,
@@ -1337,6 +1339,7 @@ __export(engine_entry_exports, {
   raceDistrictFingerprint: () => raceDistrictFingerprint,
   raceGridPose: () => raceGridPose,
   raceMaximumDurationMs: () => raceMaximumDurationMs,
+  racePhysicsVersion: () => racePhysicsVersion,
   racePublicationIdentity: () => racePublicationIdentity,
   raceRecordConfiguration: () => raceRecordConfiguration,
   raceVehicleWorldPose: () => raceVehicleWorldPose,
@@ -1351,6 +1354,46 @@ __export(engine_entry_exports, {
   verifiedCareerFinish: () => verifiedCareerFinish
 });
 module.exports = __toCommonJS(engine_entry_exports);
+
+// app/js/physics/road-plane-dynamics.js
+var BANKED_ROAD_MODEL = "banked-road-v1";
+var BANKED_ROAD_MAXIMUM_CROSSFALL = 0.7;
+var BANKED_ROAD_MAXIMUM_ROLL = Math.atan(BANKED_ROAD_MAXIMUM_CROSSFALL);
+var ROAD_GRAVITY_METERS_PER_SECOND_SQUARED = 9.81;
+function roadPlaneForces({ pitch, roll, forwardSpeedMetersPerSecond, yawRate, tyreGrip }) {
+  if (![pitch, roll, forwardSpeedMetersPerSecond, yawRate, tyreGrip].every(Number.isFinite) || Math.abs(pitch) > 0.55 + 1e-8 || Math.abs(roll) > BANKED_ROAD_MAXIMUM_ROLL + 1e-8 || tyreGrip < 0 || tyreGrip > 1.35) throw Error("invalid_road_plane_dynamics");
+  const cp = Math.cos(pitch), cr = Math.cos(roll), sr = Math.sin(roll), g = ROAD_GRAVITY_METERS_PER_SECOND_SQUARED;
+  const horizontalSpeed = forwardSpeedMetersPerSecond * cp, curveAccelerationRight = horizontalSpeed * yawRate;
+  const gravityForward = g * Math.sin(pitch), gravityRight = -g * cp * sr;
+  const normalAcceleration = Math.max(0, g * cp * cr - curveAccelerationRight * sr), tractionAcceleration = tyreGrip * normalAcceleration;
+  const lateralDemand = curveAccelerationRight * cr - gravityRight;
+  const longitudinalTractionAcceleration = Math.sqrt(Math.max(0, tractionAcceleration ** 2 - lateralDemand ** 2));
+  const lateralResidualAcceleration = gravityRight + Math.max(-tractionAcceleration, Math.min(tractionAcceleration, lateralDemand)) - curveAccelerationRight * cr;
+  const minimumCurveAcceleration = -g * cp * (tyreGrip * cr + sr) / (cr - tyreGrip * sr);
+  const maximumCurveAcceleration = g * cp * (tyreGrip * cr - sr) / (cr + tyreGrip * sr);
+  const denominator = (horizontalSpeed < 0 ? -1 : 1) * Math.max(2, Math.abs(horizontalSpeed));
+  const first = minimumCurveAcceleration / denominator, second = maximumCurveAcceleration / denominator;
+  return Object.freeze({
+    pitch,
+    roll,
+    gravityForward,
+    gravityRight,
+    normalAcceleration,
+    tractionAcceleration,
+    lateralDemand,
+    longitudinalTractionAcceleration,
+    lateralResidualAcceleration,
+    lateralGripReserve: tractionAcceleration > 0 ? longitudinalTractionAcceleration / tractionAcceleration : 0,
+    // Insufficient static grip causes a downhill slide, not an invented steering
+    // input. Zero heading rate remains possible even outside the no-slip cone.
+    minimumYawRate: Math.min(0, first, second),
+    maximumYawRate: Math.max(0, first, second)
+  });
+}
+function roadPlaneHorizontalVelocity(forward, lateral, { pitch, roll }) {
+  if (![forward, lateral, pitch, roll].every(Number.isFinite)) throw Error("invalid_road_plane_velocity");
+  return { right: lateral * Math.cos(roll), forward: forward * Math.cos(pitch) + lateral * Math.sin(pitch) * Math.sin(roll) };
+}
 
 // app/js/racing/course-rules.js
 var RACE_COURSE_VERSION = 1;
@@ -1461,7 +1504,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
       if (heights && (!Array.isArray(heights) || heights.length < 2 || heights.length > 250 || heights.some((s, i) => !Number.isFinite(s.t) || !Number.isFinite(s.y) || s.t < 0 || s.t > 1 || i > 0 && s.t <= heights[i - 1].t) || heights[0].t !== 0 || heights.at(-1).t !== 1)) throw Error("invalid_race_road_heights");
       if (heights) {
         const span = Number(road.heightSampleSpanMeters ?? 1.2);
-        if (!(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > 0.15))) throw Error("invalid_race_road_heights");
+        if (!(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > (road.surfaceModel === BANKED_ROAD_MODEL ? BANKED_ROAD_MAXIMUM_CROSSFALL : 0.15)))) throw Error("invalid_race_road_heights");
       }
       const id = `${String(road.sourceId).slice(0, 180)}:${reverse ? "reverse" : "forward"}`, edge = {
         id,
@@ -1477,12 +1520,14 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
         edge.heightSamples = reverse ? heights.map((s) => ({ ...s, t: 1 - s.t, leftY: s.rightY, rightY: s.leftY })).reverse() : heights.map((s) => ({ ...s }));
         edge.heightSampleSpanMeters = Number(road.heightSampleSpanMeters) || 1.2;
       }
+      if (road.surfaceModel) edge.surfaceModel = road.surfaceModel;
       if (edgeIds.has(id)) throw Error("duplicate_race_road_identity");
       edgeIds.add(id);
       edges.push(edge);
       if (!outgoing.has(a)) outgoing.set(a, []);
       outgoing.get(a).push(edge);
     };
+    if (road?.surfaceModel !== void 0 && road.surfaceModel !== BANKED_ROAD_MODEL) throw Error("invalid_race_surface_model");
     if (!road?.sourceId || !finitePoint(road.a) || !finitePoint(road.b) || road.driveable !== true || road.supported !== true) continue;
     const length = distance(road.a, road.b) * metersPerUnit, width = Number(road.widthMeters);
     if (length < RACE_MINIMUM_SPAN_METERS || !Number.isFinite(width) || width < minimumWidth || Math.abs(road.b.y - road.a.y) * metersPerUnit / length > maximumGrade) continue;
@@ -1564,6 +1609,7 @@ function createRaceCourse(graph, path, settings = {}) {
     startOffsetMeters: closed ? Number(settings.startOffsetMeters ?? edges[0].length * 0.5) : null,
     name: clean(settings.name) || "Mapped road run",
     description: String(settings.description || "").trim().slice(0, 400),
+    ...edges.some((e) => e.surfaceModel === BANKED_ROAD_MODEL) ? { surfaceModel: BANKED_ROAD_MODEL } : {},
     locationId: clean(settings.locationId),
     locationLabel: clean(settings.locationLabel),
     anchor: settings.anchor ? { lat: Number(settings.anchor.lat), lon: Number(settings.anchor.lon) } : null,
@@ -1705,46 +1751,6 @@ function advanceRaceProgress(course, progress, pose, nowMs, { startedAtMs, maxim
     }
   }
   return next;
-}
-
-// app/js/physics/road-plane-dynamics.js
-var BANKED_ROAD_MODEL = "banked-road-v1";
-var BANKED_ROAD_MAXIMUM_CROSSFALL = 0.7;
-var BANKED_ROAD_MAXIMUM_ROLL = Math.atan(BANKED_ROAD_MAXIMUM_CROSSFALL);
-var ROAD_GRAVITY_METERS_PER_SECOND_SQUARED = 9.81;
-function roadPlaneForces({ pitch, roll, forwardSpeedMetersPerSecond, yawRate, tyreGrip }) {
-  if (![pitch, roll, forwardSpeedMetersPerSecond, yawRate, tyreGrip].every(Number.isFinite) || Math.abs(pitch) > 0.55 + 1e-8 || Math.abs(roll) > BANKED_ROAD_MAXIMUM_ROLL + 1e-8 || tyreGrip < 0 || tyreGrip > 1.35) throw Error("invalid_road_plane_dynamics");
-  const cp = Math.cos(pitch), cr = Math.cos(roll), sr = Math.sin(roll), g = ROAD_GRAVITY_METERS_PER_SECOND_SQUARED;
-  const horizontalSpeed = forwardSpeedMetersPerSecond * cp, curveAccelerationRight = horizontalSpeed * yawRate;
-  const gravityForward = g * Math.sin(pitch), gravityRight = -g * cp * sr;
-  const normalAcceleration = Math.max(0, g * cp * cr - curveAccelerationRight * sr), tractionAcceleration = tyreGrip * normalAcceleration;
-  const lateralDemand = curveAccelerationRight * cr - gravityRight;
-  const longitudinalTractionAcceleration = Math.sqrt(Math.max(0, tractionAcceleration ** 2 - lateralDemand ** 2));
-  const lateralResidualAcceleration = gravityRight + Math.max(-tractionAcceleration, Math.min(tractionAcceleration, lateralDemand)) - curveAccelerationRight * cr;
-  const minimumCurveAcceleration = -g * cp * (tyreGrip * cr + sr) / (cr - tyreGrip * sr);
-  const maximumCurveAcceleration = g * cp * (tyreGrip * cr - sr) / (cr + tyreGrip * sr);
-  const denominator = (horizontalSpeed < 0 ? -1 : 1) * Math.max(2, Math.abs(horizontalSpeed));
-  const first = minimumCurveAcceleration / denominator, second = maximumCurveAcceleration / denominator;
-  return Object.freeze({
-    pitch,
-    roll,
-    gravityForward,
-    gravityRight,
-    normalAcceleration,
-    tractionAcceleration,
-    lateralDemand,
-    longitudinalTractionAcceleration,
-    lateralResidualAcceleration,
-    lateralGripReserve: tractionAcceleration > 0 ? longitudinalTractionAcceleration / tractionAcceleration : 0,
-    // Insufficient static grip causes a downhill slide, not an invented steering
-    // input. Zero heading rate remains possible even outside the no-slip cone.
-    minimumYawRate: Math.min(0, first, second),
-    maximumYawRate: Math.max(0, first, second)
-  });
-}
-function roadPlaneHorizontalVelocity(forward, lateral, { pitch, roll }) {
-  if (![forward, lateral, pitch, roll].every(Number.isFinite)) throw Error("invalid_road_plane_velocity");
-  return { right: lateral * Math.cos(roll), forward: forward * Math.cos(pitch) + lateral * Math.sin(pitch) * Math.sin(roll) };
 }
 
 // app/js/controls/traversal-control-policy.js?v=9
@@ -3888,6 +3894,7 @@ async function raceDistrictFingerprint(district) {
       a: r.a,
       b: r.b,
       width: r.widthMeters,
+      ...r.surfaceModel ? { surfaceModel: r.surfaceModel } : {},
       direction: r.direction || "both",
       structure: r.structure,
       clearance: r.clearanceMeters,
@@ -3926,6 +3933,7 @@ async function raceCourseKey(course) {
     version: course.version,
     location: course.locationId,
     anchor: course.anchor,
+    ...course.surfaceModel ? { surfaceModel: course.surfaceModel } : {},
     discipline: course.discipline,
     laps: course.laps,
     segments: course.segments
@@ -3936,10 +3944,17 @@ async function raceCourseKey(course) {
 
 // app/js/racing/record-rules.js
 var RACE_PHYSICS_VERSION = "earth-road-2026-10-28.2";
-function raceRecordConfiguration(profile) {
+var RACE_BANKED_PHYSICS_VERSION = "earth-banked-road-2026-10-29.1";
+function racePhysicsVersion(course) {
+  if (course?.surfaceModel === void 0) return RACE_PHYSICS_VERSION;
+  if (course.surfaceModel === BANKED_ROAD_MODEL) return RACE_BANKED_PHYSICS_VERSION;
+  throw Error("invalid_race_surface_model");
+}
+var isCurrentRacePhysicsVersion = (version) => version === RACE_PHYSICS_VERSION || version === RACE_BANKED_PHYSICS_VERSION;
+function raceRecordConfiguration(profile, { course } = {}) {
   if (!profile?.vehicleId || !Number.isFinite(profile.conditionValue)) throw Error("invalid_race_record_profile");
   return {
-    physicsVersion: RACE_PHYSICS_VERSION,
+    physicsVersion: racePhysicsVersion(course),
     vehicleId: profile.vehicleId,
     condition: profile.conditionValue,
     grip: profile.surface.grip,
@@ -3948,9 +3963,9 @@ function raceRecordConfiguration(profile) {
     boost: false
   };
 }
-function raceCompetitiveRecordConfiguration(profile, { slot, participants }) {
+function raceCompetitiveRecordConfiguration(profile, { slot, participants, course }) {
   if (!Number.isInteger(participants) || participants < 1 || participants > 4 || !Number.isInteger(slot) || slot < 0 || slot >= participants) throw Error("invalid_race_record_grid");
-  return { ...raceRecordConfiguration(profile), gridRow: Math.floor(slot / 2), gridParticipants: participants, timing: "grid-to-finish" };
+  return { ...raceRecordConfiguration(profile, { course }), gridRow: Math.floor(slot / 2), gridParticipants: participants, timing: "grid-to-finish" };
 }
 
 // services/racing/engine-entry.mjs
@@ -3983,6 +3998,7 @@ function canonicalRaceDistrict(raw) {
       label: label(r.label, 100),
       a: point(r.a),
       b: point(r.b),
+      ...r.surfaceModel !== void 0 ? { surfaceModel: r.surfaceModel } : {},
       widthMeters: number(r.widthMeters),
       direction: r.direction || "both",
       structure: r.structure,
@@ -4084,6 +4100,7 @@ function assertRaceCourseInDistrict(course, localFacts) {
   if (course.locationId !== localFacts.locationId || Math.abs(course.anchor.lat - localFacts.anchor.lat) > 1e-7 || Math.abs(course.anchor.lon - localFacts.anchor.lon) > 1e-7 || course.metersPerUnit !== localFacts.metersPerUnit) throw Error("race_course_wrong_world");
   const graph = buildRaceRoadGraph(localFacts.roads, { metersPerUnit: localFacts.metersPerUnit }), byId = new Map(graph.edges.map((e) => [e.id, e]));
   const local = createRaceCourse(graph, course.sourcePath, { ...course });
+  if (local.surfaceModel !== course.surfaceModel) throw Error("race_roads_changed_requalify_route");
   if (local.segments.length !== course.segments.length) throw Error("race_roads_changed_requalify_route");
   for (let i = 0; i < course.segments.length; i++) {
     const a = course.segments[i], b = local.segments[i];
@@ -4113,6 +4130,7 @@ async function readPublishedRaceCourse({ read, id, uid }) {
   const pointer = await read(`racingLocations/${await raceLocationKey(facts.locationId)}`);
   if (pointer?.districtId !== record.districtId) throw Error("race_roads_changed_requalify_route");
   const course = await reconstructPublishedRace(record.reference, facts);
+  if ((record.physicsVersion ?? RACE_PHYSICS_VERSION) !== racePhysicsVersion(course)) throw Error("race_physics_version_changed");
   if (await raceCourseKey(course) !== id) throw Error("race_course_changed");
   return { ...course, publication: {
     status: record.status,
@@ -4169,6 +4187,7 @@ function racingRivalOutcome(challenge) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  RACE_BANKED_PHYSICS_VERSION,
   RACE_DISTRICT_STORAGE_LIMITS,
   RACE_MAXIMUM_DURATION_MS,
   RACE_PHYSICS_VERSION,
@@ -4180,6 +4199,7 @@ function racingRivalOutcome(challenge) {
   createRaceCourse,
   createRaceSession,
   createRaceVehicleProfile,
+  isCurrentRacePhysicsVersion,
   normalizeRaceActions,
   normalizeRaceRouteReference,
   normalizeVehicleGarage,
@@ -4194,6 +4214,7 @@ function racingRivalOutcome(challenge) {
   raceDistrictFingerprint,
   raceGridPose,
   raceMaximumDurationMs,
+  racePhysicsVersion,
   racePublicationIdentity,
   raceRecordConfiguration,
   raceVehicleWorldPose,

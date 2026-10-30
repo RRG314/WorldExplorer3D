@@ -1,5 +1,5 @@
 import {randomUUID,createHash} from 'node:crypto';
-import {createRaceSession,RACE_PHYSICS_VERSION,raceRecordConfiguration,raceCourseKey,raceGridPose} from './generated/engine.mjs';
+import {createRaceSession,racePhysicsVersion,raceRecordConfiguration,raceCourseKey,raceGridPose} from './generated/engine.mjs';
 
 export const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const CODE=/^[A-Z0-9]{6}$/;
@@ -23,8 +23,8 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
  const races=new Map(),connections=new Map(),joinFlights=new Map();let closed=false;
  const send=(client,payload)=>client?.send(payload);
  function broadcast(race,payload){for(const uid of race.roster.keys()){const client=connections.get(uid);if(client?.race===race)send(client,payload);}}
- function envelope(race){return {...(race.finalSnapshot||race.session.snapshot()),courseId:race.courseId,physicsVersion:RACE_PHYSICS_VERSION,
-  profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile)])),
+ function envelope(race){return {...(race.finalSnapshot||race.session.snapshot()),courseId:race.courseId,physicsVersion:racePhysicsVersion(race.course),
+  profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile,{course:race.course})])),
   purpose:race.course.publication?.purpose||'competition',settlement:race.settlement,receipt:race.receipt||null};}
  function detach(client){if(connections.get(client.uid)!==client)return;connections.delete(client.uid);const race=client.race;
   client.race=null;

@@ -61,6 +61,23 @@ render as road ribbons, and retained diagnostic profiles are never promoted in
 place. This changes compilation order, not the permitted surface envelope or
 the supported race controller model.
 
+Banked pavement requires the explicit `banked-road-v1` model in the private
+reviewed source annotation. The compiler validates its bound against the shared
+driving kernel's 0.7 maximum crossfall. Ordinary reviewed pavement retains 0.15.
+Only finalized compiled evidence can grant banked qualification, which still
+samples the actual published road top and wheel positions. Provider tags cannot
+grant it. Canonical district facts and chunk hashes retain the model; selected
+source edges determine the resulting course controller. Player route settings
+cannot opt an ordinary road into banked handling.
+
+The model belongs to district and course identity. Service reconstruction,
+qualification receipts, moderation, curation, network snapshots, driver profiles,
+Journal configurations, shared boards and career classes use its separate physics
+version. Existing ordinary course fingerprints and physics versions remain
+unchanged. These contracts do not enable a source pack: the Nordschleife still
+needs its public reviewed profiles, long-course admission, complete supported
+world, presentation and gameplay acceptance.
+
 The loader reads each reviewed source once, before preparing terrain. It plans
 ground probes at no more than two-metre spacing down the entire mapped route,
 including both pavement edges plus a two-metre margin. The existing accepted
