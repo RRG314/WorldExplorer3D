@@ -66,9 +66,20 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   cannot publish into a replacement world. Six focused ownership/geometry checks
   pass. The same view exposed race paint being overwritten by later pavement;
   a controlled render-order probe confirmed the cause, and race paint now uses
-  the normal marking layer. These two repairs still need their final affected
-  world view. They do not complete venue art, kerbs, runoff, pits, landscape or
-  full-lap acceptance.
+  the normal marking layer. The final actual-world view now shows the paint and complete fitted stand;
+  326 sampled terrace-top positions clear the graded ground. This does not
+  complete venue art, kerbs, runoff, pits or landscape.
+- Frozen `e451ab40` completed the full 20.710 km Nordschleife T13 practice
+  loop through all 784 ordered gates, with zero barrier contacts or timing
+  penalties. Actual Results confirmed the Journal save and walking return.
+  The recorded 19:22.16 includes stationary inspection after countdown, so it
+  is not a comparative driving-time claim. The driver used uninterrupted
+  Chromium touch steering with held keyboard pedals and controlled grid setup;
+  it was scripted, not a human or physical-phone test. One moving 60-second
+  desktop-host sample at a landscape phone viewport measured 60.00 FPS,
+  p95 18.3 ms, p99 18.6 ms, worst 18.8 ms and no frame over 250 ms. No page,
+  console or cleanup errors occurred. The full-lap gameplay boundary now passes;
+  the detailed venue pack remains unfinished and is not production acceptance.
 - Full-length reviewed venues now retain bounded source membership, extent and
   identity through world qualification, canonical/chunk storage and shared
   reconstruction. Long joins and saved results carry compact metadata resolved

@@ -289,7 +289,9 @@ to another road. Existing route references retain the rotated path and offset.
 The one- and two-lap events use the T13 label rather than GP, and the Racing
 panel and event description identify the unfinished venue. The reference
 catalogue remains researched; no completed pack or official comparable record
-is implied. Full gameplay and detailed presentation remain required.
+is implied. The actual full-loop one-lap practice journey now passes all 784
+ordered gates with a clean finish, Journal save and ordinary walking return.
+Detailed presentation and final coordinated release acceptance remain required.
 
 The separate `nordschleife/decks.json` source product carries all five reviewed
 bridge profiles and the nine adjoining observed pavement profiles. Its reproduction recipe pins the retained normalized observations,
