@@ -24,9 +24,10 @@ export function reserveDaytonaGrandstandRepresentations(ctx){
  for(const mesh of ctx.buildingMeshes||[])if(!mesh.userData?.reviewedVenueExterior&&isDaytonaStandRepresentation(mesh.userData,footprint)){
   mesh.userData.deferredReviewedExterior='daytona-tri-oval';if(mesh.userData.sourceBuildingId)sources.add(mesh.userData.sourceBuildingId);
  }
- // Generic roof details lack a footprint. Their existing stable body identity
- // transfers custody only after that body's outline has matched this venue.
- for(const mesh of ctx.buildingMeshes||[])if(mesh.userData?.isRoofDetail&&sources.has(mesh.userData.sourceBuildingId))mesh.userData.deferredReviewedExterior='daytona-tri-oval';
+ // Some source-owned visual adjuncts lack their body footprint or roof flag.
+ // Their stable body identity transfers custody only after the body outline
+ // has matched this venue; neighbouring source identities remain separate.
+ for(const mesh of ctx.buildingMeshes||[])if(sources.has(mesh.userData?.sourceBuildingId))mesh.userData.deferredReviewedExterior='daytona-tri-oval';
 }
 // Half-plane clipping of already triangulated source geometry preserves the
 // indented mapped outline, including disjoint concourse/access-bay slices.

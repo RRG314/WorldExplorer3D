@@ -49,7 +49,7 @@ test('the real mid-building batch keeps deferred stand bodies and roofs individu
  globalThis.THREE=T;
  const {ctx:runtime}=await import('../app/js/shared-context.js?v=55'),{batchMidLodBuildingMeshes}=await import('../app/js/world/building-batching.js?v=15');
  const ctx=context(),scene=new T.Scene(),footprint=DAYTONA_STAND_FOOTPRINT.map(p=>ctx.geoToWorld(p.lat,p.lon)),material=new T.MeshStandardMaterial(),stand=new T.Mesh(new T.BoxGeometry(),material),roof=new T.Mesh(new T.BoxGeometry(),material),others=[0,1].map(()=>new T.Mesh(new T.BoxGeometry(),material));
- stand.userData={sourceBuildingId:'provider:stand',buildingFootprint:footprint,lodTier:'mid'};roof.userData={sourceBuildingId:'provider:stand',isRoofDetail:true,lodTier:'mid'};others.forEach((m,i)=>{m.position.x=i*3;m.userData={sourceBuildingId:'neighbor:'+i,lodTier:'mid'};});scene.add(stand,roof,...others);
+ stand.userData={sourceBuildingId:'provider:stand',buildingFootprint:footprint,lodTier:'mid'};roof.userData={sourceBuildingId:'provider:stand',lodTier:'mid'};others.forEach((m,i)=>{m.position.x=i*3;m.userData={sourceBuildingId:'neighbor:'+i,lodTier:'mid'};});scene.add(stand,roof,...others);
  Object.assign(ctx,{buildingMeshes:[stand,roof,...others],buildings:[],dynamicBuildingColliders:[],replaceWorldCollection(k,v){this[k]=v;},addEarthWorldObject:m=>scene.add(m)});
  publishReviewedVenueExteriors(ctx,T);assert.equal(stand.userData.deferredReviewedExterior,'daytona-tri-oval');assert.equal(roof.userData.deferredReviewedExterior,'daytona-tri-oval');assert.equal(others[0].userData.deferredReviewedExterior,undefined);
  Object.assign(runtime,{buildingMeshes:ctx.buildingMeshes,replaceWorldCollection(k,v){this[k]=v;},addEarthWorldObject:m=>scene.add(m)});

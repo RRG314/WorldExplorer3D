@@ -481,9 +481,10 @@ body/roof retention, neighbouring batch preservation and unavailable-ground
 fallback. Native replacement must be rechecked at this publication boundary.
 
 The native follow-up removed the windowed body and exposed the seating. It
-also identified an unfootprinted generic roof detail in a second shared batch.
-The reservation now includes roof details only through a stable provider body
-identity whose outline has already matched the stand. The same deferred
-publisher retires those reserved details on successful adoption. The exact
-missing-footprint roof case fails before this correction and passes afterward;
-original visuals still survive an unavailable-ground replacement.
+also identified a remaining copied visual under the same provider building ID.
+Roof-only reservation did not cover every source-owned adjunct. Reservation
+therefore includes all visuals carrying that stable provider body identity,
+after the body's outline has matched the venue. Neighbouring identities remain
+separate. The missing-footprint and unlabelled-adjunct cases fail before their
+corrections and pass afterward; an unavailable-ground replacement preserves the
+original visuals. Native absence of every obsolete batch range remains pending.
