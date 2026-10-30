@@ -645,7 +645,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
         oldGrid={xValues,zValues,worldYs,boundaryTriangles,detailedCoverage:spec.detailedCoverage};
       const active=()=>current()&&appCtx.worldLoadRuntimeState===runtime&&!mesh.userData?.farFieldDisposed;
       const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:positionData,segments,current:active,yieldWork,
-        innerSpacing:2*scale,outerSpacing:8*scale,
+        innerSpacing:3*scale,outerSpacing:8*scale,
         skipCell:c=>cellFullyInsideDetailedCoverage(c.minX,c.maxX,c.minZ,c.maxZ,spec.detailedCoverage),
         heightAt:(x,z,candidates)=>{
           const seam=detailHeightAt(lines,'x',x,z)??detailHeightAt(lines,'z',x,z);

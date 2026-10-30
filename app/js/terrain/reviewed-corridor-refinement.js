@@ -43,7 +43,7 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
    if(nearby.length&&Math.max(cell.maxX-cell.minX,cell.maxZ-cell.minZ)>spacing+1e-7){
     const x=coordinate((cell.minX+cell.maxX)/2),z=coordinate((cell.minZ+cell.maxZ)/2);
     for(const [minX,maxX]of [[cell.minX,x],[x,cell.maxX]])for(const[minZ,maxZ]of [[cell.minZ,z],[z,cell.maxZ]])pending.push({cell:{...cell,minX,maxX,minZ,maxZ},candidates:nearby});
-   }else{leaves.push(cell);if(leaves.length>maximumLeaves)throw Error('reviewed_terrain_refinement_capacity');}
+   }else{leaves.push(cell);if(leaves.length>maximumLeaves)throw Error(`reviewed_terrain_refinement_capacity: leaves ${leaves.length}/${maximumLeaves}`);}
    if(++work%128===0)await pause();
   }
  }
@@ -65,7 +65,7 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
  for(let i=0;i<positions.length;i+=3)if(!byPoint.has(key(positions[i],positions[i+2])))byPoint.set(key(positions[i],positions[i+2]),i/3);
  function vertex(x,z,root){
   x=coordinate(x);z=coordinate(z);const id=key(x,z);let index=byPoint.get(id);
-  if(index===undefined){index=positions.length/3;if(index>=maximumVertices)throw Error('reviewed_terrain_refinement_capacity');byPoint.set(id,index);positions.push(x,0,z);}
+  if(index===undefined){index=positions.length/3;if(index>=maximumVertices)throw Error(`reviewed_terrain_refinement_capacity: vertices ${index}/${maximumVertices}`);byPoint.set(id,index);positions.push(x,0,z);}
   if(!updated.has(index)){
    const y=heightAt(x,z,roots.get(root)||[]);if(!Number.isFinite(y))throw Error('reviewed_terrain_ground_unavailable');positions[index*3+1]=Math.fround(y);updated.add(index);
   }
@@ -87,5 +87,5 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
   if(trianglesByCell.has(c.root))trianglesByCell.get(c.root).push(...triangles);
   await pause();
  }
- return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size}};
+ return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size,innerSpacingWorld:innerSpacing,outerSpacingWorld:outerSpacing}};
 }
