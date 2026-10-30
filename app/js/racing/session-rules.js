@@ -1,9 +1,10 @@
-import {createRaceProgress,advanceRaceProgress,raceGridPose,prepareRaceCourseGeometry,projectRacePosition}from'./course-rules.js';
+import {createRaceProgress,advanceRaceProgress,raceGridPose,prepareRaceCourseGeometry,projectRacePosition,raceProjectionOutsidePavement}from'./course-rules.js';
 import {createRaceVehicleState,stepRaceVehicle,raceVehicleGroundPose,snapshotRaceVehicle,raceVehicleSpeedMetersPerSecond}from'./vehicle-controller.js';
 import {raceAiActions,raceFormationActions}from'./ai-controller.js';
 import {OVAL_FORMATION_DURATION_MS,OVAL_PACE_METERS_PER_SECOND,OVAL_CAUTION_DURATION_MS,OVAL_ORDER_PENALTY_MS,OVAL_MERGE_CLEARANCE_METERS,ovalTrackZone,ovalPaceActions,ovalDistanceGap,ovalDraftActor,ovalDraftReduction} from './oval-rules.js';
 import {mphToCarSpeed,METERS_PER_SECOND_PER_MPH} from '../physics/vehicle-speed-units.js?v=2';
 import {raceMaximumDurationMs} from './session-limits.js';
+import {createRacePitGeometry,racePitEntryNearby,racePitGateCrossing,racePitMappedDistance,racePitPavementAt} from './pit-lane-rules.js';
 export {RACE_MAXIMUM_DURATION_MS} from './session-limits.js';
 const STEP_MS=1000/60,NEUTRAL=Object.freeze({steer:0,throttle:0,reverse:0,brake:0,serviceBrake:1});
 const FORMATION_MS=OVAL_FORMATION_DURATION_MS,FORMATION_TICKS=Math.round(FORMATION_MS/STEP_MS);
@@ -20,11 +21,12 @@ export function normalizeRaceActions(value){
 // rewards. No timer, database, renderer, global room registry or wallet here.
 export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurationMs,onComplete=()=>{}}){
  if(!id||!course||!creatorUid||!Number.isFinite(createdAtMs))throw Error('invalid_race_session');
+ if(course.pitLane&&course.discipline!=='oval')throw Error('race_pit_discipline_unavailable');
  const allowedDurationMs=raceMaximumDurationMs(course);
  maximumDurationMs??=allowedDurationMs;
  if(!Number.isFinite(maximumDurationMs)||maximumDurationMs<=0||maximumDurationMs>allowedDurationMs)throw Error('invalid_race_duration');
  course=prepareRaceCourseGeometry(structuredClone(course));
- const rolling=course.discipline==='oval',players=new Map();let phase='lobby',leaderUid=creatorUid,startAtMs=null,tick=0,formationTick=0,formationComplete=false,lastNow=createdAtMs,completedAtMs=null,reason='',outcomeEmitted=false,cautionUntilMs=0;
+ const rolling=course.discipline==='oval',pitGeometry=createRacePitGeometry(course),players=new Map();let phase='lobby',leaderUid=creatorUid,startAtMs=null,tick=0,formationTick=0,formationComplete=false,lastNow=createdAtMs,completedAtMs=null,reason='',outcomeEmitted=false,cautionUntilMs=0;
  const activeHumans=()=>[...players.values()].filter(p=>!p.ai&&!p.left);
  function participant(uid){const p=players.get(uid);if(!p)throw Error('race_not_joined');return p;}
  function lobby(){if(phase!=='lobby')throw Error('race_roster_locked');}
@@ -34,7 +36,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
   if(!handling||handling.width>envelope.widthMeters||handling.length>envelope.lengthMeters||handling.height>envelope.heightMeters)throw Error('race_vehicle_exceeds_course_envelope');
   const p={uid,label:String(label||'Explorer').slice(0,40),profile,ai:ai===true,difficulty:Math.max(0,Math.min(1,Number(difficulty)||.65)),ready:ai===true,
    slot:players.size,car:null,previousFrame:null,progress:null,lastSequence:-1,queue:[],actions:NEUTRAL,lastControlAt:-Infinity,disconnectedAt:null,left:false,dnf:false,
-   ovalZone:null,ovalRestricted:false,ovalPassed:new Set(),ovalPenaltyReason:null,ovalDraft:0};
+   ovalZone:null,ovalRestricted:false,ovalPassed:new Set(),ovalPenaltyReason:null,ovalDraft:0,pitProgress:null,pitTimingProgress:null,pitCommitted:false,pitEnteredAt:null,pitEntrySpeed:0,pitVisits:0};
   players.set(uid,p);for(const other of players.values())if(!other.ai)other.ready=false;return snapshot();
  }
  function setReady(uid,ready){lobby();const p=participant(uid);if(p.ai)throw Error('race_rival_control_forbidden');p.ready=ready===true;return snapshot();}
@@ -86,31 +88,74 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
  }
  function ovalPositions(){
   return new Map([...players.values()].filter(p=>!p.dnf&&!p.progress.finished).map(p=>{
-   const projection=projectRacePosition(course,raceVehicleGroundPose(p.car));
-   const zone=ovalTrackZone(projection),speed=raceVehicleSpeedMetersPerSecond(p.car);
-   return [p.uid,{projection,zone,speed:Math.abs(speed),contacts:p.car.barrierContacts,draftActor:ovalDraftActor(p.uid,p.car,p.profile.handling,zone,speed,p.disconnectedAt===null)}];
+   const pose=raceVehicleGroundPose(p.car),mainProjection=projectRacePosition(course,pose),pitProjection=p.pitProgress?projectRacePosition(pitGeometry.pitPavement,pose):null,
+    projection=p.pitCommitted&&pitProjection?{...pitProjection,distanceMeters:racePitMappedDistance(course,pitGeometry,pitProjection.distanceMeters)}:mainProjection,
+    zone=p.pitCommitted?'pit':ovalTrackZone(projection),speed=raceVehicleSpeedMetersPerSecond(p.car);
+   return [p.uid,{projection,mainProjection,pitProjection,zone,speed:Math.abs(speed),contacts:p.car.barrierContacts,draftActor:ovalDraftActor(p.uid,p.car,p.profile.handling,zone,speed,p.disconnectedAt===null)}];
   }));
  }
  function ovalPenalty(p,why){
   p.ovalPenaltyReason=why;p.progress={...p.progress,penaltyMs:p.progress.penaltyMs+OVAL_ORDER_PENALTY_MS,
    ...(p.progress.finished?{elapsedMs:p.progress.elapsedMs+OVAL_ORDER_PENALTY_MS}:{})};
+  if(p.pitTimingProgress)p.pitTimingProgress={...p.pitTimingProgress,penaltyMs:p.pitTimingProgress.penaltyMs+OVAL_ORDER_PENALTY_MS,...(p.pitTimingProgress.finished?{elapsedMs:p.pitTimingProgress.elapsedMs+OVAL_ORDER_PENALTY_MS}:{})};
  }
  function enforceOvalOrder(before,after,yellow){
   for(const [uid,a]of after){
    const p=players.get(uid),b=before.get(uid);p.ovalZone=a.zone;
-   const restricted=yellow||b.zone==='apron'||a.zone==='apron';
+   const restricted=yellow||b.zone==='apron'||a.zone==='apron'||b.zone==='pit'||a.zone==='pit';
    if(!restricted){p.ovalRestricted=false;p.ovalPassed.clear();continue;}
    if(!p.ovalRestricted)p.ovalPassed.clear();p.ovalRestricted=true;
    for(const [otherUid,other]of after){
     if(uid===otherUid||!a.projection||!other.projection||!b.projection)continue;
+    if(!yellow&&(b.zone==='pit'||a.zone==='pit')&&other.zone!=='pit')continue;
     const previous=before.get(otherUid)?.projection;if(!previous)continue;
     const gap=ovalDistanceGap(a.projection.distanceMeters,other.projection.distanceMeters,course.lengthMeters),
      oldGap=ovalDistanceGap(b.projection.distanceMeters,previous.distanceMeters,course.lengthMeters);
     if(oldGap>=0&&oldGap<40&&gap<0&&!p.ovalPassed.has(otherUid)){
-     p.ovalPassed.add(otherUid);ovalPenalty(p,yellow?'passing-under-yellow':'passing-on-apron');
+     p.ovalPassed.add(otherUid);ovalPenalty(p,yellow?'passing-under-yellow':a.zone==='pit'||b.zone==='pit'?'passing-in-pits':'passing-on-apron');
     }
    }
    if(b.zone==='apron'&&a.zone==='bank'&&[...after].some(([otherUid,other])=>otherUid!==uid&&other.zone==='bank'&&a.projection&&other.projection&&Math.abs(ovalDistanceGap(a.projection.distanceMeters,other.projection.distanceMeters,course.lengthMeters))<OVAL_MERGE_CLEARANCE_METERS))ovalPenalty(p,'unsafe-apron-merge');
+   if(b.zone==='pit'&&!p.pitCommitted&&[...after].some(([otherUid,other])=>otherUid!==uid&&other.zone==='bank'&&a.projection&&other.projection&&Math.abs(ovalDistanceGap(a.projection.distanceMeters,other.projection.distanceMeters,course.lengthMeters))<OVAL_MERGE_CLEARANCE_METERS))ovalPenalty(p,'unsafe-pit-merge');
+  }
+ }
+ function pitPhysicalCourse(p,row){
+  return racePitPavementAt(course,pitGeometry,raceVehicleGroundPose(p.car),{active:p.pitCommitted,approach:Boolean(p.pitTimingProgress),pitProjection:row.pitProjection,mainProjection:row.mainProjection});
+ }
+ function advancePlayerProgress(p,pose,frameAt,row){
+  const previous=p.progress;
+  if(pitGeometry&&!p.pitProgress&&previous.nextGate===pitGeometry.covered[0].index&&racePitEntryNearby(course,pitGeometry,row.mainProjection)&&
+   Math.sin(p.car.angle)*pitGeometry.entry.forward.x+Math.cos(p.car.angle)*pitGeometry.entry.forward.z>.94&&racePitGateCrossing(pitGeometry.entry,previous.lastPose,pose,course.metersPerUnit)){
+   p.pitProgress=createRaceProgress(previous.lastPose,previous.lastAtMs);p.pitTimingProgress=previous;p.pitEnteredAt=frameAt;p.pitEntrySpeed=row.speed;
+  }
+  if(!p.pitProgress){p.progress=advanceRaceProgress(course,p.progress,pose,frameAt,{startedAtMs:startAtMs});return;}
+  const pitProjection=projectRacePosition(pitGeometry.pitPavement,pose);
+  if(!p.pitCommitted&&raceProjectionOutsidePavement(pitProjection)){
+   p.pitProgress=p.pitTimingProgress=null;p.pitEnteredAt=null;p.progress=advanceRaceProgress(course,p.progress,pose,frameAt,{startedAtMs:startAtMs});return;
+  }
+  p.pitProgress=advanceRaceProgress(pitGeometry.pitPavement,p.pitProgress,pose,frameAt,{startedAtMs:p.pitEnteredAt});
+  const before=p.pitTimingProgress||p.progress,next=advanceRaceProgress(pitGeometry.timing,before,pose,frameAt,{startedAtMs:startAtMs}),n=course.gates.length,
+   ordinal=p=>p.finished?course.laps*n:(p.lap-1)*n+p.nextGate;
+  for(let at=ordinal(before);at<ordinal(next);at++)if(p.pitProgress.nextGate<(pitGeometry.requirements.get(at%n)??Infinity)){
+   if(p.pitCommitted)p.dnf=true;else{p.pitProgress=p.pitTimingProgress=null;p.progress=advanceRaceProgress(course,p.progress,pose,frameAt,{startedAtMs:startAtMs});}return;
+  }
+  if(!p.pitCommitted){
+   p.pitTimingProgress=next;
+   const main=projectRacePosition(course,pose),takesBranch=ovalTrackZone(main)==='apron'&&pitProjection.error+.5<(main?.error??Infinity)||raceProjectionOutsidePavement(main);
+   if(takesBranch){p.pitCommitted=true;p.pitVisits++;p.progress=next;p.pitTimingProgress=null;if(p.pitEntrySpeed>11)ovalPenalty(p,'pit-entry-speed');return;}
+   // A main-track car can pass the shared entry node. Until the branch is
+   // physically distinguishable, both bounded gate cursors follow the same
+   // simulated body; only the chosen path can become the timing authority.
+   if(pitProjection.distanceMeters>60||p.pitProgress.finished){p.pitProgress=p.pitTimingProgress=null;p.pitEnteredAt=null;}
+   p.progress=advanceRaceProgress(course,p.progress,pose,frameAt,{startedAtMs:startAtMs});return;
+  }
+  p.progress=next;
+  if(p.pitProgress.finished){
+   if(!next.finished&&next.nextGate!==(pitGeometry.covered.at(-1).index+1)%n){p.dnf=true;return;}
+   // Resume the main timing planes over this same physical exit step. The
+   // car remains at its simulated pose and can cross a nearby main gate once.
+   if(!next.finished)p.progress=advanceRaceProgress(course,{...next,lastPose:before.lastPose,lastAtMs:before.lastAtMs},pose,frameAt,{startedAtMs:startAtMs});
+   p.pitProgress=null;p.pitCommitted=false;
   }
  }
  function advance(nowMs){
@@ -145,12 +190,13 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     if(p.dnf||p.progress.finished)continue;
     if(p.disconnectedAt!==null&&frameAt-p.disconnectedAt>10000){p.dnf=true;continue;}
     while(p.queue.length&&p.queue[0].at<=frameAt){const command=p.queue.shift();p.actions=command.actions;p.lastControlAt=command.at;}
-    let actions=p.ai?raceAiActions(course,p.car,p.progress,p.profile,{difficulty:p.difficulty,...(rolling?{laneOffsetMeters:course.participants===1?0:p.slot%2===0?-1.4:1.4,...(yellow?{formation:true,paceMetersPerSecond:OVAL_PACE_METERS_PER_SECOND}:{})}:{})}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
-    if(rolling)actions=ovalPaceActions(actions,before.get(p.uid).speed,yellow||before.get(p.uid).zone==='apron');
+    const row=rolling?before.get(p.uid):null;
+    let actions=p.ai?raceAiActions(p.pitCommitted?pitGeometry.pitPavement:course,p.car,p.pitCommitted?p.pitProgress:p.progress,p.profile,{difficulty:p.difficulty,...(rolling?{laneOffsetMeters:p.pitCommitted?0:course.participants===1?0:p.slot%2===0?-1.4:1.4,...(yellow||p.pitCommitted?{formation:true,paceMetersPerSecond:OVAL_PACE_METERS_PER_SECOND}:{})}:{})}):p.disconnectedAt!==null||frameAt-p.lastControlAt>400?NEUTRAL:p.actions;
+    if(rolling)actions=ovalPaceActions(actions,row.speed,yellow||row.zone==='apron'||row.zone==='pit');
     p.previousFrame=snapshotRaceVehicle(p.car);
     if(rolling)p.ovalDraft=ovalDraftReduction(before.get(p.uid).draftActor,draftActors,course.metersPerUnit,{enabled:!yellow});
-    stepRaceVehicle(course,p.car,actions,1/60,p.profile,{draftReduction:p.ovalDraft});
-    p.progress=advanceRaceProgress(course,p.progress,raceVehicleGroundPose(p.car),frameAt,{startedAtMs:startAtMs});
+    stepRaceVehicle(rolling?pitPhysicalCourse(p,row):course,p.car,actions,1/60,p.profile,{draftReduction:p.ovalDraft});
+    advancePlayerProgress(p,raceVehicleGroundPose(p.car),frameAt,row);
    }
    if(rolling){
     // Use the same pre-tick flag for every actor. An incident starts a caution
@@ -193,6 +239,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     disconnected:p.disconnectedAt!==null,dnf:p.dnf,position,lastInputSequence:p.lastSequence,pose:frame?raceVehicleGroundPose(frame):null,
     speed:p.car?.speed||0,condition:p.car?.condition??p.profile.conditionValue,barrierContacts:p.car?.barrierContacts??0,
     vehicleState:frame,...(rolling?{trackZone:p.ovalZone,ovalPenaltyReason:p.ovalPenaltyReason,draftingReduction:phase==='running'&&!p.progress?.finished?p.ovalDraft:0}:{}),
+    ...(pitGeometry?{pit:{active:p.pitCommitted,approach:Boolean(p.pitTimingProgress),visits:p.pitVisits,nextGate:p.pitProgress?.nextGate??null,gates:pitGeometry.pitPavement.gates.length}}:{}),
     progress:p.progress?{nextGate:p.progress.nextGate,lap:p.progress.lap,finished:p.progress.finished,elapsedMs:p.progress.elapsedMs??null,
      bestLapMs:p.progress.bestLapMs,lapTimes:[...p.progress.lapTimes],penaltyMs:p.progress.penaltyMs}:null};})};
  }

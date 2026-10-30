@@ -11,13 +11,15 @@ export function normalizeRaceVenueSource(value){
   !Number.isFinite(value.qualificationRadiusWorld)||value.qualificationRadiusWorld<1200||value.qualificationRadiusWorld>6000||
   !Array.isArray(value.sourceFeatureIds)||!value.sourceFeatureIds.length||value.sourceFeatureIds.length>500||
   value.sourceFeatureIds.some(id=>!sourceId(id))||new Set(value.sourceFeatureIds).size!==value.sourceFeatureIds.length)fail();
+ const pits=value.pitSourceFeatureIds;
+ if(pits!==undefined&&(!Array.isArray(pits)||!pits.length||pits.length>50||pits.some(id=>!sourceId(id)||value.sourceFeatureIds.includes(id))||new Set(pits).size!==pits.length))fail();
  return Object.freeze({version:1,id:value.id,sourceSha256:value.sourceSha256,mappedLengthMeters:value.mappedLengthMeters,
-  qualificationRadiusWorld:value.qualificationRadiusWorld,sourceFeatureIds:Object.freeze([...value.sourceFeatureIds])});
+  qualificationRadiusWorld:value.qualificationRadiusWorld,sourceFeatureIds:Object.freeze([...value.sourceFeatureIds]),...(pits?{pitSourceFeatureIds:Object.freeze([...pits])}:{})});
 }
 export function sameRaceVenueSource(a,b){return JSON.stringify(normalizeRaceVenueSource(a))===JSON.stringify(normalizeRaceVenueSource(b));}
 export function assertRaceVenueRoads(roads,venue,{partial=false}={}){
  if(!venue)return;
- const allowed=new Set(venue.sourceFeatureIds),found=new Set();
+ const allowed=new Set([...venue.sourceFeatureIds,...venue.pitSourceFeatureIds||[]]),found=new Set();
  for(const road of roads){
   if(!allowed.has(road.sourceFeatureId)||!sourceId(road.sourceId)||!road.sourceId.startsWith(road.sourceFeatureId+':')||
    [road.a,road.b].some(p=>!p||!Number.isFinite(p.x)||!Number.isFinite(p.z)||Math.hypot(p.x,p.z)>venue.qualificationRadiusWorld+.002))fail();

@@ -43,6 +43,11 @@ export function assertRaceCourseInDistrict(course,localFacts){
   }
   for(let j=0;j<=steps;j++)for(const side of [-1.2,0,1.2])if(Math.abs(sampleRaceSegmentY(a,j/steps,side)-sampleRaceSegmentY(b,j/steps,side))*course.metersPerUnit>.01)throw Error('race_roads_changed_requalify_route');
  }
+ if(Boolean(local.pitLane)!==Boolean(course.pitLane))throw Error('race_roads_changed_requalify_route');
+ if(course.pitLane){
+  for(const key of ['entryDistanceMeters','exitDistanceMeters','replacedDistanceMeters'])if(Math.abs(local.pitLane[key]-course.pitLane[key])>.003)throw Error('race_roads_changed_requalify_route');
+  assertRaceCourseInDistrict(course.pitLane.course,localFacts);
+ }
  return true;
 }
 export async function racePublicationIdentity(reference,facts){const course=await reconstructPublishedRace(reference,facts);return {course,id:await raceCourseKey(course)};}

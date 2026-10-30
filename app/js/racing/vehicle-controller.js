@@ -30,13 +30,14 @@ export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}
  const frame=prepareVehicleDriveFrame(car,{...actions,boost:0},dt,profile.config);
  const driving=stepVehiclePlanarDrive(car,dt,frame,{config:profile.config,planetary:false,metersPerWorldUnit:course.metersPerUnit,
   ...(course.surfaceModel===BANKED_ROAD_MODEL?{roadPlane:{pitch:car.terrainPitch||0,roll:car.terrainRoll||0}}:{}),
-  ...(course.discipline==='oval'?{aerodynamicDrag:{coefficientPerMeter:OVAL_AERODYNAMIC_DRAG_PER_METER*Math.max(.5,Math.min(1.8,profile.handling.width*profile.handling.height/2.7)),reduction:draftReduction}}:{}),
+  ...(course.discipline==='oval'||course.ovalAerodynamics===true?{aerodynamicDrag:{coefficientPerMeter:OVAL_AERODYNAMIC_DRAG_PER_METER*Math.max(.5,Math.min(1.8,profile.handling.width*profile.handling.height/2.7)),reduction:draftReduction}}:{}),
   surfaceDynamics:profile.surface,vehicleHandling:profile.handling,vehicleCondition:profile.condition,vehicleUpgrades:profile.upgrades,
   characterVehicle:profile.character,maxSpd:Math.min(profile.config.maxSpd,mphToCarSpeed(profile.handling.topSpeedMph)),
   friction:profile.config.friction,accel:profile.config.accel*profile.handling.accelerationScale});
  car.steerAngle=driving.steerAngle;
  const next=integrateVehiclePlanarPosition(car,dt,driving,course.metersPerUnit,false);
- const support=projectRacePosition(course,{...next,y:car.y-VEHICLE_ROOT_TO_GROUND_METERS});
+ const supportPose={...next,y:car.y-VEHICLE_ROOT_TO_GROUND_METERS},support=course.fullRoadContactProjection?
+  projectRacePosition(course,supportPose,{pavementPaddingMeters:profile.handling.width*.5+.2})||projectRacePosition(course,supportPose):projectRacePosition(course,supportPose);
  if(!support)throw Error('race_surface_lost');
  const margin=Math.max(.3,(support.widthMeters-profile.handling.width)*.5-.2);
  let x=next.x,z=next.z;
@@ -53,7 +54,7 @@ export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}
  const segment=course.segments[support.index];
  const contact=resolveVehicleRoadContactPose({...(course.surfaceModel===BANKED_ROAD_MODEL?{maximumRoll:BANKED_ROAD_MAXIMUM_ROLL}:{}),x,z,y:support.y,yaw:car.angle,variant:profile.variant,
   pitch:car.terrainPitch||0,roll:car.terrainRoll||0,
-  sampleSurface:(px,pz)=>projectRacePosition(course,{x:px,z:pz,y:support.y},{minimumMeters:Math.max(0,segment.startMeters-12),maximumMeters:Math.min(course.lengthMeters,segment.startMeters+segment.lengthMeters+12)})?.y});
+  sampleSurface:(px,pz)=>projectRacePosition(course,{x:px,z:pz,y:support.y},course.fullRoadContactProjection?{pavementPaddingMeters:0}:{minimumMeters:Math.max(0,segment.startMeters-12),maximumMeters:Math.min(course.lengthMeters,segment.startMeters+segment.lengthMeters+12)})?.y});
  car.x=x;car.z=z;car.y=contact.y+VEHICLE_ROOT_TO_GROUND_METERS;
  car.terrainPitch=contact.pitch;car.terrainRoll=contact.roll;
  car.maximumWheelPenetration=contact.maximumWheelPenetration;car.maximumWheelGap=contact.maximumWheelGap;

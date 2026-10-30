@@ -6,8 +6,9 @@ export function normalizeRaceRouteReference(value) {
   !RACE_DISCIPLINES.includes(value.discipline)||!Number.isInteger(value.laps)||value.laps<1||value.laps>8||
   !Number.isInteger(value.participants)||value.participants<1||value.participants>4)throw Error('invalid_saved_race_route');
  const offset=value.startOffsetMeters??null;if(offset!==null&&(!Number.isFinite(offset)||offset<=0))throw Error('invalid_saved_race_route');
+ const pit=value.pitPath;if(pit!==undefined&&(!Array.isArray(pit)||!pit.length||pit.length>512||pit.some(id=>typeof id!=='string'||id.length>190)||new Set(pit).size!==pit.length))throw Error('invalid_saved_race_pit_route');
  return {version:1,districtFingerprint:value.districtFingerprint,path:[...value.path],discipline:value.discipline,laps:value.laps,
-  participants:value.participants,startOffsetMeters:offset,name:String(value.name||'Your mapped route').trim().slice(0,100)};
+  participants:value.participants,startOffsetMeters:offset,name:String(value.name||'Your mapped route').trim().slice(0,100),...(pit?{pitPath:[...pit]}:{})};
 }
 export async function raceDistrictFingerprint(district) {
  const value=JSON.stringify({version:1,...(district.venueSource?{venueSource:normalizeRaceVenueSource(district.venueSource)}:{}),locationId:district.locationId,anchor:district.anchor,metersPerUnit:district.metersPerUnit,
@@ -19,7 +20,7 @@ export async function raceDistrictFingerprint(district) {
 }
 export function raceCourseReference(course,districtFingerprint) {
  return normalizeRaceRouteReference({version:1,districtFingerprint,path:course.sourcePath,discipline:course.discipline,laps:course.laps,
-  participants:course.participants,startOffsetMeters:course.startOffsetMeters,name:course.name});
+  participants:course.participants,startOffsetMeters:course.startOffsetMeters,name:course.name,...(course.pitPath?{pitPath:course.pitPath}:{})});
 }
 export function restoreRaceCourse(reference,district,graph,fingerprint) {
  const route=normalizeRaceRouteReference(reference);
@@ -30,7 +31,7 @@ export function restoreRaceCourse(reference,district,graph,fingerprint) {
 export async function raceCourseKey(course) {
  const data=new TextEncoder().encode(JSON.stringify({version:course.version,...(course.venueSource?{venueSource:normalizeRaceVenueSource(course.venueSource)}:{}),location:course.locationId,anchor:course.anchor,
   ...(course.surfaceModel?{surfaceModel:course.surfaceModel}:{}),...(course.pavementModel?{pavementModel:course.pavementModel}:{}),...(course.edgeBandModel?{edgeBandModel:course.edgeBandModel}:{}),
-  discipline:course.discipline,laps:course.laps,segments:course.segments}));
+  discipline:course.discipline,laps:course.laps,segments:course.segments,...(course.pitLane?{pitLane:{version:course.pitLane.version,entryDistanceMeters:course.pitLane.entryDistanceMeters,exitDistanceMeters:course.pitLane.exitDistanceMeters,replacedDistanceMeters:course.pitLane.replacedDistanceMeters,segments:course.pitLane.course.segments}}:{})}));
  const hash=await crypto.subtle.digest('SHA-256',data);
  return 'road-race-'+Array.from(new Uint8Array(hash).slice(0,16),b=>b.toString(16).padStart(2,'0')).join('');
 }

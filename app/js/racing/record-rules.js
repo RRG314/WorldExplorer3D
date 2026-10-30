@@ -9,17 +9,18 @@ export const RACE_PHYSICS_VERSION='earth-road-2026-10-28.2';
 export const RACE_BANKED_PHYSICS_VERSION='earth-banked-road-2026-10-29.1';
 export const RACE_PROFILED_PAVEMENT_PHYSICS_VERSION='earth-profiled-pavement-2026-10-30.1';
 export const RACE_OVAL_PHYSICS_VERSION='earth-oval-2026-10-30.3';
+export const RACE_OVAL_PIT_PHYSICS_VERSION='earth-oval-pit-2026-10-30.1';
 export function racePhysicsVersion(course){
  if(course?.discipline==='oval'){
   if(course.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||course.surfaceModel!==BANKED_ROAD_MODEL)throw Error('invalid_race_surface_model');
-  return RACE_OVAL_PHYSICS_VERSION;
+  return course.pitLane?RACE_OVAL_PIT_PHYSICS_VERSION:RACE_OVAL_PHYSICS_VERSION;
  }
  if(course?.pavementModel!==undefined){if(course.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||course.surfaceModel!==BANKED_ROAD_MODEL)throw Error('invalid_race_surface_model');return RACE_PROFILED_PAVEMENT_PHYSICS_VERSION;}
  if(course?.surfaceModel===undefined)return RACE_PHYSICS_VERSION;
  if(course.surfaceModel===BANKED_ROAD_MODEL)return RACE_BANKED_PHYSICS_VERSION;
  throw Error('invalid_race_surface_model');
 }
-export const isCurrentRacePhysicsVersion=version=>version===RACE_PHYSICS_VERSION||version===RACE_BANKED_PHYSICS_VERSION||version===RACE_PROFILED_PAVEMENT_PHYSICS_VERSION||version===RACE_OVAL_PHYSICS_VERSION;
+export const isCurrentRacePhysicsVersion=version=>version===RACE_PHYSICS_VERSION||version===RACE_BANKED_PHYSICS_VERSION||version===RACE_PROFILED_PAVEMENT_PHYSICS_VERSION||version===RACE_OVAL_PHYSICS_VERSION||version===RACE_OVAL_PIT_PHYSICS_VERSION;
 export function raceRecordConfiguration(profile,{course}={}) {
  if(!profile?.vehicleId||!Number.isFinite(profile.conditionValue))throw Error('invalid_race_record_profile');
  return {physicsVersion:racePhysicsVersion(course),vehicleId:profile.vehicleId,condition:profile.conditionValue,

@@ -24,6 +24,7 @@ const clean=s=>String(s||'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0
 // height authority. Mutable diagnostic fixtures retain the exhaustive path.
 const spatialIndexes=new WeakMap();
 export function prepareRaceCourseGeometry(course){
+ if(course.pitLane){prepareRaceCourseGeometry(course.pitLane.course);Object.freeze(course.pitLane);}
  for(const segment of course.segments){
   Object.freeze(segment.a);Object.freeze(segment.b);Object.freeze(segment.forward);
   if(segment.heightSampleRange)Object.freeze(segment.heightSampleRange);
@@ -309,10 +310,32 @@ export function createRaceCourse(graph,path,settings={}){
  }
  const last=segments.at(-1);course.gates.push(last.pavementModel?gateAt(last,1,lengthMeters):{...last.b,forward:last.forward,halfWidthMeters:last.widthMeters*.5,distanceMeters:lengthMeters});
  if(!course.locationId||!course.anchor||!Number.isFinite(course.anchor.lat)||Math.abs(course.anchor.lat)>85||!Number.isFinite(course.anchor.lon)||Math.abs(course.anchor.lon)>180)throw Error('invalid_race_location');
+ if(settings.pitPath!==undefined){
+  if(!isClosedRaceDiscipline(discipline)||!graph.venueSource?.pitSourceFeatureIds||!Array.isArray(settings.pitPath)||!settings.pitPath.length||settings.pitPath.length>512)throw Error('race_pit_source_required');
+  const pitEdges=settings.pitPath.map(id=>byId.get(id)),allowed=new Set(graph.venueSource.pitSourceFeatureIds),mainSources=new Set(edges.map(e=>e.sourceId));
+  if(pitEdges.some(e=>!e||![...allowed].some(id=>e.sourceId.startsWith(id+':'))||mainSources.has(e.sourceId))||new Set(settings.pitPath).size!==settings.pitPath.length)throw Error('race_invalid_pit_path');
+  if(pitEdges.some(e=>e.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||e.heightSamples?.some(row=>!Number.isFinite(row.racingWidthMeters))))throw Error('race_pit_pavement_required');
+  const pit=createRaceCourse(graph,settings.pitPath,{locationId:course.locationId,locationLabel:course.locationLabel,anchor:course.anchor,discipline:'sprint',participants:1,name:course.name+' · pit lane',gateSpacingMeters:15});
+  if(pit.lengthMeters>2000)throw Error('race_pit_length');
+  const entryNode=pitEdges[0].from,exitNode=pitEdges.at(-1).to,mainNodes=new Set(edges.map(e=>e.from));
+  if(entryNode===exitNode||!mainNodes.has(entryNode)||!mainNodes.has(exitNode)||pitEdges.slice(0,-1).some(e=>mainNodes.has(e.to)))throw Error('race_pit_join_invalid');
+  const join=node=>{const matches=course.segments.filter(s=>s.a.id===node);if(matches.length!==1)throw Error('race_pit_join_invalid');return matches[0].startMeters;},
+   entryDistanceMeters=join(entryNode),exitDistanceMeters=join(exitNode),replacedDistanceMeters=(exitDistanceMeters-entryDistanceMeters+course.lengthMeters)%course.lengthMeters;
+  if(replacedDistanceMeters<50||replacedDistanceMeters>Math.min(3000,course.lengthMeters*.7))throw Error('race_pit_join_invalid');
+  for(const [node,pitSegment,t]of [[entryNode,pit.segments[0],0],[exitNode,pit.segments.at(-1),1]]){
+   const main=course.segments.find(s=>s.a.id===node);
+   if(Math.abs(sampleRaceSegmentY(main,0,0)-sampleRaceSegmentY(pitSegment,t,0))*course.metersPerUnit>.01)throw Error('race_pit_join_height');
+  }
+  // This branch is reconstructed from approved road facts. Its source path is
+  // part of the reference and class identity; caller-supplied meshes or poses
+  // cannot describe an alternative timing route.
+  course.pitPath=Object.freeze([...settings.pitPath]);course.pitLane={version:1,course:pit,entryDistanceMeters,exitDistanceMeters,replacedDistanceMeters};
+ }
  return prepareRaceCourseGeometry(course);
 }
 
-export function projectRacePosition(course,pose,{minimumMeters=-Infinity,maximumMeters=Infinity}={}){
+export function projectRacePosition(course,pose,{minimumMeters=-Infinity,maximumMeters=Infinity,pavementPaddingMeters}={}){
+ if(pavementPaddingMeters!==undefined&&(!Number.isFinite(pavementPaddingMeters)||pavementPaddingMeters<0||pavementPaddingMeters>4))throw Error('invalid_race_projection_padding');
  let nearest=null;
  function sample(index){
   const s=course.segments[index],dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,l2=dx*dx+dz*dz;
@@ -322,7 +345,10 @@ export function projectRacePosition(course,pose,{minimumMeters=-Infinity,maximum
   const x=s.a.x+dx*t,z=s.a.z+dz*t,lateral=((pose.x-x)*s.forward.z-(pose.z-z)*s.forward.x)*course.metersPerUnit,y=sampleRaceSegmentY(s,t,lateral);
   const error=Math.hypot(pose.x-x,pose.z-z)*course.metersPerUnit,vertical=Math.abs(pose.y-y)*course.metersPerUnit;
   if(vertical>2.5)return;
-  if(!nearest||error<nearest.error||error===nearest.error&&index<nearest.index)nearest={index,t,x,y,z,lateralMeters:lateral,error,vertical,distanceMeters:s.startMeters+s.lengthMeters*t,widthMeters:s.widthMeters,...(s.pavementModel?{pavement:racePavementCrossSection(s,t)}:{})};
+  if(nearest&&!(error<nearest.error||error===nearest.error&&index<nearest.index))return;
+  const candidate={index,t,x,y,z,lateralMeters:lateral,error,vertical,distanceMeters:s.startMeters+s.lengthMeters*t,widthMeters:s.widthMeters,...(s.pavementModel?{pavement:racePavementCrossSection(s,t)}:{})};
+  if(pavementPaddingMeters!==undefined&&raceProjectionOutsidePavement(candidate,-pavementPaddingMeters))return;
+  nearest=candidate;
  }
  const tree=raceSpatialIndex(course.segments);
  if(!tree){for(let index=0;index<course.segments.length;index++)sample(index);return nearest;}
@@ -378,7 +404,7 @@ export function advanceRaceProgress(course,progress,pose,nowMs,{startedAtMs,maxi
  if(nowMs<startedAtMs){if(travel>.3)throw Error('race_false_start');return next;}
  const from=progress.lastPose;
  for(let count=0;count<8&&!next.finished;count++){
-  const gate=course.gates[next.nextGate],f=gate.forward;
+  const gate=course.gates[next.nextGate];if(gate.pitUnavailable===true)break;const f=gate.forward;
   const a=(from.x-gate.x)*f.x+(from.z-gate.z)*f.z,b=(pose.x-gate.x)*f.x+(pose.z-gate.z)*f.z;
   if(!(a<=0&&b>0))break;
   const t=-a/(b-a),x=from.x+(pose.x-from.x)*t,z=from.z+(pose.z-from.z)*t,y=from.y+(pose.y-from.y)*t;

@@ -43,9 +43,33 @@ test. An initial coasting fixture hit a curved boundary after its observation
 window grew too long; the retained diagnosis separates collision braking from
 aerodynamic deceleration, and the corrected check has zero boundary contacts.
 
+The shared course contract now admits a separate reviewed pit path with two
+main-loop joins, complete profiled pavement, bounded length and join heights
+within one centimetre. Canonical references, reconstruction and class identity
+retain that geometry. Pit timing planes lie on the actual branch, including a
+finish line inside it; ordered pit checkpoints must precede their timing credit.
+The car never follows a synthetic timing pose.
+
+A shared junction briefly retains two bounded gate cursors until the simulated
+body takes a distinguishable branch. Main-track cars retain their original
+progress. Pit pavement supports the same body through the existing physics
+delegate, with member containment at overlapping entry/exit pavement, rather
+than clamping whichever centreline is closest. Ordinary projection and physics
+retain their previous calculation and allocation behavior.
+
+The oval pit class has controlled checks for complete entry/checkpoints/exit and
+finish, a finish inside the pit path, no false main-track entry, speed and passing
+penalties, occupied exit clearance, canonical geometry rejection, backend replay
+and network prediction. The 25 focused checks pass. Entry, midpoint and exit
+renders show the licensed M3 with zero boundary contacts, penalties and WebGL
+errors. Their initial fixture content limit was below the already admitted
+four-car asset budget; the same captures were rechecked against the real model
+and cabin ceiling. This is not a native moving-scene performance acceptance.
+
 These are controlled engine/presentation boundaries. Daytona remains private
-circuit practice under construction. Its pit branch, complete native oval
-gameplay and venue presentation remain open; no major pack is accepted.
+circuit practice under construction. Its native pit pavement/admission, complete
+oval gameplay and venue presentation remain open; no major pack is accepted.
+Circuit pit gameplay is still explicitly unavailable.
 
 Three mapped Daytona garage exteriors also passed publication in the actual
 loaded world: three roots and three replacement colliders, with no remaining
