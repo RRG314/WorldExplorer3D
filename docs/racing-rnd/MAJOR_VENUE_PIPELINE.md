@@ -163,6 +163,24 @@ are game event equipment, not surveyed permanent venue objects or official
 braking references. They do not certify kerbs, runoff, pits, grandstands,
 landmarks, complete discipline rules or a finished major venue.
 
+### Nordschleife trackside interpretation
+
+The existing scoped race-furniture owner selects three corrugated steel bands
+for Nordschleife rather than its default concrete barrier. Steel supports and
+the set-back mesh fence remain bounded static batches, follow the qualified
+pavement and retire with practice. The physical corridor and timing do not
+change. This is an authored trackside interpretation, not a complete surveyed
+perimeter, kerb or runoff product.
+
+The existing reviewed-building publication owner also adopts an original T13
+grandstand exterior from OSM bleacher outline 34435441 v7. The exact indented
+plan is retained; terrace and bench heights are estimates. Clipped terraces,
+five bench bays, four aisles and safety rails replace only a uniquely matching
+provider visual/solid envelope. Nearby buildings, existing entrances and
+interior permission retain their owners. The world building collection retires
+the batched geometry and owned material resources. It does not grant a new
+interior or claim completed pits, landscape or venue acceptance.
+
 ## Qualified road snapshot publication
 
 The existing district publisher supports inline snapshots up to 750 KiB and

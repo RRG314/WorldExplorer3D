@@ -7,6 +7,7 @@ import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {finishVenueSurface} from './venue-surface-materials.js';
 import {replaceVenueCollision,venueComponentCollider} from './venue-collision.js';
 import {createSilverstoneWingExterior,isSilverstoneWing} from './silverstone-wing-exterior.js';
+import {createNordschleifeT13Exterior,isT13StandRepresentation} from './nordschleife-t13-exterior.js';
 
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
@@ -201,6 +202,16 @@ export function publishReviewedVenueExteriors(ctx,THREE){
   }
   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
   added.push(root);
+ }
+ const t13=createNordschleifeT13Exterior(THREE,ctx);
+ if(t13){
+  const retired=new Set(ctx.buildingMeshes.filter(m=>isT13StandRepresentation(m.userData,t13.footprint)));
+  for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
+  ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
+  replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>isT13StandRepresentation(b,t13.footprint)),[
+   venueComponentCollider(t13.root.userData.sourceBuildingId,t13.footprint,t13.bottom,t13.top)
+  ]);
+  added.push(t13.root);
  }
  for(const root of added){ctx.addEarthWorldObject(root);ctx.buildingMeshes.push(root);}
  return {published:added.map(r=>r.name)};

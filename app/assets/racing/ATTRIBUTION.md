@@ -55,11 +55,20 @@ of official circuit or championship records.
 - A seven-metre conservative authored usable corridor refers to the minimum
   retained mapped width, not an independent pavement-edge or bank survey.
   Original varying widths, surfaces and bridge/layer tags remain intact.
-- This is a geographic source, not a released playable venue. Full ground,
-  banking, vertically separated crossings, timing-line placement, presentation
-  and gameplay acceptance remain required before race admission. World source
-  inspection is enabled with racing explicitly closed. It does not
-  substitute for the tourist, GP or combined endurance layouts.
+- This is a geographic source, not a released venue pack. Full-loop private
+  practice uses an authored game timing line on the T13 straight, separate from
+  official records. Detailed presentation and full gameplay acceptance remain
+  unfinished. It does not substitute for the tourist, GP or combined endurance
+  layouts.
+- The T13 exterior retains [OSM bleacher way 34435441](https://www.openstreetmap.org/way/34435441),
+  version 7 dated April 19, 2026, under ODbL 1.0. The adapted outline is in
+  `app/js/world/nordschleife-t13-survey.js`; mapper account metadata is omitted.
+  Original terraces, benches, aisles and railings interpret that plan and
+  Rheinland-Pfalz DOP20 source imagery. Heights and details are authored
+  estimates, not a measured architectural survey. No orthophoto is bundled.
+  Orthophoto source: © GeoBasis-DE / LVermGeoRP2026,
+  [dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0),
+  [LVermGeoRP](https://lvermgeo.rlp.de/geodaten-geoshop/open-data/) [Daten bearbeitet].
 
 ### Reviewed bridge and approach profiles
 

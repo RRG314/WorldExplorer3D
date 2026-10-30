@@ -49,8 +49,19 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   cases cover a later junction split, saved-route reconstruction and unavailable
   or invalid line support. It is an original game line aligned to orthophoto
   paint, not an independently surveyed official timing marker. The event uses
-  the T13 label and explicitly describes the venue as in progress; actual-world
-  start and full-lap verification remain pending. The catalogue is still researched.
+  the T13 label and explicitly describes the venue as in progress; the actual world
+  offered both full-loop events and started the four-car grid. A scripted
+  continuous-touch opening run reached 39 of 784 gates with zero barrier contacts.
+  The next segment stopped after the car coasted into a bend between driver
+  commands; that failed attempt is retained and is not a completed lap. Leaving
+  practice and returning to walking passed without browser or cleanup errors.
+  The catalogue is still researched.
+- Nord presentation now has a scoped three-band corrugated steel perimeter and
+  a mapped T13 grandstand interpretation through the existing building owner.
+  Focused checks cover grade/crossfall, bounded static batches, exact outline
+  clipping, collision transfer, neighbour retention and resource release.
+  Actual-world visual inspection of these additions remains pending; neither
+  completes venue art, kerbs, runoff, pits, landscape or full-lap acceptance.
 - Full-length reviewed venues now retain bounded source membership, extent and
   identity through world qualification, canonical/chunk storage and shared
   reconstruction. Long joins and saved results carry compact metadata resolved

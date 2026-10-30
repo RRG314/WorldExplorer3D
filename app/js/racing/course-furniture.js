@@ -5,14 +5,15 @@ import {raceCourseSurfacePoint} from './course-markings.js';
 // buildings retain their owners; these bounded batches retire with the race.
 // Every base follows the qualified pavement, including its crossfall/deck.
 export function buildRaceFurniture(course) {
- const unit=course.metersPerUnit,chunks=new Map(),boards=[];
- const chunkAt=d=>{const key=Math.floor(d/128);if(!chunks.has(key))chunks.set(key,{key,positions:[],uvs:[],fencePositions:[],fenceUvs:[],posts:[],center:raceCourseSurfacePoint(course,Math.min(course.lengthMeters,key*128+64))});return chunks.get(key);};
+ const unit=course.metersPerUnit,chunks=new Map(),boards=[],guardrail=course.venueSource?.id==='nurburgring-nordschleife';
+ const chunkAt=d=>{const key=Math.floor(d/128);if(!chunks.has(key))chunks.set(key,{key,positions:[],uvs:[],fencePositions:[],fenceUvs:[],posts:[],railPosts:[],center:raceCourseSurfacePoint(course,Math.min(course.lengthMeters,key*128+64))});return chunks.get(key);};
  function quad(positions,uvs,points,u0=0,u1=1,v0=0,v1=1){for(const i of [0,1,2,0,2,3]){positions.push(points[i].x,points[i].y,points[i].z);uvs.push([u0,u1,u1,u0][i],[v0,v0,v1,v1][i]);}}
  function point(segment,t,lateral,lift=0){return {x:segment.a.x+(segment.b.x-segment.a.x)*t+segment.forward.z*lateral/unit,
   y:sampleRaceSegmentY(segment,t,lateral)+lift/unit,z:segment.a.z+(segment.b.z-segment.a.z)*t-segment.forward.x*lateral/unit};}
  // The inner foot meets the same 20 cm edge clearance enforced by the road
  // controller. The upper wall recedes from the admitted chassis envelope.
- const profile=[[-.2,0],[-.2,.18],[.06,.36],[.18,.86],[.38,.86],[.5,0]];
+ const profile=guardrail?[[.04,0],[-.14,.045],[-.2,.11],[-.14,.175],[.04,.22]]:[[-.2,0],[-.2,.18],[.06,.36],[.18,.86],[.38,.86],[.5,0]];
+ const levels=guardrail?[.31,.60,.89]:[0];
  for(const segment of course.segments) {
   const count=Math.max(1,Math.ceil(segment.lengthMeters/4));
   for(let i=0;i<count;i++) {
@@ -20,16 +21,21 @@ export function buildRaceFurniture(course) {
    const chunk=chunkAt((start+end)/2),t0=i/count,t1=(i+1)/count;
    for(const side of [-1,1]) {
     const edge=segment.widthMeters/2;
-    const ring=t=>profile.map(([offset,height])=>point(segment,t,side*(edge+offset),height));
-    const a=ring(t0),b=ring(t1);
-    for(let j=0;j<profile.length;j++){const k=(j+1)%profile.length;quad(chunk.positions,chunk.uvs,[a[j],b[j],b[k],a[k]],start/2,end/2,profile[j][1]/2,profile[k][1]/2);}
+    for(const level of levels){
+     const ring=t=>profile.map(([offset,height])=>point(segment,t,side*(edge+offset),height+level));
+     const a=ring(t0),b=ring(t1);
+     // Corrugated steel is a double-sided sheet, not a solid concrete prism.
+     const faces=guardrail?profile.length-1:profile.length;
+     for(let j=0;j<faces;j++){const k=(j+1)%profile.length;quad(chunk.positions,chunk.uvs,[a[j],b[j],b[k],a[k]],start/2,end/2,profile[j][1]/2,profile[k][1]/2);}
+    }
     // Fence rises behind the wall, leaving the whole admitted lane unobstructed.
-    const lateral=side*(edge+.36);
-    quad(chunk.fencePositions,chunk.fenceUvs,[point(segment,t0,lateral,.86),point(segment,t1,lateral,.86),point(segment,t1,lateral,2.5),point(segment,t0,lateral,2.5)],start/.12,end/.12,0,1.64/.12);
+    const lateral=side*(edge+(guardrail ? .75 : .36)),base=guardrail?0:.86;
+    quad(chunk.fencePositions,chunk.fenceUvs,[point(segment,t0,lateral,base),point(segment,t1,lateral,base),point(segment,t1,lateral,2.5),point(segment,t0,lateral,2.5)],start/.12,end/.12,0,(2.5-base)/.12);
    }
   }
  }
- for(let d=0;d<course.lengthMeters;d+=8){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.posts.push(raceCourseSurfacePoint(course,d,side*(segment.widthMeters/2+.36),.86));}
+ for(let d=0;d<course.lengthMeters;d+=8){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.posts.push(raceCourseSurfacePoint(course,d,side*(segment.widthMeters/2+(guardrail ? .75 : .36)),guardrail?0:.86));}
+ if(guardrail)for(let d=0;d<course.lengthMeters;d+=4){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.railPosts.push(raceCourseSurfacePoint(course,d,side*(segment.widthMeters/2+.10)));}
  let previousTurn=-Infinity;
  for(let d=180;d<course.lengthMeters-30;d+=15) {
   const a=raceSegmentAtDistance(course,d-30).forward,b=raceSegmentAtDistance(course,d+30).forward;
@@ -40,7 +46,7 @@ export function buildRaceFurniture(course) {
    boards.push({distance,at,position,yaw:Math.atan2(segment.forward.x,segment.forward.z)+Math.PI});
   }
  }
- return {chunks:[...chunks.values()],boards,profile,heightMeters:2.5};
+ return {chunks:[...chunks.values()],boards,profile,heightMeters:2.5,perimeter:guardrail?'corrugated-steel':'temporary-concrete'};
 }
 function geometry(T,positions,uvs) {
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));
@@ -54,7 +60,7 @@ export function prepareRaceFurniture(T,context,course) {
  const dispose=()=>{if(disposed)return;disposed=true;root.parent?.remove(root);for(const item of owned)item.dispose();for(const texture of textures)texture.dispose();root.clear();};
  try {
  const wall=keep(new T.MeshStandardMaterial({color:0xc2c1b6,map:context.concreteDiffuse||null,normalMap:context.concreteNormal||null,normalScale:new T.Vector2(.12,.12),roughnessMap:context.concreteRoughness||null,roughness:.95,side:T.DoubleSide}));
- const metal=keep(new T.MeshStandardMaterial({color:0x76818a,metalness:.72,roughness:.58}));
+ const metal=keep(new T.MeshStandardMaterial({color:0x899397,metalness:.72,roughness:.48,side:T.DoubleSide}));
  const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const ctx=canvas.getContext('2d');
  ctx.strokeStyle='#a8b1b4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,32);ctx.lineTo(32,0);ctx.lineTo(64,32);ctx.lineTo(32,64);ctx.closePath();ctx.stroke();
  const chain=new T.CanvasTexture(canvas);chain.wrapS=chain.wrapT=T.RepeatWrapping;chain.anisotropy=4;textures.push(chain);
@@ -62,12 +68,15 @@ export function prepareRaceFurniture(T,context,course) {
  // mipmapped chain links into bright, flickering dots at normal chase angles.
  const fence=keep(new T.MeshStandardMaterial({color:0x7c878a,map:chain,transparent:true,opacity:.72,depthWrite:false,
   side:T.DoubleSide,metalness:.35,roughness:.75}));
- const postGeometry=keep(new T.BoxGeometry(.065/unit,1.7/unit,.065/unit)),matrix=new T.Matrix4();
+ const fenceHeight=data.perimeter==='corrugated-steel'?2.5:1.7;
+ const postGeometry=keep(new T.BoxGeometry(.065/unit,fenceHeight/unit,.065/unit)),matrix=new T.Matrix4();
+ const railPostGeometry=data.perimeter==='corrugated-steel'?keep(new T.BoxGeometry(.12/unit,1.16/unit,.075/unit)):null;
  for(const chunk of data.chunks) {
   const group=new T.Group();group.name='Race perimeter '+chunk.key;
-  const barrier=new T.Mesh(keep(geometry(T,chunk.positions,chunk.uvs)),wall);barrier.receiveShadow=true;group.add(barrier);
+  const barrier=new T.Mesh(keep(geometry(T,chunk.positions,chunk.uvs)),railPostGeometry?metal:wall);barrier.name=railPostGeometry?'Three corrugated steel rails':'Temporary concrete barrier';barrier.receiveShadow=true;group.add(barrier);
   const mesh=new T.Mesh(keep(geometry(T,chunk.fencePositions,chunk.fenceUvs)),fence);group.add(mesh);
-  if(chunk.posts.length){const posts=new T.InstancedMesh(postGeometry,metal,chunk.posts.length);chunk.posts.forEach((p,i)=>{matrix.makeTranslation(p.x,p.y+.85/unit,p.z);posts.setMatrixAt(i,matrix);});posts.instanceMatrix.needsUpdate=true;group.add(posts);}
+  if(chunk.posts.length){const posts=new T.InstancedMesh(postGeometry,metal,chunk.posts.length);chunk.posts.forEach((p,i)=>{matrix.makeTranslation(p.x,p.y+fenceHeight*.5/unit,p.z);posts.setMatrixAt(i,matrix);});posts.instanceMatrix.needsUpdate=true;group.add(posts);}
+  if(chunk.railPosts.length){const posts=new T.InstancedMesh(railPostGeometry,metal,chunk.railPosts.length);posts.name='Guardrail supports';chunk.railPosts.forEach((p,i)=>{matrix.makeTranslation(p.x,p.y+.58/unit,p.z);posts.setMatrixAt(i,matrix);});posts.instanceMatrix.needsUpdate=true;group.add(posts);}
   root.add(group);chunks.push({group,center:chunk.center,fence:mesh});
  }
  const boardGeometry=keep(new T.PlaneGeometry(.9/unit,1.05/unit));

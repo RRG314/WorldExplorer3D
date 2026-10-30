@@ -26,3 +26,20 @@ test('failed equipment preparation retires already-created materials without tou
  try {assert.throws(()=>prepareRaceFurniture(three,{concreteDiffuse:map},course()));assert.ok(made>0);assert.equal(released,made);assert.equal(borrowed,0);}
  finally{globalThis.document=previous;map.dispose();}
 });
+test('Nord perimeter uses three conforming corrugated rails with separate supports and a set-back fence',()=>{
+ const c={...course(),venueSource:{id:'nurburgring-nordschleife'}},before=structuredClone(c),data=buildRaceFurniture(c);
+ assert.equal(data.perimeter,'corrugated-steel');
+ let vertices=0,supports=0;
+ for(const chunk of data.chunks){
+  vertices+=chunk.positions.length/3;supports+=chunk.railPosts.length;
+  assert.equal(chunk.positions.length/3,chunk.uvs.length/2);
+  for(let i=0;i<chunk.positions.length;i+=3){
+   const [x,y,z]=chunk.positions.slice(i,i+3),height=(y-z*.04-x*c.metersPerUnit*.08/1.2)*c.metersPerUnit;
+   assert.ok(Math.abs(x)*c.metersPerUnit>=4.3-1e-8,'closest rail matches the physical edge clearance');
+   assert.ok([.31,.60,.89].some(base=>height>=base-1e-8&&height<=base+.22+1e-8),'all three steel bands follow the banked road');
+  }
+  for(let i=0;i<chunk.fencePositions.length;i+=3)assert.ok(Math.abs(chunk.fencePositions[i])*c.metersPerUnit>=5.25-1e-8);
+ }
+ assert.ok(vertices<40000);assert.equal(supports,Math.ceil(c.lengthMeters/4)*2);
+ assert.deepEqual(c,before,'presentation cannot alter road facts, timing or physics');
+});
