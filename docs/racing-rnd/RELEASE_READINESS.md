@@ -26,6 +26,14 @@ Updated October 29, 2026. **Full racing is not release-ready.** No production de
   changing the existing camera owner or near-clip lifecycle. Optional banked
   pavement forces remain behind explicit course admission; no unfinished major
   venue becomes selectable merely by raising a surface limit.
+- The retained Nordschleife source now includes five reviewed bridge profiles
+  and nine adjoining pavement profiles through the existing venue loader and
+  packed world compiler. Comparing the complete approach cores exposed false
+  bare-earth ramps; the repair preserves observed heights and camber and rejects
+  excessive reconciliation. The frozen full-layout component check sampled all
+  53 joins and matched retained clean approach heights within 1.6 cm. This is
+  local agreement with the source data, not absolute survey accuracy, a rendered
+  venue, gameplay acceptance or permission to enable the unfinished pack.
 - Actual held-key Silverstone driving reproduced fixed-tick pose repeats and
   double advances independently of pulsed automation, barriers or camera-mode
   changes. Practice now samples adjacent accepted session frames for the body,
