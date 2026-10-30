@@ -33,7 +33,8 @@ test('the graph and saved reference preserve every Nordschleife span while physi
  assert.equal(normalizeRaceRouteReference(reference).path.length,2048);
  assert.throws(()=>normalizeRaceRouteReference({...reference,path:[...reference.path,path[0]]}),/invalid_saved/);
  assert.throws(()=>createRaceCourse(graph,path,{locationId:'topology-only',anchor:{lat:50.359,lon:6.963},discipline:'circuit'}),/race_route_length/);
- assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).raceAdmission,'pending-timing-line','source inspection cannot enable an unfinished race pack');
+ assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).raceAdmission,'practice');
+ assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).presentationStatus,'under-construction','source topology alone cannot finish venue presentation');
 });
 test('both OSM pit-lane spellings are excluded from a reviewed main-course layout',()=>{
  for(const spelling of ['pitlane','pit_lane']){const changed=structuredClone(source);changed.ways.find(w=>w.id===changed.layout.wayIds[0]).tags.raceway=spelling;

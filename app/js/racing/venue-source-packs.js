@@ -22,6 +22,12 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
   Object.freeze({artifactId:'nordschleife-fine-nw-v1',contentSha256:'8ef2dc7bb03787f248da570967d902cfa917f2dbce02929f5581e1a64baba428'}),
   Object.freeze({artifactId:'nordschleife-fine-ne-v1',contentSha256:'11e185425a7ae941d59bb666a0ac14132d8e2892bb290f86a91c115897711945'})
  ]),
+ landscapeGroundArtifacts:Object.freeze([
+  Object.freeze({artifactId:'nordschleife-landscape-north-v1',contentSha256:'b3710270f8216f8c46d6dce46445cf937dd4a5cd33b732ab6dedc8814a9d829c'}),
+  Object.freeze({artifactId:'nordschleife-landscape-south-v1',contentSha256:'5a2f5162b8474d54d64972cae624791be5cf9e9560f427546a449f244fe9f9cf'}),
+  Object.freeze({artifactId:'nordschleife-landscape-west-v1',contentSha256:'2f4289dd7f8e26359c9543f27b932ceb19b39ca357191a4d115340466f7aa4fd'}),
+  Object.freeze({artifactId:'nordschleife-landscape-east-v1',contentSha256:'a19294eb018bf9d130593592029bc0847f4d381851152642731ef79bff3c3783'})
+ ]),
  reviewedDeckProfiles:Object.freeze({url:'/app/assets/racing/nordschleife/decks.json',contentSha256:'586ba8daef6c299170ea0a619cec2bed4b40ba57f09cec6522f4b187fdc62647'}),
  pavementWidthPolicy:'mapped',surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:3500,
  routeExtent:'mapped-venue-v1',motorAccess:'virtual-raceway-v1',raceAdmission:'practice',layoutLabel:'T13',
@@ -29,17 +35,21 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  // transverse paint in RLP DOP20. This is not a surveyed official timing marker.
  startLine:Object.freeze({sourceFeatureId:'osm:way:41395670',segment:6,fraction:.725}),
  presentationStatus:'under-construction',
- // Wider visual relief uses the same four retained native ground artifacts.
- // Feather inside their outer border; the physical road corridor is unchanged.
+ // Wider visual relief uses the same native source plus its retained perimeter tiles.
+ // Feather inside the outer coverage border; the physical road corridor is unchanged.
  landscapeRefinement:Object.freeze({radiusMeters:350,fullHeightRadiusMeters:150,spacingMeters:32,coverageFadeMeters:70,
-  coverage:Object.freeze({south:50.3363798755773,north:50.38183828592638,west:6.918536857397612,east:7.0070029465777})})
+  coverage:Object.freeze({south:50.33179264672786,north:50.38642068124047,west:6.911350335124666,east:7.014189468850645})})
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;
  return RACING_VENUE_SOURCES.find(pack=>geographicVenueDistance(pack.anchor,location)<=15)||null;
 }
-export function racingVenueGroundRequirements(descriptor){
- const required=descriptor.groundArtifacts||[{artifactId:descriptor.groundArtifactId,contentSha256:descriptor.groundContentSha256}];
+// Physical road/deck proofs retain their original group. World activation also
+// requires the explicit visual perimeter through the same accepted ground owner.
+export function racingVenueGroundRequirements(descriptor,{includeLandscape=false}={}){
+ const physical=descriptor.groundArtifacts||[{artifactId:descriptor.groundArtifactId,contentSha256:descriptor.groundContentSha256}],landscape=descriptor.landscapeGroundArtifacts;
+ if(landscape!==undefined&&(!Array.isArray(landscape)||!landscape.length||landscape.length>8))throw Error('venue_landscape_ground_group_invalid');
+ const required=includeLandscape&&landscape?[...physical,...landscape]:physical;
  if(!Array.isArray(required)||!required.length||required.length>32||required.some(item=>typeof item?.artifactId!=='string'||!item.artifactId||item.artifactId.length>160||!/^[a-f0-9]{64}$/.test(item.contentSha256))||new Set(required.map(item=>item.artifactId)).size!==required.length||
   !required.some(item=>item.artifactId===descriptor.groundArtifactId&&item.contentSha256===descriptor.groundContentSha256))throw Error('venue_ground_group_invalid');
  return Object.freeze(required.map(item=>Object.freeze({artifactId:item.artifactId,contentSha256:item.contentSha256})));
@@ -70,7 +80,7 @@ function reviewedLandscapeRefinement(descriptor){
  return Object.freeze({radiusMeters,fullHeightRadiusMeters,spacingMeters,coverageFadeMeters,coverage:Object.freeze({...coverage})});
 }
 export function createRacingVenueGroundPlan(descriptor,source){
- const layout=compileMappedVenueLayout(source),requiredArtifacts=racingVenueGroundRequirements(descriptor),coverageProbes=[];
+ const layout=compileMappedVenueLayout(source),requiredArtifacts=racingVenueGroundRequirements(descriptor,{includeLandscape:true}),coverageProbes=[];
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  const halfWidth=maximumPavementWidth(source,layout,descriptor)*.5+2,landscape=reviewedLandscapeRefinement(descriptor),metersPerDegree=6371008.8*Math.PI/180;
  for(let index=1;index<layout.points.length;index++){
@@ -103,7 +113,7 @@ export function createRacingVenueGroundPlan(descriptor,source){
 const inside=(point,bounds)=>point&&point.lat>=bounds.south&&point.lat<=bounds.north&&point.lon>=bounds.west&&point.lon<=bounds.east;
 export function prepareVenueSourceMerge(data,source,descriptor,ground){
  const required=racingVenueGroundRequirements(descriptor);
- if(ground?.status!=='accepted'||required.some(item=>{
+ if(ground?.status!=='accepted'||racingVenueGroundRequirements(descriptor,{includeLandscape:true}).some(item=>{
   const index=ground.artifactIds?.indexOf(item.artifactId)??-1;
   return index<0||ground.contentSha256s?.[index]!==item.contentSha256;
  }))throw Error('venue_ground_not_ready');
@@ -154,6 +164,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   ...(startLine?{startLine,layoutLabel:descriptor.layoutLabel||'Circuit'}:{}),
   ...(descriptor.presentationStatus?{presentationStatus:descriptor.presentationStatus}:{}),
   ...(landscapeRefinement?{landscapeRefinement}:{}),
+  ...(descriptor.landscapeGroundArtifacts?{landscapeGroundArtifacts:descriptor.landscapeGroundArtifacts}:{}),
   ...(venueSource?{venueSource}:{}),...(descriptor.raceAdmission?{raceAdmission:descriptor.raceAdmission}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
   sourceFeatureIds:Object.freeze(layout.wayIds.map(id=>`osm:way:${id}`)),mappedLengthMeters:layout.lengthMeters,
   referenceLengthMeters:layout.referenceLengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,

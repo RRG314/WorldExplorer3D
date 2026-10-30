@@ -12,7 +12,7 @@ import {raceCourseReference,restoreRaceCourse} from '../app/js/racing/course-lib
 // are verified separately; a flat source projection cannot accept a venue pack.
 const pack=RACING_VENUE_SOURCES.find(p=>p.id==='nurburgring-nordschleife'),
  source=await loadRacingVenueSource(pack,{fetchImpl:async url=>new Response(fs.readFileSync(new URL('..'+url,import.meta.url)))}),layout=compileMappedVenueLayout(source),
- group=racingVenueGroundRequirements(pack),ground={status:'accepted',artifactIds:group.map(g=>g.artifactId),contentSha256s:group.map(g=>g.contentSha256)},
+ group=racingVenueGroundRequirements(pack,{includeLandscape:true}),ground={status:'accepted',artifactIds:group.map(g=>g.artifactId),contentSha256s:group.map(g=>g.contentSha256)},
  venue=prepareVenueSourceMerge({},source,pack,ground).metadata,frame=earthCoordinateFrame(pack.anchor,100000),roads=[];
 for(const id of layout.wayIds){
  const way=layout.ways.get(id),sourceFeatureId=`osm:way:${id}`;

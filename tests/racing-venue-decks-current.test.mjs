@@ -42,7 +42,8 @@ test('the pinned Nord deck artifact reaches private world-source ownership and t
  }
  for(const p of artifact.pavements){const way=normalized.selection.roadWays.find(w=>Number(w.id)===p.sourceWayId),survey=roadSourceSurvey(way);assert.equal(survey.geographicPavementProfile.maximumAdjustmentMeters,.05);assert.equal(survey.geographicPavementProfile.samples.length,p.samples.length);}
  assert.throws(()=>prepareVenueSourceMerge({},JSON.parse(JSON.stringify(source)),descriptor,ground),/not_prepared/);
- assert.equal(RACING_VENUE_SOURCES.find(s=>s.id===config.venueId).raceAdmission,'pending-timing-line','source inspection cannot enable the unfinished race pack');
+ assert.equal(RACING_VENUE_SOURCES.find(s=>s.id===config.venueId).raceAdmission,'practice');
+ assert.equal(RACING_VENUE_SOURCES.find(s=>s.id===config.venueId).presentationStatus,'under-construction','physical source proof is distinct from completed venue presentation');
 });
 
 test('changed source identity, geometry, width, station coverage or ground cannot acquire deck authority even under a new content hash',async()=>{

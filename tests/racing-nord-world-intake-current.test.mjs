@@ -7,7 +7,8 @@ import {raceVenueById} from '../app/js/racing/venue-catalog.js';
 const pack=RACING_VENUE_SOURCES.find(p=>p.id==='nurburgring-nordschleife'),catalog=JSON.parse(fs.readFileSync(new URL('../app/assets/ground/manifest-catalog.json',import.meta.url)));
 test('Nord world inspection keeps the ground group, T13 practice and unfinished catalogue distinct from the ordinary GP location',async()=>{
  assert.equal(racingVenueSourceAt(pack.anchor),pack);assert.equal(racingVenueSourceAt({lat:50.3356,lon:6.9475}),null);
- const group=racingVenueGroundRequirements(pack);assert.equal(group.length,4);
+ assert.equal(racingVenueGroundRequirements(pack).length,4,'physical source proof remains unchanged');
+ const group=racingVenueGroundRequirements(pack,{includeLandscape:true});assert.equal(group.length,8);
  for(const item of group){const entry=catalog.manifests.find(m=>m.artifactId===item.artifactId);assert.equal(entry.contentSha256,item.contentSha256);
   assert.ok(fs.existsSync(new URL('../app/assets/ground/'+entry.url,import.meta.url)));assert.equal(entry.verticalDatum,'EGM2008');assert.equal(entry.complete,true);assert.equal(entry.missingSampleCount,0);}
  const source=await loadRacingVenueSource(pack,{fetchImpl:async url=>new Response(fs.readFileSync(new URL('..'+url,import.meta.url)))}),
