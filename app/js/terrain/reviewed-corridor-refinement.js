@@ -1,6 +1,7 @@
 // Bounded topology refinement for the existing far-terrain geometry owner.
 // Heights, materials, publication and disposal remain with that owner. Leaves
 // share every edge vertex, so a refined valley cannot open a terrain crack.
+import {conformPartitionEdges} from './partition-edge-conformance.js';
 const coordinate=n=>Math.round(n*1e6)/1e6;
 const key=(x,z)=>`${coordinate(x)}:${coordinate(z)}`;
 const pointSegmentDistance=(x,z,s)=>{const dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,t=Math.max(0,Math.min(1,((x-s.a.x)*dx+(z-s.a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-s.a.x-dx*t,z-s.a.z-dz*t);};
@@ -68,7 +69,7 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
  for(let i=0;i<basePositions.length;i+=3)edgePoint(basePositions[i],basePositions[i+2]);
  for(const p of edgeStations)edgePoint(p.x,p.z);
  for(const map of[vertical,horizontal])for(const[k,values]of map)map.set(k,[...values].sort((a,b)=>a-b));
- const positions=Array.from(basePositions),byPoint=new Map(),updated=new Set(),trianglesByCell=new Map(),indices=[];
+ const positions=Array.from(basePositions),byPoint=new Map(),updated=new Set(),trianglesByCell=new Map(),indices=[],partitionTriangles=partitionTriangle?.conformEdges?[]:null;
  for(let i=0;i<positions.length;i+=3)if(!byPoint.has(key(positions[i],positions[i+2])))byPoint.set(key(positions[i],positions[i+2]),i/3);
  function vertex(x,z,root){
   x=coordinate(x);z=coordinate(z);if(partitionTriangle){x=Math.fround(x);z=Math.fround(z);}const id=key(x,z);let index=byPoint.get(id);
@@ -83,7 +84,7 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
   const points=triangle.map(i=>({x:positions[i*3],z:positions[i*3+2]}));
   for(const piece of partitionTriangle(points)){
    const ids=piece.map(p=>vertex(p.x,p.z,root));if(new Set(ids).size!==3)continue;
-   indices.push(...ids);target.push(ids);
+   indices.push(...ids);target.push(ids);partitionTriangles?.push(ids);
    if(indices.length/3>maximumVertices*4)throw Error('reviewed_terrain_boundary_triangle_capacity');
   }
  }
@@ -103,5 +104,11 @@ export async function refineReviewedCorridorCells({xValues,zValues,basePositions
   if(trianglesByCell.has(c.root))trianglesByCell.get(c.root).push(...triangles);
   await pause();
  }
- return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size,innerSpacingWorld:innerSpacing,outerSpacingWorld:outerSpacing,landscapeSpacingWorld:landscapeSpacing}};
+ let conformance;
+ if(partitionTriangles){
+  conformance=await conformPartitionEdges(positions,partitionTriangles,{cellSize:outerSpacing,maximumTriangles:maximumVertices*4,pause});
+  indices.length=0;for(const triangle of partitionTriangles)for(const next of conformance.replacements.get(triangle)||[triangle])indices.push(...next);
+  for(const [root,triangles]of trianglesByCell)trianglesByCell.set(root,triangles.flatMap(t=>conformance.replacements.get(t)||[t]));
+ }
+ return {positions:new Float32Array(positions),indices:new Uint32Array(indices),trianglesByCell,stats:{leaves:leaves.length,vertices:positions.length/3,triangles:indices.length/3,sourceSegments:segments.length,sourceCells:roots.size,innerSpacingWorld:innerSpacing,outerSpacingWorld:outerSpacing,landscapeSpacingWorld:landscapeSpacing,...(conformance?{conformedTriangles:conformance.conformedTriangles,insertedEdgeVertices:conformance.insertedEdgeVertices}:{})}};
 }

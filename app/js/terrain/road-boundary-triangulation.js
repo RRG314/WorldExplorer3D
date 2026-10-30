@@ -54,7 +54,7 @@ export function createRoadBoundaryPartition(roads,venue){
   return {...road,transportRecord:{...record,crossSection:{...section,pavementSections:bank}}};
  });
  if(banks.length)layers.push(indexRoadBoundary(banks,venue));
- return triangle=>{
+ const partition=triangle=>{
   const b=bounds(triangle);let rings=[triangle];
   for(const index of layers){
    const candidates=new Set();
@@ -73,4 +73,5 @@ export function createRoadBoundaryPartition(roads,venue){
   const triangles=[];for(const piece of rings)for(let i=2;i<piece.length;i++){const t=[piece[0],piece[i-1],piece[i]];if(Math.abs(area(t))>1e-10)triangles.push(t);}
   return triangles;
  };
+ partition.conformEdges=banks.length>0;return partition;
 }

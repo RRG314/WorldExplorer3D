@@ -141,3 +141,14 @@ coordinate round-trip and terrain agreement checks after repair. The pinned
 curved-section GPU comparison was inspected with no WebGL error. Native
 full-width qualification remains a separate required check; the failed capture
 is retained and does not count as venue acceptance.
+
+The subsequent native capture still failed full-width admission and exposed a
+second discontinuity: partitioned terrain neighbours did not always share an
+inserted edge vertex. Profiled bank/apron terrain now conforms those edges using
+the existing Float32 coordinates and compiled heights before pavement support is
+published. Original limits, other terrain paths and ordinary roads are retained.
+Both retained native knee witnesses pass through actual terrain and pavement
+compilation, with contact-height variation below 0.1 mm across the sampled
+20-micrometre interval. Focused topology, capacity, cancellation and unchanged
+boundary checks pass; the rendered curved-section comparison was inspected.
+These repairs still require whole-venue full-width qualification.
