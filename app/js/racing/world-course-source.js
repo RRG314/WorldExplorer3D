@@ -11,7 +11,7 @@ import {STREET_POLYGON_GRID_WORLD}from'../world/compiler/street-coordinate-grid.
 import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.js';
 import {assertReviewedSurfaceAccepted}from'../world/compiler/transport-surface-model.js?v=25';
 import {hasReviewedPavement}from'../world/compiler/reviewed-deck-profile.js';
-import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL}from'../physics/road-plane-dynamics.js';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL}from'../physics/road-plane-dynamics.js';
 import {normalizeRaceVenueSource,assertRaceVenueRoads}from'./venue-course-policy.js';
 import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
@@ -88,6 +88,13 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     // owns driving height after terrain tessellation and intersecting corridors.
     // Engineered bridges/tunnels retain the independent profile/layer fence.
     if(groundOwned)diagnostics.maximumGroundProfileDepartureMeters=Math.max(diagnostics.maximumGroundProfileDepartureMeters,Math.abs(drive.position.y-guide)*metersPerUnit);
+    if(hasEdges){
+     if(!groundOwned||typeof context.terrainMeshHeightAt!=='function')return null;
+     // Same uncut terrain triangles and at-grade bias used by the road compiler.
+     const baseY=context.terrainMeshHeightAt(px,pz,{ignorePortalCuts:true})+.18;
+     if(!Number.isFinite(baseY))return null;
+     return {x:px,z:pz,y:drive.position.y,baseY};
+    }
     return {x:px,z:pz,y:drive.position.y};
    }
    const stations=hasEdges?[...new Set([...Array.from({length:steps+1},(_,i)=>i/steps),...streetEdgeStationFractions(edgeRoad,segIndex,sourceTStart,sourceTEnd)])].sort((a,b)=>a-b):Array.from({length:steps+1},(_,i)=>i/steps);
@@ -97,7 +104,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     const point=surface(x,z,t);
     if(!point){failure='surface_layer_mismatch';break;}
     const y=point.y;
-    if(sample===0)firstPoint=point;if(sample===stations.length-1)lastPoint=point;
+    if(sample===0)firstPoint=hasEdges?{x:point.x,z:point.z,y:point.y}:point;if(sample===stations.length-1)lastPoint=hasEdges?{x:point.x,z:point.z,y:point.y}:point;
     const water=context.SurfaceQuery.waterAt?.(x,z),space=tunnel?resolveTunnelSpace(feature,x,z,y+.5):null;
     if(tunnel){if(!space?.inside){failure='unqualified_tunnel';break;}minimumClearance=Math.min(minimumClearance,space.clearance*metersPerUnit);}
     if(water?.feature&&Number.isFinite(water.position?.y)&&water.position.y>y+.15&&!space?.inside){failure='submerged_road';break;}
@@ -127,7 +134,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    const key=`${sourceFeatureId}:${segIndex}:${sourceTStart.toFixed(6)}:${sourceTEnd.toFixed(6)}`;
    const a={...firstPoint,connectionLayer:`source-node:${segment.fromId}`},b={...lastPoint,connectionLayer:`source-node:${segment.toId}`};
    roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,
-    ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),
+    ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),...(hasEdges?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
     driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:samples,heightSampleSpanMeters:spanMeters,
     sourceAuthority:String(feature.transportRecord?.provenance?.authority||feature.sourceAuthority||'published-world-road')});
    diagnostics.eligible++;yield;

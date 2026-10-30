@@ -2,6 +2,16 @@
 // the existing YXZ chassis attitude: positive roll raises the right wheels;
 // negative pitch climbs forward. Speeds/accelerations here are SI units.
 export const BANKED_ROAD_MODEL='banked-road-v1';
+// Authored edges retain the original pavement plane limits. Their separately
+// witnessed additive lift has its own small height and derivative envelope.
+export const AUTHORED_ROAD_EDGE_MODEL='authored-road-edge-v1';
+export const AUTHORED_ROAD_EDGE_MAXIMUM_LIFT_METERS=.1;
+export const AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL=.3;
+// At a corner the lateral ramp rotates into the along-road axis. Its
+// vector envelope includes the authored .3 crossfall and .05 entry taper.
+export const AUTHORED_ROAD_EDGE_MAXIMUM_GRADE=.3;
+export const AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT=Math.hypot(.3,.05);
+export const AUTHORED_ROAD_EDGE_PUBLICATION_EPSILON_METERS=.0002;
 export const BANKED_ROAD_MAXIMUM_CROSSFALL=.7;
 export const BANKED_ROAD_MAXIMUM_GRADE=.22;
 export const BANKED_ROAD_MAXIMUM_ROLL=Math.atan(BANKED_ROAD_MAXIMUM_CROSSFALL);

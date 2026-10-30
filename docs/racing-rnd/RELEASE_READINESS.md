@@ -243,3 +243,11 @@ immutable. New checks cover continuous entry/exit, neighbouring cells, elevated
 road separation and qualification through the normal published-surface reader.
 These component checks pass; the remaining native geometry failures still need
 rechecking after their pavement and kerb repairs.
+
+Authored kerb facts now retain a published base height alongside the raised top.
+The optional typed contract keeps the original pavement grade/crossfall limits
+and separately bounds the added lift to 100 mm and its plane gradient envelope.
+Qualification reads that base from the existing uncut terrain triangles. New
+checks pass for unsafe-data rejection, route reversal, immutable identities,
+chunk tampering, both generated runtimes and existing four-wheel contact.
+Native pavement geometry and the final complete venue still require acceptance.

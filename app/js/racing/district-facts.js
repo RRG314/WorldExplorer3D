@@ -15,7 +15,7 @@ export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
  const roofHeight=n=>{if(!Number.isFinite(n)||Math.abs(n)>1e7)fail();return Math.round(n*m*10000)/(m*10000);};
  const lateral=s=>{if(s.lateralSamples===undefined)return {};
   if(!Array.isArray(s.lateralSamples)||s.lateralSamples.length<3||s.lateralSamples.length>32)fail();
-  return {lateralSamples:s.lateralSamples.map(p=>({offsetMeters:number(p?.offsetMeters),y:roofHeight(p?.y)}))};};
+  return {lateralSamples:s.lateralSamples.map(p=>({offsetMeters:number(p?.offsetMeters),y:roofHeight(p?.y),...(p?.baseY!==undefined?{baseY:roofHeight(p.baseY)}:{})}))};};
  const point=p=>({x:number(p?.x),y:number(p?.y),z:number(p?.z),connectionLayer:label(p?.connectionLayer,180)});
  const anchor={lat:Number(raw.anchor?.lat),lon:Number(raw.anchor?.lon)};
  if(!Number.isFinite(anchor.lat)||Math.abs(anchor.lat)>85||!Number.isFinite(anchor.lon)||Math.abs(anchor.lon)>180)fail();
@@ -24,7 +24,7 @@ export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
   if(!r.sourceId||r.sourceId.length>180||!['surface','bridge','tunnel'].includes(r.structure)||!['both','forward','reverse',undefined].includes(r.direction)||r.driveable!==true||r.supported!==true)fail();
   const samples=r.heightSamples;if(!Array.isArray(samples)||samples.length<2||samples.length>250)fail();
   return {sourceId:label(r.sourceId,180),sourceFeatureId:label(r.sourceFeatureId,180),label:label(r.label,100),a:point(r.a),b:point(r.b),
-   ...(r.surfaceModel!==undefined?{surfaceModel:r.surfaceModel}:{}),
+   ...(r.surfaceModel!==undefined?{surfaceModel:r.surfaceModel}:{}),...(r.edgeBandModel!==undefined?{edgeBandModel:r.edgeBandModel}:{}),
    widthMeters:number(r.widthMeters),direction:r.direction||'both',structure:r.structure,clearanceMeters:number(r.clearanceMeters||0),driveable:true,supported:true,
    heightSamples:samples.map(s=>{const height=s.lateralSamples?roofHeight:number;return {t:s.t,y:height(s.y),leftY:height(s.leftY),rightY:height(s.rightY),...lateral(s)};}),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
  }).sort((a,b)=>a.sourceId.localeCompare(b.sourceId));
