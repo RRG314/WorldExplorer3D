@@ -84,3 +84,13 @@ test('an unavailable native source or superseded owner leaves the previous far g
  await assert.rejects(h.built.refineReviewedCorridors(h.mesh,{current:()=>false}),/superseded/);
  assert.equal(h.mesh.geometry.attributes.position,position);
 });
+
+test('narrow detailed-seam cells refine only their long axis within the same geometry budget',async()=>{
+ const xValues=[-320,-.01,0,.01,320],zValues=[-320,320],basePositions=new Float32Array(zValues.flatMap(z=>xValues.flatMap(x=>[x,0,z]))),
+  segment={a:{x:0,z:-310},b:{x:0,z:310},innerRadius:7,outerRadius:28};
+ const result=await refineReviewedCorridorCells({xValues,zValues,basePositions,segments:[segment],heightAt:(x,z)=>x*.1+z*.03,innerSpacing:3,maximumLeaves:10000});
+ assert.ok(result.stats.leaves<10000);assert.ok(result.stats.vertices<30000);
+ for(let i=0;i<result.indices.length;i+=3){const[a,b,c]=[...result.indices.slice(i,i+3)].map(id=>({x:result.positions[id*3],z:result.positions[id*3+2]}));
+  assert.ok((b.z-a.z)*(c.x-a.x)-(b.x-a.x)*(c.z-a.z)>0,'no collapsed narrow leaves');
+ }
+});
