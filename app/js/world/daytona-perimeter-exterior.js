@@ -22,8 +22,13 @@ export function buildDaytonaPerimeter(ctx){
    const a=road.pts[segment],b=road.pts[segment+1],length=Math.hypot(b.x-a.x,b.z-a.z)*unit,count=Math.max(1,Math.ceil(length/2));
    const station=t=>{
     const n=roadPavementFrameAtSegment(profile,segment,t),section=roadPavementSectionForSegment(road,segment,t),x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,
-     point=(lateral,height=0)=>({x:x+n.x*lateral,y:height,z:z+n.z*lateral}),inside=point(section.positive-.05/unit),y=index.sampleAt(inside.x,inside.z,NaN,'at_grade');
-    if(!Number.isFinite(y))throw Error('daytona_perimeter_surface_unavailable');
+     point=(lateral,height=0)=>({x:x+n.x*lateral,y:height,z:z+n.z*lateral}),near=point(section.positive-.2/unit),inner=point(section.positive-.4/unit),
+     nearY=index.sampleAt(near.x,near.z,NaN,'at_grade'),innerY=index.sampleAt(inner.x,inner.z,NaN,'at_grade');
+    // Source joins can trim centimetres from the very outside corner. Read two
+    // actual interior contacts and continue their short crossfall to the wall
+    // base; never enlarge contacts or invent support under the drivable road.
+    if(!Number.isFinite(nearY)||!Number.isFinite(innerY))throw Error('daytona_perimeter_surface_unavailable');
+    const y=2*nearY-innerY;
     return {section,point,y};
    };
    for(let i=0;i<count;i++){

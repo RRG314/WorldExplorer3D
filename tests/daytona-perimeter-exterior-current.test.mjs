@@ -7,12 +7,12 @@ import {disposeLandmarkModel} from '../app/js/world/landmark-lifetime.js';
 
 // Controlled five-way bank/apron surface. This checks presentation projection
 // and resource ownership; native venue geometry has its own accepted evidence.
-function fixture(unit){
+function fixture(unit,{outerTrim=0}={}){
  const roads=[],positions=[],height=l=>(10+(l>=-6?l*.6:-3.6+(l+6)*.02))/unit;
  for(let i=0;i<5;i++){
   const sourceFeatureId=`fixture:${i}`,a={x:0,z:i*40/unit},b={x:0,z:(i+1)*40/unit};
   roads.push({sourceFeatureId,pts:[a,b],transportSurfaceModel:{reviewedSurfacePhase:'accepted'},transportRecord:{crossSection:{pavementSections:{coordinateSpace:'world',nodeDistances:[0,40/unit],nodeFrames:[{x:-1,z:0},{x:-1,z:0}],samples:[0,40/unit].map(distance=>({distance,positive:4/unit,negative:12/unit,bankNegative:6/unit}))}}}});
-  for(const [lo,hi]of [[-12,-6],[-6,0],[0,4]])for(const [l,z]of [[lo,a.z],[hi,a.z],[hi,b.z],[lo,a.z],[hi,b.z],[lo,b.z]])positions.push(-l/unit,height(l),z);
+  for(const [lo,hi]of [[-12,-6],[-6,0],[0,4-outerTrim]])for(const [l,z]of [[lo,a.z],[hi,a.z],[hi,b.z],[lo,a.z],[hi,b.z],[lo,b.z]])positions.push(-l/unit,height(l),z);
  }
  const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));const mesh=new T.Mesh(geometry);mesh.userData.terrainMode='at_grade';
  const index=createRoadContactIndex([mesh]);
@@ -31,6 +31,12 @@ test('paint stays on actual bank triangles and outer-wall collision leaves all p
 test('unpublished or incomplete support cannot produce a floating perimeter',()=>{
  const f=fixture(1);assert.equal(buildDaytonaPerimeter({...f.ctx,roadContactIndex:null}),null);assert.equal(buildDaytonaPerimeter({...f.ctx,roads:f.ctx.roads.slice(1)}),null);
  assert.throws(()=>buildDaytonaPerimeter({...f.ctx,roadContactIndex:{...f.ctx.roadContactIndex,sampleAt:()=>null}}),/surface_unavailable/);f.dispose();
+});
+test('trimmed outside corners use interior published contacts without expanding the road contact owner',()=>{
+ const f=fixture(1.11,{outerTrim:.1}),index=f.ctx.roadContactIndex;
+ assert.equal(index.sampleAt(-3.95/1.11,20/1.11,NaN,'at_grade'),null);
+ const plan=buildDaytonaPerimeter(f.ctx);assert.ok(plan);assert.ok(plan.colliders.every(c=>Math.abs(c.maxY*1.11-13.52)<1e-4));
+ assert.equal(index.sampleAt(-3.95/1.11,20/1.11,NaN,'at_grade'),null,'presentation cannot enlarge support');f.dispose();
 });
 test('LOD selection reads no heights and the existing landmark owner releases every unique resource',()=>{
  const f=fixture(1.11),oldDocument=globalThis.document;
