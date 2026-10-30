@@ -7,6 +7,8 @@ import {authorVenueEdgeRecipes} from '../app/js/racing/venue-edge-authoring.js';
 import {RACING_VENUE_SOURCES} from '../app/js/racing/venue-source-packs.js';
 import {prepareCarriagewayTiles} from '../app/js/world/compiler/street-carriageway.js';
 import {meshCarriagewayTile} from '../app/js/world/compiler/street-carriageway-mesh.js';
+import {roadSourceCoordinateTolerance} from '../app/js/terrain/published-road-integrity.js';
+import {STREET_POLYGON_GRID_WORLD} from '../app/js/world/compiler/street-coordinate-grid.js';
 import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js';
 
 test('accepted sloping band pieces cannot be snapped back into flat asphalt slivers',()=>{
@@ -28,6 +30,12 @@ test('accepted sloping band pieces cannot be snapped back into flat asphalt sliv
   for(let i=0;i<=100;i++){
    const offset=-3.9+i*.000005,x=(p.x+q.x)/2+fz*offset/unit,z=(p.z+q.z)/2-fx*offset/unit,y=contact.sampleAt(x,z,10,'at_grade');
    assert.ok(Number.isFinite(y)&&y>10.035,`the accepted outer outline cannot contain a flat sliver: ${offset},${y}`);
+  }
+  const start=road.pts[8],end=road.pts[9],distance=Math.hypot(end.x-start.x,end.z-start.z),vx=(end.x-start.x)/distance,vz=(end.z-start.z)/distance,along=3/11;
+  for(const offset of [-3.8996425337114218,-3.899585075595875,-3.8995]){
+   const x=start.x+(end.x-start.x)*along+vz*offset/unit,z=start.z+(end.z-start.z)*along-vx*offset/unit,raw=contact.sampleAt(x,z,10,'at_grade'),projected=Number.isFinite(raw)?null:contact.nearestSurfaceAt(x,z,roadSourceCoordinateTolerance(x,z,STREET_POLYGON_GRID_WORLD),'at_grade'),y=raw??projected?.y;
+   if(projected)assert.ok(projected.distance<.001,'only existing source/render precision may project to a real top');
+   assert.ok(Number.isFinite(y)&&y>10.015,`the tapered outer top must cover its accepted outline: ${offset},${y}`);
   }
   const outside=-3.903;assert.equal(contact.sampleAt((p.x+q.x)/2+fz*outside/unit,(p.z+q.z)/2-fx*outside/unit,10,'at_grade'),null,'the compiler pad cannot expand the existing road footprint');
  }finally{contact.dispose();}

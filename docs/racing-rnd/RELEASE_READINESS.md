@@ -215,3 +215,10 @@ reproduced the failure at translated world coordinates. The repair keeps final
 edge clipping at accepted-surface precision and avoids snapping those pieces
 back onto the design grid. That regression and eight affected compiler/worker
 cases pass. Native admission and driving verification remain open.
+
+A further controlled compiler sweep passes all 749 kerbed spans across the
+35 authored Nordschleife roads on a flat base, with at most 13 lateral points
+and measured row-fit error below 3 mm. Flat asphalt now comes from the authored
+inner asphalt union, avoiding false low contacts in tiny differences between
+clipped roof pieces. This is source-geometry evidence; real terrain, storage,
+driving and complete venue presentation remain separate acceptance boundaries.

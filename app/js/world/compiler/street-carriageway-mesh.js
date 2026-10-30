@@ -31,7 +31,10 @@ export function meshCarriagewayTile(tile, sampleTop, partitionSurface, {polygons
   edgeFaces=edgeFaces??authored.faces;
   const domain=authored?.faces.length?edgeClip.difference(polygons,authored.polygons):polygons;
   const bands=edgeFaces.length?resolveStreetEdgeBands(edgeFaces,domain,tile.bounds):null,
-    asphalt=bands?.footprint.length?edgeClip.difference(polygons,bands.footprint):polygons;
+    // The authored inner union owns flat asphalt. Filling tiny differences
+    // between independently clipped roof faces with asphalt creates false
+    // low contacts at the rounded outer boundary after Float32 publication.
+    asphalt=authored?.faces.length?edgeClip.intersection(polygons,authored.polygons):bands?.footprint.length?edgeClip.difference(polygons,bands.footprint):polygons;
   const compile=shapes=>{
     if(!shapes.length)return {positions:new Float32Array(),indices:new Uint16Array()};
     const mesh=meshPavementTile(tile,shapes,sampleOnce,{cellSize,curbHeight:0,includeCurbs:false,includeTriangles:false,preclipped:!!bands});
