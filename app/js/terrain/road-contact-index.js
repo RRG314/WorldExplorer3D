@@ -199,6 +199,21 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
     },
     projectPolygon,
     projectTriangle: projectPolygon,
+    // Construction-only access to the same referenced triangles. No copied
+    // surface or query-time geometry is retained by this visitor.
+    forEachTriangleInBounds(bounds,visit){
+      if(!bounds||!['minX','maxX','minZ','maxZ'].every(k=>Number.isFinite(bounds[k]))||bounds.maxX<bounds.minX||bounds.maxZ<bounds.minZ||typeof visit!=='function')throw Error('invalid_road_triangle_bounds');
+      const candidates=new Set();
+      for(let x=Math.floor(bounds.minX/cellSize);x<=Math.floor(bounds.maxX/cellSize);x++)for(let z=Math.floor(bounds.minZ/cellSize);z<=Math.floor(bounds.maxZ/cellSize);z++){
+        const start=cells.get(x)?.get(z);if(start===undefined)continue;
+        for(let i=start+1,end=i+buckets[start];i<end;i++)candidates.add(buckets[i]);
+      }
+      for(const id of candidates){
+        const o=id*5,p=sources[records[o]],a=records[o+1],b=records[o+2],c=records[o+3];
+        if(Math.max(p[a],p[b],p[c])<bounds.minX||Math.min(p[a],p[b],p[c])>bounds.maxX||Math.max(p[a+2],p[b+2],p[c+2])<bounds.minZ||Math.min(p[a+2],p[b+2],p[c+2])>bounds.maxZ)continue;
+        visit({positions:p,a,b,c,denominator:denominators[id]});
+      }
+    },
     sampleAt:(x,z,referenceY=NaN,mode=null)=>sampleContact(x,z,referenceY,mode),
     sampleProfileAt:(x,z,referenceY=NaN,mode=null)=>sampleContact(x,z,referenceY,mode,true)
   };

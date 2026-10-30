@@ -100,15 +100,17 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   appCtx._cancelTransportPreparation?.();
   appCtx._cancelTransportPreparation=dispose;
   try {
-    const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,
+    const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,sourceFeatureId:road.sourceFeatureId,
       edgeBandRecipe:reviewedRoadEdgeRecipe(road),pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
       structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
     }));
     const includeOverview=appCtx.farTerrainClipmapState?.regionalRoadCoverage?.status!=='ready';
     stats.overviewOwner=includeOverview?'selected-transport-fallback':'regional-source-coverage';
     const planInput={roads:sourceRoads,focus,includeOverview,maxTextureSize:Math.min(4096,appCtx.renderer.capabilities.maxTextureSize)};
+    let pavementJoins=[];
     if(terrainReady){
-      await Promise.all([request({type:'plan',input:planInput}),terrainReady]);
+      const [,joins]=await Promise.all([request({type:'plan',input:planInput}),terrainReady]);
+      pavementJoins=joins||[];
       if(disposed||!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
     }
     const heightProbes=[];
@@ -119,8 +121,8 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       heightProbes.push({x:point.x,z:point.z,y});
     }
     const terrain=captureTransportTerrain(appCtx);
-    recoveryInput={...planInput,terrain,heightProbes,includeOverview:false,deferInitial:true};
-    const initial=await request({type:'prepare',input:{...(terrainReady?{}:planInput),terrain,heightProbes}});
+    recoveryInput={...planInput,terrain,pavementJoins,heightProbes,includeOverview:false,deferInitial:true};
+    const initial=await request({type:'prepare',input:{...(terrainReady?{}:planInput),terrain,pavementJoins,heightProbes}});
 
     if(!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
     if(includeOverview){

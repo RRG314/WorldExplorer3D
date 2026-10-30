@@ -41,7 +41,7 @@ export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxText
   return {tiles,keys,layout,masks,plan};
 }
 
-export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true,heightProbes=[],preparedPlan=null,deferInitial=false}) {
+export function createTransportDetailCompiler({roads,terrain,pavementJoins=[],focus={x:0,z:0},radius,maxTextureSize=4096,includeOverview=true,heightProbes=[],preparedPlan=null,deferInitial=false}) {
   const restored=restoreTransportTerrain(terrain);
   const heightParity={samples:heightProbes.length,maximumDifference:0};
   for(const point of heightProbes){
@@ -49,7 +49,7 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
     if(!Number.isFinite(actual)||!Number.isFinite(point.y)||difference>1e-4)throw new Error('Transport terrain snapshot differs from the published height authority');
     heightParity.maximumDifference=Math.max(heightParity.maximumDifference,difference);
   }
-  const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true});
+  const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true,pavementJoins});
   const clipSurface=createPortalSurfaceClipper(terrain.portalMasks);
   const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize,includeOverview});
   const regions=new Map([...plan.initial,...plan.pending].map(region=>[region.key,region]));

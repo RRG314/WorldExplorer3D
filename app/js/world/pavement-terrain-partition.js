@@ -1,6 +1,7 @@
 import {terrainGridInterval} from '../terrain/world-grid.js';
 import {createRoadContactIndex,createRoadContactIndexCooperatively} from '../terrain/road-contact-index.js?v=1';
 import {projectDecalTriangle} from '../terrain/surface-decal-projection.js';
+import {createPavementJoinPartition} from './pavement-join-partition.js';
 
 const refinedDetailed=mesh=>mesh.userData?.isTerrainMesh&&mesh.userData.reviewedTerrainCells?.size>0;
 function indexedTerrainSupports(meshes,includeFarTerrain){
@@ -30,9 +31,10 @@ export function triangleMayOverlapCell(points, minX, maxX, minZ, maxZ) {
 
 // Split against the rendered terrain planes. This preserves creases exactly
 // without recursively multiplying skinny pavement triangles near a grid edge.
-export function createPavementTerrainPartition(meshes = [], {includeFarTerrain = false,farSupportIndex} = {}) {
+export function createPavementTerrainPartition(meshes = [], {includeFarTerrain = false,farSupportIndex,pavementJoins=[]} = {}) {
   const farMeshes=indexedTerrainSupports(meshes,includeFarTerrain);
   const farIndex=farSupportIndex ?? (farMeshes.length ? createRoadContactIndex(farMeshes,64) : null);
+  const joins=createPavementJoinPartition(pavementJoins);
   const grids=[];
   for(const mesh of meshes){
     if(!mesh.userData?.isTerrainMesh || mesh.visible===false || mesh.userData.pendingTerrainTile||refinedDetailed(mesh))continue;
@@ -72,8 +74,9 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
     }
     return projectDecalTriangle(points,supports(),0,workspace);
   }
-  function* partitionSteps(vertices,sampleTop){
+  function* partitionSteps(vertices,sampleTop,tile){
     const output=[],world=[{x:0,z:0},{x:0,z:0},{x:0,z:0}];
+    const selectedJoins=joins.select(tile);
     // One workspace per iterator, including concurrent/cooperative callers.
     // Clipped coordinates are consumed before its next use; published output
     // and failure diagnostics never reference borrowed storage.
@@ -89,14 +92,16 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
         if(!clipped)continue;
         for(let j=0;j<clipped.length;j+=9){
           coveredArea+=Math.abs((clipped[j+3]-clipped[j])*(clipped[j+8]-clipped[j+2])-(clipped[j+5]-clipped[j+2])*(clipped[j+6]-clipped[j]))/2;
-          for(let k=j;k<j+9;k+=3){const x=clipped[k]+g.ox,z=clipped[k+2]+g.oz;output.push(x,sampleTop(x,z),z);}
+          if(selectedJoins.length)joins.append(clipped,j,output,sampleTop,selectedJoins);
+          else for(let k=j;k<j+9;k+=3){const x=clipped[k]+g.ox,z=clipped[k+2]+g.oz;output.push(x,sampleTop(x,z),z);}
         }
       }
       if(farIndex) {
         const clipped=farIndex.projectTriangle(world,0);
         for(let j=0;j<clipped.length;j+=9) {
           coveredArea+=Math.abs((clipped[j+3]-clipped[j])*(clipped[j+8]-clipped[j+2])-(clipped[j+5]-clipped[j+2])*(clipped[j+6]-clipped[j]))/2;
-          for(let k=j;k<j+9;k+=3)output.push(clipped[k],sampleTop(clipped[k],clipped[k+2]),clipped[k+2]);
+          if(selectedJoins.length)joins.append(clipped,j,output,sampleTop,selectedJoins);
+          else for(let k=j;k<j+9;k+=3)output.push(clipped[k],sampleTop(clipped[k],clipped[k+2]),clipped[k+2]);
         }
       }
       const difference=coveredArea-areaBefore-area;
@@ -114,13 +119,13 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
     }
     return complete ? output : null;
   };
-  const partition=(vertices,sampleTop)=>{
-    const steps=partitionSteps(vertices,sampleTop);let step;
+  const partition=(vertices,sampleTop,tile)=>{
+    const steps=partitionSteps(vertices,sampleTop,tile);let step;
     do{step=steps.next();}while(!step.done);
     return step.value;
   };
   partition.steps=partitionSteps;
-  partition.dispose=()=>{farIndex?.dispose();grids.length=0;};
+  partition.dispose=()=>{farIndex?.dispose();joins.dispose();grids.length=0;};
   return partition;
 }
 

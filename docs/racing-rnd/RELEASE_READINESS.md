@@ -320,3 +320,20 @@ serve terrain rendering, queries and pavement subtraction. A regression
 reproduces the former endpoint cut and passes after the repair; existing upper
 street, bridge, wall and internal-overlap cases pass. Native rechecking remains
 required.
+
+Reviewed pavement endpoints now supply their actual Float32 ribbon triangles to
+the existing regional pavement partition. Only an exact shared source endpoint
+with an accepted neighboring road in the same venue requests this join. The
+compiler cuts ordinary pavement at those triangle edges and gives both sides
+the same boundary height; terrain vertices elsewhere remain unchanged. These
+bounded inputs are temporary construction geometry, retained with the existing
+worker recovery input and released with its owner. They add no live height
+sampler or vehicle correction. Cancellation, missing-support and overlap guards
+remain in the normal partition.
+
+A retained native Mini-Karussell triangle fixture reduces the failed crossfall
+from 40.28 to 0.385 with the original 0.7 base limit. A separate controlled
+regression covers the seam, exact node/venue admission, untouched distant
+vertices and invalid-input/capacity rejection. Actual worker transfer and repeat
+region compilation match the synchronous output. These are construction checks;
+the full native collector and venue acceptance remain required.

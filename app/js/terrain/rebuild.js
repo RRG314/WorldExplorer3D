@@ -32,6 +32,7 @@ import { yieldToMainThread, yieldToWorldFrame } from "../world/cooperative-sched
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
 import { createRoadContactIndex, createRoadContactIndexCooperatively } from './road-contact-index.js?v=1';
 import { createSpatialRoadBatches } from './spatial-road-batches.js';
+import {publishedPavementJoins} from './published-pavement-joins.js';
 
 const ROAD_SURFACE_BIAS = 0.18;
 
@@ -521,6 +522,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   const roadBatchBuilder = createSpatialRoadBatches();
   const roadMainBatches = roadBatchBuilder.batches;
+  const pavementJoins=[];
   // Accessories keep their exact geometry, but no longer force every marking
   // and bridge skirt in the region through the GPU from every street view.
   const roadSkirtBuilder = createSpatialRoadBatches();
@@ -636,6 +638,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       leftEdge.push(...ribbonEdges.leftEdge);
       rightEdge.push(...ribbonEdges.rightEdge);
       appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
+      pavementJoins.push(...publishedPavementJoins(renderRoad,verts,indices,baseRoads));
       recordAtGradeRoadTerrainConformance(
         roadTerrainAudit,
         renderRoad,
@@ -678,8 +681,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   assertCurrent();
   await measureAsync('buildCarriagewayRegions',async()=>{
+    roadSurfaceIntegrity.reviewedPavementJoins=pavementJoins.length;
+    roadSurfaceIntegrity.reviewedPavementJoinVertices=pavementJoins.reduce((count,join)=>count+join.positions.length/3,0);
     if(typeof Worker==='function') {
-      releaseTerrain();
+      releaseTerrain(pavementJoins);
       detail=await preparingDetail;
       assertCurrent();
       for(const region of detail.initial.regions){
@@ -691,7 +696,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       roadBatchBuilder.finish();
       return;
     }
-    const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,current:isCurrent,yieldWork:yieldToMainThread});
+    const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,pavementJoins,current:isCurrent,yieldWork:yieldToMainThread});
     try {
       trace('indexCarriageways:start',{roads:atGradeRoads.length});
       const tiles=prepareCarriagewayTiles(atGradeRoads.map(({road})=>{const edgeBandRecipe=reviewedRoadEdgeRecipe(road);return edgeBandRecipe?{...road,edgeBandRecipe}:road;}));

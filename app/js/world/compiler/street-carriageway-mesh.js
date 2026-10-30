@@ -38,7 +38,7 @@ export function meshCarriagewayTile(tile, sampleTop, partitionSurface, {polygons
   const compile=shapes=>{
     if(!shapes.length)return {positions:new Float32Array(),indices:new Uint16Array()};
     const mesh=meshPavementTile(tile,shapes,sampleOnce,{cellSize,curbHeight:0,includeCurbs:false,includeTriangles:false,preclipped:!!bands});
-    const partitioned=partitionSurface(mesh.vertices,sampleOnce);
+    const partitioned=partitionSurface(mesh.vertices,sampleOnce,tile);
     if(!partitioned)throw new Error(`Carriageway ${tile.key} has incomplete or overlapping terrain support: ${JSON.stringify(partitionSurface.lastCoverage || {})}`);
     return indexPavementPositions(partitioned);
   };
