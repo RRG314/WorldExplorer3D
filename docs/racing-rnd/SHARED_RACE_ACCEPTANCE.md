@@ -30,6 +30,15 @@ These are controlled engine/presentation boundaries. Daytona remains private
 circuit practice under construction. Its pit branch, drafting, complete native
 oval gameplay and venue presentation remain open; no major pack is accepted.
 
+Three mapped Daytona garage exteriors also passed publication in the actual
+loaded world: three roots and three replacement colliders, with no remaining
+generic representation under those source identities. Two car views and a
+precisely admitted walking view show their terrain fit and closed façade detail.
+The normal restore helper snapped the first two attempted north-garage views to
+a service road; those views are retained as framing failures. No pit driving or
+full venue acceptance is inferred from these placements. Nearby generic service
+buildings remained a presentation failure and are being replaced separately.
+
 ## Actual city and deployed services
 
 Frozen browser build: `5.6.1+f2d621309ecd.1b27b746bce01a83.staging`.

@@ -214,3 +214,14 @@ The 5.2 m eaves, 6.4 m ridges, closed service bays, ribs, vents, glazing and
 safety trim are original estimates. They do not reproduce sponsor graphics or
 confer interior admission. Terrain support, collision, LOD and disposal use the
 existing building publication and lifecycle owners.
+
+The same retained snapshot supplies six neighboring service, inspection, media
+and club outlines: ways [407713759](https://www.openstreetmap.org/way/407713759),
+[407713780](https://www.openstreetmap.org/way/407713780),
+[407713756](https://www.openstreetmap.org/way/407713756),
+[407713761](https://www.openstreetmap.org/way/407713761),
+[407709762](https://www.openstreetmap.org/way/407709762) and
+[407709764](https://www.openstreetmap.org/way/407709764).
+Their heights and façade/roof details are original estimates recorded in the
+same survey module. They replace generic presentation only and do not change
+geographic ground, building ownership or access permissions.

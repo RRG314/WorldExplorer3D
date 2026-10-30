@@ -13,9 +13,9 @@ test('mapped garage reservation distinguishes neighbouring sources and waits for
 });
 test('three mapped garages retain indented roof plans, metre-scale detail, bounded LODs and exactly owned resources',()=>{
  for(const unit of [1,1.11]){
-  const c=fixture(unit),exteriors=createDaytonaPaddockExteriors(T,c);assert.equal(exteriors.length,3);assert.ok(c.reads()>100);
+  const c=fixture(unit),exteriors=createDaytonaPaddockExteriors(T,c);assert.equal(exteriors.length,9);assert.equal(exteriors.filter(e=>e.root.userData.paddockGarage).length,3);assert.ok(c.reads()>100);
   for(const [i,e]of exteriors.entries()){
-   const {root,footprint}=e,source=DAYTONA_PADDOCK_BUILDINGS[i],lod=root.children[0];assert.equal(root.userData.sourceBuildingId,source.sourceBuildingId);assert.equal(root.userData.exteriorOnly,true);assert.equal(lod.levels.length,3);assert.equal(lod.levels[2].object.children.length,0);assert.ok(root.userData.architecture.closedServiceBays>15);
+   const {root,footprint}=e,source=DAYTONA_PADDOCK_BUILDINGS[i],lod=root.children[0];assert.equal(root.userData.sourceBuildingId,source.sourceBuildingId);assert.equal(root.userData.exteriorOnly,true);assert.equal(lod.levels.length,3);assert.equal(lod.levels[2].object.children.length,0);if(source.kind==='garage')assert.ok(root.userData.architecture.closedServiceBays>15);else assert.equal(root.userData.architecture.garages,0);
    assert.ok(Math.abs((e.top-root.position.y)*unit-source.ridgeMeters-.35)<1e-9);assert.ok(lod.levels[0].object.children.length<=7);assert.ok(lod.levels[1].object.children.length<=3);
    for(const level of lod.levels.slice(0,2)){
     const roof=level.object.children.find(m=>m.material?.color?.getHex()===lod.levels[0].object.children.find(m=>m.material?.metalness===.45&&m.material?.roughness===.55)?.material.color.getHex());assert.ok(roof);
@@ -34,7 +34,7 @@ test('the existing publication owner retires only the matching bodies and adjunc
  const retired=[];for(const p of plans){const m=new T.Mesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial());m.userData={sourceBuildingId:p.sourceBuildingId,buildingFootprint:p.footprint};scene.add(m);c.buildingMeshes.push(m);retired.push(m);}
  const roof=new T.Mesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial());roof.userData={sourceBuildingId:plans[0].sourceBuildingId,isRoofDetail:true};scene.add(roof);c.buildingMeshes.push(roof);retired.push(roof);
  const neighbour=new T.Mesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial());neighbour.userData={sourceBuildingId:'unrelated'};scene.add(neighbour);c.buildingMeshes.push(neighbour);
- publishReviewedVenueExteriors(c,T);const callback=c.deferredTransportLandmarkPublishers.at(-1);assert.equal(c.reads(),0);c._worldLoadSequence=8;callback();assert.equal(c.reads(),0);assert.equal(c.buildingMeshes.length,5);
- c._worldLoadSequence=7;callback();assert.equal(c.buildingMeshes.filter(m=>m.userData.paddockGarage).length,3);assert.ok(retired.every(m=>m.parent===null));assert.equal(neighbour.parent,scene);assert.equal(c.dynamicBuildingColliders.length,3);assert.ok(c.buildings.every(b=>b.collisionReplacedByVenue));callback();assert.equal(c.dynamicBuildingColliders.length,3);
+ publishReviewedVenueExteriors(c,T);const callback=c.deferredTransportLandmarkPublishers.at(-1);assert.equal(c.reads(),0);c._worldLoadSequence=8;callback();assert.equal(c.reads(),0);assert.equal(c.buildingMeshes.length,11);
+ c._worldLoadSequence=7;callback();assert.equal(c.buildingMeshes.filter(m=>m.userData.paddockStructure).length,9);assert.ok(retired.every(m=>m.parent===null));assert.equal(neighbour.parent,scene);assert.equal(c.dynamicBuildingColliders.length,9);assert.ok(c.buildings.every(b=>b.collisionReplacedByVenue));callback();assert.equal(c.dynamicBuildingColliders.length,9);
  for(const m of c.buildingMeshes)disposeLandmarkModel(m);
 });

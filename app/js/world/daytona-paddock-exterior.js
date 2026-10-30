@@ -38,7 +38,7 @@ export function createDaytonaPaddockExteriors(T,ctx){
  if(typeof ctx.elevationWorldYAtWorldXZ!=='function')return [];
  const results=[];
  for(const plan of daytonaPaddockPlans(ctx)){
-  if(ctx.buildingMeshes?.some(m=>m.userData?.paddockGarage&&m.userData.sourceBuildingId===plan.sourceBuildingId))continue;
+  if(ctx.buildingMeshes?.some(m=>m.userData?.paddockStructure&&m.userData.sourceBuildingId===plan.sourceBuildingId))continue;
   const {footprint,unit}=plan,edges=footprint.map((a,i)=>({a,b:footprint[(i+1)%footprint.length]})),longest=edges.reduce((a,b)=>Math.hypot(a.b.x-a.a.x,a.b.z-a.a.z)>Math.hypot(b.b.x-b.a.x,b.b.z-b.a.z)?a:b),
    length=Math.hypot(longest.b.x-longest.a.x,longest.b.z-longest.a.z),ux=(longest.b.x-longest.a.x)/length,uz=(longest.b.z-longest.a.z)/length,
    center=footprint.reduce((a,p)=>({x:a.x+p.x/footprint.length,z:a.z+p.z/footprint.length}),{x:0,z:0}),
@@ -50,10 +50,10 @@ export function createDaytonaPaddockExteriors(T,ctx){
   for(let u=lowU+4;u<highU;u+=8)for(let v=lowV+4;v<highV;v+=8){const p=world(u,v);if(inside(p,footprint))ground.push(ctx.elevationWorldYAtWorldXZ(p.x,p.z));}
   if(!ground.length||!ground.every(Number.isFinite)||Math.max(...ground)-Math.min(...ground)>4/unit)continue;
   const bottom=Math.min(...ground),floor=Math.max(...ground)+.08/unit,root=new T.Group();root.position.set(center.x,floor,center.z);root.name='Daytona — '+plan.label;
-  root.userData={sourceBuildingId:plan.sourceBuildingId,buildingFootprint:footprint,reviewedVenueExterior:true,paddockGarage:true,exteriorOnly:true,
+  root.userData={sourceBuildingId:plan.sourceBuildingId,buildingFootprint:footprint,reviewedVenueExterior:true,paddockStructure:true,paddockGarage:plan.kind==='garage',exteriorOnly:true,
    sourceClaim:'Exact OSM plan; NAIP roof observation; original estimated heights, closed service bays, roof ribs and vents; no interior admission'};
   const material=(color,roughness=.85,metalness=0)=>{const m=new T.MeshStandardMaterial({color,roughness,metalness,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;},
-   wall=material(0xd5cfb7,.95),roof=material(0xc6ccca,.55,.45),dark=material(0x364147,.9),trim=material(0x818f92,.5,.45),glass=material(0x2e515b,.3,.35),yellow=material(0xc1a14f,.75),foundation=material(0xb4b3a7,.97),
+   wall=material(0xd5cfb7,.95),roof=material(plan.kind==='club'?0x75655b:0xc6ccca,.55,.45),dark=material(0x364147,.9),trim=material(0x818f92,.5,.45),glass=material(0x2e515b,.3,.35),yellow=material(0xc1a14f,.75),foundation=material(0xb4b3a7,.97),
    materials=[wall,roof,dark,trim,glass,yellow,foundation],lod=new T.LOD();root.add(lod);
   const minV=Math.min(...local.map(p=>p.v)),maxV=Math.max(...local.map(p=>p.v)),bays=Math.max(1,Math.round((maxV-minV)/12)),bay=(maxV-minV)/bays;
   const triangles=T.ShapeUtils.triangulateShape(local.map(p=>new T.Vector2(p.u,p.v)),[]).map(t=>t.map(i=>local[i]));
@@ -67,7 +67,20 @@ export function createDaytonaPaddockExteriors(T,ctx){
     if(length<.01)continue;
     const p=world(a.u,a.v),q=world(b.u,b.v),lo=(Math.min(ctx.elevationWorldYAtWorldXZ(p.x,p.z),ctx.elevationWorldYAtWorldXZ(q.x,q.z))-floor)*unit;
     panel(a,b,lo,0,6);panel(a,b,0,plan.eavesMeters,0);
-    if(!detail||length<14)continue;
+    if(!detail||length<6)continue;
+    if(plan.kind!=='garage'&&plan.kind!=='inspection'){
+     const count=Math.max(1,Math.floor((length-1)/3.1)),pitch=length/count,middle={u:(a.u+b.u)/2,v:(a.v+b.v)/2},test=world(middle.u-dv*.3,middle.v+du*.3),out=inside(test,footprint)?-1:1,
+      at=(s,offset=.05)=>({u:a.u+du*s-dv*offset*out,v:a.v+dv*s+du*offset*out}),floors=plan.kind==='club'?2:plan.kind==='media'?2:1,step=plan.kind==='club'?4.4:plan.kind==='media'?2.65:3.1;
+     for(let n=0;n<count;n++)for(let floor=0;floor<floors;floor++){
+      const l=(n+.12)*pitch,r=(n+.88)*pitch,bottom=floor*step+.65,top=Math.min(plan.eavesMeters-.45,(floor+1)*step-.35);
+      panel(at(l),at(r),bottom,top,4);panel(at(l-.055,.07),at(l+.055,.07),bottom-.1,top+.1,3);panel(at(r-.055,.07),at(r+.055,.07),bottom-.1,top+.1,3);panel(at(l-.1,.07),at(r+.1,.07),bottom-.08,bottom+.04,3);
+     }
+     // Recessed staff entrance and lintel. The solid mapped building remains
+     // closed; this exterior does not register a new service or interior.
+     if(length>10){const c=length*.5;panel(at(c-.65,.08),at(c+.65,.08),.08,2.45,2);panel(at(c-.8,.12),at(c+.8,.12),2.45,2.6,3);}
+     panel(at(.1,.09),at(length-.1,.09),plan.eavesMeters-.3,plan.eavesMeters-.15,3);continue;
+    }
+    if(length<14)continue;
     // Closed, recessed roller doors with original evenly spaced service bays.
     const count=Math.max(1,Math.floor((length-1)/4.8)),pitch=length/count,
      middle={u:(a.u+b.u)/2,v:(a.v+b.v)/2},test=world(middle.u-dv*.3,middle.v+du*.3),out=inside(test,footprint)?-1:1,
@@ -105,7 +118,8 @@ export function createDaytonaPaddockExteriors(T,ctx){
    batchOwnedStaticStructure(T,group);return group;
   }
   lod.addLevel(level(true),0);lod.addLevel(level(false),330/unit);lod.addLevel(new T.Group(),1100/unit);
-  root.userData.architecture={garages:1,closedServiceBays:bayCount,roofBays:bays,lodLevels:3,eavesMeters:plan.eavesMeters,ridgeMeters:plan.ridgeMeters};
+  root.userData.architecture={kind:plan.kind,garages:plan.kind==='garage'?1:0,closedServiceBays:bayCount,roofBays:bays,lodLevels:3,eavesMeters:plan.eavesMeters,ridgeMeters:plan.ridgeMeters};
+  const used=new Set();root.traverse(m=>{if(m.material)used.add(m.material);});for(const m of materials)if(!used.has(m))m.dispose();
   finishVenueSurface(T,root,foundation,'../../assets/textures/earth/concrete_diffuse.jpg',4);
   results.push({root,footprint,bottom,top:floor+(plan.ridgeMeters+.35)/unit,sourceBuildingId:plan.sourceBuildingId});
  }return results;
