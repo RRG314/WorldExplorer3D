@@ -1,5 +1,6 @@
 import {roadPlacementOffsetWorld} from './world/road-units.js';
 import {roadPavementSectionForSegment,sampleRoadPavementSection} from './world/road-pavement-sections.js';
+import {projectRoadPavementPoint} from './world/road-pavement-coordinate-frame.js';
 import {
   attachCompiledTransportSurface,
   assertReviewedSurfaceAccepted,
@@ -749,7 +750,7 @@ function shouldRenderRoadSkirts(feature) {
 
 function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return NaN;
-  const projection = projected || projectPointToFeature(feature, x, z);
+  const projection = projected?projectRoadPavementPoint(feature,x,z,projected):projectPointToFeature(feature, x, z);
   if (!projection) return NaN;
   const model = feature.transportSurfaceModel || null;
   const distances = isNumericProfileArray(model?.distances)
@@ -789,7 +790,7 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
       : p1.z + (p2.z - p1.z) * projectionT;
     const tangentX = (p2.x - p1.x) / Math.max(1e-6, segLen);
     const tangentZ = (p2.z - p1.z) / Math.max(1e-6, segLen);
-    const lateralOffset = (x - sampleX) * -tangentZ + (z - sampleZ) * tangentX;
+    const lateralOffset = projection.pavementLateral??((x - sampleX) * -tangentZ + (z - sampleZ) * tangentX);
     return applyJunctionTransitionY(
       feature,
       x,
@@ -931,7 +932,7 @@ function projectPointToFeature(feature, x, z) {
       };
     }
   }
-  return best;
+  return projectRoadPavementPoint(feature,x,z,best);
 }
 
 function featureTraversalKey(feature) {

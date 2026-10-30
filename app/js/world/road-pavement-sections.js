@@ -2,6 +2,7 @@
 // Positive extents follow its (-tangent.z, tangent.x) normal. Source nodes and
 // route distances stay intact when an asymmetric apron widens the pavement.
 import {BANKED_ROAD_MAXIMUM_CROSSFALL} from '../physics/road-plane-dynamics.js';
+import {roadPavementNodeFrames} from './road-pavement-coordinate-frame.js';
 export function validateRoadPavementSections(profile,{venueId,sourceFeatureId,sourceSha256,nodeIds}){
  const fail=()=>{throw Error('reviewed_pavement_sections_invalid');};
  if(typeof venueId!=='string'||!venueId||typeof sourceFeatureId!=='string'||!sourceFeatureId||!/^[a-f0-9]{64}$/.test(sourceSha256)||profile?.version!==1||profile.venueId!==venueId||profile.sourceFeatureId!==sourceFeatureId||profile.sourceSha256!==sourceSha256||
@@ -26,7 +27,7 @@ export function validateRoadPavementSections(profile,{venueId,sourceFeatureId,so
   ...(authoredBank?{bankingReference:Object.freeze({url:profile.bankingReference.url,interpretation:'documented angles; authored transition locations'})}:{})});
 }
 
-export function roadPavementSectionsInWorld(profile,points,metersPerWorldUnit){
+export function roadPavementSectionsInWorld(profile,points,metersPerWorldUnit,{geoToWorld}={}){
  if(!profile)return null;
  if(profile.coordinateSpace!==undefined||!Number.isFinite(metersPerWorldUnit)||!(metersPerWorldUnit>0&&metersPerWorldUnit<=10)||!Array.isArray(points)||points.length!==profile.nodeIds.length)throw Error('reviewed_pavement_coordinates_invalid');
  const distances=[0];for(let i=1;i<points.length;i++){
@@ -35,7 +36,14 @@ export function roadPavementSectionsInWorld(profile,points,metersPerWorldUnit){
  const samples=profile.samples.map(s=>Object.freeze({distance:distances[s.segment]+(distances[s.segment+1]-distances[s.segment])*s.fraction,
   positive:s.positiveMeters/metersPerWorldUnit,negative:s.negativeMeters/metersPerWorldUnit,bankNegative:s.bankNegativeMeters/metersPerWorldUnit,
   ...(s.bankAngleDegrees!==undefined?{bankSlope:Math.tan(s.bankAngleDegrees*Math.PI/180)}:{}),...(s.apronAngleDegrees!==undefined?{apronSlope:Math.tan(s.apronAngleDegrees*Math.PI/180)}:{})}));
- return Object.freeze({...profile,coordinateSpace:'world',metersPerWorldUnit,nodeDistances:Object.freeze(distances),samples:Object.freeze(samples),length:distances.at(-1),maximumExtent:Math.max(...samples.map(s=>Math.max(s.positive,s.negative)))});
+ const continuations={};
+ for(const side of ['start','end'])if(profile.geographicContinuations?.[side]){
+  if(typeof geoToWorld!=='function')throw Error('reviewed_pavement_coordinates_invalid');
+  const p=profile.geographicContinuations[side],world=geoToWorld(p.lat,p.lon);
+  if(![world?.x,world?.z].every(Number.isFinite))throw Error('reviewed_pavement_coordinates_invalid');continuations[side]=world;
+ }
+ const {geographicContinuations,...evidence}=profile;
+ return Object.freeze({...evidence,coordinateSpace:'world',metersPerWorldUnit,nodeDistances:Object.freeze(distances),nodeFrames:roadPavementNodeFrames(points,continuations),samples:Object.freeze(samples),length:distances.at(-1),maximumExtent:Math.max(...samples.map(s=>Math.max(s.positive,s.negative)))});
 }
 
 export function sampleRoadPavementSection(profile,distance){

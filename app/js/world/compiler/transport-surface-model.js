@@ -4,6 +4,7 @@ import {tunnelObstructionMaximumY, tunnelRoofHalfWidth} from './tunnel-envelope.
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {sampleRoadPavementSection,sampleRoadPavementHeight} from '../road-pavement-sections.js';
+import {roadPavementFrameAtDistance} from '../road-pavement-coordinate-frame.js';
 import {validateReviewedDeckProfile,validateReviewedPavementProfile,sampleReviewedDeckProfile} from './reviewed-deck-profile.js';
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,BANKED_ROAD_MAXIMUM_GRADE} from '../../physics/road-plane-dynamics.js';
 import {
@@ -373,8 +374,9 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     const distance = sampleDistances[index];
     const point = pointAtDistance(points, pathDistances, distance);
     const tangent = tangentAtDistance(points, pathDistances, distance);
-    const normalX = -tangent.z;
-    const normalZ = tangent.x;
+    const pavementFrame=pavementSections?roadPavementFrameAtDistance(pavementSections,distance):null;
+    const normalX = pavementFrame?pavementFrame.x:-tangent.z;
+    const normalZ = pavementFrame?pavementFrame.z:tangent.x;
     const groundY = sampleTerrainOrThrow(
       sampleTerrainY,
       point.x + normalX * corridorCenterOffset,
@@ -674,8 +676,8 @@ function compileTransportSurfaceWithScratch(feature, sampleTerrainY, options, al
     if(mode!=='at_grade'||pavementSections.coordinateSpace!=='world'||pavementSections.sourceFeatureId!==String(feature.sourceFeatureId)||reviewedProfile)throw Error('reviewed_pavement_profile_conflict');
     const storage=new Float32Array(sampleCount*10);pavementOffsets=storage.subarray(0,sampleCount*4);pavementHeightDeltas=storage.subarray(sampleCount*4,sampleCount*8);pavementCenterBounds=storage.subarray(sampleCount*8);
     for(let i=0;i<sampleCount;i++){
-      const d=sampleDistances[i],section=sampleRoadPavementSection(pavementSections,d),p=pointAtDistance(points,pathDistances,d),tangent=tangentAtDistance(points,pathDistances,d),
-        rawAt=offset=>sampleTerrainOrThrow(sampleTerrainY,p.x-tangent.z*offset,p.z+tangent.x*offset)-pavementCenterReferences[i],
+      const d=sampleDistances[i],section=sampleRoadPavementSection(pavementSections,d),p=pointAtDistance(points,pathDistances,d),frame=roadPavementFrameAtDistance(pavementSections,d),
+        rawAt=offset=>sampleTerrainOrThrow(sampleTerrainY,p.x+frame.x*offset,p.z+frame.z*offset)-pavementCenterReferences[i],
         positions=[-section.negative,-section.bankNegative,0,section.positive],deltas=[section.apronSlope===undefined?rawAt(-section.negative):-section.bankSlope*section.bankNegative-section.apronSlope*(section.negative-section.bankNegative),section.bankSlope===undefined?rawAt(-section.bankNegative):-section.bankSlope*section.bankNegative,0,section.bankSlope===undefined?rawAt(section.positive):section.bankSlope*section.positive];
       pavementOffsets.set(positions,i*4);pavementHeightDeltas.set(deltas,i*4);
       const terrain=positions.map(rawAt).map(y=>y+pavementCenterReferences[i]+surfaceBias);

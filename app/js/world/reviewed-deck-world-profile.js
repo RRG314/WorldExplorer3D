@@ -4,7 +4,7 @@ import {roadPavementSectionsInWorld} from './road-pavement-sections.js';
 export function reviewedDeckSurveyInWorld(survey,points,{geoToWorld,heightToWorld,metersPerWorldUnit}={}){
  if(survey?.sourcePavementSections){
   if(survey.geographicDeckProfile||survey.geographicPavementProfile)throw Error('reviewed_surface_profile_conflict');
-  const {sourcePavementSections,...evidence}=survey;return Object.freeze({...evidence,pavementSections:roadPavementSectionsInWorld(sourcePavementSections,points,metersPerWorldUnit)});
+  const {sourcePavementSections,...evidence}=survey;return Object.freeze({...evidence,pavementSections:roadPavementSectionsInWorld(sourcePavementSections,points,metersPerWorldUnit,{geoToWorld})});
  }
  const deck=survey?.geographicDeckProfile||survey?.geographicPavementProfile;if(!deck)return survey;
  if(survey.geographicDeckProfile&&survey.geographicPavementProfile)throw Error('reviewed_surface_profile_conflict');

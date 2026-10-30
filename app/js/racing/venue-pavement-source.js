@@ -19,6 +19,13 @@ export function annotateReviewedVenuePavementSections(source,artifact,{descripto
   if(profile.samples.some(s=>s.positiveMeters+s.bankNegativeMeters<source.layout.usableWidthMeters))fail();
   profiles.set(id,profile);
  }
+ // The selected loop already proves exact directed node continuity. Derive
+ // endpoint transects from those same adjoining source spans, never pit roads
+ // or proximity guesses. No source coordinate or observation is replaced.
+ for(let i=0;i<layout.wayIds.length;i++){
+  const id=layout.wayIds[i],previous=layout.ways.get(layout.wayIds[(i+layout.wayIds.length-1)%layout.wayIds.length]),next=layout.ways.get(layout.wayIds[(i+1)%layout.wayIds.length]);
+  profiles.set(id,Object.freeze({...profiles.get(id),geographicContinuations:Object.freeze({start:Object.freeze({...previous.geometry.at(-2)}),end:Object.freeze({...next.geometry[1]})})}));
+ }
  Object.defineProperty(source,reviewedSections,{value:Object.freeze({contentSha256,profiles}),enumerable:false});return source;
 }
 export function reviewedVenuePavementSections(source,descriptor,wayId){

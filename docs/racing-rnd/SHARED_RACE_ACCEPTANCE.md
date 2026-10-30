@@ -130,3 +130,14 @@ profile. A controlled GPU journey uses the existing licensed BMW M3 racing
 visual and shared controller on an uploaded bank/apron mesh. These checks do
 not confer finished-venue admission, live deployment or final network release
 acceptance; native full-profile qualification remains a separate boundary.
+
+Full-width qualification exposed an off-centre height discontinuity at graded
+source bends. Profiled pavement now uses shared source-node transects for both
+compiler probes and height lookup; adjoining selected ways derive their end
+transects from the same exact source nodes. This preserves the source path,
+packed height ownership, physical footprint and existing slope/fit bounds.
+A controlled bend reproduced an 8.2 cm jump before repair and passes continuity,
+coordinate round-trip and terrain agreement checks after repair. The pinned
+curved-section GPU comparison was inspected with no WebGL error. Native
+full-width qualification remains a separate required check; the failed capture
+is retained and does not count as venue acceptance.

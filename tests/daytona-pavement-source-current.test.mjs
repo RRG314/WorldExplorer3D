@@ -22,11 +22,16 @@ test('the complete changed Daytona bank/apron fits the shared compiler and every
  const merged=prepareVenueSourceMerge({},source,descriptor,{status:'accepted',artifactIds:[descriptor.groundArtifactId],contentSha256s:[descriptor.groundContentSha256]}),frame=earthCoordinateFrame(descriptor.anchor,100000),unit=1.11,
   height=(x,z)=>{const g=frame.toGeographic(x,z),p=mercator(g.lat,g.lon);return sample(ground.model,p.eastingMeters,p.northingMeters)/unit;},features=[];
  for(const id of source.layout.wayIds){
-  const raw=source.ways.find(w=>w.id===id),way=merged.data.elements.find(w=>w.type==='way'&&w.id===id),pts=raw.geometry.map(g=>frame.toWorld(g.lat,g.lon)),survey=reviewedDeckSurveyInWorld(roadSourceSurvey(way),pts,{metersPerWorldUnit:unit}),
+  const raw=source.ways.find(w=>w.id===id),way=merged.data.elements.find(w=>w.type==='way'&&w.id===id),pts=raw.geometry.map(g=>frame.toWorld(g.lat,g.lon)),survey=reviewedDeckSurveyInWorld(roadSourceSurvey(way),pts,{metersPerWorldUnit:unit,geoToWorld:(lat,lon)=>frame.toWorld(lat,lon)}),
    record=reviewedRoadTransportRecord(normalizeTransportSource({sourceId:`osm:way:${id}`,id,type:'way',providerNamespace:'osm',completeness:'lossless',geometryProvenance:'osm-overpass'},way.tags),survey),feature={sourceFeatureId:`osm:way:${id}`,sourceNodeIds:way.nodes,pts,width:record.crossSection.widthMeters/unit,metersPerWorldUnit:unit,surfaceBias:.18,structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:survey,transportRecord:record};
   const model=compile(feature,height,{reviewedSurfacePhase:'preparation'});assert.ok(model.maximumReviewedCrossfall<=.7);assert.ok(model.maximumReviewedApronCrossfall<.027);assert.equal(model.width,6/unit);attach(feature,model);features.push(feature);
  }
  assert.equal(pack(features).profiles,5);for(const f of features){const m=f.transportSurfaceModel;assert.equal(m.pavementCenterBounds.buffer,m.centerHeights.buffer);assert.equal(m.reviewedSurfacePhase,'accepted');}
+ for(let i=0;i<features.length;i++){
+  const a=features[i].transportRecord.crossSection.pavementSections,b=features[(i+1)%features.length].transportRecord.crossSection.pavementSections;
+  assert.deepEqual(a.nodeFrames.at(-1),b.nodeFrames[0],'exact adjoining source ways share one lateral transect');
+  assert.equal(a.geographicContinuations,undefined,'the world DTO retains only converted coordinates');
+ }
  // Final graph reconciliation cannot evade the physical cross-section's
  // existing cut/fill envelope by moving only its source-centre profile.
  features[0].transportSurfaceModel.centerHeights[2]+=20;assert.throws(()=>pack(features),/cut_fill_exceeded/);
