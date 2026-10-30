@@ -1,3 +1,4 @@
+import {normalizeRaceVenueSource} from './venue-course-policy.js';
 import {compileMappedVenueLayout,geographicVenueDistance} from './venue-layout.js';
 import {annotateRoadSourceSurvey} from '../world/road-source-survey.js';
 import {sha256Text} from '../terrain/ground-artifact.js?v=4';
@@ -57,6 +58,9 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  const layout=compileMappedVenueLayout(source);
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  maximumPavementWidth(source,layout,descriptor);
+ if(descriptor.routeExtent!==undefined&&descriptor.routeExtent!=='mapped-venue-v1')throw Error('venue_route_extent_invalid');
+ const venueSource=descriptor.routeExtent?normalizeRaceVenueSource({version:1,id:descriptor.id,sourceSha256:descriptor.sourceSha256,
+  mappedLengthMeters:layout.lengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,sourceFeatureIds:layout.wayIds.map(id=>`osm:way:${id}`)}):undefined;
  const original=Array.isArray(data?.elements)?data.elements:[],existingNodes=new Map(original.filter(e=>e.type==='node').map(e=>[e.id,e]));
  const sourceWays=new Map(source.ways.map(w=>[w.id,w])),layoutWays=new Set(layout.wayIds),bounds=source.source?.coverage;
  if(!bounds||!['south','north','west','east'].every(k=>Number.isFinite(bounds[k]))||bounds.south>=bounds.north||bounds.west>=bounds.east)throw Error('venue_source_coverage_invalid');
@@ -83,7 +87,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   const deck=layoutWays.has(raw.id)?reviewedVenueDeckProfile(source,descriptor,raw.id):null;
   const pavement=layoutWays.has(raw.id)?reviewedVenuePavementProfile(source,descriptor,raw.id):null;
   const sourceFeatureId=`osm:way:${raw.id}`,way={type:'way',id:raw.id,version:raw.version,nodes:[...raw.nodes],tags:{...raw.tags,_sourceFeatureId:sourceFeatureId,_sourceCompleteness:'lossless',...(!layoutWays.has(raw.id)?{_regionalContext:'fixed-location'}:{})}};
-  if(layoutWays.has(raw.id))annotateRoadSourceSurvey(way,{version:1,venueId:descriptor.id,sourceFeatureId,
+  if(layoutWays.has(raw.id))annotateRoadSourceSurvey(way,{version:1,venueId:descriptor.id,sourceFeatureId,...(venueSource?{venueSource}:{}),
    ...(descriptor.pavementWidthPolicy==='mapped'?{pavementWidthPolicy:'mapped'}:{}),
    usableWidthMeters:source.layout.usableWidthMeters,maximumCrossfall:descriptor.maximumCrossfall,
    ...(descriptor.surfaceModel?{surfaceModel:descriptor.surfaceModel}:{}),
@@ -93,7 +97,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   elements.set(`way:${raw.id}`,way);
  }
  return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({id:descriptor.id,name:descriptor.name,status:'source-prepared',
-  sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
+  ...(venueSource?{venueSource}:{}),sourceSha256:descriptor.sourceSha256,sourceDate:source.source.osmBase,layoutWayIds:Object.freeze([...layout.wayIds]),
   sourceFeatureIds:Object.freeze(layout.wayIds.map(id=>`osm:way:${id}`)),mappedLengthMeters:layout.lengthMeters,
   referenceLengthMeters:layout.referenceLengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,
   groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required,retiredGeneralized})};

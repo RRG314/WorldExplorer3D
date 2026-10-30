@@ -1,11 +1,14 @@
 import {buildRaceRoadGraph} from './course-rules.js';
 
+import {normalizeRaceVenueSource} from './venue-course-policy.js';
+
 const fail=()=>{throw Error('race_invalid_district');};
 const label=(value,max)=>String(value||'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,max);
 // An approved snapshot has millimetre precision in metres. Private V1 drafts
 // retain their original fingerprints; canonicalisation applies only at intake.
-export function canonicalRaceDistrict(raw){
+export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
  if(raw?.type!=='RaceDistrictFacts'||raw.version!==1||!Array.isArray(raw.roads)||!raw.roads.length||raw.roads.length>5000)fail();
+ const venueSource=normalizeRaceVenueSource(raw.venueSource);
  const m=raw.metersPerUnit;if(!Number.isFinite(m)||m<=0||m>10)fail();
  const number=n=>{if(!Number.isFinite(n)||Math.abs(n)>1e7)fail();return Math.round(n*m*1000)/(m*1000);};
  const point=p=>({x:number(p?.x),y:number(p?.y),z:number(p?.z),connectionLayer:label(p?.connectionLayer,180)});
@@ -20,6 +23,6 @@ export function canonicalRaceDistrict(raw){
    widthMeters:number(r.widthMeters),direction:r.direction||'both',structure:r.structure,clearanceMeters:number(r.clearanceMeters||0),driveable:true,supported:true,
    heightSamples:samples.map(s=>({t:s.t,y:number(s.y),leftY:number(s.leftY),rightY:number(s.rightY)})),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
  }).sort((a,b)=>a.sourceId.localeCompare(b.sourceId));
- const facts={type:'RaceDistrictFacts',version:1,locationId,locationLabel:label(raw.locationLabel,80),anchor,metersPerUnit:m,roads};
- const graph=buildRaceRoadGraph(roads,{metersPerUnit:m});if(graph.edges.length<roads.length)fail();return facts;
+ const facts={type:'RaceDistrictFacts',version:1,...(venueSource?{venueSource}:{}),locationId,locationLabel:label(raw.locationLabel,80),anchor,metersPerUnit:m,roads};
+ const graph=buildRaceRoadGraph(roads,{metersPerUnit:m,venueSource,partialVenue});if(graph.edges.length<roads.length)fail();return facts;
 }

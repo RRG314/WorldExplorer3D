@@ -1,7 +1,7 @@
 import {Timestamp} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
 import {createRaceVehicleProfile,raceVehicleWorldPose,normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById,
- raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,racePhysicsVersion,RACE_PHYSICS_VERSION,prepareExplorerCreditAward,racingCareerContext} from './generated/engine.mjs';
+ raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,racePhysicsVersion,RACE_PHYSICS_VERSION,prepareExplorerCreditAward,racingCareerContext,raceCourseProjection} from './generated/engine.mjs';
 import {digest} from './authority.mjs';
 const time=v=>v?.toMillis?.()??0;
 const entityId=(uid,id)=>`personal:${uid}:${id}`;
@@ -125,7 +125,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
     const receipt={id:race.id,purpose,courseId:race.courseId,courseRevision:race.course.publication.revision,physicsVersion,
      players:[{uid:p.uid,finished,timeMs:finished?p.progress.elapsedMs:null,credits:0}]};
     if(finished)tx.update(db.collection('racingCourses').doc(race.courseId),{qualification:{resultId:race.id,revision:race.course.publication.revision,physicsVersion,timeMs:p.progress.elapsedMs,completedAt:ts(nowMs)}});
-    tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
+    tx.create(resultRef,{fingerprint,receipt,snapshot,course:raceCourseProjection(race.course,race.courseId),participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
      profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile,{course:race.course})])),physicsVersion,createdAt:ts(nowMs)});
     return receipt;
    }
@@ -162,7 +162,7 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
     }
     receipt.players.push({uid:p.uid,boardId,finished:eligible,timeMs:eligible?p.progress.elapsedMs:null,credits});
    }
-   tx.create(resultRef,{fingerprint,receipt,snapshot,course:race.course,participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
+   tx.create(resultRef,{fingerprint,receipt,snapshot,course:raceCourseProjection(race.course,race.courseId),participantUids:snapshot.players.map(p=>p.uid),courseId:race.courseId,roomCode:race.roomCode,worldSeed:race.worldSeed,
     careerContexts:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,p.careerContext||racingCareerContext({},nowMs)])),
     profiles:Object.fromEntries([...race.roster].map(([uid,p])=>[uid,raceRecordConfiguration(p.profile,{course:race.course})])),physicsVersion,createdAt:ts(nowMs)});
    return receipt;

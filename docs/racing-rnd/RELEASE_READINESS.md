@@ -34,6 +34,14 @@ Updated October 29, 2026. **Full racing is not release-ready.** No production de
   53 joins and matched retained clean approach heights within 1.6 cm. This is
   local agreement with the source data, not absolute survey accuracy, a rendered
   venue, gameplay acceptance or permission to enable the unfinished pack.
+- Full-length reviewed venues now retain bounded source membership, extent and
+  identity through world qualification, canonical/chunk storage and shared
+  reconstruction. Long joins and saved results carry compact metadata resolved
+  against the browser's verified approved course. Nine new contract cases passed,
+  including actual local WebSocket join/result recovery and replay-safe result
+  transactions. Five affected identity/storage/connection checks also passed.
+  This enables the next full-world venue work; it is not a completed Nordschleife
+  pack or a production deployment check.
 - Actual held-key Silverstone driving reproduced fixed-tick pose repeats and
   double advances independently of pulsed automation, barriers or camera-mode
   changes. Practice now samples adjacent accepted session frames for the body,

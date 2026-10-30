@@ -51,7 +51,7 @@ export async function readRaceDistrictFacts(record,readChunk){
   if(chunk?.type!=='RaceDistrictRoadChunk'||chunk.version!==1||chunk.index!==descriptor.index||!Array.isArray(chunk.roads)||chunk.roads.length!==descriptor.roadCount)fail();
   // Firestore map order is unspecified. Canonical schema construction binds
   // the values rather than incidental SDK object-property iteration order.
-  const normalized=canonicalRaceDistrict({...manifest.header,roads:chunk.roads}).roads;
+  const normalized=canonicalRaceDistrict({...manifest.header,roads:chunk.roads},{partialVenue:true}).roads;
   if(size(normalized)!==descriptor.bytes||await hash(normalized)!==descriptor.contentSha256)fail();
   roads.push(...normalized);
  }

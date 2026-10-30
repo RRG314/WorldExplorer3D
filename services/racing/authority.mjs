@@ -1,5 +1,5 @@
 import {randomUUID,createHash} from 'node:crypto';
-import {createRaceSession,racePhysicsVersion,raceRecordConfiguration,raceCourseKey,raceGridPose} from './generated/engine.mjs';
+import {createRaceSession,racePhysicsVersion,raceRecordConfiguration,raceCourseKey,raceGridPose,raceCourseProjection} from './generated/engine.mjs';
 
 export const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const CODE=/^[A-Z0-9]{6}$/;
@@ -64,7 +64,7 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
   race.leaseUntil=admitted.leaseUntil;race.lastRenew=now();if(created)races.set(race.roomCode,race);
   const old=connections.get(client.uid);if(old&&old!==client){old.race=null;old.close('race_connection_replaced');}
   client.race=race;connections.set(client.uid,client);
-  send(client,{type:'joined',course:race.course,snapshot:envelope(race)});broadcast(race,{type:'snapshot',snapshot:envelope(race)});
+  send(client,{type:'joined',course:raceCourseProjection(race.course,race.courseId),snapshot:envelope(race)});broadcast(race,{type:'snapshot',snapshot:envelope(race)});
  }
  async function command(client,input) {
   if(closed)throw Error('race_service_stopping');

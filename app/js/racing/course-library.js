@@ -1,3 +1,4 @@
+import {normalizeRaceVenueSource} from './venue-course-policy.js';
 import {createRaceCourse,RACE_DISCIPLINES,RACE_MAX_ROUTE_EDGES} from './course-rules.js';
 export function normalizeRaceRouteReference(value) {
  if(!value||value.version!==1||!/^race-district:[a-f0-9]{64}$/.test(value.districtFingerprint)||
@@ -9,7 +10,7 @@ export function normalizeRaceRouteReference(value) {
   participants:value.participants,startOffsetMeters:offset,name:String(value.name||'Your mapped route').trim().slice(0,100)};
 }
 export async function raceDistrictFingerprint(district) {
- const value=JSON.stringify({version:1,locationId:district.locationId,anchor:district.anchor,metersPerUnit:district.metersPerUnit,
+ const value=JSON.stringify({version:1,...(district.venueSource?{venueSource:normalizeRaceVenueSource(district.venueSource)}:{}),locationId:district.locationId,anchor:district.anchor,metersPerUnit:district.metersPerUnit,
   roads:[...district.roads].sort((a,b)=>a.sourceId.localeCompare(b.sourceId)).map(r=>({id:r.sourceId,a:r.a,b:r.b,width:r.widthMeters,
    ...(r.surfaceModel?{surfaceModel:r.surfaceModel}:{}),
    direction:r.direction||'both',structure:r.structure,clearance:r.clearanceMeters,heights:r.heightSamples,span:r.heightSampleSpanMeters}))});
@@ -27,7 +28,7 @@ export function restoreRaceCourse(reference,district,graph,fingerprint) {
   ...(route.startOffsetMeters===null?{startOffsetMeters:undefined}:{})});
 }
 export async function raceCourseKey(course) {
- const data=new TextEncoder().encode(JSON.stringify({version:course.version,location:course.locationId,anchor:course.anchor,
+ const data=new TextEncoder().encode(JSON.stringify({version:course.version,...(course.venueSource?{venueSource:normalizeRaceVenueSource(course.venueSource)}:{}),location:course.locationId,anchor:course.anchor,
   ...(course.surfaceModel?{surfaceModel:course.surfaceModel}:{}),
   discipline:course.discipline,laps:course.laps,segments:course.segments}));
  const hash=await crypto.subtle.digest('SHA-256',data);

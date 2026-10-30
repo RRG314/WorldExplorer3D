@@ -1334,6 +1334,7 @@ __export(engine_entry_exports, {
   prepareRaceDistrictStorage: () => prepareRaceDistrictStorage,
   raceCompetitiveRecordConfiguration: () => raceCompetitiveRecordConfiguration,
   raceCourseKey: () => raceCourseKey,
+  raceCourseProjection: () => raceCourseProjection,
   raceCourseReference: () => raceCourseReference,
   raceDistrictChunkPath: () => raceDistrictChunkPath,
   raceDistrictFingerprint: () => raceDistrictFingerprint,
@@ -1350,6 +1351,7 @@ __export(engine_entry_exports, {
   readRaceDistrictFacts: () => readRaceDistrictFacts,
   rebaseRaceReference: () => rebaseRaceReference,
   reconstructPublishedRace: () => reconstructPublishedRace,
+  resolveRaceCourseProjection: () => resolveRaceCourseProjection,
   restoreRaceCourse: () => restoreRaceCourse,
   verifiedCareerFinish: () => verifiedCareerFinish
 });
@@ -1394,6 +1396,37 @@ function roadPlaneHorizontalVelocity(forward, lateral, { pitch, roll }) {
   if (![forward, lateral, pitch, roll].every(Number.isFinite)) throw Error("invalid_road_plane_velocity");
   return { right: lateral * Math.cos(roll), forward: forward * Math.cos(pitch) + lateral * Math.sin(pitch) * Math.sin(roll) };
 }
+
+// app/js/racing/venue-course-policy.js
+var fail = () => {
+  throw Error("race_invalid_venue_extent");
+};
+var sourceId = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9:_.\/-]{0,179}$/.test(value);
+function normalizeRaceVenueSource(value) {
+  if (value === void 0) return void 0;
+  if (!value || value.version !== 1 || typeof value.id !== "string" || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(value.id) || !/^[a-f0-9]{64}$/.test(value.sourceSha256) || !Number.isFinite(value.mappedLengthMeters) || value.mappedLengthMeters < 200 || value.mappedLengthMeters > 3e4 || !Number.isFinite(value.qualificationRadiusWorld) || value.qualificationRadiusWorld < 1200 || value.qualificationRadiusWorld > 6e3 || !Array.isArray(value.sourceFeatureIds) || !value.sourceFeatureIds.length || value.sourceFeatureIds.length > 500 || value.sourceFeatureIds.some((id) => !sourceId(id)) || new Set(value.sourceFeatureIds).size !== value.sourceFeatureIds.length) fail();
+  return Object.freeze({
+    version: 1,
+    id: value.id,
+    sourceSha256: value.sourceSha256,
+    mappedLengthMeters: value.mappedLengthMeters,
+    qualificationRadiusWorld: value.qualificationRadiusWorld,
+    sourceFeatureIds: Object.freeze([...value.sourceFeatureIds])
+  });
+}
+function sameRaceVenueSource(a, b) {
+  return JSON.stringify(normalizeRaceVenueSource(a)) === JSON.stringify(normalizeRaceVenueSource(b));
+}
+function assertRaceVenueRoads(roads, venue, { partial = false } = {}) {
+  if (!venue) return;
+  const allowed = new Set(venue.sourceFeatureIds), found = /* @__PURE__ */ new Set();
+  for (const road of roads) {
+    if (!allowed.has(road.sourceFeatureId) || !sourceId(road.sourceId) || !road.sourceId.startsWith(road.sourceFeatureId + ":") || [road.a, road.b].some((p) => !p || !Number.isFinite(p.x) || !Number.isFinite(p.z) || Math.hypot(p.x, p.z) > venue.qualificationRadiusWorld + 2e-3)) fail();
+    found.add(road.sourceFeatureId);
+  }
+  if (!partial && found.size !== allowed.size) fail();
+}
+var raceVenueMaximumLength = (venue) => venue ? Math.max(8e3, Math.min(3e4, venue.mappedLengthMeters * 1.01)) : 8e3;
 
 // app/js/racing/course-rules.js
 var RACE_COURSE_VERSION = 1;
@@ -1483,8 +1516,10 @@ function sliceHeights(segment, start, end) {
   const at = (t) => ({ t: (t - start) / (end - start), y: sampleRaceSegmentY(segment, t), leftY: sampleRaceSegmentY(segment, t, -segment.heightSampleSpanMeters), rightY: sampleRaceSegmentY(segment, t, segment.heightSampleSpanMeters) });
   return [at(start), ...segment.heightSamples.filter((s) => s.t > start && s.t < end).map((s) => ({ ...s, t: (s.t - start) / (end - start) })), at(end)];
 }
-function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximumGrade = 0.22 } = {}) {
+function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximumGrade = 0.22, venueSource, partialVenue = false } = {}) {
   if (!(metersPerUnit > 0 && metersPerUnit <= 10) || !Array.isArray(roads) || roads.length > 5e4) throw Error("invalid_race_road_source");
+  const venue = normalizeRaceVenueSource(venueSource);
+  assertRaceVenueRoads(roads, venue, { partial: partialVenue });
   const nodes = [], edges = [], outgoing = /* @__PURE__ */ new Map(), buckets = /* @__PURE__ */ new Map(), edgeIds = /* @__PURE__ */ new Set();
   function node(point, layer) {
     const gx = Math.round(point.x * 2), gz = Math.round(point.z * 2), key = `${gx}:${gz}:${layer}`;
@@ -1537,7 +1572,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
     if (road.direction !== "reverse") add(from, to, false);
     if (road.direction !== "forward") add(to, from, true);
   }
-  return { version: RACE_COURSE_VERSION, metersPerUnit, nodes, edges, outgoing };
+  return { version: RACE_COURSE_VERSION, metersPerUnit, ...venue ? { venueSource: venue } : {}, nodes, edges, outgoing };
 }
 function createRaceCourse(graph, path, settings = {}) {
   if (!Array.isArray(path) || path.length < 1 || path.length > RACE_MAX_ROUTE_EDGES) throw Error("invalid_race_route");
@@ -1576,7 +1611,7 @@ function createRaceCourse(graph, path, settings = {}) {
     lengthMeters += edge.length;
   }
   if (closed && angle(segments.at(-1).forward, segments[0].forward) > Math.PI * 0.64) throw Error("race_turn_too_sharp");
-  if (lengthMeters < 200 || lengthMeters > 8e3) throw Error("race_route_length");
+  if (lengthMeters < 200 || lengthMeters > raceVenueMaximumLength(graph.venueSource)) throw Error("race_route_length");
   if (closed) {
     const original = segments.shift(), offset = Number(settings.startOffsetMeters ?? original.lengthMeters * 0.5);
     if (!(offset > 0 && offset < original.lengthMeters)) throw Error("invalid_race_start");
@@ -1605,6 +1640,7 @@ function createRaceCourse(graph, path, settings = {}) {
   if (gridRun < gridLength) throw Error("race_grid_has_no_clearance");
   const course = {
     version: RACE_COURSE_VERSION,
+    ...graph.venueSource ? { venueSource: graph.venueSource } : {},
     sourcePath: [...path],
     startOffsetMeters: closed ? Number(settings.startOffsetMeters ?? edges[0].length * 0.5) : null,
     name: clean(settings.name) || "Mapped road run",
@@ -3790,7 +3826,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     return snapshot();
   }
   function snapshot(presentation = false) {
-    const ordered = [...players.values()].sort((a, b) => a.dnf - b.dnf || (a.progress?.finished && b.progress?.finished ? a.progress.elapsedMs - b.progress.elapsedMs : a.progress?.finished ? -1 : b.progress?.finished ? 1 : (b.progress?.lap || 1) - (a.progress?.lap || 1) || (b.progress?.nextGate || 0) - (a.progress?.nextGate || 0)));
+    const ordered2 = [...players.values()].sort((a, b) => a.dnf - b.dnf || (a.progress?.finished && b.progress?.finished ? a.progress.elapsedMs - b.progress.elapsedMs : a.progress?.finished ? -1 : b.progress?.finished ? 1 : (b.progress?.lap || 1) - (a.progress?.lap || 1) || (b.progress?.nextGate || 0) - (a.progress?.nextGate || 0)));
     let previousPosition = 0;
     return {
       id,
@@ -3807,8 +3843,8 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       serverAtMs: lastNow,
       simulationAtMs: startAtMs === null ? null : startAtMs + tick * STEP_MS,
       completedAtMs,
-      players: ordered.map((p, index) => {
-        const previous = ordered[index - 1], tied = !p.dnf && p.progress?.finished && previous?.progress?.finished && p.progress.elapsedMs === previous.progress.elapsedMs;
+      players: ordered2.map((p, index) => {
+        const previous = ordered2[index - 1], tied = !p.dnf && p.progress?.finished && previous?.progress?.finished && p.progress.elapsedMs === previous.progress.elapsedMs;
         const position = tied ? previousPosition : index + 1;
         previousPosition = position;
         const frame = snapshotRaceVehicle(p.car);
@@ -3886,6 +3922,7 @@ function normalizeRaceRouteReference(value) {
 async function raceDistrictFingerprint(district) {
   const value = JSON.stringify({
     version: 1,
+    ...district.venueSource ? { venueSource: normalizeRaceVenueSource(district.venueSource) } : {},
     locationId: district.locationId,
     anchor: district.anchor,
     metersPerUnit: district.metersPerUnit,
@@ -3931,6 +3968,7 @@ function restoreRaceCourse(reference, district, graph, fingerprint) {
 async function raceCourseKey(course) {
   const data = new TextEncoder().encode(JSON.stringify({
     version: course.version,
+    ...course.venueSource ? { venueSource: normalizeRaceVenueSource(course.venueSource) } : {},
     location: course.locationId,
     anchor: course.anchor,
     ...course.surfaceModel ? { surfaceModel: course.surfaceModel } : {},
@@ -3968,30 +4006,61 @@ function raceCompetitiveRecordConfiguration(profile, { slot, participants, cours
   return { ...raceRecordConfiguration(profile, { course }), gridRow: Math.floor(slot / 2), gridParticipants: participants, timing: "grid-to-finish" };
 }
 
+// app/js/racing/course-projection.js
+function raceCourseProjection(course, courseId) {
+  if (!course.venueSource) return course;
+  if (!/^road-race-[a-f0-9]{32}$/.test(courseId || "")) throw Error("invalid_race_course_projection");
+  return {
+    type: "RaceCourseProjection",
+    version: 1,
+    courseId,
+    physicsVersion: racePhysicsVersion(course),
+    venueSource: normalizeRaceVenueSource(course.venueSource),
+    locationId: course.locationId,
+    locationLabel: course.locationLabel,
+    anchor: { lat: course.anchor.lat, lon: course.anchor.lon },
+    name: course.name,
+    description: course.description,
+    discipline: course.discipline,
+    laps: course.laps,
+    participants: course.participants,
+    lengthMeters: course.lengthMeters,
+    metersPerUnit: course.metersPerUnit,
+    ...course.surfaceModel ? { surfaceModel: course.surfaceModel } : {}
+  };
+}
+var ordered = (value) => Array.isArray(value) ? value.map(ordered) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, ordered(value[key])])) : value;
+function resolveRaceCourseProjection(value, expectedCourse, courseId) {
+  if (value?.type !== "RaceCourseProjection") return value;
+  if (!expectedCourse?.venueSource || JSON.stringify(ordered(value)) !== JSON.stringify(ordered(raceCourseProjection(expectedCourse, courseId)))) throw Error("invalid_race_snapshot");
+  return expectedCourse;
+}
+
 // services/racing/engine-entry.mjs
 var import_economy_authority = __toESM(require_economy_authority(), 1);
 
 // app/js/racing/district-facts.js
-var fail = () => {
+var fail2 = () => {
   throw Error("race_invalid_district");
 };
 var label = (value, max) => String(value || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max);
-function canonicalRaceDistrict(raw) {
-  if (raw?.type !== "RaceDistrictFacts" || raw.version !== 1 || !Array.isArray(raw.roads) || !raw.roads.length || raw.roads.length > 5e3) fail();
+function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
+  if (raw?.type !== "RaceDistrictFacts" || raw.version !== 1 || !Array.isArray(raw.roads) || !raw.roads.length || raw.roads.length > 5e3) fail2();
+  const venueSource = normalizeRaceVenueSource(raw.venueSource);
   const m = raw.metersPerUnit;
-  if (!Number.isFinite(m) || m <= 0 || m > 10) fail();
+  if (!Number.isFinite(m) || m <= 0 || m > 10) fail2();
   const number = (n) => {
-    if (!Number.isFinite(n) || Math.abs(n) > 1e7) fail();
+    if (!Number.isFinite(n) || Math.abs(n) > 1e7) fail2();
     return Math.round(n * m * 1e3) / (m * 1e3);
   };
   const point = (p) => ({ x: number(p?.x), y: number(p?.y), z: number(p?.z), connectionLayer: label(p?.connectionLayer, 180) });
   const anchor = { lat: Number(raw.anchor?.lat), lon: Number(raw.anchor?.lon) };
-  if (!Number.isFinite(anchor.lat) || Math.abs(anchor.lat) > 85 || !Number.isFinite(anchor.lon) || Math.abs(anchor.lon) > 180) fail();
+  if (!Number.isFinite(anchor.lat) || Math.abs(anchor.lat) > 85 || !Number.isFinite(anchor.lon) || Math.abs(anchor.lon) > 180) fail2();
   const locationId = `earth:${Math.round(anchor.lat * 1e7)}:${Math.round(anchor.lon * 1e7)}`;
   const roads = raw.roads.map((r) => {
-    if (!r.sourceId || r.sourceId.length > 180 || !["surface", "bridge", "tunnel"].includes(r.structure) || !["both", "forward", "reverse", void 0].includes(r.direction) || r.driveable !== true || r.supported !== true) fail();
+    if (!r.sourceId || r.sourceId.length > 180 || !["surface", "bridge", "tunnel"].includes(r.structure) || !["both", "forward", "reverse", void 0].includes(r.direction) || r.driveable !== true || r.supported !== true) fail2();
     const samples = r.heightSamples;
-    if (!Array.isArray(samples) || samples.length < 2 || samples.length > 250) fail();
+    if (!Array.isArray(samples) || samples.length < 2 || samples.length > 250) fail2();
     return {
       sourceId: label(r.sourceId, 180),
       sourceFeatureId: label(r.sourceFeatureId, 180),
@@ -4009,9 +4078,9 @@ function canonicalRaceDistrict(raw) {
       heightSampleSpanMeters: number(r.heightSampleSpanMeters)
     };
   }).sort((a, b) => a.sourceId.localeCompare(b.sourceId));
-  const facts = { type: "RaceDistrictFacts", version: 1, locationId, locationLabel: label(raw.locationLabel, 80), anchor, metersPerUnit: m, roads };
-  const graph = buildRaceRoadGraph(roads, { metersPerUnit: m });
-  if (graph.edges.length < roads.length) fail();
+  const facts = { type: "RaceDistrictFacts", version: 1, ...venueSource ? { venueSource } : {}, locationId, locationLabel: label(raw.locationLabel, 80), anchor, metersPerUnit: m, roads };
+  const graph = buildRaceRoadGraph(roads, { metersPerUnit: m, venueSource, partialVenue });
+  if (graph.edges.length < roads.length) fail2();
   return facts;
 }
 
@@ -4020,11 +4089,11 @@ var utf8 = new TextEncoder();
 var RACE_DISTRICT_STORAGE_LIMITS = Object.freeze({ inlineBytes: 750 * 1024, chunkBytes: 384 * 1024, totalBytes: 4 * 1024 * 1024, chunks: 12, roads: 5e3 });
 var size = (value) => utf8.encode(JSON.stringify(value)).byteLength;
 var hash = async (value) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", utf8.encode(JSON.stringify(value)))), (b) => b.toString(16).padStart(2, "0")).join("");
-var fail2 = () => {
+var fail3 = () => {
   throw Error("race_district_storage_unavailable");
 };
 function raceDistrictChunkPath(id, index) {
-  if (!/^[a-f0-9]{64}$/.test(id || "") || !Number.isInteger(index) || index < 0 || index >= RACE_DISTRICT_STORAGE_LIMITS.chunks) fail2();
+  if (!/^[a-f0-9]{64}$/.test(id || "") || !Number.isInteger(index) || index < 0 || index >= RACE_DISTRICT_STORAGE_LIMITS.chunks) fail3();
   return `racingDistricts/${id}/racingRoadChunks/${String(index).padStart(4, "0")}`;
 }
 async function prepareRaceDistrictStorage(input) {
@@ -4057,35 +4126,35 @@ async function prepareRaceDistrictStorage(input) {
 async function readRaceDistrictFacts(record, readChunk) {
   if (!record) return null;
   if (record.facts) {
-    if (record.factsManifest) fail2();
+    if (record.factsManifest) fail3();
     return record.facts;
   }
   const manifest = record.factsManifest, limits = RACE_DISTRICT_STORAGE_LIMITS;
-  if (manifest?.type !== "RaceDistrictRoadManifest" || manifest.version !== 1 || !manifest.header || !Number.isInteger(manifest.roadCount) || manifest.roadCount < 1 || manifest.roadCount > limits.roads || !Number.isInteger(manifest.bytes) || manifest.bytes <= limits.inlineBytes || manifest.bytes > limits.totalBytes || !Array.isArray(manifest.chunks) || !manifest.chunks.length || manifest.chunks.length > limits.chunks || typeof readChunk !== "function") fail2();
+  if (manifest?.type !== "RaceDistrictRoadManifest" || manifest.version !== 1 || !manifest.header || !Number.isInteger(manifest.roadCount) || manifest.roadCount < 1 || manifest.roadCount > limits.roads || !Number.isInteger(manifest.bytes) || manifest.bytes <= limits.inlineBytes || manifest.bytes > limits.totalBytes || !Array.isArray(manifest.chunks) || !manifest.chunks.length || manifest.chunks.length > limits.chunks || typeof readChunk !== "function") fail3();
   let expectedCount = 0, totalBytes = 0;
   for (let index = 0; index < manifest.chunks.length; index++) {
     const chunk = manifest.chunks[index];
-    if (chunk.index !== index || !Number.isInteger(chunk.roadCount) || chunk.roadCount < 1 || chunk.roadCount > limits.roads || !Number.isInteger(chunk.bytes) || chunk.bytes < 2 || chunk.bytes > limits.chunkBytes || !/^[a-f0-9]{64}$/.test(chunk.contentSha256 || "")) fail2();
+    if (chunk.index !== index || !Number.isInteger(chunk.roadCount) || chunk.roadCount < 1 || chunk.roadCount > limits.roads || !Number.isInteger(chunk.bytes) || chunk.bytes < 2 || chunk.bytes > limits.chunkBytes || !/^[a-f0-9]{64}$/.test(chunk.contentSha256 || "")) fail3();
     expectedCount += chunk.roadCount;
     totalBytes += chunk.bytes;
   }
-  if (expectedCount !== manifest.roadCount || totalBytes > limits.totalBytes) fail2();
+  if (expectedCount !== manifest.roadCount || totalBytes > limits.totalBytes) fail3();
   const roads = [];
   for (const descriptor of manifest.chunks) {
     const chunk = await readChunk(descriptor.index);
-    if (chunk?.type !== "RaceDistrictRoadChunk" || chunk.version !== 1 || chunk.index !== descriptor.index || !Array.isArray(chunk.roads) || chunk.roads.length !== descriptor.roadCount) fail2();
-    const normalized = canonicalRaceDistrict({ ...manifest.header, roads: chunk.roads }).roads;
-    if (size(normalized) !== descriptor.bytes || await hash(normalized) !== descriptor.contentSha256) fail2();
+    if (chunk?.type !== "RaceDistrictRoadChunk" || chunk.version !== 1 || chunk.index !== descriptor.index || !Array.isArray(chunk.roads) || chunk.roads.length !== descriptor.roadCount) fail3();
+    const normalized = canonicalRaceDistrict({ ...manifest.header, roads: chunk.roads }, { partialVenue: true }).roads;
+    if (size(normalized) !== descriptor.bytes || await hash(normalized) !== descriptor.contentSha256) fail3();
     roads.push(...normalized);
   }
   const facts = canonicalRaceDistrict({ ...manifest.header, roads });
-  if (size(facts) !== manifest.bytes) fail2();
+  if (size(facts) !== manifest.bytes) fail3();
   return facts;
 }
 
 // app/js/racing/publication-rules.js
 async function reconstructPublishedRace(reference, facts) {
-  const fingerprint = await raceDistrictFingerprint(facts), graph = buildRaceRoadGraph(facts.roads, { metersPerUnit: facts.metersPerUnit });
+  const fingerprint = await raceDistrictFingerprint(facts), graph = buildRaceRoadGraph(facts.roads, { metersPerUnit: facts.metersPerUnit, venueSource: facts.venueSource });
   return restoreRaceCourse(normalizeRaceRouteReference(reference), facts, graph, fingerprint);
 }
 async function rebaseRaceReference(reference, approvedFacts, localFacts) {
@@ -4098,9 +4167,9 @@ async function rebaseRaceReference(reference, approvedFacts, localFacts) {
 }
 function assertRaceCourseInDistrict(course, localFacts) {
   if (course.locationId !== localFacts.locationId || Math.abs(course.anchor.lat - localFacts.anchor.lat) > 1e-7 || Math.abs(course.anchor.lon - localFacts.anchor.lon) > 1e-7 || course.metersPerUnit !== localFacts.metersPerUnit) throw Error("race_course_wrong_world");
-  const graph = buildRaceRoadGraph(localFacts.roads, { metersPerUnit: localFacts.metersPerUnit }), byId = new Map(graph.edges.map((e) => [e.id, e]));
+  const graph = buildRaceRoadGraph(localFacts.roads, { metersPerUnit: localFacts.metersPerUnit, venueSource: localFacts.venueSource }), byId = new Map(graph.edges.map((e) => [e.id, e]));
   const local = createRaceCourse(graph, course.sourcePath, { ...course });
-  if (local.surfaceModel !== course.surfaceModel) throw Error("race_roads_changed_requalify_route");
+  if (local.surfaceModel !== course.surfaceModel || !sameRaceVenueSource(local.venueSource, course.venueSource)) throw Error("race_roads_changed_requalify_route");
   if (local.segments.length !== course.segments.length) throw Error("race_roads_changed_requalify_route");
   for (let i = 0; i < course.segments.length; i++) {
     const a = course.segments[i], b = local.segments[i];
@@ -4209,6 +4278,7 @@ function racingRivalOutcome(challenge) {
   prepareRaceDistrictStorage,
   raceCompetitiveRecordConfiguration,
   raceCourseKey,
+  raceCourseProjection,
   raceCourseReference,
   raceDistrictChunkPath,
   raceDistrictFingerprint,
@@ -4225,6 +4295,7 @@ function racingRivalOutcome(challenge) {
   readRaceDistrictFacts,
   rebaseRaceReference,
   reconstructPublishedRace,
+  resolveRaceCourseProjection,
   restoreRaceCourse,
   verifiedCareerFinish
 });

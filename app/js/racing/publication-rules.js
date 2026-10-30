@@ -1,3 +1,4 @@
+import {sameRaceVenueSource} from './venue-course-policy.js';
 import {buildRaceRoadGraph,createRaceCourse,sampleRaceSegmentY} from './course-rules.js';
 import {raceDistrictFingerprint,normalizeRaceRouteReference,restoreRaceCourse,raceCourseKey} from './course-library.js';
 import {racePhysicsVersion,RACE_PHYSICS_VERSION} from './record-rules.js';
@@ -6,7 +7,7 @@ export {canonicalRaceDistrict} from './district-facts.js';
 import {readRaceDistrictFacts,raceDistrictChunkPath} from './district-storage.js';
 
 export async function reconstructPublishedRace(reference,facts){
- const fingerprint=await raceDistrictFingerprint(facts),graph=buildRaceRoadGraph(facts.roads,{metersPerUnit:facts.metersPerUnit});
+ const fingerprint=await raceDistrictFingerprint(facts),graph=buildRaceRoadGraph(facts.roads,{metersPerUnit:facts.metersPerUnit,venueSource:facts.venueSource});
  return restoreRaceCourse(normalizeRaceRouteReference(reference),facts,graph,fingerprint);
 }
 export async function rebaseRaceReference(reference,approvedFacts,localFacts){
@@ -19,11 +20,11 @@ export async function rebaseRaceReference(reference,approvedFacts,localFacts){
 }
 export function assertRaceCourseInDistrict(course,localFacts){
  if(course.locationId!==localFacts.locationId||Math.abs(course.anchor.lat-localFacts.anchor.lat)>1e-7||Math.abs(course.anchor.lon-localFacts.anchor.lon)>1e-7||course.metersPerUnit!==localFacts.metersPerUnit)throw Error('race_course_wrong_world');
- const graph=buildRaceRoadGraph(localFacts.roads,{metersPerUnit:localFacts.metersPerUnit}),byId=new Map(graph.edges.map(e=>[e.id,e]));
+ const graph=buildRaceRoadGraph(localFacts.roads,{metersPerUnit:localFacts.metersPerUnit,venueSource:localFacts.venueSource}),byId=new Map(graph.edges.map(e=>[e.id,e]));
  // Rebuild the entire path using currently published and collision-qualified
  // spans, including direction, decks, water, width and tunnel admission.
  const local=createRaceCourse(graph,course.sourcePath,{...course});
- if(local.surfaceModel!==course.surfaceModel)throw Error('race_roads_changed_requalify_route');
+ if(local.surfaceModel!==course.surfaceModel||!sameRaceVenueSource(local.venueSource,course.venueSource))throw Error('race_roads_changed_requalify_route');
  if(local.segments.length!==course.segments.length)throw Error('race_roads_changed_requalify_route');
  for(let i=0;i<course.segments.length;i++){
   const a=course.segments[i],b=local.segments[i];

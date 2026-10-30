@@ -4,6 +4,26 @@ The owner confirmed on October 29 that the release must wait for the circuit,
 oval and rally packs. The accepted city core remains reusable evidence. No
 production deployment or purchase is part of source intake.
 
+## Full-length venue contracts
+
+An explicit `mapped-venue-v1` source descriptor can carry a bounded venue header
+through the existing qualification, district storage, graph, reconstruction and
+course identity. It binds the pinned source hash, ordered source-way membership,
+mapped length and finite radius. World qualification requires the current load
+publication and the same privately adopted survey on each accepted road model;
+provider JSON and caller radius options cannot widen ordinary districts. Missing
+source ways fail admission. Ordinary routes keep their 8 km / 1,200 world-unit
+fences and existing immutable IDs. Reviewed routes are limited to 30 km and a
+source-specific length envelope; laps retain the existing session budget.
+
+Long course joins and settled results carry a small course projection, using the
+already approved reconstructed geometry on each side. Before opening a socket,
+the browser verifies its expected course key; it resolves a projection only when
+all retained identity and display facts match. Result recovery needs no stored
+copy of track geometry. The 256 KiB incoming frame limit and command bounds are
+unchanged. Controlled full-length contract, chunk, transaction and actual local
+WebSocket checks cover these paths; they are not rendered venue acceptance.
+
 ## Silverstone implementation
 
 `config/racing-venues/silverstone-layout.json` fixes the complete GP way order.

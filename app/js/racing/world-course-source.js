@@ -9,6 +9,7 @@ import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.j
 import {assertReviewedSurfaceAccepted}from'../world/compiler/transport-surface-model.js?v=25';
 import {hasReviewedPavement}from'../world/compiler/reviewed-deck-profile.js';
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL}from'../physics/road-plane-dynamics.js';
+import {normalizeRaceVenueSource,assertRaceVenueRoads}from'./venue-course-policy.js';
 import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
 // Read published world facts through their existing owners. Qualification never
@@ -17,8 +18,11 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  const publication=context.worldPublication,traversal=context.buildTraversalNetworks?.()?.drive;
  if(!publication?.requestId||context.worldLoading||!traversal?.segments||!context.SurfaceQuery?.driveAt||!context.sampleFeatureSurfaceY)throw Error('race_world_not_ready');
  const metersPerUnit=Number(context.METERS_PER_WORLD_UNIT)||1.11,envelope={width:2.35,length:6.5,height:2.4};
- const radius=Math.max(100,Math.min(1200,Number(radiusWorld)||270)),checkBuilding=createBuildingCollisionQuery(context),roads=[];
- const selectedSources=sourceFeatureIds?new Set(sourceFeatureIds):null;
+ const runtime=context.worldLoadRuntimeState,pack=runtime?.sequence===publication.sequence?runtime.venuePack:null;
+ const adopted=pack?.status==='source-prepared'?pack.venueSource:undefined,venueSource=normalizeRaceVenueSource(adopted);
+ if(venueSource&&(pack.id!==venueSource.id||pack.sourceSha256!==venueSource.sourceSha256||JSON.stringify(pack.sourceFeatureIds)!==JSON.stringify(venueSource.sourceFeatureIds)))throw Error('race_invalid_venue_extent');
+ const radius=venueSource?venueSource.qualificationRadiusWorld:Math.max(100,Math.min(1200,Number(radiusWorld)||270)),checkBuilding=createBuildingCollisionQuery(context),roads=[];
+ const selectedSources=venueSource?new Set(venueSource.sourceFeatureIds):sourceFeatureIds?new Set(sourceFeatureIds):null;
  if(selectedSources&&(!selectedSources.size||selectedSources.size>500||[...selectedSources].some(id=>typeof id!=='string'||!id||id.length>180)))throw Error('invalid_race_source_selection');
  const diagnostics={sourceSegments:traversalSegmentCount(traversal.segments),eligible:0,rejected:{},sampledPositions:0,
   precisionContacts:0,maximumPrecisionDistanceWorld:0,maximumGroundProfileDepartureMeters:0};
@@ -43,6 +47,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
     try{if(!model?.surveyedSurface)throw Error('missing_reviewed_surface');assertReviewedSurfaceAccepted(model);}
     catch{rejected('unqualified_reviewed_surface');yield;continue;}
    }
+   if(venueSource&&(feature.surfaceSurveyEvidence?.venueSource!==adopted||model?.surveyedSurface?.venueSource!==adopted)){rejected('unqualified_venue_source');yield;continue;}
    const banked=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
    const structureName=String(feature.structureSemantics?.structureKind||'surface');
    const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
@@ -119,17 +124,18 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  await drainCooperatively(collect(),{current:active,yieldWork,budgetMs:2});
  if(!active())throw Error('race_world_changed');
  if(!roads.length)throw Error('no_qualified_racing_roads');
+ assertRaceVenueRoads(roads,venueSource);
  const anchor=publication.location||context.LOC,identity=context.livingWorldPublication?.worldIdentity;
  const loaded=context.worldLoadRuntimeState&&context.worldLoadRuntimeState.sequence===publication.sequence?context.worldLoadRuntimeState.location:null;
  const stableLocationId=identity?.latitudeE7!==undefined?`earth:${identity.latitudeE7}:${identity.longitudeE7}`:
   `earth:${Math.round(Number(anchor?.lat)*1e7)}:${Math.round(Number(anchor?.lon)*1e7)}`;
- return {type:'RaceDistrictFacts',version:1,locationId:String(locationId||stableLocationId).slice(0,80),
+ return {type:'RaceDistrictFacts',version:1,...(venueSource?{venueSource}:{}),locationId:String(locationId||stableLocationId).slice(0,80),
   locationLabel:String(locationLabel||loaded?.name||identity?.location?.name||context.LOC?.name||'Mapped district').slice(0,80),anchor:{lat:Number(anchor?.lat),lon:Number(anchor?.lon)},metersPerUnit,
   radiusWorld:radius,vehicleEnvelope:envelope,roads,diagnostics,provenance:{authority:'published-world-road-qualification-v1',requestId:publication.requestId}};
 }
 
 export function recommendRaceCourses(district){
- const graph=buildRaceRoadGraph(district.roads,{metersPerUnit:district.metersPerUnit}),events=[],signatures=new Set(),failures={};
+ const graph=buildRaceRoadGraph(district.roads,{metersPerUnit:district.metersPerUnit,venueSource:district.venueSource}),events=[],signatures=new Set(),failures={};
  const rejected=error=>{failures[error.message]=(failures[error.message]||0)+1;};
  const starts=graph.edges.filter(e=>e.length>=2).sort((a,b)=>Math.hypot(graph.nodes[a.from].x,graph.nodes[a.from].z)-Math.hypot(graph.nodes[b.from].x,graph.nodes[b.from].z)).slice(0,30);
  const settings={locationId:district.locationId,locationLabel:district.locationLabel,anchor:district.anchor,participants:4};

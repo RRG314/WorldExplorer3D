@@ -1,6 +1,7 @@
 // Portable race-course facts and rules. The world compiler supplies road facts;
 // this module cannot invent pavement, change a building or move a transport.
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL} from '../physics/road-plane-dynamics.js';
+import {normalizeRaceVenueSource,assertRaceVenueRoads,raceVenueMaximumLength} from './venue-course-policy.js';
 export const RACE_COURSE_VERSION=1;
 export const RACE_MAX_ROUTE_EDGES=2048;
 // Keep source-node topology down to centimetres, above the approved snapshot's
@@ -70,8 +71,9 @@ function sliceHeights(segment,start,end){
 
 // The graph is a bounded derived index of published source roads, not another
 // geographic authority. Different vertical decks are never joined by XZ alone.
-export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximumGrade=.22}={}){
+export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximumGrade=.22,venueSource,partialVenue=false}={}){
  if(!(metersPerUnit>0&&metersPerUnit<=10)||!Array.isArray(roads)||roads.length>50000)throw Error('invalid_race_road_source');
+ const venue=normalizeRaceVenueSource(venueSource);assertRaceVenueRoads(roads,venue,{partial:partialVenue});
  const nodes=[],edges=[],outgoing=new Map(),buckets=new Map(),edgeIds=new Set();
  function node(point,layer){
   const gx=Math.round(point.x*2),gz=Math.round(point.z*2),key=`${gx}:${gz}:${layer}`;
@@ -107,7 +109,7 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximum
   }
   if(road.direction!=='reverse')add(from,to,false);if(road.direction!=='forward')add(to,from,true);
  }
- return {version:RACE_COURSE_VERSION,metersPerUnit,nodes,edges,outgoing};
+ return {version:RACE_COURSE_VERSION,metersPerUnit,...(venue?{venueSource:venue}:{}),nodes,edges,outgoing};
 }
 
 // Dijkstra with a small binary heap. Work is bounded by the published graph;
@@ -150,7 +152,7 @@ export function createRaceCourse(graph,path,settings={}){
   points.push({...b});lengthMeters+=edge.length;
  }
  if(closed&&angle(segments.at(-1).forward,segments[0].forward)>Math.PI*.64)throw Error('race_turn_too_sharp');
- if(lengthMeters<200||lengthMeters>8000)throw Error('race_route_length');
+ if(lengthMeters<200||lengthMeters>raceVenueMaximumLength(graph.venueSource))throw Error('race_route_length');
  if(closed){
   // Put a circuit's timing/grid line within its selected straight, never on
   // the corner at the end of that way. A driver can then cross it naturally.
@@ -171,7 +173,7 @@ export function createRaceCourse(graph,path,settings={}){
   gridRun+=segment.lengthMeters;if(gridRun>=gridLength)break;
  }
  if(gridRun<gridLength)throw Error('race_grid_has_no_clearance');
- const course={version:RACE_COURSE_VERSION,sourcePath:[...path],startOffsetMeters:closed?Number(settings.startOffsetMeters??edges[0].length*.5):null,name:clean(settings.name)||'Mapped road run',description:String(settings.description||'').trim().slice(0,400),
+ const course={version:RACE_COURSE_VERSION,...(graph.venueSource?{venueSource:graph.venueSource}:{}),sourcePath:[...path],startOffsetMeters:closed?Number(settings.startOffsetMeters??edges[0].length*.5):null,name:clean(settings.name)||'Mapped road run',description:String(settings.description||'').trim().slice(0,400),
   ...(edges.some(e=>e.surfaceModel===BANKED_ROAD_MODEL)?{surfaceModel:BANKED_ROAD_MODEL}:{}),
   locationId:clean(settings.locationId),locationLabel:clean(settings.locationLabel),anchor:settings.anchor?{lat:Number(settings.anchor.lat),lon:Number(settings.anchor.lon)}:null,
   discipline,laps,participants,vehicleEnvelope:{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},metersPerUnit:graph.metersPerUnit,vehicleClass:settings.vehicleClass||'road',traffic:'closed-course',collision:'ghost',

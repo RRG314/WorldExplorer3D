@@ -1,15 +1,17 @@
+import {raceCourseKey} from './course-library.js';
+import {resolveRaceCourseProjection} from './course-projection.js';
 import {RACE_PHYSICS_VERSION,isCurrentRacePhysicsVersion} from './record-rules.js';
 
 // A connection belongs to one account, world and room. Retry is pumped by the
 // existing gameplay update; there is no additional browser frame/timer loop.
 export function createRaceConnection({uid,endpoint,credentials,join,isCurrent,WebSocketClass=globalThis.WebSocket,
- physicsVersion=RACE_PHYSICS_VERSION,
+ physicsVersion=RACE_PHYSICS_VERSION,expectedCourse=null,
  now=()=>Date.now(),onSnapshot=()=>{},onError=()=>{},onConnection=()=>{}}) {
  const url=new URL(endpoint);
  if(!isCurrentRacePhysicsVersion(physicsVersion))throw Error('race_physics_version_changed');
  const loopback=['127.0.0.1','localhost','[::1]'].includes(url.hostname);
  if(url.pathname!=='/race'||url.search||url.hash||url.username||url.password||!(url.protocol==='wss:'||url.protocol==='ws:'&&loopback))throw Error('race_secure_service_required');
- let socket=null,revision=0,disposed=false,connecting=false,nextAttempt=0,attempts=0,latest=null,receivedAt=0,joined=false,sequence=0,lastSent=-Infinity;
+ let expectedVerified=false,socket=null,revision=0,disposed=false,connecting=false,nextAttempt=0,attempts=0,latest=null,receivedAt=0,joined=false,sequence=0,lastSent=-Infinity;
  const active=()=>!disposed&&isCurrent();
  function send(message){if(active()&&socket?.readyState===1){socket.send(JSON.stringify(message));return true;}return false;}
  function stop(reason='race_connection_closed'){
@@ -22,6 +24,10 @@ export function createRaceConnection({uid,endpoint,credentials,join,isCurrent,We
   // credential request on the next frame, before a socket can even open.
   connecting=true;nextAttempt=now()+10000;const request=++revision;
   try {
+   if(expectedCourse&&!expectedVerified){
+    if(await raceCourseKey(expectedCourse)!==join.courseId)throw Error('race_course_wrong_world');
+    if(!active()||request!==revision)return;expectedVerified=true;
+   }
    const identity=await credentials();if(!active()||request!==revision)return;
    const ws=new WebSocketClass(url.href);socket=ws;
    ws.addEventListener('open',()=>{if(!active()||request!==revision){ws.close();return;}ws.send(JSON.stringify({type:'authenticate',...identity}));});
@@ -37,14 +43,18 @@ export function createRaceConnection({uid,endpoint,credentials,join,isCurrent,We
      if(state?.physicsVersion!==physicsVersion||state.courseId!==join.courseId||!Array.isArray(state.players)||state.players.length>4||!state.players.some(p=>p.uid===uid)||
       !Number.isFinite(state.serverAtMs)||latest&&state.id===latest.id&&state.serverAtMs<latest.serverAtMs)throw Error('invalid_race_snapshot');
      if(latest&&latest.id!==state.id)throw Error('race_session_replaced');
+     // Only resolve an identity-only join after the local approved course's
+     // immutable key was checked before opening this socket.
+     if(message.type==='joined'&&expectedCourse?.venueSource&&message.course?.type!=='RaceCourseProjection')throw Error('invalid_race_snapshot');
+     const course=resolveRaceCourseProjection(message.course,expectedVerified?expectedCourse:null,join.courseId);
      const newlyJoined=!joined;latest=state;receivedAt=now();joined=true;connecting=false;attempts=0;sequence=Math.max(sequence,(state.players.find(p=>p.uid===uid).lastInputSequence||0)+1);
-     if(newlyJoined)onConnection('connected');onSnapshot(state,message.course||null);
+     if(newlyJoined)onConnection('connected');onSnapshot(state,course||null);
     }catch(error){onError(error.message);stop('race_protocol_error');}
    });
    ws.addEventListener('error',()=>{});
    ws.addEventListener('close',()=>{if(!active()||request!==revision)return;socket=null;joined=false;connecting=false;nextAttempt=now()+Math.min(2000,500*++attempts);onConnection('reconnecting');});
    nextAttempt=now()+5000;
-  }catch{if(active()&&request===revision){connecting=false;nextAttempt=now()+1000;attempts++;onConnection('reconnecting');}}
+  }catch(error){if(error.message==='race_course_wrong_world'){onError(error.message);stop('race_protocol_error');return;}if(active()&&request===revision){connecting=false;nextAttempt=now()+1000;attempts++;onConnection('reconnecting');}}
  }
  return Object.freeze({connect,stop,send,snapshot:()=>latest,receivedAt:()=>receivedAt,connected:()=>joined,isFresh:()=>joined&&now()-receivedAt<=500,
   pump(){if(!active()){stop('race_session_changed');return;}
