@@ -15,6 +15,13 @@ export function buildDaytonaPerimeter(ctx){
  const roads=venue.sourceFeatureIds.map(id=>ctx.roads.find(r=>r.sourceFeatureId===id));
  if(roads.length!==5||roads.some(r=>!r?.transportRecord?.crossSection?.pavementSections||r.transportSurfaceModel?.reviewedSurfacePhase!=='accepted'))return null;
  const chunks=new Map(),colliders=[];let distance=0,paintFaces=0;
+ const baseContact=(x,z)=>{
+  const y=index.sampleAt(x,z,NaN,'at_grade');if(Number.isFinite(y))return y;
+  // A wall footing may meet a clipped source corner just beside the transect.
+  // Read its actual nearest triangle, bounded to four centimetres. This does
+  // not alter the index, road footprint or any driving/qualification tolerance.
+  return index.nearestSurfaceAt?.(x,z,.04/unit,'at_grade')?.y;
+ };
  const chunkAt=d=>{const key=Math.floor(d/128);if(!chunks.has(key))chunks.set(key,{key,wall:[],fence:[],fenceUvs:[],metal:[],paint:[],colors:[],center:null});return chunks.get(key);};
  for(const road of roads){
   const profile=road.transportRecord.crossSection.pavementSections;
@@ -23,7 +30,7 @@ export function buildDaytonaPerimeter(ctx){
    const station=t=>{
     const n=roadPavementFrameAtSegment(profile,segment,t),section=roadPavementSectionForSegment(road,segment,t),x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,
      point=(lateral,height=0)=>({x:x+n.x*lateral,y:height,z:z+n.z*lateral}),near=point(section.positive-.2/unit),inner=point(section.positive-.4/unit),
-     nearY=index.sampleAt(near.x,near.z,NaN,'at_grade'),innerY=index.sampleAt(inner.x,inner.z,NaN,'at_grade');
+     nearY=baseContact(near.x,near.z),innerY=baseContact(inner.x,inner.z);
     // Source joins can trim centimetres from the very outside corner. Read two
     // actual interior contacts and continue their short crossfall to the wall
     // base; never enlarge contacts or invent support under the drivable road.
