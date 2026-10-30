@@ -157,7 +157,11 @@ controller on the exported apron; these remain controlled component evidence.
 The latest actual native boundary drive used continuously held acceleration and
 braking through the repaired knee. It retained four wheel contacts and zero
 penetration over 19.3 world units; maximum rigid-body wheel gap at the crease was
-0.06153 world units (68.3 mm). Both views were inspected. The
-last whole-width capture still failed seven height profiles and eight capacity
-checks. The current connected-end and canonical-grid repairs require native
-qualification. No major venue pack or final moving-performance budget is accepted.
+0.06153 world units (68.3 mm). Both views were inspected. The subsequent native qualification passes all 127 original spans with no
+rejections, invalid raw heights or invalid canonical heights. All 127 retain
+full profiles through the 668,691-byte storage round trip, with at most 19
+lateral points and measured fit error below 3 mm. Maximum departure from the
+compiled surface is 44.5 mm; this is local agreement, not survey accuracy.
+The affected source-join view was inspected. Timing-line admission, finished
+presentation, discipline gameplay and final performance remain open. No major
+venue pack is accepted.
