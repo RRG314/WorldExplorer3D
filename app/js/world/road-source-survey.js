@@ -23,7 +23,7 @@ export function reviewedRoadTransportRecord(record,survey){
  }else if(policy==='profiled'){
   const profile=survey.pavementSections,venue=survey.venueSource;
   if(!venue||profile?.coordinateSpace!=='world'||profile.venueId!==survey.venueId||profile.sourceFeatureId!==record.identity||
-   profile.sourceSha256!==venue?.sourceSha256||venue.id!==survey.venueId||!venue.sourceFeatureIds.includes(record.identity)||
+   profile.sourceSha256!==venue?.sourceSha256||venue.id!==survey.venueId||![...venue.sourceFeatureIds,...(venue.pitSourceFeatureIds||[])].includes(record.identity)||
    profile.samples.some(s=>(s.positive+s.bankNegative)*profile.metersPerWorldUnit<survey.usableWidthMeters))throw Error('reviewed_road_pavement_profile_unavailable');
   const widthMeters=Math.max(...profile.samples.map(s=>(s.positive+s.negative)*profile.metersPerWorldUnit)),mid=sampleRoadPavementSection(profile,profile.length*.5);
   crossSection=Object.freeze({...record.crossSection,widthMeters,widthSource:'reviewed-venue-pavement-sections',pavementSections:profile,

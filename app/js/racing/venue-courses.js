@@ -13,11 +13,13 @@ export function buildVenueRaceCourses(district,venue){
   if(suffix.length!==3||suffix.some(n=>!Number.isFinite(n))||!Number.isInteger(suffix[0])||suffix[0]<0||suffix[1]<0||suffix[2]>1||suffix[1]>=suffix[2])throw Error('race_venue_source_order_missing');
   bySource.get(road.sourceFeatureId).push({road,segment:suffix[0],start:suffix[1],end:suffix[2]});
  }
- for(const id of venue.sourceFeatureIds){
+ function orderedRows(ids){const rows=[];for(const id of ids){
   const roads=bySource.get(id);if(!roads?.length)throw Error('race_venue_surface_incomplete');
   roads.sort((a,b)=>a.segment-b.segment||a.start-b.start);
-  for(const row of roads){const edge=edges.get(row.road.sourceId+':forward');if(!edge)throw Error('race_venue_direction_unavailable');ordered.push({...row,edge});}
- }
+  for(const row of roads){const edge=edges.get(row.road.sourceId+':forward');if(!edge)throw Error('race_venue_direction_unavailable');rows.push({...row,edge});}
+ }return rows;}
+ ordered.push(...orderedRows(venue.sourceFeatureIds));
+ const pitPath=venue.pitSourceFeatureIds?orderedRows(venue.pitSourceFeatureIds).map(row=>row.edge.id):undefined;
  let first=0,startOffsetMeters;
  if(venue.startLine){
   const line=venue.startLine;
@@ -27,7 +29,9 @@ export function buildVenueRaceCourses(district,venue){
   const {row,index}=matches[0];first=index;startOffsetMeters=row.edge.length*(line.fraction-row.start)/(row.end-row.start);
  }
  const path=[...ordered.slice(first),...ordered.slice(0,first)].map(row=>row.edge.id),label=venue.layoutLabel||'GP';
- const settings={locationId:district.locationId,locationLabel:district.locationLabel,anchor:district.anchor,discipline:'circuit',participants:4,
+ const discipline=venue.raceDiscipline||'circuit';if(!['circuit','oval'].includes(discipline))throw Error('race_venue_discipline_invalid');
+ const settings={locationId:district.locationId,locationLabel:district.locationLabel,anchor:district.anchor,discipline,participants:4,
+  ...(pitPath?{pitPath}:{}),
   ...(startOffsetMeters!==undefined?{startOffsetMeters}:{}),
   ...(venue.presentationStatus==='under-construction'?{description:'Venue detail is in progress. Private practice uses a game timing line; times are separate from official venue records.'}:{})};
  const course=createRaceCourse(graph,path,{...settings,laps:1,name:`${venue.name} · ${label} · 1 lap`});

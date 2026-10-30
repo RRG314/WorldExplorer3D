@@ -635,7 +635,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       const runtime=appCtx.worldLoadRuntimeState,pack=runtime?.venuePack,venue=pack?.venueSource;
       if(!venue||runtime.sequence!==appCtx._worldLoadSequence)return null;
       if(reviewedRefinement)return reviewedRefinement;
-      const selected=new Set(venue.sourceFeatureIds),roads=(appCtx.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
+      const selected=new Set([...venue.sourceFeatureIds,...(venue.pitSourceFeatureIds||[])]),roads=(appCtx.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
       if(roads.length!==selected.size||roads.some(r=>r.surfaceSurveyEvidence?.venueSource!==venue||r.transportSurfaceModel?.surveyedSurface?.venueSource!==venue||r.transportSurfaceModel.reviewedSurfacePhase!=='accepted'))throw Error('reviewed_terrain_source_unavailable');
       const scale=Number(appCtx.WORLD_UNITS_PER_METER)||1,exaggeration=Number(appCtx.TERRAIN_Y_EXAGGERATION)||1,landscape=pack.landscapeRefinement,segments=[];
       for(const road of roads){

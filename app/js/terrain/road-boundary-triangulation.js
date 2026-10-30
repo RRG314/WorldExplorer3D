@@ -27,7 +27,7 @@ const overlap=(a,b)=>a.minX<=b.maxX&&a.maxX>=b.minX&&a.minZ<=b.maxZ&&a.maxZ>=b.m
 export function reviewedRoadBoundaryPartition(context){
  const pack=context.worldLoadRuntimeState?.venuePack,venue=pack?.venueSource;if(pack?.terrainEdgePolicy===undefined)return null;
  if(pack.terrainEdgePolicy!==REVIEWED_PAVEMENT_BOUNDARY_POLICY||!venue)throw Error('reviewed_terrain_boundary_policy_invalid');
- const selected=new Set(venue.sourceFeatureIds),roads=(context.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
+ const selected=new Set([...venue.sourceFeatureIds,...(venue.pitSourceFeatureIds||[])]),roads=(context.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
  if(roads.length!==selected.size||roads.some(r=>!hasReviewedPavementBoundary(r)||r.surfaceSurveyEvidence.venueSource!==venue))throw Error('reviewed_terrain_boundary_source_unavailable');
  return createRoadBoundaryPartition(roads,venue);
 }

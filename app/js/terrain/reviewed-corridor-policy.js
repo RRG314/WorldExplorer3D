@@ -7,7 +7,7 @@ export const REVIEWED_PAVEMENT_BOUNDARY_POLICY='fitted-pavement-boundary-v1';
 export function hasReviewedPavementBoundary(feature){
  const model=feature?.transportSurfaceModel,survey=model?.surveyedSurface,evidence=feature?.surfaceSurveyEvidence;
  return !!(model?.reviewedSurfacePhase==='accepted'&&survey?.surfaceModel==='banked-road-v1'&&survey.terrainEdgePolicy===REVIEWED_PAVEMENT_BOUNDARY_POLICY&&
-  evidence?.terrainEdgePolicy===REVIEWED_PAVEMENT_BOUNDARY_POLICY&&survey.venueSource&&survey.venueSource===evidence.venueSource&&survey.sourceFeatureId===feature.sourceFeatureId&&survey.venueSource.sourceFeatureIds?.includes(feature.sourceFeatureId));
+  evidence?.terrainEdgePolicy===REVIEWED_PAVEMENT_BOUNDARY_POLICY&&survey.venueSource&&survey.venueSource===evidence.venueSource&&survey.sourceFeatureId===feature.sourceFeatureId&&[...survey.venueSource.sourceFeatureIds,...(survey.venueSource.pitSourceFeatureIds||[])].includes(feature.sourceFeatureId));
 }
 // Detailed source tiles halve to about 3.04 m at this venue. A 3.1 m ceiling
 // avoids another fourfold subdivision merely to remove centimetres of spacing.
@@ -18,7 +18,7 @@ export const REVIEWED_CORRIDOR_SUPPORT_METERS=REVIEWED_DETAIL_MAXIMUM_SPACING_ME
 export function reviewedTerrainCorridors(context,{includeLandscape=false}={}){
  const runtime=context.worldLoadRuntimeState,pack=runtime?.venuePack,venue=pack?.venueSource;
  if(!venue||runtime.sequence!==context._worldLoadSequence)return null;
- const selected=new Set(venue.sourceFeatureIds),roads=(context.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
+ const selected=new Set([...venue.sourceFeatureIds,...(venue.pitSourceFeatureIds||[])]),roads=(context.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
  if(roads.length!==selected.size||roads.some(r=>r.surfaceSurveyEvidence?.venueSource!==venue||r.transportSurfaceModel?.surveyedSurface?.venueSource!==venue||r.transportSurfaceModel.reviewedSurfacePhase!=='accepted'))throw Error('reviewed_terrain_source_unavailable');
  const scale=Number(context.WORLD_UNITS_PER_METER)||1,segments=[],landscape=includeLandscape?pack.landscapeRefinement:null;
  for(const road of roads){

@@ -6,7 +6,10 @@ import {roadPlacementOffsetWorld} from '../world/road-units.js';
 // No proximity alias, navigation node, source point or height is introduced.
 export function reviewedRoadContinuations(roads,venue){
  const result=new Map();if(!Array.isArray(venue?.sourceFeatureIds))return result;
- const selected=new Set(venue.sourceFeatureIds),nodes=new Map();
+ // Keep the accepted loop's continuations at a three-way pit exit. The open
+ // branch has its own directed continuation; it cannot replace that loop join.
+ for(const ids of [venue.sourceFeatureIds,...(venue.pitSourceFeatureIds?[venue.pitSourceFeatureIds]:[])]){
+ const selected=new Set(ids),nodes=new Map();
  for(const road of roads){
   const model=road.transportSurfaceModel;
   if(!selected.has(road.sourceFeatureId)||model?.reviewedSurfacePhase!=='accepted'||model.surveyedSurface?.venueSource!==venue||road.surfaceSurveyEvidence?.venueSource!==venue||road.structureSemantics?.terrainMode!=='at_grade'||road.sourceNodeIds?.length!==road.pts?.length||road.pts.length<2)continue;
@@ -28,5 +31,5 @@ export function reviewedRoadContinuations(roads,venue){
    minimumTurnRadians:0,pavementContinuation:true};
   if(!result.has(a.road))result.set(a.road,[]);result.get(a.road).push(join);
  }
- return result;
+ }return result;
 }

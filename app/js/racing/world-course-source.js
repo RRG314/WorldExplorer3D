@@ -24,10 +24,10 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  const metersPerUnit=Number(context.METERS_PER_WORLD_UNIT)||1.11,envelope={width:2.35,length:6.5,height:2.4};
  const runtime=context.worldLoadRuntimeState,pack=runtime&&runtime.sequence===publication.sequence?runtime.venuePack:null;
  const adopted=pack?.status==='source-prepared'?pack.venueSource:undefined,venueSource=normalizeRaceVenueSource(adopted);
- if(venueSource&&(pack.id!==venueSource.id||pack.sourceSha256!==venueSource.sourceSha256||JSON.stringify(pack.sourceFeatureIds)!==JSON.stringify(venueSource.sourceFeatureIds)))throw Error('race_invalid_venue_extent');
+ if(venueSource&&(pack.id!==venueSource.id||pack.sourceSha256!==venueSource.sourceSha256||JSON.stringify(pack.sourceFeatureIds)!==JSON.stringify(venueSource.sourceFeatureIds)||JSON.stringify(pack.pitSourceFeatureIds)!==JSON.stringify(venueSource.pitSourceFeatureIds)))throw Error('race_invalid_venue_extent');
  const radius=venueSource?venueSource.qualificationRadiusWorld:Math.max(100,Math.min(1200,Number(radiusWorld)||270)),checkBuilding=createBuildingCollisionQuery(context),roads=[];
- const selectedSources=venueSource?new Set(venueSource.sourceFeatureIds):sourceFeatureIds?new Set(sourceFeatureIds):null;
- if(selectedSources&&(!selectedSources.size||selectedSources.size>500||[...selectedSources].some(id=>typeof id!=='string'||!id||id.length>180)))throw Error('invalid_race_source_selection');
+ const selectedSources=venueSource?new Set([...venueSource.sourceFeatureIds,...(venueSource.pitSourceFeatureIds||[])]):sourceFeatureIds?new Set(sourceFeatureIds):null;
+ if(selectedSources&&(!selectedSources.size||selectedSources.size>(venueSource?550:500)||[...selectedSources].some(id=>typeof id!=='string'||!id||id.length>180)))throw Error('invalid_race_source_selection');
  const diagnostics={sourceSegments:traversalSegmentCount(traversal.segments),eligible:0,rejected:{},sampledPositions:0,
   precisionContacts:0,maximumPrecisionDistanceWorld:0,maximumGroundProfileDepartureMeters:0,maximumLateralProfileDepartureMeters:0};
  const rejected=reason=>{diagnostics.rejected[reason]=(diagnostics.rejected[reason]||0)+1;};

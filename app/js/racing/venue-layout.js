@@ -38,3 +38,24 @@ export function compileMappedVenueLayout(source){
  return Object.freeze({venueId:source.venueId,points:Object.freeze(ordered.map(Object.freeze)),lengthMeters,referenceLengthMeters:reference,
   lengthDifferenceMeters:lengthMeters-reference,wayIds:Object.freeze([...source.layout.wayIds]),ways,nodes});
 }
+
+// A separately reviewed open branch; it never changes the ordered race loop.
+export function compileMappedVenuePitLayout(source,descriptor,layout=compileMappedVenueLayout(source)){
+ const ids=descriptor?.pitWayIds;if(ids===undefined)return null;
+ const fail=()=>{throw Error('venue_pit_layout_invalid');};
+ if(!Array.isArray(ids)||!ids.length||ids.length>50||new Set(ids).size!==ids.length||ids.some(id=>!Number.isSafeInteger(id)||layout.wayIds.includes(id)||!layout.ways.has(id)))fail();
+ const mainNodes=new Set(layout.wayIds.flatMap(id=>layout.ways.get(id).nodes)),points=[];let previous=null,lengthMeters=0;
+ for(const id of ids){const way=layout.ways.get(id);if(!['yes','1','true'].includes(way.tags.oneway)||previous!==null&&previous!==way.nodes[0])fail();
+  for(let i=0;i<way.nodes.length;i++){
+   if(i){const distance=geographicVenueDistance(way.geometry[i-1],way.geometry[i]);if(distance<RACE_MINIMUM_SPAN_METERS||distance>1000)fail();lengthMeters+=distance;}
+   if(!points.length||i>0)points.push({...way.geometry[i],nodeId:way.nodes[i],wayId:id});
+  }previous=way.nodes.at(-1);
+ }
+ if(lengthMeters<200||lengthMeters>2000||points[0].nodeId===points.at(-1).nodeId||!mainNodes.has(points[0].nodeId)||!mainNodes.has(points.at(-1).nodeId)||points.slice(1,-1).some(p=>mainNodes.has(p.nodeId)))fail();
+ const neighbour=(node,outgoing)=>{
+  for(const id of layout.wayIds){const w=layout.ways.get(id),at=w.nodes.indexOf(node);if(at<0)continue;if(outgoing&&at<w.nodes.length-1)return w.geometry[at+1];if(!outgoing&&at>0)return w.geometry[at-1];}
+  fail();
+ };
+ return Object.freeze({wayIds:Object.freeze([...ids]),sourceFeatureIds:Object.freeze(ids.map(id=>`osm:way:${id}`)),points:Object.freeze(points.map(Object.freeze)),lengthMeters,
+  mainContinuations:Object.freeze({start:Object.freeze({...neighbour(points[0].nodeId,false)}),end:Object.freeze({...neighbour(points.at(-1).nodeId,true)})})});
+}
