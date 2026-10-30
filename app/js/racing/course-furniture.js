@@ -1,12 +1,13 @@
 import {racePavementCrossSection} from './pavement-cross-section.js';
 import {sampleRaceSegmentY,raceSegmentAtDistance} from './course-rules.js';
 import {raceCourseSurfacePoint} from './course-markings.js';
+import {createChainLinkTexture} from '../world/chain-link-texture.js';
 
 // Original temporary World Explorer event equipment. Geographic roads and
 // buildings retain their owners; these bounded batches retire with the race.
 // Every base follows the qualified pavement, including its crossfall/deck.
 export function buildRaceFurniture(course) {
- const unit=course.metersPerUnit,chunks=new Map(),boards=[],guardrail=course.venueSource?.id==='nurburgring-nordschleife';
+ const unit=course.metersPerUnit,chunks=new Map(),boards=[],guardrail=course.venueSource?.id==='nurburgring-nordschleife',permanentOval=course.venueSource?.id==='daytona-tri-oval';
  const chunkAt=d=>{const key=Math.floor(d/128);if(!chunks.has(key))chunks.set(key,{key,positions:[],uvs:[],fencePositions:[],fenceUvs:[],posts:[],railPosts:[],center:raceCourseSurfacePoint(course,Math.min(course.lengthMeters,key*128+64))});return chunks.get(key);};
  function quad(positions,uvs,points,u0=0,u1=1,v0=0,v1=1){for(const i of [0,1,2,0,2,3]){positions.push(points[i].x,points[i].y,points[i].z);uvs.push([u0,u1,u1,u0][i],[v0,v0,v1,v1][i]);}}
  function point(segment,t,lateral,lift=0){return {x:segment.a.x+(segment.b.x-segment.a.x)*t+segment.forward.z*lateral/unit,
@@ -16,7 +17,7 @@ export function buildRaceFurniture(course) {
  const profile=guardrail?[[.04,0],[-.14,.045],[-.2,.11],[-.14,.175],[.04,.22]]:[[-.2,0],[-.2,.18],[.06,.36],[.18,.86],[.38,.86],[.5,0]];
  const levels=guardrail?[.31,.60,.89]:[0];
  const edgeAt=(segment,t,side)=>{const s=racePavementCrossSection(segment,t);return s?(side<0?-s.minimumMeters:s.maximumMeters):segment.widthMeters/2;},edgeAtDistance=(d,side,extra)=>{const s=raceSegmentAtDistance(course,d);return side*(edgeAt(s,(d-s.startMeters)/s.lengthMeters,side)+extra);};
- for(const segment of course.segments) {
+ for(const segment of permanentOval?[]:course.segments) {
   const count=Math.max(1,Math.ceil(segment.lengthMeters/4));
   for(let i=0;i<count;i++) {
    const start=segment.startMeters+i*segment.lengthMeters/count,end=segment.startMeters+(i+1)*segment.lengthMeters/count;
@@ -36,7 +37,7 @@ export function buildRaceFurniture(course) {
    }
   }
  }
- for(let d=0;d<course.lengthMeters;d+=8){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.posts.push(raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,guardrail ? .75 : .36),guardrail?0:.86));}
+ if(!permanentOval)for(let d=0;d<course.lengthMeters;d+=8){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.posts.push(raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,guardrail ? .75 : .36),guardrail?0:.86));}
  if(guardrail)for(let d=0;d<course.lengthMeters;d+=4){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.railPosts.push(raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,.10)));}
  let previousTurn=-Infinity;
  for(let d=180;d<course.lengthMeters-30;d+=15) {
@@ -48,7 +49,7 @@ export function buildRaceFurniture(course) {
    boards.push({distance,at,position,yaw:Math.atan2(segment.forward.x,segment.forward.z)+Math.PI});
   }
  }
- return {chunks:[...chunks.values()],boards,profile,heightMeters:2.5,perimeter:guardrail?'corrugated-steel':'temporary-concrete'};
+ return {chunks:[...chunks.values()],boards,profile,heightMeters:2.5,perimeter:permanentOval?'permanent-venue':guardrail?'corrugated-steel':'temporary-concrete'};
 }
 function geometry(T,positions,uvs) {
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));
@@ -63,9 +64,7 @@ export function prepareRaceFurniture(T,context,course) {
  try {
  const wall=keep(new T.MeshStandardMaterial({color:0xc2c1b6,map:context.concreteDiffuse||null,normalMap:context.concreteNormal||null,normalScale:new T.Vector2(.12,.12),roughnessMap:context.concreteRoughness||null,roughness:.95,side:T.DoubleSide}));
  const metal=keep(new T.MeshStandardMaterial({color:0x899397,metalness:.72,roughness:.48,side:T.DoubleSide}));
- const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const ctx=canvas.getContext('2d');
- ctx.strokeStyle='#a8b1b4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,32);ctx.lineTo(32,0);ctx.lineTo(64,32);ctx.lineTo(32,64);ctx.closePath();ctx.stroke();
- const chain=new T.CanvasTexture(canvas);chain.wrapS=chain.wrapT=T.RepeatWrapping;chain.anisotropy=4;textures.push(chain);
+ const chain=createChainLinkTexture(T);textures.push(chain);
  // Preserve filtered wire coverage in the distance. A hard alpha cutout turns
  // mipmapped chain links into bright, flickering dots at normal chase angles.
  const fence=keep(new T.MeshStandardMaterial({color:0x7c878a,map:chain,transparent:true,opacity:.72,depthWrite:false,

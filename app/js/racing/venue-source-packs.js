@@ -48,9 +48,10 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  groundArtifactId:'daytona-tri-oval-fine-v3',groundContentSha256:'54ab1fad6a2a80f7f62178ab7d58a2433e386d6360eaea1d583fef1ae0117942',
  reviewedPavementSections:Object.freeze({url:'/app/assets/racing/daytona/pavement-sections.json',contentSha256:'34c26054f0e3c5ca538fec0ceba0fa611d990b3dbb6792d80c2885898368b873'}),
  pavementWidthPolicy:'profiled',surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:1200,routeExtent:'mapped-venue-v1',
- // The surveyed source/ground can load through the ordinary world owner.
- // Timing, oval rules and presentation have not yet passed pack acceptance.
- raceAdmission:'pending-timing-line',presentationStatus:'under-construction',layoutLabel:'Tri-oval',terrainEdgePolicy:REVIEWED_PAVEMENT_BOUNDARY_POLICY
+ // Original game reference on the retained frontstretch. It is deliberately
+ // separate from an official surveyed finish line and leaves source bytes intact.
+ startLine:Object.freeze({sourceFeatureId:'osm:way:11371365',segment:0,fraction:.6}),
+ raceAdmission:'practice',presentationStatus:'under-construction',layoutLabel:'Tri-oval',terrainEdgePolicy:REVIEWED_PAVEMENT_BOUNDARY_POLICY
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;

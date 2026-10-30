@@ -29,7 +29,7 @@ export function buildRacePaint(course) {
  }
  // White event boundaries remain inside the admitted pavement. They are
  // flat paint on its accepted surface, not invented raised kerb geometry.
- for(const segment of course.segments)for(const side of [-1,1]) {
+ for(const segment of course.venueSource?.id==='daytona-tri-oval'?[]:course.segments)for(const side of [-1,1]) {
   const edge=side*(segment.widthMeters/2-.32);
   if(segment.pavementModel){const edgeAt=d=>{const s=sectionAt(d);return side<0?s.minimumMeters+.32:s.maximumMeters-.32;};rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,d=>edgeAt(d)-.06,d=>edgeAt(d)+.06,.88);}else rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,edge-.06,edge+.06,.88);
  }

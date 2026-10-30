@@ -7,6 +7,7 @@ import {earthCoordinateFrame} from '../app/js/earth-core/coordinate-frame.js';
 import {buildVenueRaceCourses} from '../app/js/racing/venue-courses.js';
 import {raceGridPose,projectRacePosition} from '../app/js/racing/course-rules.js';
 import {raceCourseReference,restoreRaceCourse} from '../app/js/racing/course-library.js';
+import {buildRaceFurniture} from '../app/js/racing/course-furniture.js';
 
 // Topology and timing-line contract only. Height/contact and full-world driving
 // are verified separately; a flat source projection cannot accept a venue pack.
@@ -58,4 +59,21 @@ test('missing, ambiguous or foreign timing references fail closed instead of fal
  // not whichever of two neighbouring intervals happens to be visited first.
  const row=roads.find(r=>r.sourceId==='osm:way:41395670:6:0.000000:1.000000');
  assert.throws(()=>buildVenueRaceCourses({...district,roads:roads.map(r=>r===row?{...r,sourceId:'osm:way:41395670:6:0.725000:1.000000'}:r)},venue),/start_line_unavailable/);
+});
+
+test('Daytona game timing keeps the complete source loop and leaves its permanent perimeter in world custody',async()=>{
+ const pack=RACING_VENUE_SOURCES.find(p=>p.id==='daytona-tri-oval'),source=await loadRacingVenueSource(pack,{fetchImpl:async url=>new Response(fs.readFileSync(new URL('..'+url,import.meta.url)))}),
+  layout=compileMappedVenueLayout(source),group=racingVenueGroundRequirements(pack),venue=prepareVenueSourceMerge({},source,pack,{status:'accepted',artifactIds:group.map(g=>g.artifactId),contentSha256s:group.map(g=>g.contentSha256)}).metadata,
+  frame=earthCoordinateFrame(pack.anchor,100000),roads=[];
+ // Deliberately flat topology fixture; native full-width evidence owns height admission.
+ for(const id of layout.wayIds){const way=layout.ways.get(id),sourceFeatureId=`osm:way:${id}`;
+  for(let segment=0;segment<way.nodes.length-1;segment++)roads.push({sourceFeatureId,sourceId:`${sourceFeatureId}:${segment}:0.000000:1.000000`,
+   a:{...frame.toWorld(way.geometry[segment].lat,way.geometry[segment].lon),y:0,connectionLayer:'source-node:'+way.nodes[segment]},
+   b:{...frame.toWorld(way.geometry[segment+1].lat,way.geometry[segment+1].lon),y:0,connectionLayer:'source-node:'+way.nodes[segment+1]},widthMeters:6,direction:'forward',driveable:true,supported:true});
+ }
+ const {events:[course]}=buildVenueRaceCourses({locationId:'daytona',locationLabel:pack.name,anchor:pack.anchor,metersPerUnit:1.11,venueSource:venue.venueSource,roads},venue);
+ assert.equal(course.sourcePath.length,127);assert.equal(new Set(course.sourcePath).size,127);assert.equal(course.sourcePath[0],'osm:way:11371365:0:0.000000:1.000000:forward');
+ assert.match(course.description,/in progress/);assert.ok(Math.abs(course.lengthMeters-layout.lengthMeters)/layout.lengthMeters<.01);
+ for(let i=0;i<4;i++)assert.ok(projectRacePosition(course,raceGridPose(course,i)).error<1.401);
+ const furniture=buildRaceFurniture(course);assert.equal(furniture.perimeter,'permanent-venue');assert.ok(furniture.chunks.every(c=>!c.positions.length&&!c.fencePositions.length&&!c.posts.length));
 });

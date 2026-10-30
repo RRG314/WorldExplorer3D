@@ -9,6 +9,8 @@ import {replaceVenueCollision,venueComponentCollider} from './venue-collision.js
 import {createSilverstoneWingExterior,isSilverstoneWing} from './silverstone-wing-exterior.js';
 import {createNordschleifeT13Exterior,isT13StandRepresentation} from './nordschleife-t13-exterior.js';
 import {createDaytonaGrandstandExterior,isDaytonaStandRepresentation,reserveDaytonaGrandstandRepresentations} from './daytona-grandstand-exterior.js';
+import {createDaytonaPerimeterExterior} from './daytona-perimeter-exterior.js';
+import {addBuildingToSpatialIndex} from './building-spatial-index.js?v=7';
 
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
@@ -220,6 +222,12 @@ export function publishReviewedVenueExteriors(ctx,THREE){
    venueComponentCollider(stand.root.userData.sourceBuildingId,stand.footprint,stand.bottom,stand.top)
   ]);
   ctx.addEarthWorldObject(stand.root);ctx.buildingMeshes.push(stand.root);published.push(stand.root.name);
+ });
+ if(venue?.id==='daytona-tri-oval'&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
+  if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
+  const exterior=createDaytonaPerimeterExterior(THREE,ctx);if(!exterior)return;
+  ctx.addEarthWorldObject(exterior.root);ctx.buildingMeshes.push(exterior.root);published.push(exterior.root.name);
+  for(const collider of exterior.colliders){ctx.buildings.push(collider);addBuildingToSpatialIndex(collider);}
  });
  for(const root of added){ctx.addEarthWorldObject(root);ctx.buildingMeshes.push(root);}
  return {published};
