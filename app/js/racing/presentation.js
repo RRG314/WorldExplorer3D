@@ -32,7 +32,10 @@ export async function prepareRacePresentation(THREE,context,course,rivals,{signa
  paintGeometry.computeVertexNormals();
  const paintMaterial=createRoadMarkingMaterial({color:0xffffff,emissive:0,emissiveIntensity:0,roughness:.9,
   vertexColors:true,side:THREE.DoubleSide,depthWrite:false},THREE);
- const painted=new THREE.Mesh(paintGeometry,paintMaterial);painted.name='Surveyed finish and full-chassis grid paint';root.add(painted);
+ const painted=new THREE.Mesh(paintGeometry,paintMaterial);painted.name='Surveyed finish and full-chassis grid paint';
+ // Match the existing road-marking layer. Depth-write-free paint drawn before
+ // the terrain owner's order-2 pavement is overwritten by that later batch.
+ painted.renderOrder=4;root.add(painted);
  const dispose=()=>{if(disposed)return;disposed=true;furniture?.dispose();for(const visual of visuals)visual.dispose();detachSceneObject(root);pole.dispose();material.dispose();lineGeometry.dispose();lineMaterial.dispose();paintGeometry.dispose();paintMaterial.dispose();};
  try {
   furniture=prepareRaceFurniture(THREE,context,course);root.add(furniture.root);

@@ -60,8 +60,15 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   a mapped T13 grandstand interpretation through the existing building owner.
   Focused checks cover grade/crossfall, bounded static batches, exact outline
   clipping, collision transfer, neighbour retention and resource release.
-  Actual-world visual inspection of these additions remains pending; neither
-  completes venue art, kerbs, runoff, pits, landscape or full-lap acceptance.
+  Actual-world inspection confirmed the steel perimeter and exposed a buried
+  flat-base grandstand. Its foundation now compiles from the existing graded
+  terrain in the existing deferred transport publication phase; stale callbacks
+  cannot publish into a replacement world. Six focused ownership/geometry checks
+  pass. The same view exposed race paint being overwritten by later pavement;
+  a controlled render-order probe confirmed the cause, and race paint now uses
+  the normal marking layer. These two repairs still need their final affected
+  world view. They do not complete venue art, kerbs, runoff, pits, landscape or
+  full-lap acceptance.
 - Full-length reviewed venues now retain bounded source membership, extent and
   identity through world qualification, canonical/chunk storage and shared
   reconstruction. Long joins and saved results carry compact metadata resolved

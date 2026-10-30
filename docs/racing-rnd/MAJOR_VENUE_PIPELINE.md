@@ -178,7 +178,11 @@ plan is retained; terrace and bench heights are estimates. Clipped terraces,
 five bench bays, four aisles and safety rails replace only a uniquely matching
 provider visual/solid envelope. Nearby buildings, existing entrances and
 interior permission retain their owners. The world building collection retires
-the batched geometry and owned material resources. It does not grant a new
+the batched geometry and owned material resources. The stand is adopted in the
+existing deferred transport-dependent phase after road grading, with its static
+foundation fitted along the hillside from that same terrain owner. A sequence
+or venue change rejects the pending callback. Race paint uses the existing
+order-four road-marking layer, after the order-two pavement batches. It does not grant a new
 interior or claim completed pits, landscape or venue acceptance.
 
 ## Qualified road snapshot publication

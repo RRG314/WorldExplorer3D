@@ -38,22 +38,47 @@ export function createNordschleifeT13Exterior(T,ctx){
  const local=footprint.map(p=>({u:(p.x-origin.x)*ux+(p.z-origin.z)*uz,v:-(p.x-origin.x)*uz+(p.z-origin.z)*ux})),
   minU=Math.min(...local.map(p=>p.u)),maxU=Math.max(...local.map(p=>p.u)),minV=Math.min(...local.map(p=>p.v)),maxV=Math.max(...local.map(p=>p.v));
  if(!((maxU-minU)*unit>90&&(maxU-minU)*unit<150&&(maxV-minV)*unit>10&&(maxV-minV)*unit<18))return null;
- const root=new T.Group();root.name='Nordschleife T13 — mapped grandstand';root.position.y=Math.min(...heights);
- root.userData={sourceBuildingId:NORD_T13_SOURCE_ID,reviewedVenueExterior:true,exteriorOnly:true,buildingFootprint:footprint,
-  sourceClaim:'OSM bleacher outline; original estimated terraces, benches and railings from RLP DOP20; no interior admission'};
- const material=(color,roughness,metalness=0)=>{const m=new T.MeshStandardMaterial({color,roughness,metalness,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;};
- const concrete=material(0xb6b5ad,.94),metal=material(0x9da5a7,.46,.65),bench=material(0x999e9a,.72,.25);
- const world=(p,y)=>new T.Vector3(origin.x+ux*p.u-uz*p.v,y,origin.z+uz*p.u+ux*p.v);
- const mesh=(g,mat)=>{const m=new T.Mesh(g,mat);m.castShadow=m.receiveShadow=true;root.add(m);return m;};
- const triangles=(points,mat)=>{const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(points.flatMap(p=>p.toArray()),3));g.computeVertexNormals();return mesh(g,mat);};
- function top(ring,height,mat){const faces=T.ShapeUtils.triangulateShape(ring.map(p=>new T.Vector2(p.u,p.v)),[]);triangles(faces.flatMap(face=>face.map(i=>world(ring[i],height))),mat);}
- function wall(a,b,bottom,top,mat){triangles([world(a,bottom),world(b,bottom),world(b,top),world(a,bottom),world(b,top),world(a,top)],mat);}
- function beam(a,b,width){const d=b.clone().sub(a),m=mesh(new T.BoxGeometry(width/unit,d.length(),width/unit),metal);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.normalize());}
  const rows=18,rise=.31/unit,tread=(maxV-minV)/rows,bays=5,aisles=[];
  const terraceAt=v=>Math.max(1,Math.min(rows,Math.ceil((v-minV)/tread)))*rise;
  function acrossAt(u){const hits=[];for(let i=0;i<local.length;i++){
   const a=local[i],b=local[(i+1)%local.length];if((a.u<=u&&b.u>u)||(b.u<=u&&a.u>u))hits.push(a.v+(b.v-a.v)*(u-a.u)/(b.u-a.u));
  }return hits.length>=2?[Math.min(...hits),Math.max(...hits)]:null;}
+ const base=Math.min(...heights),datum=[],steps=Math.ceil((maxU-minU)*unit/2.5);
+ // Compile the foundation once from the existing terrain owner, after final
+ // road grading. There is no live height sampler or separate ground authority.
+ for(let i=0;i<=steps;i++){
+  const u=minU+.001+(maxU-minU-.002)*i/steps,range=acrossAt(u);if(!range)return null;
+  const groundAt=v=>ctx.elevationWorldYAtWorldXZ(origin.x+ux*u-uz*v,origin.z+uz*u+ux*v);
+  let y=groundAt(range[0])+.12/unit;if(!Number.isFinite(y))return null;
+  for(let j=0;j<=rows;j++){
+   const v=range[0]+(range[1]-range[0])*j/rows,ground=groundAt(v);if(!Number.isFinite(ground))return null;
+   y=Math.max(y,ground+.12/unit-terraceAt(v));
+  }
+  datum.push({u,y:y-base});
+ }
+ const foundationAt=u=>{let lower=datum[0],upper=datum.at(-1);for(let i=1;i<datum.length;i++)if(datum[i].u>=u){lower=datum[i-1];upper=datum[i];break;}
+  const t=Math.max(0,Math.min(1,(u-lower.u)/(upper.u-lower.u)));return lower.y+(upper.y-lower.y)*t;};
+ const root=new T.Group();root.name='Nordschleife T13 — mapped grandstand';root.position.y=Math.min(...heights);
+ root.userData={sourceBuildingId:NORD_T13_SOURCE_ID,reviewedVenueExterior:true,exteriorOnly:true,buildingFootprint:footprint,
+  sourceClaim:'OSM bleacher outline; original estimated terraces, benches and railings from RLP DOP20; no interior admission'};
+ const material=(color,roughness,metalness=0)=>{const m=new T.MeshStandardMaterial({color,roughness,metalness,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;};
+ const concrete=material(0xb6b5ad,.94),metal=material(0x9da5a7,.46,.65),bench=material(0x999e9a,.72,.25);
+ const world=(p,y)=>new T.Vector3(origin.x+ux*p.u-uz*p.v,y+foundationAt(p.u),origin.z+uz*p.u+ux*p.v);
+ const mesh=(g,mat)=>{const m=new T.Mesh(g,mat);m.castShadow=m.receiveShadow=true;root.add(m);return m;};
+ const triangles=(points,mat)=>{const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(points.flatMap(p=>p.toArray()),3));g.computeVertexNormals();return mesh(g,mat);};
+ function top(ring,height,mat){
+  const cuts=[minU,...datum.slice(1,-1).map(s=>s.u),maxU];
+  for(let i=1;i<cuts.length;i++){
+   const part=clip(clip(ring,'u',cuts[i-1],true),'u',cuts[i],false);if(part.length<3)continue;
+   const faces=T.ShapeUtils.triangulateShape(part.map(p=>new T.Vector2(p.u,p.v)),[]);triangles(faces.flatMap(face=>face.map(j=>world(part[j],height))),mat);
+  }
+ }
+ function wall(a,b,bottom,top,mat){
+  const cuts=[0,1];for(const s of datum){const t=(s.u-a.u)/(b.u-a.u);if(t>0&&t<1)cuts.push(t);}cuts.sort((a,b)=>a-b);
+  const at=t=>({u:a.u+(b.u-a.u)*t,v:a.v+(b.v-a.v)*t});
+  for(let i=1;i<cuts.length;i++){const p=at(cuts[i-1]),q=at(cuts[i]);triangles([world(p,bottom),world(q,bottom),world(q,top),world(p,bottom),world(q,top),world(p,top)],mat);}
+ }
+ function beam(a,b,width){const d=b.clone().sub(a),m=mesh(new T.BoxGeometry(width/unit,d.length(),width/unit),metal);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.normalize());}
  for(let i=1;i<bays;i++)aisles.push(minU+(maxU-minU)*i/bays);
  for(let row=0;row<rows;row++){
   const lo=minV+row*tread,hi=lo+tread,y=(row+1)*rise,ring=clip(clip(local,'v',lo,true),'v',hi,false);if(ring.length<3)continue;
@@ -77,7 +102,7 @@ export function createNordschleifeT13Exterior(T,ctx){
   const length=Math.hypot(b.u-a.u,b.v-a.v),count=Math.ceil(length*unit/3);
   for(let j=0;j<=count;j++){const t=j/count,p={u:a.u+(b.u-a.u)*t,v:a.v+(b.v-a.v)*t},y=terraceAt(p.v);beam(world(p,y),world(p,y+.95/unit),.04);}
  }
- root.userData.architecture={rows,benchBays:bays,aisles:aisles.length,footprintRetained:true,heightMeters:rows*rise*unit+.95,estimatedHeights:true,interiorAdmission:false};
+ root.userData.architecture={rows,benchBays:bays,aisles:aisles.length,footprintRetained:true,heightMeters:rows*rise*unit+.95,estimatedHeights:true,foundationStations:datum.length,interiorAdmission:false};
  batchOwnedStaticStructure(T,root);finishVenueSurface(T,root,concrete,'../../assets/textures/earth/concrete_diffuse.jpg',3/unit);
- return {root,footprint,bottom:root.position.y,top:root.position.y+rows*rise};
+ return {root,footprint,bottom:base,top:base+Math.max(...datum.map(s=>s.y))+rows*rise};
 }

@@ -203,16 +203,20 @@ export function publishReviewedVenueExteriors(ctx,THREE){
   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
   added.push(root);
  }
- const t13=createNordschleifeT13Exterior(THREE,ctx);
- if(t13){
+ const published=added.map(r=>r.name),venue=ctx.worldLoadRuntimeState?.venuePack,sequence=ctx._worldLoadSequence;
+ // The existing transport-dependent publication phase runs after final road
+ // grading. A pre-grade flat foundation buries this long stand on the hillside.
+ if(venue?.id==='nurburgring-nordschleife'&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
+  if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
+  const t13=createNordschleifeT13Exterior(THREE,ctx);if(!t13)return;
   const retired=new Set(ctx.buildingMeshes.filter(m=>isT13StandRepresentation(m.userData,t13.footprint)));
   for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
   replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>isT13StandRepresentation(b,t13.footprint)),[
    venueComponentCollider(t13.root.userData.sourceBuildingId,t13.footprint,t13.bottom,t13.top)
   ]);
-  added.push(t13.root);
- }
+  ctx.addEarthWorldObject(t13.root);ctx.buildingMeshes.push(t13.root);published.push(t13.root.name);
+ });
  for(const root of added){ctx.addEarthWorldObject(root);ctx.buildingMeshes.push(root);}
- return {published:added.map(r=>r.name)};
+ return {published};
 }
