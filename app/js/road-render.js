@@ -1,3 +1,4 @@
+import {applyRoadCreaseNormals} from './terrain/road-crease-normals.js';
 import { normalizePublishedRoadIndices } from './terrain/published-road-integrity.js';
 
 export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8,
@@ -129,7 +130,7 @@ function buildIndexedBatchMesh({
   targetList = null,
   verts = [],
   indices = [],
-  colors = null,baseY = null,
+  colors = null,baseY = null,normalCreaseAngleRadians,
   material = null,
   renderOrder = 0,
   userData = null,
@@ -141,6 +142,7 @@ function buildIndexedBatchMesh({
   }
   if(colors!==null&&(!((Array.isArray(colors)||ArrayBuffer.isView(colors)))||colors.length!==verts.length||!colors.every(n=>Number.isInteger(n)&&n>=0&&n<=255)))throw Error('invalid_road_batch_colors');
   if(baseY!==null&&(!((Array.isArray(baseY)||ArrayBuffer.isView(baseY)))||baseY.length!==verts.length/3||!baseY.every(Number.isFinite)))throw Error('invalid_road_base_witness');
+  if(normalCreaseAngleRadians!==undefined&&(!Number.isFinite(normalCreaseAngleRadians)||normalCreaseAngleRadians<=0||normalCreaseAngleRadians>Math.PI/2))throw Error('invalid_road_normal_crease');
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
   if(colors!==null)geometry.setAttribute('color',new THREE.BufferAttribute(new Uint8Array(colors),3,true));
@@ -159,7 +161,7 @@ function buildIndexedBatchMesh({
       correctedDownwardTriangles: normalized.correctedDownwardTriangles };
   }
   geometry.setIndex(new THREE.BufferAttribute(publishedIndices, 1));
-  geometry.computeVertexNormals();
+  if(normalCreaseAngleRadians!==undefined)applyRoadCreaseNormals(geometry,normalCreaseAngleRadians);else geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = renderOrder;
   mesh.receiveShadow = !!receiveShadow;

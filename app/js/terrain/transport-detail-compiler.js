@@ -1,3 +1,4 @@
+import {PAVEMENT_NORMAL_CREASE_RADIANS} from './road-crease-normals.js';
 import {prepareCarriagewayTiles,unionCarriageway} from '../world/compiler/street-carriageway.js';
 import {meshCarriagewayTile} from '../world/compiler/street-carriageway-mesh.js';
 import {createPavementTerrainPartition} from '../world/pavement-terrain-partition.js';
@@ -58,14 +59,14 @@ export function createTransportDetailCompiler({roads,terrain,pavementJoins=[],fo
     for(const tile of region.tiles){
       const mesh=meshCarriagewayTile(tile,restored.sampleUncutTop,partition,{polygons:tile.polygons,edgeFaces:tile.edgeFaces});
       const cut=clipSurface(mesh.positions,mesh.indices);
-      builder.append(cut.positions,cut.indices,'at_grade');
+      builder.append(cut.positions,cut.indices,'at_grade',tile.segments.some(s=>s.road.transportRecord?.crossSection?.pavementSections)?{normalCreaseAngleRadians:PAVEMENT_NORMAL_CREASE_RADIANS}:{});
       appendRoadEdgeBands(builder,mesh.edgeBands,clipSurface);
       tile.polygons=null;
     }
     builder.finish();
     return {key:region.key,bounds:region.bounds,keys:region.tiles.map(tile=>tile.key),
       roadIndices:[...new Set(region.tiles.flatMap(tile=>[...tile.segments,...tile.joins].map(item=>item.road.auditIndex)))],
-      batches:builder.batches.map(batch=>({positions:Float32Array.from(batch.verts),indices:Uint32Array.from(batch.indices),...(batch.material?{material:batch.material,colors:Uint8Array.from(batch.colors),baseY:Float32Array.from(batch.baseY)}:{})}))};
+      batches:builder.batches.map(batch=>({positions:Float32Array.from(batch.verts),indices:Uint32Array.from(batch.indices),...(batch.normalCreaseAngleRadians!==undefined?{normalCreaseAngleRadians:batch.normalCreaseAngleRadians}:{}),...(batch.material?{material:batch.material,colors:Uint8Array.from(batch.colors),baseY:Float32Array.from(batch.baseY)}:{})}))};
   }
   const initial=deferInitial?[]:plan.initial.map(compile);
   return {

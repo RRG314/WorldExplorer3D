@@ -1,3 +1,4 @@
+import {PAVEMENT_NORMAL_CREASE_RADIANS} from './road-crease-normals.js';
 import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import {createRoadRegionLease} from './road-region-lease.js';
 import {hasReviewedPavement} from '../world/compiler/reviewed-deck-profile.js';
@@ -692,7 +693,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       assertCurrent();
       for(const region of detail.initial.regions){
         initialRegionKeys.add(region.key);
-        for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade',{material:batch.material,colors:batch.colors,baseY:batch.baseY});
+        for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade',{material:batch.material,colors:batch.colors,baseY:batch.baseY,normalCreaseAngleRadians:batch.normalCreaseAngleRadians});
         roadSurfaceIntegrity.carriagewayRegions+=region.keys.length;
       }
       detail.initial=null;
@@ -711,7 +712,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         const mesh=meshCarriagewayTile(tile,uncutRoadTop,partition,{edgeFaces:tile.edgeFaces});
         if(mesh.indices.length) {
           const cut=clipGroundSurface(mesh.positions,mesh.indices);
-          appendRoadMainGeometry(cut.positions,cut.indices,'at_grade');
+          appendRoadMainGeometry(cut.positions,cut.indices,'at_grade',tile.segments.some(s=>s.road.transportRecord?.crossSection?.pavementSections)?{normalCreaseAngleRadians:PAVEMENT_NORMAL_CREASE_RADIANS}:{});
         }
         appendRoadEdgeBands(roadBatchBuilder,mesh.edgeBands,clipGroundSurface);
         if(mesh.indices.length||mesh.edgeBands?.indices.length)roadSurfaceIntegrity.carriagewayRegions++;
@@ -753,7 +754,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         targetList: stagedRoadMeshes,
         verts: batch.verts,
         indices: batch.indices,
-        colors:batch.colors||null,baseY:batch.baseY||null,
+        colors:batch.colors||null,baseY:batch.baseY||null,normalCreaseAngleRadians:batch.normalCreaseAngleRadians,
         material: roadMaterialForBatch(batch),
         renderOrder: 2,
         frustumCulled: true,
@@ -927,7 +928,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const schedule={current:publicationCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
       try {
         for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
-          verts:batch.positions,indices:batch.indices,colors:batch.colors||null,baseY:batch.baseY||null,material:roadMaterialForBatch(batch),renderOrder:2,frustumCulled:true,
+          verts:batch.positions,indices:batch.indices,colors:batch.colors||null,baseY:batch.baseY||null,normalCreaseAngleRadians:batch.normalCreaseAngleRadians,material:roadMaterialForBatch(batch),renderOrder:2,frustumCulled:true,
           userData:{isRoadBatch:true,...(batch.material?{roadSurfaceMaterial:batch.material}:{}),terrainMode:'at_grade',surfaceRanges:[{start:0,count:batch.indices.length,terrainMode:'at_grade'}],roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
         contact=await createRoadContactIndexCooperatively(meshes,16,schedule);
         // Clip dashes to this region's exact road tops. Neighboring regions own
