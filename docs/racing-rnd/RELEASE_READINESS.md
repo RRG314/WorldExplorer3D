@@ -488,3 +488,13 @@ after the body's outline has matched the venue. Neighbouring identities remain
 separate. The missing-footprint and unlabelled-adjunct cases fail before their
 corrections and pass afterward; an unavailable-ground replacement preserves the
 original visuals. Native absence of every obsolete batch range remains pending.
+
+The final native publication check confirms zero remaining shared-batch ranges
+for the replaced provider building, one reviewed stand visual and one transferred
+collision envelope. The actual car view shows the seating instead of the generic
+windowed shell. The preceding unchanged-model check drove the frontstretch with
+continuously held throttle for 2.2 seconds, retained all four wheel contacts
+(maximum measured gap about 5.3 mm, no penetration), then returned to walking.
+No GL, page or console errors occurred. These are local publication and gameplay
+checks; final moving-scene performance, full pavement, fences, paint, pits and
+oval rules remain open, as does complete venue acceptance.
