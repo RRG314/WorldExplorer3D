@@ -1,5 +1,5 @@
 import {refineReviewedCorridorCells,corridorSegmentDistance} from './reviewed-corridor-refinement.js';
-import {REVIEWED_CORRIDOR_INNER_SPACING_METERS,REVIEWED_CORRIDOR_OUTER_SPACING_METERS} from './reviewed-corridor-policy.js';
+import {REVIEWED_CORRIDOR_INNER_SPACING_METERS,REVIEWED_CORRIDOR_OUTER_SPACING_METERS,REVIEWED_CORRIDOR_INNER_MARGIN_METERS,REVIEWED_CORRIDOR_OUTER_MARGIN_METERS} from './reviewed-corridor-policy.js';
 import {mappedWaterBedMetersAt, createMappedWaterBedSampler} from './mapped-water-bed.js';
 import {
   addCoverageEdges,
@@ -645,7 +645,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       for(const road of roads){
         if(road.structureSemantics?.terrainMode!=='at_grade')continue;
         const half=road.width*.5;
-        for(let i=1;i<road.pts.length;i++)segments.push({a:road.pts[i-1],b:road.pts[i],innerRadius:half+8*scale,outerRadius:half+40*scale,...(landscape?{landscapeRadius:landscape.radiusMeters*scale}:{})});
+        for(let i=1;i<road.pts.length;i++)segments.push({a:road.pts[i-1],b:road.pts[i],innerRadius:half+REVIEWED_CORRIDOR_INNER_MARGIN_METERS*scale,outerRadius:half+REVIEWED_CORRIDOR_OUTER_MARGIN_METERS*scale,...(landscape?{landscapeRadius:landscape.radiusMeters*scale}:{})});
       }
       const originalCount=geometry.attributes.position.count,lines=collectDetailBoundaryLines(appCtx.terrainGroup?.children),
         oldGrid={xValues,zValues,worldYs,boundaryTriangles,detailedCoverage:spec.detailedCoverage};

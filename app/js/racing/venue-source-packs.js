@@ -5,6 +5,7 @@ import {annotateRoadSourceSurvey} from '../world/road-source-survey.js';
 import {sha256Text} from '../terrain/ground-artifact.js?v=4';
 import {parseMeters} from '../world/compiler/transport-source-normalizer.js?v=4';
 import {annotateReviewedVenueDecks,reviewedVenueDeckProfile,reviewedVenuePavementProfile} from './venue-deck-source.js';
+import {REVIEWED_CORRIDOR_OUTER_MARGIN_METERS} from '../terrain/reviewed-corridor-policy.js';
 
 // A reviewed source package is not a playable-catalogue flag. Admission still
 // requires the existing world publication and racing surface qualification.
@@ -43,7 +44,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
 }),Object.freeze({
  id:'daytona-tri-oval',name:'Daytona International Speedway',anchor:Object.freeze({lat:29.185,lon:-81.071}),
  sourceUrl:'/app/assets/racing/daytona/source.json',sourceSha256:'6add37bd68a3f9c6c8fc7aaad4da0ecd47d024b959add83b366065842247c773',
- groundArtifactId:'daytona-tri-oval-fine-v1',groundContentSha256:'253120fe32cd96247c3d5a52a1f10298e95bf2182128d1ad31ec37f57655576b',
+ groundArtifactId:'daytona-tri-oval-fine-v2',groundContentSha256:'2f50689464ecb4ba3882cb7082c5ed8839e4032e280d0b3e84d9508c0676fc68',
  surfaceModel:'banked-road-v1',maximumCrossfall:.7,qualificationRadiusWorld:1200,routeExtent:'mapped-venue-v1',
  // The surveyed source/ground can load through the ordinary world owner.
  // Timing, oval rules and presentation have not yet passed pack acceptance.
@@ -91,7 +92,7 @@ function reviewedLandscapeRefinement(descriptor){
 export function createRacingVenueGroundPlan(descriptor,source){
  const layout=compileMappedVenueLayout(source),requiredArtifacts=racingVenueGroundRequirements(descriptor,{includeLandscape:true}),coverageProbes=[];
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
- const halfWidth=maximumPavementWidth(source,layout,descriptor)*.5+2,landscape=reviewedLandscapeRefinement(descriptor),metersPerDegree=6371008.8*Math.PI/180;
+ const halfWidth=maximumPavementWidth(source,layout,descriptor)*.5+(descriptor.routeExtent==='mapped-venue-v1'?REVIEWED_CORRIDOR_OUTER_MARGIN_METERS:2),landscape=reviewedLandscapeRefinement(descriptor),metersPerDegree=6371008.8*Math.PI/180;
  for(let index=1;index<layout.points.length;index++){
   const a=layout.points[index-1],b=layout.points[index],length=geographicVenueDistance(a,b),steps=Math.max(1,Math.ceil(length/2));
   const east=(b.lon-a.lon)*Math.cos((a.lat+b.lat)*Math.PI/360)*metersPerDegree,north=(b.lat-a.lat)*metersPerDegree;
@@ -102,6 +103,12 @@ export function createRacingVenueGroundPlan(descriptor,source){
     longitude:lon-north/magnitude*lateral/(metersPerDegree*Math.cos(lat*Math.PI/180))}));
    if(coverageProbes.length>60000)throw Error('venue_ground_probe_bound');
   }
+ }
+ // The existing refinement also reaches around source caps and corners. Probe
+ // their cardinal extents before starting a world, through the same ground owner.
+ if(descriptor.routeExtent==='mapped-venue-v1')for(const point of layout.points){
+  for(const [east,north]of [[halfWidth,0],[-halfWidth,0],[0,halfWidth],[0,-halfWidth]])coverageProbes.push(Object.freeze({latitude:point.lat+north/metersPerDegree,longitude:point.lon+east/(metersPerDegree*Math.cos(point.lat*Math.PI/180))}));
+  if(coverageProbes.length>60000)throw Error('venue_ground_probe_bound');
  }
  if(landscape){
   const {coverage:c,radiusMeters}=landscape,epsilon=.000001;

@@ -7,7 +7,7 @@ import {compileGroundArtifact} from '../app/js/terrain/ground-artifact.js';
 import {compileMappedVenueLayout} from '../app/js/racing/venue-layout.js';
 import {geographicToWebMercatorMeters} from '../app/js/terrain/source-contract.js';
 import {sampleDistrictGroundElevationMeters as sample} from '../app/js/world/compiler/district-ground-model.js';
-import {RACING_VENUE_SOURCES,prepareVenueSourceMerge} from '../app/js/racing/venue-source-packs.js';
+import {RACING_VENUE_SOURCES,prepareVenueSourceMerge,createRacingVenueGroundPlan} from '../app/js/racing/venue-source-packs.js';
 import {roadSourceSurvey} from '../app/js/world/road-source-survey.js';
 import {buildVenueRaceCourses} from '../app/js/racing/venue-courses.js';
 const read=file=>fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
@@ -22,8 +22,11 @@ test('native window decoding retains the original pixel-centre affine, endian va
 });
 test('the actual compact Daytona ground covers the whole exact oval and retains varying measured banks through the shared compiler',()=>{
  const text=read('app/assets/ground/daytona/ground-artifact.json'),artifact=JSON.parse(text),manifest=JSON.parse(read('app/assets/ground/daytona/ground-manifest.json')),source=JSON.parse(read('app/assets/racing/daytona/source.json')),descriptor=RACING_VENUE_SOURCES.find(s=>s.id===source.venueId),layout=compileMappedVenueLayout(source),compiled=compileGroundArtifact({manifest,artifact});
- assert.equal(crypto.createHash('sha256').update(text).digest('hex'),descriptor.groundContentSha256);assert.equal(manifest.contentSha256,descriptor.groundContentSha256);assert.equal(compiled.status,'accepted');assert.equal(artifact.grid.sampleCount,632448);
+ assert.equal(crypto.createHash('sha256').update(text).digest('hex'),descriptor.groundContentSha256);assert.equal(manifest.contentSha256,descriptor.groundContentSha256);assert.equal(compiled.status,'accepted');assert.equal(artifact.grid.sampleCount,669685);
  assert.equal(manifest.sourceEvidence.sourceVerticalAccuracyMeters,null);assert.equal(manifest.sourceEvidence.normalizationUncertaintyIncludesSourceAccuracy,false);assert.equal(manifest.sourceEvidence.normalization.accuracyMeters,5.125);assert.ok(manifest.sourceEvidence.quantization.maximumErrorMeters<=.0050001);
+ const failure=geographicToWebMercatorMeters(29.19188026901,-81.0660516259155);
+ assert.ok(Number.isFinite(sample(compiled.model,failure.eastingMeters,failure.northingMeters)),'the actual first native refinement failure must be inside the delivered ground');
+ for(const p of createRacingVenueGroundPlan(descriptor,source).coverageProbes){const q=geographicToWebMercatorMeters(p.latitude,p.longitude);assert.ok(Number.isFinite(sample(compiled.model,q.eastingMeters,q.northingMeters)),'ground preflight must cover the same road-width plus 40m refinement, including cap extents');}
  let stations=0,high=0,low=0,maximumGrade=0;
  for(const id of layout.wayIds){const way=layout.ways.get(id);for(let i=1;i<way.geometry.length;i++){
   const ga=way.geometry[i-1],gb=way.geometry[i],a=geographicToWebMercatorMeters(ga.lat,ga.lon),b=geographicToWebMercatorMeters(gb.lat,gb.lon),dx=b.eastingMeters-a.eastingMeters,dz=b.northingMeters-a.northingMeters,length=Math.hypot(dx,dz),nx=dz/length,nz=-dx/length,scale=1/Math.cos((ga.lat+gb.lat)*Math.PI/360),steps=Math.ceil(length/scale/2);let previous;

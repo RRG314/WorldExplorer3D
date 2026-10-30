@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "artifactId": "daytona-tri-oval-fine-v1",
+  "artifactId": "daytona-tri-oval-fine-v2",
   "providerId": "usgs-3dep-best-available",
   "sourceRelease": "USGS-3DEP:FL_Peninsular_2018_D18:20221020",
-  "contentSha256": "253120fe32cd96247c3d5a52a1f10298e95bf2182128d1ad31ec37f57655576b",
+  "contentSha256": "2f50689464ecb4ba3882cb7082c5ed8839e4032e280d0b3e84d9508c0676fc68",
   "spacingMeters": 2,
   "coverage": {
-    "south": 29.178305790075743,
-    "north": 29.191842348645327,
-    "west": -81.07527204521983,
-    "east": -81.06213867576605
+    "south": 29.178117551873004,
+    "north": 29.192014877259513,
+    "west": -81.07546967458234,
+    "east": -81.06192308009781
   },
   "verticalDatum": "EGM2008",
   "complete": true,
@@ -19,7 +19,7 @@
     "sourceClassification": "bare-earth-dtm",
     "sourceCrs": "EPSG:26917+5703",
     "targetCrs": "EPSG:9056+3855",
-    "sourceConfigurationSha256": "1efe15bf8d033ff85421af186a72dff081b2e767c6ad3e45ea188452944213f1",
+    "sourceConfigurationSha256": "501018842a10051396ab4aa8720a1ca9290cddd57bc050415fd68b61e0497d1f",
     "raster": {
       "filename": "daytona-native-window-v1/daytona-native-window.f32",
       "bytes": 8488800,

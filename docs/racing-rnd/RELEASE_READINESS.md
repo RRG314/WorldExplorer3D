@@ -399,10 +399,19 @@ venue pack or the final moving-frame budget.
 Daytona now has an exact five-way tri-oval source and a compact one-metre-source
 ground product through the existing world/ground pipeline. The unchanged native
 window and reproduction recipe retain source identity, affine, hashes, datum
-grids and licensing. The 632,448-sample artifact is 1,687,500 bytes; all 2,196
+grids and licensing. The 669,685-sample artifact is 1,786,800 bytes; all 2,196
 two-metre route stations retain centre and both 6 m edge samples, including
 varying high banks. Five source/ground cases pass. Unknown source vertical
 accuracy remains explicit. Native road publication and driving are not yet
 accepted, and race admission remains pending the timing line. Oval rules, pits,
 presentation and the completed pack remain open; this does not increase the
 accepted-pack count.
+
+The first native Daytona load correctly rejects a refinement point beyond the
+initial 35 m ground margin. The delivered margin is now 55 m, within the same
+retained native pixels. Ground preparation probes the refinement's existing
+40 m outer margin plus pavement width and source-cap extents before starting
+the world. Geometry, contact limits and refinement distances are unchanged.
+The exact native failure point and every new probe now have finite support;
+the changed preflight also fits the already accepted Nord ground manifests.
+Native rechecking remains pending, with the failed load retained.

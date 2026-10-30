@@ -20,7 +20,7 @@ window; a replay of the retained source ranges reproduces its exact pixel and
 metadata digests. No nodata or edge filling is permitted.
 
 The existing datum preparation, global ground grid, quantizer and accepted-ground
-compiler deliver 632,448 samples in 1,687,500 bytes. Delivery spacing is 2 m in
+compiler deliver 669,685 samples in 1,786,800 bytes. Delivery spacing is 2 m in
 Web Mercator, with one-centimetre quantization. The source is EPSG:26917 with
 NAVD88 heights; the target remains WGS84(G1674)/EGM2008. Pinned GEOID18, NADCON5
 and EGM2008 grids provide one non-ballpark PROJ operation with stated uncertainty
