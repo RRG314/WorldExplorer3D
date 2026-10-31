@@ -18,14 +18,17 @@ Carrera 4S use the existing vehicle owners. The E46 and Carrera are road models;
 do not relabel them GT3 cars or replace them with generic prototypes.
 
 Nordschleife, Silverstone and Daytona have integrated source/ground and completed
-native practice journeys. Their complete presentation/pack acceptance remains
-open. Nine layouts lack integrated source/ground packs. Zero packs have passed
-all release gates. Reuse [SHARED_RACE_ACCEPTANCE.md](SHARED_RACE_ACCEPTANCE.md) and
+native practice journeys. All three scoped packs now pass the local release
+acceptance recorded in RELEASE_READINESS.md, including Silverstone’s complete
+pit branch and the exact coordinated candidate. The other nine are deferred.
+Production deployment and its live health/identity checks remain separate. Reuse [SHARED_RACE_ACCEPTANCE.md](SHARED_RACE_ACCEPTANCE.md) and
 [RELEASE_READINESS.md](RELEASE_READINESS.md); do not restart the investigation.
 
-Source inspection identifies these constraints before further content work:
+The following constraints and dependency sequence record the historical work.
+Use RELEASE_READINESS.md for the completed three-pack candidate; the deferred
+nine-pack sequence does not reopen this release:
 
-| Existing boundary | Current constraint | Required extension |
+| Existing boundary | Historical constraint | Implemented or deferred extension |
 | --- | --- | --- |
 | `scripts/lib/osm-venue-intake.mjs`, `venue-layout.js` | Keeps raceways and requires a closed loop | Reviewed open stages with preserved road tags, direction and exact endpoints |
 | `venue-courses.js` | Circuit/oval events; closed-path start-line rotation | Open-stage assembly without closing or rotating the route |
@@ -239,8 +242,8 @@ intake results; do not invent a full-release deadline before those inputs exist.
 
 | Venue work queue | Reuse | Remaining work |
 | --- | --- | --- |
-| Nordschleife T13, Silverstone GP | Accepted source/ground, full laps, steady-driving repair | Complete presentation, circuit pit/sector/cut paths and affected final gates |
-| Daytona tri-oval | Accepted source/ground, oval/pit rules and full pit lap | Preserve pending checkpoint; bounded remaining presentation and affected final gates |
+| Nordschleife T13, Silverstone GP | Accepted source/ground, full laps, steady-driving repair, presentation; Silverstone full pit | Local candidate accepted; preserve evidence and perform coordinated production rollout |
+| Daytona tri-oval | Accepted source/ground, oval/pit rules, full pit lap, presentation and moving budget | Local candidate accepted; preserve evidence and perform coordinated production rollout |
 | Indianapolis, Talladega, Bristol | USGS window/datum pipeline and banked oval/pit rules | Three distinct exact source/ground/profile/pit packs, Bristol concrete, scenery and first native acceptance each |
 | Spa GP, Monza GP | Circuit compiler, reviewed decks/kerbs, circuit pit policy | Exact geographic packs, relief/landmarks, presentation and first native acceptance each |
 | Turini 2026, Ouninpohja 2025, Fafe 2026, Umeå 2026 | B1/B3 shared stage contracts | Four dated geographic/condition packs, pace notes, landscape and first native stage acceptance each |

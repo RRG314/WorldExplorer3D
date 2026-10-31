@@ -10,7 +10,10 @@ Daytona tri-oval. These are the three integrated venues with accepted complete
 practice journeys. The other nine researched layouts are deferred and do not
 block this release. Retain their source work for later packs. This supersedes
 the October 29 request to wait for all twelve. Presentation, shared vehicles
-and the existing racing product outcomes below remain required.
+and the existing racing product outcomes below remain required. The owner
+explicitly requires Silverstone pit completion before release; its separate
+73-checkpoint native journey and matching candidate now pass as recorded in
+[RELEASE_READINESS.md](RELEASE_READINESS.md). Production rollout is separate.
 
 The finish line is one versioned release candidate, with these outcomes checked
 once on the final affected paths. A failed check is repaired and rechecked at its

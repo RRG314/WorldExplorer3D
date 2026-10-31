@@ -44,8 +44,12 @@ unchanged 15% fence. This is an authored usable corridor, not a surveyed width.
 The accepted complete GP lap is retained. Enabling full-corridor terrain detail
 also changes the published height of five main-track spans at the pit fork by
 more than half a metre. Their geometry remains mapped, and full main/pit wheel
-qualification passes. A short held-input check of that changed fork in the
-final package remains required; a repeated full GP lap is unnecessary.
+qualification passes. The exact production-configured package also passes a
+short continuous accelerator/brake check of the changed fork: 303 frames,
+no missing four-wheel support samples or penetration, 33.3 ms maximum frame,
+and no frames above 250 ms. Ordinary free-driving retains its existing body
+suspension clearance; the tight race-contact figures above are separate.
+Both published GP choices match the final packaged world.
 
 ## Shared product and online integration
 
@@ -102,9 +106,20 @@ not to wait for hardware they do not own. Location-based play, optional
 continuous exploration, buildings, Ocean, Space, saves and platform launch
 owners remain in place. This package does not claim a new native-store release.
 
-## Candidate rebuild in progress
+## Frozen candidate
 
-The prior production-configured candidate is superseded by the completed pit
-work. A matching frozen artifact, catalogue receipt and coordinated rollout
-handoff are being rebuilt. Nothing has been deployed. Existing production
-code/ground retention and rollback remain required.
+Production-configured build: `5.6.1+7d8b3d29bfe0.67f217596d32efb3.production`.
+Frozen source: `7d8b3d29bfe0b4b08f72e897eb22f536d06773f4`.
+Asset-manifest SHA256: `b1b2a229c25a4529f6f3215218e173120a459e2e993d1a078dd1f14ad55de64f`.
+
+Artifact verification and the existing configuration-only promotion validator
+pass. The played complete pit source and this artifact have identical shipped
+game-source files, independently compared in Git. The exact production-configured
+artifact loads Silverstone in 28.5 seconds, qualifies all 589 main/pit spans and
+passes the changed-fork check above with zero page, console or cleanup errors.
+These functional checks explicitly use staging configuration; production
+attestation is a rollout check. Matching Functions/service source archives,
+indexes, reviewed catalogue and deployment configuration are frozen in the
+release handoff. Current-production code and all 84 predecessor ground files
+remain retained by verified hashes. Production and the prior rollback are
+unchanged. The Silverstone pit requirement is completed; no pit deferral remains.
