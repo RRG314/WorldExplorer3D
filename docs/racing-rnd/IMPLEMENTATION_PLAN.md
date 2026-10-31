@@ -181,8 +181,13 @@ shows flight, landing, recovery and both staggered finishes. The existing garage
 park transaction retains damage during renewal, reconnect and release. Desktop
 and VR consume the same timing/notes and recovery availability. These are
 controlled contract checks, not geographic stage or live-cloud acceptance.
-World intake still rejects stage admission until source-bound access, full
-chassis clearance and native published support are integrated and verified.
+World intake now requires an explicit source-bound closed-stage review, mapped
+width, matching accepted ground and complete condition/timing facts. Its private
+interval capability reaches the ordinary transport/traversal owners; outside
+intervals, missing topology and serialized copies cannot acquire it. Controlled
+source-to-published-triangle qualification and two staggered BMW finishes pass.
+Unprepared stages still reject admission. No real rally pack is registered;
+native support, full chassis clearance and geographic acceptance remain open.
 
 C has complete additional source extracts for Spa, Monza and Talladega, plus
 Talladega's pinned native/normalized ground through the existing compiler.

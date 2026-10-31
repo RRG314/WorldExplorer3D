@@ -76,10 +76,19 @@ function maximumPavementWidth(source,layout,descriptor,pit=compileMappedVenuePit
  if(policy==='profiled')width=Math.max(...[...layout.wayIds,...(circuitPit?[]:pit?.wayIds||[])].flatMap(id=>reviewedVenuePavementSections(source,descriptor,id).samples.map(s=>s.positiveMeters+s.negativeMeters)));
  else if(policy==='mapped'){
   const widths=layout.wayIds.map(id=>parseMeters(layout.ways.get(id).tags.width));
-  if(widths.some(width=>!Number.isFinite(width)||width<usable||width>24))throw Error('venue_mapped_pavement_width_invalid');
+  if(widths.some(width=>!Number.isFinite(width)||width<usable||width>(layout.stage?30:24)))throw Error('venue_mapped_pavement_width_invalid');
   width=Math.max(...widths);
  }
  return Math.max(width,circuitPit?.physicalWidthMeters||0);
+}
+function reviewedStageLayout(layout,descriptor){
+ if(!layout.stage)return false;
+ if(!layout.stage.rally)throw Error('venue_stage_runtime_unavailable');
+ if(descriptor.raceDiscipline!=='rally'||descriptor.routeExtent!=='mapped-venue-v1'||descriptor.motorAccess!=='virtual-stage-v1'||
+  descriptor.pavementWidthPolicy!=='mapped'||descriptor.maximumCrossfall!==.15||descriptor.surfaceModel!==undefined||
+  descriptor.startLine!==undefined||descriptor.pitWayIds!==undefined||descriptor.reviewedPavementSections!==undefined||
+  descriptor.reviewedDeckProfiles!==undefined||descriptor.edgeBandAuthoring!==undefined)throw Error('venue_stage_review_unavailable');
+ return true;
 }
 function reviewedCircuitPitWidth(source,layout,descriptor,pit){
  const explicit=descriptor.pitUsableWidthMeters!==undefined||descriptor.pitPavementWidthPolicy!==undefined;
@@ -115,8 +124,9 @@ function reviewedTerrainEdgePolicy(descriptor){
 }
 export function createRacingVenueGroundPlan(descriptor,source){
  reviewedTerrainEdgePolicy(descriptor);
- const layout=compileMappedVenueLayout(source),pit=compileMappedVenuePitLayout(source,descriptor,layout),routes=[layout.points,...(pit?[pit.points]:[])],requiredArtifacts=racingVenueGroundRequirements(descriptor,{includeLandscape:true}),coverageProbes=[];
- if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
+ const layout=compileMappedVenueLayout(source),stage=reviewedStageLayout(layout,descriptor),pit=compileMappedVenuePitLayout(source,descriptor,layout),
+  routes=stage?layout.wayIds.map(id=>layout.ways.get(id).geometry):[layout.points,...(pit?[pit.points]:[])],requiredArtifacts=racingVenueGroundRequirements(descriptor,{includeLandscape:true}),coverageProbes=[];
+ if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=(stage?3:6)&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  const physicalWidth=maximumPavementWidth(source,layout,descriptor,pit),extent=descriptor.pavementWidthPolicy==='profiled'?Math.max(...[...layout.wayIds,...(pit?.wayIds||[])].flatMap(id=>reviewedVenuePavementSections(source,descriptor,id).samples.map(s=>Math.max(s.positiveMeters,s.negativeMeters)))):physicalWidth*.5;
  const halfWidth=extent+(descriptor.routeExtent==='mapped-venue-v1'?REVIEWED_CORRIDOR_OUTER_MARGIN_METERS:2),landscape=reviewedLandscapeRefinement(descriptor),metersPerDegree=6371008.8*Math.PI/180;
  for(const points of routes)for(let index=1;index<points.length;index++){
@@ -159,17 +169,16 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   const index=ground.artifactIds?.indexOf(item.artifactId)??-1;
   return index<0||ground.contentSha256s?.[index]!==item.contentSha256;
  }))throw Error('venue_ground_not_ready');
- const layout=compileMappedVenueLayout(source),pit=compileMappedVenuePitLayout(source,descriptor,layout);
- if(layout.stage)throw Error('venue_stage_runtime_unavailable');
- if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
+ const layout=compileMappedVenueLayout(source),stage=reviewedStageLayout(layout,descriptor),pit=compileMappedVenuePitLayout(source,descriptor,layout);
+ if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=(stage?3:6)&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  maximumPavementWidth(source,layout,descriptor);
  const startLine=reviewedStartLine(descriptor,layout),landscapeRefinement=reviewedLandscapeRefinement(descriptor),terrainEdgePolicy=reviewedTerrainEdgePolicy(descriptor);
  const circuitPit=reviewedCircuitPitWidth(source,layout,descriptor,pit);
  if(descriptor.routeExtent!==undefined&&descriptor.routeExtent!=='mapped-venue-v1')throw Error('venue_route_extent_invalid');
- if(descriptor.raceDiscipline!==undefined&&!['circuit','oval'].includes(descriptor.raceDiscipline))throw Error('venue_discipline_invalid');
+ if(descriptor.raceDiscipline!==undefined&&!['circuit','oval',...(stage?['rally']:[])].includes(descriptor.raceDiscipline))throw Error('venue_discipline_invalid');
  if(pit&&!circuitPit&&(!descriptor.routeExtent||descriptor.pavementWidthPolicy!=='profiled'||descriptor.raceDiscipline!=='oval'))throw Error('venue_pit_review_unavailable');
- const venueSource=descriptor.routeExtent?normalizeRaceVenueSource({version:1,id:descriptor.id,sourceSha256:descriptor.sourceSha256,
-  mappedLengthMeters:layout.lengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,sourceFeatureIds:layout.wayIds.map(id=>`osm:way:${id}`),...(pit?{pitSourceFeatureIds:pit.sourceFeatureIds}:{})}):undefined;
+ const venueSource=descriptor.routeExtent?normalizeRaceVenueSource({version:stage?2:1,id:descriptor.id,sourceSha256:descriptor.sourceSha256,
+  mappedLengthMeters:layout.lengthMeters,qualificationRadiusWorld:descriptor.qualificationRadiusWorld,sourceFeatureIds:layout.wayIds.map(id=>`osm:way:${id}`),...(stage?{stage:layout.stage}:{}),...(pit?{pitSourceFeatureIds:pit.sourceFeatureIds}:{})}):undefined;
  const edgeRecipes=authorVenueEdgeRecipes(layout,descriptor);
  const original=Array.isArray(data?.elements)?data.elements:[],existingNodes=new Map(original.filter(e=>e.type==='node').map(e=>[e.id,e]));
  const sourceWays=new Map(source.ways.map(w=>[w.id,w])),layoutWays=new Set(layout.wayIds),surveyWays=new Set([...layout.wayIds,...(pit?.wayIds||[])]),bounds=source.source?.coverage;
@@ -201,6 +210,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   const sourceFeatureId=`osm:way:${raw.id}`,way={type:'way',id:raw.id,version:raw.version,nodes:[...raw.nodes],tags:{...raw.tags,_sourceFeatureId:sourceFeatureId,_sourceCompleteness:'lossless',...(!surveyWays.has(raw.id)?{_regionalContext:'fixed-location'}:{})}};
   const widthReview=circuitPit&&!layoutWays.has(raw.id)?circuitPit:{usableWidthMeters:source.layout.usableWidthMeters,pavementWidthPolicy:descriptor.pavementWidthPolicy};
   if(surveyWays.has(raw.id))annotateRoadSourceSurvey(way,{version:1,venueId:descriptor.id,sourceFeatureId,...(venueSource?{venueSource}:{}),
+   ...(stage?{sourceNodeIds:Object.freeze(raw.nodes.map(String))}:{}),
    ...(['mapped','profiled'].includes(widthReview.pavementWidthPolicy)?{pavementWidthPolicy:widthReview.pavementWidthPolicy}:{}),
    ...(sections?{sourcePavementSections:sections}:{}),
    usableWidthMeters:widthReview.usableWidthMeters,maximumCrossfall:layoutWays.has(raw.id)?descriptor.maximumCrossfall:.15,
@@ -215,6 +225,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
  }
  return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({id:descriptor.id,name:descriptor.name,status:'source-prepared',
   ...(startLine?{startLine,layoutLabel:descriptor.layoutLabel||'Circuit'}:{}),
+  ...(stage?{layoutLabel:descriptor.layoutLabel||'Stage'}:{}),
   ...(descriptor.presentationStatus?{presentationStatus:descriptor.presentationStatus}:{}),
   ...(descriptor.raceDiscipline?{raceDiscipline:descriptor.raceDiscipline}:{}),
   ...(pit?{pitSourceFeatureIds:pit.sourceFeatureIds,pitLayoutWayIds:pit.wayIds,pitMappedLengthMeters:pit.lengthMeters}:{}),

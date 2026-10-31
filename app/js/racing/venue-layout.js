@@ -1,6 +1,7 @@
 // Independently reusable mapped facts. This validator does not make a venue
 // playable: the world must still publish and collision-qualify its full surface.
 import {RACE_MINIMUM_SPAN_METERS} from './course-rules.js';
+import {normalizeRallyStage} from './rally-rules.js';
 // Stage intake retains motor-road facts. A source's highway/access tags are
 // never rewritten to raceway to obtain a closed-event capability.
 export const MAPPED_STAGE_HIGHWAYS=Object.freeze(['raceway','primary','secondary','tertiary','unclassified','residential','service','track','road']);
@@ -74,9 +75,10 @@ function compileOpenStage(source,ways,nodes){
  const reference=source.layout.referenceLengthMeters,width=source.layout.usableWidthMeters;
  if(!Number.isFinite(reference)||reference<500||reference>30000||Math.abs(lengthMeters-reference)/reference>.01)throw Error('venue_layout_length_mismatch');
  if(!Number.isFinite(width)||width<3||width>30)throw Error('venue_stage_width_invalid');
+ const rally=normalizeRallyStage(source.layout.rally,legs);
  return Object.freeze({venueId:source.venueId,kind:'open-stage-v1',points:Object.freeze(points.map(Object.freeze)),lengthMeters,
   referenceLengthMeters:reference,lengthDifferenceMeters:lengthMeters-reference,wayIds:Object.freeze(wayIds),ways,nodes,
-  stage:Object.freeze({kind:'open-stage-v1',minimumWidthMeters:width,startNodeId:points[0].nodeId,finishNodeId:points.at(-1).nodeId,legs:Object.freeze(legs)})});
+  stage:Object.freeze({kind:'open-stage-v1',minimumWidthMeters:width,startNodeId:points[0].nodeId,finishNodeId:points.at(-1).nodeId,legs:Object.freeze(legs),...(rally?{rally}:{})})});
 }
 
 // A separately reviewed open branch; it never changes the ordered race loop.

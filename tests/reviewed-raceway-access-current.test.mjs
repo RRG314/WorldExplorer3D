@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {normalizeTransportSource} from '../app/js/world/compiler/transport-source-normalizer.js?v=4';
 import {roadSourceSurvey,reviewedRoadTransportRecord} from '../app/js/world/road-source-survey.js';
-import {RACING_VENUE_SOURCES,loadRacingVenueSource,prepareVenueSourceMerge} from '../app/js/racing/venue-source-packs.js';
+import {RACING_VENUE_SOURCES,loadRacingVenueSource,prepareVenueSourceMerge,racingVenueGroundRequirements} from '../app/js/racing/venue-source-packs.js';
 import {compileTransportNetworkModel} from '../app/js/world/compiler/transport-network-model.js';
 const pack=RACING_VENUE_SOURCES.find(p=>p.id==='nurburgring-nordschleife');
-const source=await loadRacingVenueSource(pack,{fetchImpl:async url=>new Response(fs.readFileSync(new URL('..'+url,import.meta.url)))}),
- prepared=prepareVenueSourceMerge({},source,pack,{status:'accepted',artifactIds:pack.groundArtifacts.map(x=>x.artifactId),contentSha256s:pack.groundArtifacts.map(x=>x.contentSha256)}),
+const source=await loadRacingVenueSource(pack,{fetchImpl:async url=>new Response(fs.readFileSync(new URL('..'+url,import.meta.url)))}),required=racingVenueGroundRequirements(pack,{includeLandscape:true}),
+ prepared=prepareVenueSourceMerge({},source,pack,{status:'accepted',artifactIds:required.map(x=>x.artifactId),contentSha256s:required.map(x=>x.contentSha256)}),
  ways=prepared.data.elements.filter(w=>roadSourceSurvey(w)),record=w=>normalizeTransportSource({sourceId:'osm:way:'+w.id,id:w.id,type:'way',providerNamespace:'osm',completeness:'lossless'},w.tags);
 
 test('reviewed virtual raceways preserve real-world private tags and pedestrian restrictions while entering the existing motor graph',()=>{

@@ -14,7 +14,9 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   barrier contacts or WebGL errors. Direct transaction checks retain damage
   through renewal/reconnect/release. These checks do not accept a real stage,
   live cloud result, physical headset or release performance. Native stage world
-  admission remains closed pending source/access, support and clearance evidence.
+  preparation now has explicit source-bound access and narrow-width contracts,
+  verified through controlled source/transport/publication checks. No real rally
+  pack is registered; native support and clearance acceptance remain open.
 
 - Frozen `f37ddb8e` completes the native Daytona oval lap and full 40-checkpoint
   pit branch through the normal game session, Results and saved Journal, using

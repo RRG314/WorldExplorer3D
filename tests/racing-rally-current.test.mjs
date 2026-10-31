@@ -69,6 +69,13 @@ test('surface changes alter actual traction without accepting arbitrary client c
  });assert.ok(distances[1]>distances[0]*2,'equal-speed braking needs substantially more road on ice');
  assert.equal(rallySurfaceDynamics(ice.course,0,profile.surface).grip,.3);
 });
+test('a narrow source centreline cannot certify the longest chassis through a bend without its swept width',()=>{
+ const f=createRallyStageFixture({hill:false}),district=structuredClone(f.district),z=20/district.metersPerUnit;
+ district.roads[0].b.z=z;district.roads[1].a.z=z;
+ assert.throws(()=>buildVenueRaceCourses(district,f.venue),/rally_chassis_clearance/);
+ district.roads.forEach(road=>{road.widthMeters=4.2;});
+ const course=buildVenueRaceCourses(district,f.venue).events[0];assert.equal(course.vehicleEnvelope.lengthMeters,6.5);
+});
 
 test('steady controls launch and land over a supported crest; missing support still rejects instead of inventing flight',()=>{
  const {course}=createRallyStageFixture(),result=runSession(course),p=result.snapshot.players[0];
