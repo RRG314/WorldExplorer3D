@@ -1,5 +1,6 @@
 import {racePavementCrossSection} from './pavement-cross-section.js';
 import {RACE_CONTACT_RULES,normalizeRaceEventRules} from './event-rules.js';
+import {normalizeGroundRaceDraft} from './route-draft.js';
 import {OVAL_FORMATION_DISTANCE_METERS} from './oval-rules.js';
 import {prepareRallyRoute,RALLY_MAXIMUM_FLIGHT_HEIGHT_METERS} from './rally-rules.js';
 // Portable race-course facts and rules. The world compiler supplies road facts;
@@ -213,6 +214,7 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth,maximumGr
         (road.surfaceModel===BANKED_ROAD_MODEL?BANKED_ROAD_MAXIMUM_CROSSFALL:.15))))throw Error('invalid_race_road_heights');
    }
    const id=`${String(road.sourceId).slice(0,180)}:${reverse?'reverse':'forward'}`,edge={id,from:a,to:b,length,widthMeters:width,
+    ...(road.surfaceKind?{surfaceKind:road.surfaceKind}:{}),
     ...(profiled?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL,racingWidthMeters:road.racingWidthMeters}:{}),
     sourceId:String(road.sourceId).slice(0,180),structure:road.structure||'surface',clearanceMeters:Number(road.clearanceMeters)||0};
    if(heights){edge.heightSamples=reverse?heights.map(s=>({...copyHeightSample(s),t:1-s.t,leftY:s.rightY,rightY:s.leftY,...(profiled?{racingOffsetMeters:-s.racingOffsetMeters||0}:{}),
@@ -256,6 +258,8 @@ export function createRaceCourse(graph,path,settings={}){
  if(graph.venueSource?.stage&&!graph.venueSource.stage.rally)throw Error('race_stage_runtime_unavailable');
  if(!Array.isArray(path)||path.length<1||path.length>RACE_MAX_ROUTE_EDGES)throw Error('invalid_race_route');
  const byId=new Map(graph.edges.map(e=>[e.id,e])),edges=path.map(id=>byId.get(id));if(edges.some(e=>!e))throw Error('race_road_missing');
+ const ground=edges.every(e=>e.surfaceKind==='ground');
+ if(edges.some(e=>e.surfaceKind==='ground')&&!ground||settings.groundDraft&&!ground)throw Error('race_invalid_ground_draft');
  const discipline=settings.discipline||'sprint';if(!RACE_DISCIPLINES.includes(discipline))throw Error('invalid_race_discipline');
  if(Boolean(graph.venueSource?.stage)!==(discipline==='rally'))throw Error('race_rally_source_required');
  if(discipline==='rally'&&(settings.startOffsetMeters!=null||settings.pitPath!==undefined||settings.laps!==undefined&&settings.laps!==1))throw Error('race_rally_settings_invalid');
@@ -271,6 +275,7 @@ export function createRaceCourse(graph,path,settings={}){
   const a=graph.nodes[edge.from],b=graph.nodes[edge.to],forward=direction(a,b);
   if(i){const previous=segments.at(-1);if(angle(previous.forward,forward)>Math.PI*.64)throw Error('race_turn_too_sharp');}
   segments.push({sourceId:edge.sourceId,a:{...a},b:{...b},forward,widthMeters:edge.widthMeters,lengthMeters:edge.length,startMeters:lengthMeters,structure:edge.structure,clearanceMeters:edge.clearanceMeters,
+    ...(edge.surfaceKind?{surfaceKind:edge.surfaceKind}:{}),
     ...(edge.edgeBandModel?{edgeBandModel:edge.edgeBandModel}:{}),
     ...(edge.pavementModel?{pavementModel:edge.pavementModel,racingWidthMeters:edge.racingWidthMeters}:{}),
     ...(edge.heightSamples?{heightSamples:edge.heightSamples.map(copyHeightSample),heightSampleSpanMeters:edge.heightSampleSpanMeters}:{})});
@@ -306,7 +311,7 @@ export function createRaceCourse(graph,path,settings={}){
   ...(edges.some(e=>e.edgeBandModel===AUTHORED_ROAD_EDGE_MODEL)?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
   ...(edges.some(e=>e.pavementModel===PROFILED_ROAD_PAVEMENT_MODEL)?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL}:{}),
   locationId:clean(settings.locationId),locationLabel:clean(settings.locationLabel),anchor:settings.anchor?{lat:Number(settings.anchor.lat),lon:Number(settings.anchor.lon)}:null,
-  discipline,laps,participants,...(rally?{rally}:{}),vehicleEnvelope:{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},metersPerUnit:graph.metersPerUnit,vehicleClass:settings.vehicleClass||'road',traffic:'closed-course',collision:'ghost',
+  discipline,laps,participants,...(ground?{surfaceKind:'ground',...(settings.groundDraft?{groundDraft:normalizeGroundRaceDraft(settings.groundDraft)}:{})}:{}),...(rally?{rally}:{}),vehicleEnvelope:{widthMeters:2.35,lengthMeters:6.5,heightMeters:2.4},metersPerUnit:graph.metersPerUnit,vehicleClass:settings.vehicleClass||'road',traffic:'closed-course',collision:'ghost',
   lengthMeters,segments,points,gateSpacingMeters:Math.min(30,Math.max(15,Number(settings.gateSpacingMeters)||25)),gates:[]};
  const gateAt=(segment,t,distanceMeters)=>{
   const section=racePavementCrossSection(segment,t),offset=section?.racingOffsetMeters||0,f=segment.forward;
@@ -349,7 +354,7 @@ export function createRaceCourse(graph,path,settings={}){
   const pitEdges=settings.pitPath.map(id=>byId.get(id)),allowed=new Set(graph.venueSource.pitSourceFeatureIds),mainSources=new Set(edges.map(e=>e.sourceId));
   if(pitEdges.some(e=>!e||![...allowed].some(id=>e.sourceId.startsWith(id+':'))||mainSources.has(e.sourceId))||new Set(settings.pitPath).size!==settings.pitPath.length)throw Error('race_invalid_pit_path');
   if(discipline==='oval'&&pitEdges.some(e=>e.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||e.heightSamples?.some(row=>!Number.isFinite(row.racingWidthMeters))))throw Error('race_pit_pavement_required');
-  const pit=createRaceCourse(graph,settings.pitPath,{locationId:course.locationId,locationLabel:course.locationLabel,anchor:course.anchor,discipline:'sprint',participants:1,name:course.name+' · pit lane',gateSpacingMeters:15});
+  const pit=createRaceCourse(graph,settings.pitPath,{locationId:course.locationId,locationLabel:course.locationLabel,anchor:course.anchor,discipline:'sprint',participants:1,eventRules:course.eventRules||null,name:course.name+' · pit lane',gateSpacingMeters:15});
   if(pit.lengthMeters>2000)throw Error('race_pit_length');
   const entryNode=pitEdges[0].from,exitNode=pitEdges.at(-1).to,mainNodes=new Set(edges.map(e=>e.from));
   if(entryNode===exitNode||!mainNodes.has(entryNode)||!mainNodes.has(exitNode)||pitEdges.slice(0,-1).some(e=>mainNodes.has(e.to)))throw Error('race_pit_join_invalid');

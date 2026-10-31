@@ -6,6 +6,7 @@ import {raceDistrictFingerprint,raceCourseReference,raceCourseKey} from '../app/
 import {prepareRacingDistrictIntake} from '../scripts/racing/intake-district.mjs';
 import {raceOnlineMetadata,raceQualificationMetadata} from '../app/js/racing/driver-progress.js';
 import {createRaceAuthority} from '../services/racing/authority.mjs';
+import {racePhysicsVersion} from '../app/js/racing/record-rules.js';
 import {createRaceVehicleProfile} from '../app/js/racing/vehicle-controller.js';
 const facts={type:'RaceDistrictFacts',version:1,locationId:'earth:430000000:70000000',locationLabel:'Controlled district',anchor:{lat:43,lon:7},metersPerUnit:1,
  roads:[{sourceId:'controlled',a:{x:0,y:0,z:0,connectionLayer:'node:1'},b:{x:0,y:0,z:250.00000000002,connectionLayer:'node:2'},widthMeters:8,structure:'surface',clearanceMeters:0,direction:'both',driveable:true,supported:true,heightSampleSpanMeters:1.2,heightSamples:[{t:0,y:0,leftY:0,rightY:0},{t:1,y:0,leftY:0,rightY:0}]}]};
@@ -23,7 +24,7 @@ test('replaced decks, missing spans, altered heights, narrowing and direction ch
   {roads:[{...facts.roads[0],a:{...facts.roads[0].a,y:3},b:{...facts.roads[0].b,y:3},heightSamples:[{t:0,y:3,leftY:3,rightY:3},{t:1,y:3,leftY:3,rightY:3}]}]}])assert.throws(()=>assertRaceCourseInDistrict(course,{...facts,...change}));
 });
 test('public course loader requires exact active approved facts and keeps creator tests owner-only',async()=>{
- const rows=new Map([[`racingCourses/${id}`,{status:'draft',ownerUid:'creator',revision:'one',districtId,reference}],
+ const rows=new Map([[`racingCourses/${id}`,{status:'draft',ownerUid:'creator',revision:'one',districtId,reference,physicsVersion:racePhysicsVersion(course)}],
   [`racingDistricts/${districtId}`,{status:'approved',facts:canonical}],[`racingLocations/${await raceLocationKey(facts.locationId)}`,{districtId}]]);
  const read=async key=>rows.get(key)||null;
  assert.equal(await readPublishedRaceCourse({read,id,uid:'other'}),null);assert.equal((await readPublishedRaceCourse({read,id,uid:'creator'})).publication.purpose,'qualification');

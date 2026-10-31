@@ -1,5 +1,6 @@
 import {normalizeRaceVenueSource} from './venue-course-policy.js';
 import {normalizeRaceEventRules} from './event-rules.js';
+import {normalizeGroundRaceDraft} from './route-draft.js';
 import {createRaceCourse,RACE_DISCIPLINES,RACE_MAX_ROUTE_EDGES} from './course-rules.js';
 export function normalizeRaceRouteReference(value) {
  if(!value||value.version!==1||!/^race-district:[a-f0-9]{64}$/.test(value.districtFingerprint)||
@@ -9,20 +10,20 @@ export function normalizeRaceRouteReference(value) {
  const offset=value.startOffsetMeters??null;if(offset!==null&&(!Number.isFinite(offset)||offset<=0))throw Error('invalid_saved_race_route');
  const pit=value.pitPath;if(pit!==undefined&&(!Array.isArray(pit)||!pit.length||pit.length>512||pit.some(id=>typeof id!=='string'||id.length>190)||new Set(pit).size!==pit.length))throw Error('invalid_saved_race_pit_route');
  const rules=normalizeRaceEventRules(value.eventRules);
- return {version:1,...(rules?{eventRules:rules}:{}),districtFingerprint:value.districtFingerprint,path:[...value.path],discipline:value.discipline,laps:value.laps,
+ return {version:1,...(rules?{eventRules:rules}:{}),...(value.groundDraft?{groundDraft:normalizeGroundRaceDraft(value.groundDraft)}:{}),districtFingerprint:value.districtFingerprint,path:[...value.path],discipline:value.discipline,laps:value.laps,
   participants:value.participants,startOffsetMeters:offset,name:String(value.name||'Your mapped route').trim().slice(0,100),...(pit?{pitPath:[...pit]}:{})};
 }
 export async function raceDistrictFingerprint(district) {
  const value=JSON.stringify({version:1,...(district.venueSource?{venueSource:normalizeRaceVenueSource(district.venueSource)}:{}),locationId:district.locationId,anchor:district.anchor,metersPerUnit:district.metersPerUnit,
   roads:[...district.roads].sort((a,b)=>a.sourceId.localeCompare(b.sourceId)).map(r=>({id:r.sourceId,a:r.a,b:r.b,width:r.widthMeters,
-   ...(r.surfaceModel?{surfaceModel:r.surfaceModel}:{}),...(r.pavementModel?{pavementModel:r.pavementModel,racingWidthMeters:r.racingWidthMeters}:{}),...(r.edgeBandModel?{edgeBandModel:r.edgeBandModel}:{}),
+   ...(r.surfaceKind?{surfaceKind:r.surfaceKind}:{}),...(r.surfaceModel?{surfaceModel:r.surfaceModel}:{}),...(r.pavementModel?{pavementModel:r.pavementModel,racingWidthMeters:r.racingWidthMeters}:{}),...(r.edgeBandModel?{edgeBandModel:r.edgeBandModel}:{}),
    direction:r.direction||'both',structure:r.structure,clearance:r.clearanceMeters,heights:r.heightSamples,span:r.heightSampleSpanMeters}))});
  const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
  return 'race-district:'+Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
 }
 export function raceCourseReference(course,districtFingerprint) {
  return normalizeRaceRouteReference({version:1,districtFingerprint,path:course.sourcePath,discipline:course.discipline,laps:course.laps,
-  participants:course.participants,startOffsetMeters:course.startOffsetMeters,name:course.name,eventRules:course.eventRules,...(course.pitPath?{pitPath:course.pitPath}:{})});
+  participants:course.participants,startOffsetMeters:course.startOffsetMeters,name:course.name,eventRules:course.eventRules,...(course.groundDraft?{groundDraft:course.groundDraft}:{}),...(course.pitPath?{pitPath:course.pitPath}:{})});
 }
 export function restoreRaceCourse(reference,district,graph,fingerprint) {
  const route=normalizeRaceRouteReference(reference);

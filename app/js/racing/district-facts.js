@@ -21,13 +21,15 @@ export function canonicalRaceDistrict(raw,{partialVenue=false}={}){
  if(!Number.isFinite(anchor.lat)||Math.abs(anchor.lat)>85||!Number.isFinite(anchor.lon)||Math.abs(anchor.lon)>180)fail();
  const locationId=`earth:${Math.round(anchor.lat*1e7)}:${Math.round(anchor.lon*1e7)}`;
  const roads=raw.roads.map(r=>{
+  if(r.surfaceKind!==undefined&&(r.surfaceKind!=='ground'||!r.sourceId?.startsWith('authored-ground:')||r.structure!=='surface'||r.surfaceModel||r.pavementModel||r.edgeBandModel))fail();
   if(!r.sourceId||r.sourceId.length>180||!['surface','bridge','tunnel'].includes(r.structure)||!['both','forward','reverse',undefined].includes(r.direction)||r.driveable!==true||r.supported!==true)fail();
   const samples=r.heightSamples;if(!Array.isArray(samples)||samples.length<2||samples.length>250)fail();
-  return {sourceId:label(r.sourceId,180),sourceFeatureId:label(r.sourceFeatureId,180),label:label(r.label,100),a:point(r.a),b:point(r.b),
+  return {sourceId:label(r.sourceId,180),sourceFeatureId:label(r.sourceFeatureId,180),label:label(r.label,100),a:point(r.a),b:point(r.b),...(r.surfaceKind?{surfaceKind:r.surfaceKind}:{}),
    ...(r.surfaceModel!==undefined?{surfaceModel:r.surfaceModel}:{}),...(r.pavementModel!==undefined?{pavementModel:r.pavementModel,racingWidthMeters:number(r.racingWidthMeters)}:{}),...(r.edgeBandModel!==undefined?{edgeBandModel:r.edgeBandModel}:{}),
    widthMeters:number(r.widthMeters),direction:r.direction||'both',structure:r.structure,clearanceMeters:number(r.clearanceMeters||0),driveable:true,supported:true,
    heightSamples:samples.map(s=>{const height=s.lateralSamples?roofHeight:number;return {t:s.t,y:height(s.y),leftY:height(s.leftY),rightY:height(s.rightY),...(s.racingOffsetMeters!==undefined?{racingOffsetMeters:number(s.racingOffsetMeters)}:{}),...(s.racingWidthMeters!==undefined?{racingWidthMeters:number(s.racingWidthMeters)}:{}),...lateral(s)};}),heightSampleSpanMeters:number(r.heightSampleSpanMeters)};
  }).sort((a,b)=>a.sourceId.localeCompare(b.sourceId));
+ if(roads.some(r=>r.surfaceKind==='ground')&&roads.some(r=>r.surfaceKind!=='ground'))fail();
  const facts={type:'RaceDistrictFacts',version:1,...(venueSource?{venueSource}:{}),locationId,locationLabel:label(raw.locationLabel,80),anchor,metersPerUnit:m,roads};
  const graph=buildRaceRoadGraph(roads,{metersPerUnit:m,venueSource,partialVenue});if(graph.edges.length<roads.length)fail();return facts;
 }

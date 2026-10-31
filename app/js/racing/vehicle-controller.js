@@ -17,7 +17,7 @@ import {resolveCrashImpact} from '../urban-sandbox/crash-physics.js?v=1';
 // The same world-impact impulse and damage curve as ordinary driving. The
 // accepted course supplies only its inward position correction/contact normal.
 export function applyRaceBarrierImpact(course,car,profile,normal){
- if(!raceHasDamage(course)){for(const key of ['speed','vFwd','vx','vz'])car[key]*=.35;car.vLat*=.2;return;}
+ if(!course.eventRules){for(const key of ['speed','vFwd'])car[key]*=.35;car.vLat*=.2;return;}
  const response=resolveCrashImpact({moverMassKg:profile.handling.massKg||1520,targetMassKg:1e9,
   moverVelocity:{x:(car.vx||0)*course.metersPerUnit,z:(car.vz||0)*course.metersPerUnit},normal,targetKind:'world'});
  if(!response.applied)return;
@@ -52,7 +52,7 @@ export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}
   maximumMeters:Math.min(course.lengthMeters,car.raceSupportDistanceMeters+12),flight:car.isAirborne===true}:{};
  const previousSupport=rally?projectRacePosition(course,raceVehicleGroundPose(car),supportOptions):null;
  if(rally&&!previousSupport)throw Error('race_surface_lost');
- const surface=rally?rallySurfaceDynamics(course,previousSupport.index,profile.surface):profile.surface;
+ const surface=rally?rallySurfaceDynamics(course,previousSupport.index,profile.surface):course.surfaceKind==='ground'?{...profile.surface,topSpeed:.8,rolling:1.5,accel:.75,grip:profile.surface.grip*.78}:profile.surface;
  const frame=prepareVehicleDriveFrame(car,{...actions,boost:0},dt,profile.config);
  const driving=stepVehiclePlanarDrive(car,dt,frame,{config:profile.config,planetary:false,metersPerWorldUnit:course.metersPerUnit,
   ...(course.surfaceModel===BANKED_ROAD_MODEL||rally?{roadPlane:{pitch:car.terrainPitch||0,roll:car.terrainRoll||0}}:{}),

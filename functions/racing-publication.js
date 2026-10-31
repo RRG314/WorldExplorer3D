@@ -30,20 +30,23 @@ async function approvedDistrict(db,id){
 async function loadPublishedCourse(db,id,uid){
  return readPublishedRaceCourse({id:courseId(id),uid,read:async path=>data(await db.doc(path).get())});
 }
-async function readRacingCatalog({db,uid,locationId,cursor}){
+async function readRacingCatalog({db,uid,locationId,cursor,roomCode,roomCourseId}){
+ const roomResult=roomCode?await require('./racing-room-publication').readRoomRaces({db,uid,locationId,roomCode,roomCourseId}):{};
+ if(roomCourseId)return {district:null,courses:[],...roomResult};
  if(typeof locationId!=='string'||!/^earth:-?\d+:-?\d+$/.test(locationId))fail('race_invalid_location');
  if(cursor!==undefined&&!/^road-race-[a-f0-9]{32}$/.test(cursor))fail('race_invalid_catalog_page');
  const pointer=data(await db.collection('racingLocations').doc(locationKey(locationId)).get());
- if(!pointer)return {district:null,courses:[]};const district=await approvedDistrict(db,pointer.districtId);
+ if(!pointer)return {district:null,courses:[],...roomResult};const district=await approvedDistrict(db,pointer.districtId);
  let publicQuery=db.collection('racingCourses').where('districtId','==',pointer.districtId).where('status','==','approved').orderBy('__name__');if(cursor)publicQuery=publicQuery.startAfter(cursor);
  const [publicRows,ownRows]=await Promise.all([publicQuery.limit(41).get(),
   db.collection('users').doc(uid).collection('racingRoutes').where('districtId','==',pointer.districtId).limit(40).get()]);
  const ids=new Set([...publicRows.docs.slice(0,40),...ownRows.docs].map(s=>s.id)),courses=[];
  for(const id of ids){const r=data(await db.collection('racingCourses').doc(id).get());if(!r||r.status!=='approved'&&r.ownerUid!==uid)continue;
   courses.push({id,status:r.status,ownerUid:r.ownerUid,revision:r.revision,reference:r.reference,reviewNote:r.reviewNote||'',tested:tested(r)});}
- return {district:{id:pointer.districtId,facts:district.facts,credits:district.credits},courses,nextCursor:publicRows.size>40?publicRows.docs[39].id:null};
+ return {...roomResult,district:{id:pointer.districtId,facts:district.facts,credits:district.credits},courses,nextCursor:publicRows.size>40?publicRows.docs[39].id:null};
 }
 async function writeRacingRoute({db,admin,uid,input,nowMs=Date.now()}){
+ if(input?.action==='share-room')return require('./racing-room-publication').shareRoomRace({db,admin,uid,input,nowMs});
  if(!input||!['save-draft','submit','withdraw'].includes(input.action))fail('race_invalid_route_command');
  if(Object.keys(input).some(k=>!['action','districtId','reference','id','revision'].includes(k)))fail('race_invalid_route_command');
  if(input.action==='save-draft'){

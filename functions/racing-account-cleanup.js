@@ -6,6 +6,12 @@ async function cleanupRacingAccount({db,uid,nowMs=Date.now()}){
  if(!uid||uid.includes('/'))throw Error('invalid_account_identity');
  if(!(await db.collection('captureAccountDeletions').doc(uid).get()).exists)throw Error('account_closing_marker_required');
  const user=db.collection('users').doc(uid);
+ for(;;){const rows=await user.collection('racingRoomRoutes').limit(100).get();if(rows.empty)break;
+  for(const row of rows.docs)await db.runTransaction(async tx=>{const r=row.data();if(!/^[A-Z0-9]{6}$/.test(r.roomCode)||!/^road-race-[a-f0-9]{32}$/.test(r.id)){tx.delete(row.ref);return;}
+   const ref=db.collection('rooms').doc(r.roomCode).collection('racingCourses').doc(r.id),course=await tx.get(ref);if(course.exists&&course.data().ownerUid===uid)tx.delete(ref);tx.delete(row.ref);
+  });
+ }
+
  for(;;){const rows=await db.collection('racingCrews').where('memberUids','array-contains',uid).limit(100).get();if(rows.empty)break;
   for(const row of rows.docs)await db.runTransaction(async tx=>{
    const snapshot=await tx.get(row.ref);if(!snapshot.exists)return;const crew=snapshot.data();

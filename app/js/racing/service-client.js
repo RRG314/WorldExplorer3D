@@ -19,7 +19,7 @@ export async function readOnlineRacingRecords({ownerUid,boardId,cursor,signal}={
  if(!ownerUid||getCurrentUser()?.uid!==ownerUid)throw Error('race_signed_account_required');
  return postProtectedFunction('getRacingRecords',boardId?{boardId}:cursor?{cursor}:{},{expectedUserId:ownerUid,signal,timeoutMs:10000});
 }
-export function readRacingCatalog({ownerUid,locationId,cursor,signal}){return postProtectedFunction('getRacingCatalog',{locationId,...(cursor?{cursor}:{})},{expectedUserId:ownerUid,signal,timeoutMs:15000});}
+export function readRacingCatalog({ownerUid,locationId,cursor,roomCode,roomCourseId,signal}){return postProtectedFunction('getRacingCatalog',{locationId,...(cursor?{cursor}:{}),...(roomCode?{roomCode}:{}),...(roomCourseId?{roomCourseId}:{})},{expectedUserId:ownerUid,signal,timeoutMs:15000});}
 export function commitRacingRoute(ownerUid,input,signal){return postProtectedFunction('commitRacingRoute',input,{expectedUserId:ownerUid,signal,timeoutMs:15000});}
 export function reviewRacingRoutes(ownerUid,input,signal){return postProtectedFunction('reviewRacingRoutes',input,{expectedUserId:ownerUid,signal,timeoutMs:15000});}
 export function readMyRacingRoutes(ownerUid,signal){return postProtectedFunction('getMyRacingRoutes',{}, {expectedUserId:ownerUid,signal,timeoutMs:15000});}

@@ -42,7 +42,7 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
   if(race&&(race.courseId!==command.courseId||race.worldSeed!==command.worldSeed))throw Error('race_room_course_locked');
   if(!race){
    if(races.size>=maximumRaces)throw Error('race_service_full');
-   const course=await store.course(command.courseId,client.uid);if(!course||await raceCourseKey(course)!==command.courseId)throw Error('race_course_unavailable');
+   const course=await store.course(command.courseId,client.uid,command.roomCode);if(!course||await raceCourseKey(course)!==command.courseId)throw Error('race_course_unavailable');
    race={id:randomUUID(),roomCode:command.roomCode,worldSeed:command.worldSeed,courseId:command.courseId,course,
     roster:new Map(),session:null,settlement:'pending',leaseUntil:0,lastRenew:-Infinity,lastBroadcast:0,renewing:false,settling:false};
    created=true;
@@ -81,7 +81,7 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
   if(v.type==='start'){
    const state=race.session.snapshot();if(state.phase!=='lobby')throw Error('race_roster_locked');if(state.leaderUid!==client.uid)throw Error('race_leader_required');
    if(state.players.some(p=>!p.ready||p.disconnected))throw Error('race_not_ready');
-   const minimum=race.course.publication?.purpose==='qualification'||race.course.discipline==='time-trial'?1:2;
+   const minimum=['qualification','room-race'].includes(race.course.publication?.purpose)||race.course.discipline==='time-trial'?1:2;
    if(race.roster.size<minimum)throw Error('race_needs_two_players');
    if(race.starting)throw Error('race_roster_locked');race.starting=true;
    try{await store.renew({race,instanceId,nowMs:now(),starting:true});race.session.start(client.uid,now());}

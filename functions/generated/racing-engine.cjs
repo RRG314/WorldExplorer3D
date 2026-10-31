@@ -1449,6 +1449,12 @@ function normalizeRaceEventRules(value) {
 }
 var raceHasDamage = (course) => course?.discipline === "rally" || course?.eventRules?.version === 1 && course.eventRules.damage === "standard";
 
+// app/js/racing/route-draft.js
+function normalizeGroundRaceDraft(value) {
+  if (value?.version !== 1 || !Array.isArray(value.anchors) || value.anchors.length < 2 || value.anchors.length > 80 || value.anchors.some((p) => !p || !Number.isFinite(p.x) || !Number.isFinite(p.z) || Math.hypot(p.x, p.z) > 1200) || ![6, 8, 10, 12].includes(value.widthMeters) || typeof value.closed !== "boolean") throw Error("race_invalid_ground_draft");
+  return { version: 1, widthMeters: value.widthMeters, closed: value.closed, anchors: value.anchors.map((p) => ({ x: p.x, z: p.z })) };
+}
+
 // app/js/racing/speed-controls.js
 function restrictedRaceSpeedActions(actions, speedMetersPerSecond, restricted, limitMetersPerSecond) {
   if (!restricted || Math.abs(speedMetersPerSecond) <= limitMetersPerSecond) return actions;
@@ -1879,6 +1885,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth, maximumGra
         to: b,
         length,
         widthMeters: width,
+        ...road.surfaceKind ? { surfaceKind: road.surfaceKind } : {},
         ...profiled ? { pavementModel: PROFILED_ROAD_PAVEMENT_MODEL, racingWidthMeters: road.racingWidthMeters } : {},
         sourceId: String(road.sourceId).slice(0, 180),
         structure: road.structure || "surface",
@@ -1932,6 +1939,8 @@ function createRaceCourse(graph, path, settings = {}) {
   if (!Array.isArray(path) || path.length < 1 || path.length > RACE_MAX_ROUTE_EDGES) throw Error("invalid_race_route");
   const byId = new Map(graph.edges.map((e) => [e.id, e])), edges = path.map((id) => byId.get(id));
   if (edges.some((e) => !e)) throw Error("race_road_missing");
+  const ground = edges.every((e) => e.surfaceKind === "ground");
+  if (edges.some((e) => e.surfaceKind === "ground") && !ground || settings.groundDraft && !ground) throw Error("race_invalid_ground_draft");
   const discipline = settings.discipline || "sprint";
   if (!RACE_DISCIPLINES.includes(discipline)) throw Error("invalid_race_discipline");
   if (Boolean(graph.venueSource?.stage) !== (discipline === "rally")) throw Error("race_rally_source_required");
@@ -1963,6 +1972,7 @@ function createRaceCourse(graph, path, settings = {}) {
       startMeters: lengthMeters,
       structure: edge.structure,
       clearanceMeters: edge.clearanceMeters,
+      ...edge.surfaceKind ? { surfaceKind: edge.surfaceKind } : {},
       ...edge.edgeBandModel ? { edgeBandModel: edge.edgeBandModel } : {},
       ...edge.pavementModel ? { pavementModel: edge.pavementModel, racingWidthMeters: edge.racingWidthMeters } : {},
       ...edge.heightSamples ? { heightSamples: edge.heightSamples.map(copyHeightSample), heightSampleSpanMeters: edge.heightSampleSpanMeters } : {}
@@ -2016,6 +2026,7 @@ function createRaceCourse(graph, path, settings = {}) {
     discipline,
     laps,
     participants,
+    ...ground ? { surfaceKind: "ground", ...settings.groundDraft ? { groundDraft: normalizeGroundRaceDraft(settings.groundDraft) } : {} } : {},
     ...rally ? { rally } : {},
     vehicleEnvelope: { widthMeters: 2.35, lengthMeters: 6.5, heightMeters: 2.4 },
     metersPerUnit: graph.metersPerUnit,
@@ -2075,7 +2086,7 @@ function createRaceCourse(graph, path, settings = {}) {
     const pitEdges = settings.pitPath.map((id) => byId.get(id)), allowed = new Set(graph.venueSource.pitSourceFeatureIds), mainSources = new Set(edges.map((e) => e.sourceId));
     if (pitEdges.some((e) => !e || ![...allowed].some((id) => e.sourceId.startsWith(id + ":")) || mainSources.has(e.sourceId)) || new Set(settings.pitPath).size !== settings.pitPath.length) throw Error("race_invalid_pit_path");
     if (discipline === "oval" && pitEdges.some((e) => e.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL || e.heightSamples?.some((row) => !Number.isFinite(row.racingWidthMeters)))) throw Error("race_pit_pavement_required");
-    const pit = createRaceCourse(graph, settings.pitPath, { locationId: course.locationId, locationLabel: course.locationLabel, anchor: course.anchor, discipline: "sprint", participants: 1, name: course.name + " \xB7 pit lane", gateSpacingMeters: 15 });
+    const pit = createRaceCourse(graph, settings.pitPath, { locationId: course.locationId, locationLabel: course.locationLabel, anchor: course.anchor, discipline: "sprint", participants: 1, eventRules: course.eventRules || null, name: course.name + " \xB7 pit lane", gateSpacingMeters: 15 });
     if (pit.lengthMeters > 2e3) throw Error("race_pit_length");
     const entryNode = pitEdges[0].from, exitNode = pitEdges.at(-1).to, mainNodes = new Set(edges.map((e) => e.from));
     if (entryNode === exitNode || !mainNodes.has(entryNode) || !mainNodes.has(exitNode) || pitEdges.slice(0, -1).some((e) => mainNodes.has(e.to))) throw Error("race_pit_join_invalid");
@@ -4174,8 +4185,8 @@ function resolveCrashImpact(options = {}) {
 
 // app/js/racing/vehicle-controller.js
 function applyRaceBarrierImpact(course, car, profile, normal) {
-  if (!raceHasDamage(course)) {
-    for (const key of ["speed", "vFwd", "vx", "vz"]) car[key] *= 0.35;
+  if (!course.eventRules) {
+    for (const key of ["speed", "vFwd"]) car[key] *= 0.35;
     car.vLat *= 0.2;
     return;
   }
@@ -4247,7 +4258,7 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
   } : {};
   const previousSupport = rally ? projectRacePosition(course, raceVehicleGroundPose(car), supportOptions) : null;
   if (rally && !previousSupport) throw Error("race_surface_lost");
-  const surface2 = rally ? rallySurfaceDynamics(course, previousSupport.index, profile.surface) : profile.surface;
+  const surface2 = rally ? rallySurfaceDynamics(course, previousSupport.index, profile.surface) : course.surfaceKind === "ground" ? { ...profile.surface, topSpeed: 0.8, rolling: 1.5, accel: 0.75, grip: profile.surface.grip * 0.78 } : profile.surface;
   const frame = prepareVehicleDriveFrame(car, { ...actions, boost: 0 }, dt, profile.config);
   const driving = stepVehiclePlanarDrive(car, dt, frame, {
     config: profile.config,
@@ -4952,6 +4963,10 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
         p.previousFrame = snapshotRaceVehicle(p.car);
         if (rolling) p.ovalDraft = ovalDraftReduction(before.get(p.uid).draftActor, draftActors, course.metersPerUnit, { enabled: !yellow });
         stepRaceVehicle(pitGeometry ? pitPhysicalCourse(p, row) : course, p.car, actions, 1 / 60, p.profile, { draftReduction: p.ovalDraft });
+        if (course.eventRules && p.car.condition <= 0.05) {
+          p.dnf = true;
+          continue;
+        }
         const beforeGate = p.progress.nextGate;
         advancePlayerProgress(p, raceVehicleGroundPose(p.car), frameAt, row);
         if (rally) {
@@ -5093,6 +5108,7 @@ function normalizeRaceRouteReference(value) {
   return {
     version: 1,
     ...rules ? { eventRules: rules } : {},
+    ...value.groundDraft ? { groundDraft: normalizeGroundRaceDraft(value.groundDraft) } : {},
     districtFingerprint: value.districtFingerprint,
     path: [...value.path],
     discipline: value.discipline,
@@ -5115,6 +5131,7 @@ async function raceDistrictFingerprint(district) {
       a: r.a,
       b: r.b,
       width: r.widthMeters,
+      ...r.surfaceKind ? { surfaceKind: r.surfaceKind } : {},
       ...r.surfaceModel ? { surfaceModel: r.surfaceModel } : {},
       ...r.pavementModel ? { pavementModel: r.pavementModel, racingWidthMeters: r.racingWidthMeters } : {},
       ...r.edgeBandModel ? { edgeBandModel: r.edgeBandModel } : {},
@@ -5139,6 +5156,7 @@ function raceCourseReference(course, districtFingerprint) {
     startOffsetMeters: course.startOffsetMeters,
     name: course.name,
     eventRules: course.eventRules,
+    ...course.groundDraft ? { groundDraft: course.groundDraft } : {},
     ...course.pitPath ? { pitPath: course.pitPath } : {}
   });
 }
@@ -5183,7 +5201,7 @@ var RACE_CIRCUIT_PIT_PHYSICS_VERSION = "earth-circuit-pit-2026-10-30.1";
 var RACE_RALLY_PHYSICS_VERSION = "earth-rally-2026-10-31.2";
 function racePhysicsVersion(course) {
   const base = raceBasePhysicsVersion(course);
-  return course?.eventRules?.version === 1 ? base + "-contacts1" : base;
+  return normalizeRaceEventRules(course?.eventRules) ? base + "-contacts1" : base;
 }
 function raceBasePhysicsVersion(course) {
   if (course?.discipline === "rally") {
@@ -5368,6 +5386,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
   if (!Number.isFinite(anchor.lat) || Math.abs(anchor.lat) > 85 || !Number.isFinite(anchor.lon) || Math.abs(anchor.lon) > 180) fail2();
   const locationId = `earth:${Math.round(anchor.lat * 1e7)}:${Math.round(anchor.lon * 1e7)}`;
   const roads = raw.roads.map((r) => {
+    if (r.surfaceKind !== void 0 && (r.surfaceKind !== "ground" || !r.sourceId?.startsWith("authored-ground:") || r.structure !== "surface" || r.surfaceModel || r.pavementModel || r.edgeBandModel)) fail2();
     if (!r.sourceId || r.sourceId.length > 180 || !["surface", "bridge", "tunnel"].includes(r.structure) || !["both", "forward", "reverse", void 0].includes(r.direction) || r.driveable !== true || r.supported !== true) fail2();
     const samples = r.heightSamples;
     if (!Array.isArray(samples) || samples.length < 2 || samples.length > 250) fail2();
@@ -5377,6 +5396,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
       label: label(r.label, 100),
       a: point(r.a),
       b: point(r.b),
+      ...r.surfaceKind ? { surfaceKind: r.surfaceKind } : {},
       ...r.surfaceModel !== void 0 ? { surfaceModel: r.surfaceModel } : {},
       ...r.pavementModel !== void 0 ? { pavementModel: r.pavementModel, racingWidthMeters: number(r.racingWidthMeters) } : {},
       ...r.edgeBandModel !== void 0 ? { edgeBandModel: r.edgeBandModel } : {},
@@ -5393,6 +5413,7 @@ function canonicalRaceDistrict(raw, { partialVenue = false } = {}) {
       heightSampleSpanMeters: number(r.heightSampleSpanMeters)
     };
   }).sort((a, b) => a.sourceId.localeCompare(b.sourceId));
+  if (roads.some((r) => r.surfaceKind === "ground") && roads.some((r) => r.surfaceKind !== "ground")) fail2();
   const facts = { type: "RaceDistrictFacts", version: 1, ...venueSource ? { venueSource } : {}, locationId, locationLabel: label(raw.locationLabel, 80), anchor, metersPerUnit: m, roads };
   const graph = buildRaceRoadGraph(roads, { metersPerUnit: m, venueSource, partialVenue });
   if (graph.edges.length < roads.length) fail2();
@@ -5523,8 +5544,22 @@ async function raceLocationKey(id) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(String(id))));
   return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
 }
-async function readPublishedRaceCourse({ read, id, uid }) {
+async function readPublishedRaceCourse({ read, id, uid, roomCode, nowMs = Date.now() }) {
   if (!/^road-race-[a-f0-9]{32}$/.test(id || "")) throw Error("race_invalid_course");
+  if (roomCode) {
+    if (!/^[A-Z0-9]{6}$/.test(roomCode)) throw Error("race_invalid_room");
+    const root = `rooms/${roomCode}`, record2 = await read(`${root}/racingCourses/${id}`);
+    if (record2) {
+      const [room, player, district2, a, b] = await Promise.all([read(root), read(`${root}/players/${uid}`), read(`${root}/racingDistricts/${record2.districtId}`), read(`users/${uid}/blockedPlayers/${record2.ownerUid}`), read(`users/${record2.ownerUid}/blockedPlayers/${uid}`)]), time = (t) => t?.toMillis?.() ?? 0;
+      if (a || b || record2.status !== "room" || record2.roomCode !== roomCode || time(record2.expiresAt) <= nowMs || room?.world?.seed !== record2.worldSeed || room?.world?.kind !== "earth" || player?.uid !== uid || time(player.expiresAt) <= nowMs || nowMs - time(player.lastSeenAt) > 12e4 || time(player.lastSeenAt) > nowMs + 5e3) throw Error("race_room_presence_expired");
+      if (district2?.status !== "room" || time(district2.expiresAt) <= nowMs || district2.worldSeed !== record2.worldSeed) throw Error("race_district_unavailable");
+      const facts2 = canonicalRaceDistrict(district2.facts);
+      if (await raceDistrictFingerprint(facts2) !== `race-district:${record2.districtId}` || Math.abs(room.world.lat - facts2.anchor.lat) > 1e-7 || Math.abs(room.world.lon - facts2.anchor.lon) > 1e-7) throw Error("race_course_wrong_world");
+      const course2 = await reconstructPublishedRace(record2.reference, facts2);
+      if (!course2.eventRules || await raceCourseKey(course2) !== id || record2.physicsVersion !== racePhysicsVersion(course2)) throw Error("race_course_changed");
+      return { ...course2, publication: { status: "room", purpose: "room-race", ownerUid: record2.ownerUid, revision: record2.revision, districtId: record2.districtId, roomCode, worldSeed: record2.worldSeed } };
+    }
+  }
   const record = await read(`racingCourses/${id}`);
   if (!record || record.status !== "approved" && !(record.ownerUid === uid && ["draft", "rejected"].includes(record.status))) return null;
   const district = await read(`racingDistricts/${record.districtId}`);

@@ -47,7 +47,10 @@ export function buildRacePaint(course,{filtered=true,venueId=course.venueSource?
  // flat paint on its accepted surface, not invented raised kerb geometry.
  for(const segment of course.venueSource?.id==='daytona-tri-oval'?[]:course.segments)for(const side of [-1,1]) {
   const edge=side*(segment.widthMeters/2-.32);
-  if(segment.pavementModel){const edgeAt=d=>{const s=sectionAt(d);return side<0?s.minimumMeters+.32:s.maximumMeters-.32;};rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,d=>edgeAt(d)-.06,d=>edgeAt(d)+.06,.88,false);}else rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,edge-.06,edge+.06,.88,false);
+  if(segment.pavementModel){const edgeAt=d=>{const s=sectionAt(d);return side<0?s.minimumMeters+.32:s.maximumMeters-.32;};rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,d=>edgeAt(d)-.06,d=>edgeAt(d)+.06,.88,false);}else for(let d=segment.startMeters;d<segment.startMeters+segment.lengthMeters;d+=2){const end=Math.min(segment.startMeters+segment.lengthMeters,d+2),p=raceCourseSurfacePoint(course,(d+end)/2,edge);if(!raceEdgeInsideAnotherSpan(course,p,segment))rectangle(d,end,edge-.09,edge+.09,course.surfaceKind==='ground'?[.9,.72,.24]:.88,false);}
+ }
+ if(!course.venueSource)for(let d=25;d<course.lengthMeters-15;d+=30){
+  for(let i=0;i<6;i++){const at=d+i*.25,lateral=(5-i)*.15;rectangle(at,at+.3,-lateral-.1,-lateral+.1,[.75,.93,.55],false);rectangle(at,at+.3,lateral-.1,lateral+.1,[.75,.93,.55],false);}
  }
  // Flat original red/white bend-edge paint for the GP pack. It follows the
  // existing qualified pavement; it creates no raised support or physics class.

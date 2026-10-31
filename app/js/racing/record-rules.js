@@ -1,3 +1,4 @@
+import {normalizeRaceEventRules} from './event-rules.js';
 import {raceCourseKey} from './course-library.js';
 import {BANKED_ROAD_MODEL,PROFILED_ROAD_PAVEMENT_MODEL} from '../physics/road-plane-dynamics.js';
 
@@ -13,7 +14,7 @@ export const RACE_OVAL_PIT_PHYSICS_VERSION='earth-oval-pit-2026-10-30.1';
 export const RACE_CIRCUIT_PIT_PHYSICS_VERSION='earth-circuit-pit-2026-10-30.1';
 export const RACE_RALLY_PHYSICS_VERSION='earth-rally-2026-10-31.2';
 export function racePhysicsVersion(course){
- const base=raceBasePhysicsVersion(course);return course?.eventRules?.version===1?base+'-contacts1':base;
+ const base=raceBasePhysicsVersion(course);return normalizeRaceEventRules(course?.eventRules)?base+'-contacts1':base;
 }
 function raceBasePhysicsVersion(course){
  if(course?.discipline==='rally'){

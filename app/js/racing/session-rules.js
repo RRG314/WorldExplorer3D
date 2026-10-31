@@ -240,6 +240,7 @@ export function createRaceSession({id,course,creatorUid,createdAtMs,maximumDurat
     p.previousFrame=snapshotRaceVehicle(p.car);
     if(rolling)p.ovalDraft=ovalDraftReduction(before.get(p.uid).draftActor,draftActors,course.metersPerUnit,{enabled:!yellow});
     stepRaceVehicle(pitGeometry?pitPhysicalCourse(p,row):course,p.car,actions,1/60,p.profile,{draftReduction:p.ovalDraft});
+    if(course.eventRules&&p.car.condition<=.05){p.dnf=true;continue;}
     const beforeGate=p.progress.nextGate;
     advancePlayerProgress(p,raceVehicleGroundPose(p.car),frameAt,row);
     if(rally)for(const split of course.rally.splits)if(split.gateIndex>=beforeGate&&split.gateIndex<p.progress.nextGate){

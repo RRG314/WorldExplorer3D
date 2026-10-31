@@ -2218,10 +2218,10 @@ exports.projectRacingCareer=functions.region('us-central1').runWith({failurePoli
  await require('./racing-career').projectRacingCareerResult({db,id:snapshot.id});
 });
 exports.getRacingRecords=racingAccountHandler(async(uid,input)=>require('./racing-api').readRacingRecords({db,uid,boardId:input?.boardId,cursor:input?.cursor}));
-exports.getRacingCatalog=racingAccountHandler(async(uid,input)=>require('./racing-publication').readRacingCatalog({db,uid,locationId:input?.locationId,cursor:input?.cursor}));
+exports.getRacingCatalog=racingAccountHandler(async(uid,input)=>require('./racing-publication').readRacingCatalog({db,uid,locationId:input?.locationId,cursor:input?.cursor,roomCode:input?.roomCode,roomCourseId:input?.roomCourseId}));
 exports.getMyRacingRoutes=racingAccountHandler(async(uid)=>require('./racing-publication').readMyRacingRoutes({db,uid}));
 exports.commitRacingRoute=racingAccountHandler(async(uid,input)=>{
- if(Buffer.byteLength(JSON.stringify(input||{}))>128*1024)throw Object.assign(Error('race_route_too_large'),{status:413});
+ if(Buffer.byteLength(JSON.stringify(input||{}))>(input?.action==='share-room'?256:128)*1024)throw Object.assign(Error('race_route_too_large'),{status:413});
  return require('./racing-publication').writeRacingRoute({db,admin,uid,input});
 });
 exports.reviewRacingRoutes=functions.region('us-central1').runWith({invoker:'public'}).https.onRequest(async(req,res)=>{

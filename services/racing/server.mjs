@@ -14,7 +14,7 @@ const app=initializeApp({projectId}),db=getFirestore(app),auth=getAuth(app),chec
 const origins=(process.env.RACE_ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean);
 if(origins.some(s=>{try{const u=new URL(s);return u.protocol!=='https:'||u.origin!==s;}catch{return true;}}))throw Error('race_https_origins_required');
 const appIds=(process.env.RACE_APP_IDS||'').split(',').map(s=>s.trim()).filter(Boolean);if(!appIds.length)throw Error('race_app_ids_required');
-const store=createFirestoreRaceStore({db,loadCourse:(id,uid)=>readPublishedRaceCourse({id,uid,read:async path=>{const s=await db.doc(path).get();return s.exists?s.data():null;}})});
+const store=createFirestoreRaceStore({db,loadCourse:(id,uid,roomCode)=>readPublishedRaceCourse({id,uid,roomCode,read:async path=>{const s=await db.doc(path).get();return s.exists?s.data():null;}})});
 const wallAnchor=Date.now(),clockAnchor=performance.now();
 const service=createRaceServer({store,origins,now:()=>wallAnchor+performance.now()-clockAnchor,authenticate:async ({idToken,appCheckToken})=>{
  const [identity,attestation]=await Promise.all([auth.verifyIdToken(idToken,true),check.verifyToken(appCheckToken)]);

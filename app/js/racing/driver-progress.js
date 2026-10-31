@@ -38,11 +38,17 @@ function raceResultMetadata(result,player,{courseId,recordKey,physicsVersion},on
 export function racePracticeMetadata(result,player,options={}){return raceResultMetadata(result,player,options,false);}
 export function raceOnlineMetadata(result,player,options={}){
  const receipt=result.receipt?.players?.find(p=>p.uid===player?.uid);
- if(result.receipt?.purpose==='qualification'||result.settlement!=='saved'||result.receipt?.id!==result.id||!receipt?.finished||receipt.timeMs!==player?.progress?.elapsedMs)throw Error('race_server_receipt_required');
+ if(['qualification','room-race'].includes(result.receipt?.purpose)||result.settlement!=='saved'||result.receipt?.id!==result.id||!receipt?.finished||receipt.timeMs!==player?.progress?.elapsedMs)throw Error('race_server_receipt_required');
  return raceResultMetadata(result,player,options,true);
 }
 export function raceQualificationMetadata(result,player,options={}){
  const receipt=result.receipt?.players?.find(p=>p.uid===player?.uid);
  if(result.receipt?.purpose!=='qualification'||result.settlement!=='saved'||result.receipt.id!==result.id||!receipt?.finished||receipt.timeMs!==player?.progress?.elapsedMs)throw Error('race_server_receipt_required');
  return raceResultMetadata(result,player,options,false,true);
+}
+
+export function raceRoomMetadata(result,player,options={}){
+ const receipt=result.receipt?.players?.find(p=>p.uid===player?.uid);
+ if(result.receipt?.purpose!=='room-race'||result.settlement!=='saved'||result.receipt.id!==result.id||!receipt?.finished||receipt.credits!==0||receipt.timeMs!==player?.progress?.elapsedMs)throw Error('race_server_receipt_required');
+ return {...raceResultMetadata(result,player,options,false),racingRoomVersion:1,serverResultId:result.id,ranked:false};
 }

@@ -5,6 +5,7 @@ import {raceDistrictFingerprint,normalizeRaceRouteReference,restoreRaceCourse,ra
 import {racePhysicsVersion,RACE_PHYSICS_VERSION} from './record-rules.js';
 
 export {canonicalRaceDistrict} from './district-facts.js';
+import {canonicalRaceDistrict} from './district-facts.js';
 import {readRaceDistrictFacts,raceDistrictChunkPath} from './district-storage.js';
 
 export async function reconstructPublishedRace(reference,facts){
@@ -53,8 +54,22 @@ export function assertRaceCourseInDistrict(course,localFacts){
 export async function racePublicationIdentity(reference,facts){const course=await reconstructPublishedRace(reference,facts);return {course,id:await raceCourseKey(course)};}
 export async function raceLocationKey(id){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(String(id))));return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');}
 // Both HTTP publication and the socket service call this exact admission rule.
-export async function readPublishedRaceCourse({read,id,uid}){
+export async function readPublishedRaceCourse({read,id,uid,roomCode,nowMs=Date.now()}){
  if(!/^road-race-[a-f0-9]{32}$/.test(id||''))throw Error('race_invalid_course');
+ if(roomCode){
+  if(!/^[A-Z0-9]{6}$/.test(roomCode))throw Error('race_invalid_room');
+  const root=`rooms/${roomCode}`,record=await read(`${root}/racingCourses/${id}`);
+  if(record){
+   const [room,player,district,a,b]=await Promise.all([read(root),read(`${root}/players/${uid}`),read(`${root}/racingDistricts/${record.districtId}`),read(`users/${uid}/blockedPlayers/${record.ownerUid}`),read(`users/${record.ownerUid}/blockedPlayers/${uid}`)]),time=t=>t?.toMillis?.()??0;
+   if(a||b||record.status!=='room'||record.roomCode!==roomCode||time(record.expiresAt)<=nowMs||room?.world?.seed!==record.worldSeed||room?.world?.kind!=='earth'||player?.uid!==uid||time(player.expiresAt)<=nowMs||nowMs-time(player.lastSeenAt)>120000||time(player.lastSeenAt)>nowMs+5000)throw Error('race_room_presence_expired');
+   if(district?.status!=='room'||time(district.expiresAt)<=nowMs||district.worldSeed!==record.worldSeed)throw Error('race_district_unavailable');
+   const facts=canonicalRaceDistrict(district.facts);
+   if(await raceDistrictFingerprint(facts)!==`race-district:${record.districtId}`||Math.abs(room.world.lat-facts.anchor.lat)>1e-7||Math.abs(room.world.lon-facts.anchor.lon)>1e-7)throw Error('race_course_wrong_world');
+   const course=await reconstructPublishedRace(record.reference,facts);
+   if(!course.eventRules||await raceCourseKey(course)!==id||record.physicsVersion!==racePhysicsVersion(course))throw Error('race_course_changed');
+   return {...course,publication:{status:'room',purpose:'room-race',ownerUid:record.ownerUid,revision:record.revision,districtId:record.districtId,roomCode,worldSeed:record.worldSeed}};
+  }
+ }
  const record=await read(`racingCourses/${id}`);
  if(!record||record.status!=='approved'&&!(record.ownerUid===uid&&['draft','rejected'].includes(record.status)))return null;
  const district=await read(`racingDistricts/${record.districtId}`);

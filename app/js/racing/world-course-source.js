@@ -18,7 +18,7 @@ import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_M
 
 // Read published world facts through their existing owners. Qualification never
 // replaces a road, runs a provider query, flattens terrain or changes residency.
-export async function collectRaceDistrict(context,{locationId,locationLabel,radiusWorld=270,sourceFeatureIds=null,current=()=>true,yieldWork=yieldToWorldFrame}={}){
+export async function collectRaceDistrict(context,{locationId,locationLabel,radiusWorld=270,sourceFeatureIds=null,current=()=>true,yieldWork=yieldToWorldFrame,allowEmpty=false}={}){
  const publication=context.worldPublication,traversal=context.buildTraversalNetworks?.()?.drive;
  if(!publication?.requestId||context.worldLoading||!traversal?.segments||!context.SurfaceQuery?.driveAt||!context.sampleFeatureSurfaceY)throw Error('race_world_not_ready');
  const metersPerUnit=Number(context.METERS_PER_WORLD_UNIT)||1.11,envelope={width:2.35,length:6.5,height:2.4};
@@ -159,7 +159,7 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
  }
  await drainCooperatively(collect(),{current:active,yieldWork,budgetMs:2});
  if(!active())throw Error('race_world_changed');
- if(!roads.length)throw Error('no_qualified_racing_roads');
+ if(!roads.length&&!allowEmpty)throw Error('no_qualified_racing_roads');
  assertRaceVenueRoads(roads,venueSource);
  const anchor=publication.location||context.LOC,identity=context.livingWorldPublication?.worldIdentity;
  const loaded=context.worldLoadRuntimeState&&context.worldLoadRuntimeState.sequence===publication.sequence?context.worldLoadRuntimeState.location:null;
