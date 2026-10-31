@@ -8,16 +8,16 @@ The owner's October 31 correction supersedes the twelve-pack launch requirement.
 This release contains **Silverstone GP, full Nordschleife T13 and Daytona
 tri-oval**. Complete native private-practice journeys already pass for all three;
 presentation, moving desktop budgets and changed shared catalogue admission now pass.
-The separate Silverstone pit lane is excluded pending the explicit release-scope
-choice recorded in RELEASE_READINESS.md; do not count it as completed.
+Silverstone also has a completed native 73-checkpoint pit journey, including
+four-wheel support and a clean exit. Final packaging is recorded in RELEASE_READINESS.md.
 The other nine references below are deferred. Retain their source work without
 enabling unfinished packs or treating their production as a launch blocker.
 
 ## Retained coverage register
 
-The source register is `app/js/racing/venue-catalog.js`. It contains twelve **researched layout references**, four in each group. Three main courses are playable with retained complete native journeys; their current acceptance and explicit pit limitation are recorded in RELEASE_READINESS.md. The existing Monaco district practice run is a qualified 705.99 m city route, not the Monaco Grand Prix circuit. Course names, target lengths and references do not certify geometry or provide a content licence.
+The source register is `app/js/racing/venue-catalog.js`. It contains twelve **researched layout references**, four in each group. Three main courses are playable with retained complete native journeys; their current acceptance and evidence limits are recorded in RELEASE_READINESS.md. The existing Monaco district practice run is a qualified 705.99 m city route, not the Monaco Grand Prix circuit. Course names, target lengths and references do not certify geometry or provide a content licence.
 
-Daytona includes its accepted complete pit branch. Silverstone's main loop and
+Silverstone and Daytona include their accepted complete pit branches. Silverstone's main loop and
 Nordschleife T13 retain their completed practice journeys. The following table
 is historical source research; the other nine references are not enabled packs.
 
@@ -45,7 +45,7 @@ Mile conversions are arithmetic using 1609.344 m/mile; quoted circuit distances 
 Additional source/ground intake is recorded in `MAJOR_VENUE_PIPELINE.md`: exact
 Spa GP, Monza GP and Talladega main/pit geometry, plus normalized Talladega
 terrain. These inputs do not add playable packs to this register. Bristol and
-Indianapolis retain explicit source-length discrepancies. The launch-specific acceptance and remaining Silverstone pit exception are
+Indianapolis retain explicit source-length discrepancies. The launch-specific acceptance and final package boundaries are
 recorded in RELEASE_READINESS.md; the general future-pack criteria remain below.
 
 1. A versioned geographic pack with independently reusable rights-cleared source geometry, source identifiers, survey date, length reconciliation, direction, elevation, banking, usable width and vertically separate crossings. No hand-drawn approximate oval standing in for a real tri-oval.

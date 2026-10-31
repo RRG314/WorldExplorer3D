@@ -1,16 +1,16 @@
 # Three-venue release
 
-The release comprises Silverstone's full GP main loop, full Nordschleife T13,
+The release comprises Silverstone's full GP loop and complete pit branch, full Nordschleife T13,
 Daytona tri-oval and its complete pit branch, and the real BMW M3 E46, M3 E92
 race car and Porsche 911 Carrera 4S. Existing garage/upgrades, rivals/crews,
 Journal, creator moderation, room racing and class leaderboards use their
 existing owners. Other nine venue layouts are deferred.
 
-Silverstone's separate pit lane is disabled. Its main loop is accepted; the
-original pit-access finish criterion still requires explicit deferral or a
-supported replacement. See [readiness and evidence limits](RELEASE_READINESS.md).
-The artifact can be reviewed before that scope decision. Do not deploy an
-unfinished lane or describe it as accepted.
+Silverstone's complete 73-checkpoint pit journey passes native publication,
+four-wheel contact and clean entry/exit. Its authored usable corridor compiles
+through the shared road owner without changing the map or native ground.
+See [readiness and evidence limits](RELEASE_READINESS.md). Build and verify the
+matching candidate before rollout.
 
 ## Frozen coordinated inputs
 

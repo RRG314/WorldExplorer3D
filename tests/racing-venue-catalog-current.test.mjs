@@ -13,7 +13,7 @@ import {createRaceServer} from '../services/racing/transport.mjs';
 import {createRaceConnection} from '../app/js/racing/network-client.js';
 const input=async slug=>JSON.parse(await fs.readFile(new URL(`../config/racing-venues/catalog/${slug}.json`,import.meta.url),'utf8'));
 
-for(const [slug,roads,length] of [['silverstone',506,5870],['nordschleife',1081,20710],['daytona',139,4011]]){
+for(const [slug,roads,length] of [['silverstone',589,5870],['nordschleife',1081,20710],['daytona',139,4011]]){
  test(`reviewed ${slug} catalogue reconstructs both complete layouts through the actual authority contract`,async()=>{
   const raw=await input(slug),{prepared,courses}=await prepareRacingVenueIntake(raw);
   assert.equal(prepared.facts.roads.length,roads);assert.equal(courses.length,2);
@@ -34,7 +34,7 @@ for(const [slug,roads,length] of [['silverstone',506,5870],['nordschleife',1081,
     const p=createRaceVehicleProfile(id);assert.ok(p.handling.width<=course.vehicleEnvelope.widthMeters);assert.ok(p.handling.length<=course.vehicleEnvelope.lengthMeters);assert.ok(p.handling.height<=course.vehicleEnvelope.heightMeters);
    }
    if(slug==='daytona')assert.equal(course.pitLane.course.gates.length,40);
-   if(slug==='silverstone')assert.equal(course.pitLane,undefined,'The unverified separate lane remains outside launch admission');
+   if(slug==='silverstone'){assert.equal(course.pitLane.course.gates.length,73);assert.equal(record.curation.nativePitPractice.complete,true);}
   }
  });
 }
@@ -44,12 +44,17 @@ test('venue content cannot publish a different source, incomplete native journey
   const edited=structuredClone(raw);change(edited);await assert.rejects(prepareRacingVenueIntake(edited));
  }
 });
-test('the real browser connection resolves the large unbanked GP course while both sockets remain within the existing buffer budget',async()=>{
+test('a separately reconstructed pit cannot inherit acceptance from an older main-loop lap',async()=>{
+ const raw=await input('silverstone');delete raw.nativePitPractice;
+ await assert.rejects(prepareRacingVenueIntake(raw),/complete native pit journey/);
+});
+test('the real browser connection resolves the full GP and pit course within the existing buffer budget',async()=>{
  const {prepared,courses}=await prepareRacingVenueIntake(await input('silverstone'));
  const docs=new Map([[`racingDistricts/${prepared.id}`,prepared.record],[`racingLocations/${prepared.locationKey}`,{districtId:prepared.id}]]);
  const {id,record}=courses[0];docs.set(`racingCourses/${id}`,record);
  const course=await readPublishedRaceCourse({id,uid:'one',read:async path=>docs.get(path)||null});
- assert.equal(course.venueSource,undefined,'Exercise the original unbanked district admission');
+ assert.equal(course.venueSource.id,'silverstone-grand-prix');
+ assert.equal(raceCourseProjection({...course,venueSource:undefined,pitLane:undefined,pitPath:undefined},id).type,'RaceCourseProjection','Large unbanked district compatibility stays compact too');
  const service=createRaceServer({origins:['http://127.0.0.1:4000'],authenticate:async ({idToken})=>({uid:idToken,expiresAtMs:Date.now()+60000}),
   store:{course:async()=>course,admit:async()=>({profile:createRaceVehicleProfile('bmw_m3_e92_race'),label:'Driver',leaseUntil:Date.now()+15000}),
    renew:async()=>({leaseUntil:Date.now()+15000}),release:async()=>{},releaseParticipant:async()=>{}}});

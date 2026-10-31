@@ -24,18 +24,28 @@ The courses are geographic game interpretations, with explicitly authored
 timing, rules and scenery. They do not claim official homologation, surveyed
 pit speeds, sponsor rights or factory handling.
 
-## Required Silverstone pit acceptance
+## Silverstone pit acceptance
 
-The owner requires the separate Silverstone pit lane before release. The prior
-candidate is superseded for acceptance. A conservative six-metre usable
-corridor is now prepared on the lower pit apron, offset up to 3.5 metres from
-the retained mapped edge line and tapering to the exact original junctions.
-The map nodes and tags remain pinned; this is an authored game corridor.
-The shared road preparation applies it before topology, terrain, meshes and
-contacts compile. The existing native ground and 15% crossfall fence remain
-unchanged. Focused native-ground compilation passes with maximum crossfall
-8.6% and grade 7.1%; actual-world publication, full pit driving, contact and
-catalogue acceptance are still required. No new release approval is claimed.
+The complete separate pit lane now passes native-world acceptance: 1.120 km,
+73 ordered checkpoints, clean entry and exit, zero barrier contacts and
+penalties. All 181 sampled contact poses have four supported wheels; maximum
+wheel gap is 1.83 cm and penetration is 1.71 cm. The shared circuit rule is
+60 km/h. Native publication qualifies all 589 main/pit spans with no rejected
+spans, and the ordinary Racing selector offers both complete GP lap choices.
+
+The original mapped line runs beside the rising pit wall. A conservative
+six-metre game corridor on the lower apron offsets up to 3.5 metres and tapers
+to the exact original junctions. Pinned map nodes/tags and native ground are
+retained. Shared road preparation compiles this authored alignment before
+junctions, terrain, meshes and contacts; no runtime height fallback or actor
+pose smoother was added. Native-ground crossfall is at most 8.6%, within the
+unchanged 15% fence. This is an authored usable corridor, not a surveyed width.
+
+The accepted complete GP lap is retained. Enabling full-corridor terrain detail
+also changes the published height of five main-track spans at the pit fork by
+more than half a metre. Their geometry remains mapped, and full main/pit wheel
+qualification passes. A short held-input check of that changed fork in the
+final package remains required; a repeated full GP lap is unnecessary.
 
 ## Shared product and online integration
 
@@ -92,18 +102,9 @@ not to wait for hardware they do not own. Location-based play, optional
 continuous exploration, buildings, Ocean, Space, saves and platform launch
 owners remain in place. This package does not claim a new native-store release.
 
-## Prior candidate — superseded pending pit acceptance
+## Candidate rebuild in progress
 
-Production-configured candidate: `5.6.1+7470b7c0b029.8666d3757ffa2717.production`.
-Frozen source: `7470b7c0b0293ae22bb6e677fd9304b8f575c62b`.
-Asset-manifest SHA256: `175d4ad691e2adedcdc2105497bb5fbb616bfb80e9e5aa7f9c4dc69d38140c72`.
-
-Artifact verification and the existing configuration-only promotion validator
-pass. The retention-only packager change preserves the same shipped game-source
-digest as the played native package. The resulting immutable generation also
-passes an actual production-configured startup using explicit local staging
-credentials, with zero page/console/cleanup errors. This is not production
-attestation. All 84 ground files and the code of the exact current-production
-predecessor are retained by verified hashes, protecting already-open worlds.
-The matching service/Functions source, indexes and reviewed catalogue are
-identified in the release receipt. Production remains unchanged. Silverstone pit completion and a matching candidate rebuild remain required.
+The prior production-configured candidate is superseded by the completed pit
+work. A matching frozen artifact, catalogue receipt and coordinated rollout
+handoff are being rebuilt. Nothing has been deployed. Existing production
+code/ground retention and rollback remain required.

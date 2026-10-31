@@ -26,13 +26,17 @@ export async function prepareRacingVenueIntake(input){
  const required=racingVenueGroundRequirements(descriptor,{includeLandscape:true});
  if(required.some(r=>!input.ground?.artifactIds?.includes(r.artifactId)||!input.ground?.contentSha256s?.includes(r.contentSha256)))throw Error('Reviewed venue ground does not match this release.');
  if(!/^[a-f0-9]{40}$/.test(input.nativePracticeCommit||'')||input.nativePractice?.complete!==true||input.nativePractice?.barrierContacts!==0||input.nativePractice?.penaltiesMs!==0)throw Error('A reviewed complete native practice journey is required.');
+ const pitPractice=input.nativePitPractice;
+ if(venue.pitSourceFeatureIds&&input.nativePractice.pitComplete!==true&&
+  (!/^[a-f0-9]{40}$/.test(pitPractice?.sourceRelease||'')||pitPractice.complete!==true||pitPractice.visits!==1||
+   pitPractice.barrierContacts!==0||pitPractice.penaltiesMs!==0||pitPractice.missingWheelContacts!==0))throw Error('A reviewed complete native pit journey is required.');
  const prepared=await prepareRacingDistrictIntake(input),fingerprint=`race-district:${prepared.id}`;
  const courses=[];
  for(const course of buildVenueRaceCourses(prepared.facts,venue).events){
   const reference=raceCourseReference(course,fingerprint),revision=hash({districtId:prepared.id,reference}),physicsVersion=racePhysicsVersion(course);
   courses.push({id:await raceCourseKey(course),record:{ownerUid:null,status:'approved',districtId:prepared.id,reference,revision,physicsVersion,
    curation:{version:2,kind:'reviewed-venue',revision,physicsVersion,venueId:descriptor.id,sourceSha256:descriptor.sourceSha256,
-    nativePracticeCommit:input.nativePracticeCommit,nativePractice:{...input.nativePractice},provenance:prepared.record.provenance}}});
+    nativePracticeCommit:input.nativePracticeCommit,nativePractice:{...input.nativePractice},...(pitPractice?{nativePitPractice:{...pitPractice}}:{}),provenance:prepared.record.provenance}}});
  }
  return {prepared,courses};
 }
