@@ -22,10 +22,10 @@ async function shareRoomRace({db,admin,uid,input,nowMs=Date.now()}){
   const courseRef=ref.collection('racingCourses').doc(id),districtRef=ref.collection('racingDistricts').doc(districtId),[old,rows]=await Promise.all([tx.get(courseRef),tx.get(ref.collection('racingCourses').limit(9))]);
   const expired=rows.docs.filter(s=>time(s.data().expiresAt)<=nowMs);
   if(!old.exists&&rows.size-expired.length>=8)fail('race_room_route_limit',409);
-  const previous=value(old);if(previous&&previous.revision!==revision)fail('race_room_route_conflict',409);
+  const previous=value(old);if(previous&&previous.ownerUid!==uid&&(await tx.get(db.collection('captureAccountDeletions').doc(previous.ownerUid))).exists)fail('race_route_owner_unavailable',409);if(previous&&previous.revision!==revision)fail('race_room_route_conflict',409);
   const expiresAt=admin.firestore.Timestamp.fromMillis(nowMs+24*3600000),record={id,status:'room',ownerUid:previous?.ownerUid||uid,roomCode:input.roomCode,worldSeed:world.seed,districtId,reference,revision,physicsVersion:racePhysicsVersion(course),expiresAt};
   for(const row of expired)if(row.id!==id)tx.delete(row.ref);
-  tx.set(db.collection('users').doc(record.ownerUid).collection('racingRoomRoutes').doc(input.roomCode+'-'+id),{roomCode:input.roomCode,id,districtId,expiresAt});
+  if(record.ownerUid===uid)tx.set(db.collection('users').doc(record.ownerUid).collection('racingRoomRoutes').doc(input.roomCode+'-'+id),{roomCode:input.roomCode,id,districtId,expiresAt});
   tx.set(districtRef,{status:'room',facts,worldSeed:world.seed,expiresAt});tx.set(courseRef,record);
   return {id,status:'room',ownerUid:record.ownerUid,revision,districtId,reference,roomCode:input.roomCode};
  });
@@ -36,7 +36,7 @@ async function readRoomRaces({db,uid,roomCode,roomCourseId,locationId,nowMs=Date
  if(roomCourseId!==undefined&&!/^road-race-[a-f0-9]{32}$/.test(roomCourseId))fail('race_invalid_course');
  const rows=roomCourseId?[await ref.collection('racingCourses').doc(roomCourseId).get()]:(await ref.collection('racingCourses').limit(8).get()).docs,roomCourses=[];
  for(const row of rows){const r=value(row);if(!r||r.status!=='room'||r.worldSeed!==world.seed||time(r.expiresAt)<=nowMs)continue;
-  const [a,b]=await Promise.all([db.collection('users').doc(uid).collection('blockedPlayers').doc(r.ownerUid).get(),db.collection('users').doc(r.ownerUid).collection('blockedPlayers').doc(uid).get()]);if(a.exists||b.exists)continue;
+  const [a,b,closing]=await Promise.all([db.collection('users').doc(uid).collection('blockedPlayers').doc(r.ownerUid).get(),db.collection('users').doc(r.ownerUid).collection('blockedPlayers').doc(uid).get(),db.collection('captureAccountDeletions').doc(r.ownerUid).get()]);if(a.exists||b.exists||closing.exists)continue;
   const entry={id:row.id,status:'room',ownerUid:r.ownerUid,revision:r.revision,districtId:r.districtId,reference:r.reference,roomCode};
   if(roomCourseId){const district=value(await ref.collection('racingDistricts').doc(r.districtId).get());if(district?.status!=='room'||time(district.expiresAt)<=nowMs)continue;entry.facts=district.facts;}
   roomCourses.push(entry);

@@ -60,8 +60,8 @@ export async function readPublishedRaceCourse({read,id,uid,roomCode,nowMs=Date.n
   if(!/^[A-Z0-9]{6}$/.test(roomCode))throw Error('race_invalid_room');
   const root=`rooms/${roomCode}`,record=await read(`${root}/racingCourses/${id}`);
   if(record){
-   const [room,player,district,a,b]=await Promise.all([read(root),read(`${root}/players/${uid}`),read(`${root}/racingDistricts/${record.districtId}`),read(`users/${uid}/blockedPlayers/${record.ownerUid}`),read(`users/${record.ownerUid}/blockedPlayers/${uid}`)]),time=t=>t?.toMillis?.()??0;
-   if(a||b||record.status!=='room'||record.roomCode!==roomCode||time(record.expiresAt)<=nowMs||room?.world?.seed!==record.worldSeed||room?.world?.kind!=='earth'||player?.uid!==uid||time(player.expiresAt)<=nowMs||nowMs-time(player.lastSeenAt)>120000||time(player.lastSeenAt)>nowMs+5000)throw Error('race_room_presence_expired');
+   const [room,player,district,a,b,closing]=await Promise.all([read(root),read(`${root}/players/${uid}`),read(`${root}/racingDistricts/${record.districtId}`),read(`users/${uid}/blockedPlayers/${record.ownerUid}`),read(`users/${record.ownerUid}/blockedPlayers/${uid}`),read(`captureAccountDeletions/${record.ownerUid}`)]),time=t=>t?.toMillis?.()??0;
+   if(a||b||closing||record.status!=='room'||record.roomCode!==roomCode||time(record.expiresAt)<=nowMs||room?.world?.seed!==record.worldSeed||room?.world?.kind!=='earth'||player?.uid!==uid||time(player.expiresAt)<=nowMs||nowMs-time(player.lastSeenAt)>120000||time(player.lastSeenAt)>nowMs+5000)throw Error('race_room_presence_expired');
    if(district?.status!=='room'||time(district.expiresAt)<=nowMs||district.worldSeed!==record.worldSeed)throw Error('race_district_unavailable');
    const facts=canonicalRaceDistrict(district.facts);
    if(await raceDistrictFingerprint(facts)!==`race-district:${record.districtId}`||Math.abs(room.world.lat-facts.anchor.lat)>1e-7||Math.abs(room.world.lon-facts.anchor.lon)>1e-7)throw Error('race_course_wrong_world');

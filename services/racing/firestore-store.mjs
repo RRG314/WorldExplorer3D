@@ -20,8 +20,8 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
   if(p.purpose==='qualification'&&uid&&uid!==p.ownerUid)fail('race_route_owner_required');
   if(p.purpose==='room-race'){
    if(p.roomCode!==race.roomCode||p.worldSeed!==race.worldSeed)fail('race_course_wrong_world');
-   const root=room(race.roomCode),[rs,ds]=await Promise.all([tx.get(root.collection('racingCourses').doc(race.courseId)),tx.get(root.collection('racingDistricts').doc(p.districtId))]),record=value(rs),district=value(ds);
-   if(record?.status!=='room'||record.revision!==p.revision||record.physicsVersion!==racePhysicsVersion(race.course)||record.worldSeed!==race.worldSeed||time(record.expiresAt)<=at||district?.status!=='room'||district.worldSeed!==race.worldSeed||time(district.expiresAt)<=at)fail('race_course_changed');
+   const root=room(race.roomCode),[rs,ds,closing]=await Promise.all([tx.get(root.collection('racingCourses').doc(race.courseId)),tx.get(root.collection('racingDistricts').doc(p.districtId)),tx.get(db.collection('captureAccountDeletions').doc(p.ownerUid))]),record=value(rs),district=value(ds);
+   if(closing.exists||record?.status!=='room'||record.revision!==p.revision||record.physicsVersion!==racePhysicsVersion(race.course)||record.worldSeed!==race.worldSeed||time(record.expiresAt)<=at||district?.status!=='room'||district.worldSeed!==race.worldSeed||time(district.expiresAt)<=at)fail('race_course_changed');
    return;
   }
   const [r,d,l]=await Promise.all([tx.get(db.collection('racingCourses').doc(race.courseId)),tx.get(db.collection('racingDistricts').doc(p.districtId)),

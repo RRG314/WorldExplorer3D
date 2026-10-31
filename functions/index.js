@@ -906,7 +906,10 @@ async function deleteRoomTree(roomRef) {
     'state',
     'urbanEntities',
     'urbanActors',
-    'urbanCivic'
+    'urbanCivic',
+    'racing',
+    'racingCourses',
+    'racingDistricts'
   ];
   for (const name of subcollections) {
     await deleteDocsByQuery(roomRef.collection(name));
