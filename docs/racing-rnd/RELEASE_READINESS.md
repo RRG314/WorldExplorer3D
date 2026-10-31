@@ -24,19 +24,18 @@ The courses are geographic game interpretations, with explicitly authored
 timing, rules and scenery. They do not claim official homologation, surveyed
 pit speeds, sponsor rights or factory handling.
 
-## Explicit Silverstone limitation
+## Required Silverstone pit acceptance
 
-The **separate Silverstone pit lane remains disabled**. Its exact retained OSM
-source passes preparation, but the current native terrain fails the 15%
-crossfall fence, including the wheel-width core. Narrowing the lane does not
-resolve it. No guard was relaxed and no unsupported pavement is enabled.
-The complete accepted GP main loop remains available. Daytona's complete pit
-lane is included; Nordschleife T13 does not invent a GP pit branch.
-
-The original finished-venue criteria included pit access. A release of these
-three main loops therefore needs the explicit Silverstone pit deferral, or a
-new supported lane and its affected acceptance. This is the remaining scope
-exception; do not describe the unavailable lane as completed.
+The owner requires the separate Silverstone pit lane before release. The prior
+candidate is superseded for acceptance. A conservative six-metre usable
+corridor is now prepared on the lower pit apron, offset up to 3.5 metres from
+the retained mapped edge line and tapering to the exact original junctions.
+The map nodes and tags remain pinned; this is an authored game corridor.
+The shared road preparation applies it before topology, terrain, meshes and
+contacts compile. The existing native ground and 15% crossfall fence remain
+unchanged. Focused native-ground compilation passes with maximum crossfall
+8.6% and grade 7.1%; actual-world publication, full pit driving, contact and
+catalogue acceptance are still required. No new release approval is claimed.
 
 ## Shared product and online integration
 
@@ -93,7 +92,7 @@ not to wait for hardware they do not own. Location-based play, optional
 continuous exploration, buildings, Ocean, Space, saves and platform launch
 owners remain in place. This package does not claim a new native-store release.
 
-## Frozen candidate
+## Prior candidate — superseded pending pit acceptance
 
 Production-configured candidate: `5.6.1+7470b7c0b029.8666d3757ffa2717.production`.
 Frozen source: `7470b7c0b0293ae22bb6e677fd9304b8f575c62b`.
@@ -107,5 +106,4 @@ credentials, with zero page/console/cleanup errors. This is not production
 attestation. All 84 ground files and the code of the exact current-production
 predecessor are retained by verified hashes, protecting already-open worlds.
 The matching service/Functions source, indexes and reviewed catalogue are
-identified in the release receipt. Production remains unchanged. The Silverstone
-pit scope exception above remains explicit.
+identified in the release receipt. Production remains unchanged. Silverstone pit completion and a matching candidate rebuild remain required.

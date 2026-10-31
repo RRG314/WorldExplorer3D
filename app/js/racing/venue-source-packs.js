@@ -1,4 +1,5 @@
 import {mergeReviewedVenueLandscape,annotateReviewedVenueLandscape} from './venue-landscape-source.js';
+import {reviewedVenuePitAlignment} from './venue-pit-alignment.js';
 import {normalizeRaceVenueSource} from './venue-course-policy.js';
 import {compileMappedVenueLayout,compileMappedVenuePitLayout,geographicVenueDistance} from './venue-layout.js';
 import {authorVenueEdgeRecipes} from './venue-edge-authoring.js';
@@ -16,7 +17,13 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  reviewedLandscape:Object.freeze({url:'/app/assets/racing/silverstone/landscape.json',contentSha256:'b9a51532833c1700967bb7e31472b9ea72b24e5268ef33a494cf2bc3e6c046c4'}),
  sourceUrl:'/app/assets/racing/silverstone/source.json',sourceSha256:'c41a9f0d43e21af306fbf3261996e997a036778205acaa28df2697ef424c2b00',
  groundArtifactId:'silverstone-gp-fine-v1',groundContentSha256:'1b1f66af6f8bcbd9db84abe0b123d69bb016955d06afcb55d2a0aee782c306bd',
- maximumCrossfall:.15,qualificationRadiusWorld:1200
+ maximumCrossfall:.15,qualificationRadiusWorld:1200,
+ routeExtent:'mapped-venue-v1',raceDiscipline:'circuit',pitWayIds:Object.freeze([227902927]),pitUsableWidthMeters:6,pitPavementWidthPolicy:'usable-corridor',
+ pitUsableAlignment:Object.freeze({sourceWayId:227902927,sourceVersion:13,
+  sourceSha256:'c41a9f0d43e21af306fbf3261996e997a036778205acaa28df2697ef424c2b00',
+  groundContentSha256:'1b1f66af6f8bcbd9db84abe0b123d69bb016955d06afcb55d2a0aee782c306bd',
+  interpretation:'authored-usable-pit-corridor',
+  stations:Object.freeze([[0,0],[350,0],[450,3.5],[825,3.5],[925,0]].map(([distanceMeters,offsetMeters])=>Object.freeze({distanceMeters,offsetMeters})))})
 }),Object.freeze({
  id:'nurburgring-nordschleife',name:'Nürburgring · Nordschleife',anchor:Object.freeze({lat:50.359,lon:6.963}),
  sourceUrl:'/app/assets/racing/nordschleife/source.json',sourceSha256:'0fcd281250a971a66b795850d1657541b475cba5e3ac249e21a3a0439d3a5d26',
@@ -131,7 +138,8 @@ export function createRacingVenueGroundPlan(descriptor,source){
   routes=stage?layout.wayIds.map(id=>layout.ways.get(id).geometry):[layout.points,...(pit?[pit.points]:[])],requiredArtifacts=racingVenueGroundRequirements(descriptor,{includeLandscape:true}),coverageProbes=[];
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=(stage?3:6)&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  const physicalWidth=maximumPavementWidth(source,layout,descriptor,pit),extent=descriptor.pavementWidthPolicy==='profiled'?Math.max(...[...layout.wayIds,...(pit?.wayIds||[])].flatMap(id=>reviewedVenuePavementSections(source,descriptor,id).samples.map(s=>Math.max(s.positiveMeters,s.negativeMeters)))):physicalWidth*.5;
- const halfWidth=extent+(descriptor.routeExtent==='mapped-venue-v1'?REVIEWED_CORRIDOR_OUTER_MARGIN_METERS:2),landscape=reviewedLandscapeRefinement(descriptor),metersPerDegree=6371008.8*Math.PI/180;
+ const alignmentExtent=descriptor.pitUsableAlignment?Math.max(...descriptor.pitUsableAlignment.stations.map(s=>Math.abs(s.offsetMeters))):0;
+ const halfWidth=extent+alignmentExtent+(descriptor.routeExtent==='mapped-venue-v1'?REVIEWED_CORRIDOR_OUTER_MARGIN_METERS:2),landscape=reviewedLandscapeRefinement(descriptor),metersPerDegree=6371008.8*Math.PI/180;
  for(const points of routes)for(let index=1;index<points.length;index++){
   const a=points[index-1],b=points[index],length=geographicVenueDistance(a,b),steps=Math.max(1,Math.ceil(length/2));
   const east=(b.lon-a.lon)*Math.cos((a.lat+b.lat)*Math.PI/360)*metersPerDegree,north=(b.lat-a.lat)*metersPerDegree;
@@ -209,6 +217,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   const deck=layoutWays.has(raw.id)?reviewedVenueDeckProfile(source,descriptor,raw.id):null;
   const pavement=layoutWays.has(raw.id)?reviewedVenuePavementProfile(source,descriptor,raw.id):null;
   const sections=surveyWays.has(raw.id)?reviewedVenuePavementSections(source,descriptor,raw.id):null;
+  const usableAlignment=pit?.wayIds.includes(raw.id)?reviewedVenuePitAlignment(source,descriptor,pit,raw.id):null;
   if(sections&&(deck||pavement))throw Error('venue_pavement_profile_conflict');
   const sourceFeatureId=`osm:way:${raw.id}`,way={type:'way',id:raw.id,version:raw.version,nodes:[...raw.nodes],tags:{...raw.tags,_sourceFeatureId:sourceFeatureId,_sourceCompleteness:'lossless',...(!surveyWays.has(raw.id)?{_regionalContext:'fixed-location'}:{})}};
   const widthReview=circuitPit&&!layoutWays.has(raw.id)?circuitPit:{usableWidthMeters:source.layout.usableWidthMeters,pavementWidthPolicy:descriptor.pavementWidthPolicy};
@@ -216,6 +225,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
    ...(stage?{sourceNodeIds:Object.freeze(raw.nodes.map(String))}:{}),
    ...(['mapped','profiled'].includes(widthReview.pavementWidthPolicy)?{pavementWidthPolicy:widthReview.pavementWidthPolicy}:{}),
    ...(sections?{sourcePavementSections:sections}:{}),
+   ...(usableAlignment?{usableAlignment}:{}),
    usableWidthMeters:widthReview.usableWidthMeters,maximumCrossfall:layoutWays.has(raw.id)?descriptor.maximumCrossfall:.15,
    ...(descriptor.surfaceModel?{surfaceModel:descriptor.surfaceModel}:{}),
    ...(terrainEdgePolicy?{terrainEdgePolicy}:{}),
