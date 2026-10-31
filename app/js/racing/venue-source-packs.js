@@ -16,8 +16,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  reviewedLandscape:Object.freeze({url:'/app/assets/racing/silverstone/landscape.json',contentSha256:'b9a51532833c1700967bb7e31472b9ea72b24e5268ef33a494cf2bc3e6c046c4'}),
  sourceUrl:'/app/assets/racing/silverstone/source.json',sourceSha256:'c41a9f0d43e21af306fbf3261996e997a036778205acaa28df2697ef424c2b00',
  groundArtifactId:'silverstone-gp-fine-v1',groundContentSha256:'1b1f66af6f8bcbd9db84abe0b123d69bb016955d06afcb55d2a0aee782c306bd',
- maximumCrossfall:.15,qualificationRadiusWorld:1200,routeExtent:'mapped-venue-v1',raceDiscipline:'circuit',
- pitWayIds:Object.freeze([227902927]),pitUsableWidthMeters:6,pitPavementWidthPolicy:'usable-corridor'
+ maximumCrossfall:.15,qualificationRadiusWorld:1200
 }),Object.freeze({
  id:'nurburgring-nordschleife',name:'Nürburgring · Nordschleife',anchor:Object.freeze({lat:50.359,lon:6.963}),
  sourceUrl:'/app/assets/racing/nordschleife/source.json',sourceSha256:'0fcd281250a971a66b795850d1657541b475cba5e3ac249e21a3a0439d3a5d26',

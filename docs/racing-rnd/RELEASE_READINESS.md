@@ -2,6 +2,12 @@
 
 Updated October 31, 2026. **The three-venue candidate is being completed.** The owner reduced launch scope to Silverstone, Nordschleife and Daytona; the other nine layouts are deferred. No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
 
+The native Silverstone pit candidate is **not admitted**: the retained ground
+exceeds the 15% crossfall fence, including the wheel-width core. Its exact source
+and shared preparation remain retained. The accepted full GP main loop is
+unchanged. The owner has been asked whether this separate lane is deferred for
+the three-track launch; do not silently count it as accepted.
+
 ## Implemented and evidenced
 
 - The shared rally foundation now binds asphalt, wet asphalt, gravel and snow/ice
