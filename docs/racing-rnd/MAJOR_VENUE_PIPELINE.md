@@ -1,5 +1,25 @@
 # Major venue source pipeline
 
+## Shared circuit pit support
+
+Circuit pits now use the existing branch geometry, physical contact and ordered
+timing owner. They retain standing starts and receive no oval drafting,
+formation, apron or flag rules. An original game pit limit of 60 km/h uses normal
+braking, with one five-second speed penalty per visit and a five-second occupied
+exit penalty. This is a versioned game policy, not an official venue speed claim.
+
+Circuit source descriptors require an explicit separate pit usable width and
+`mapped` or `usable-corridor` width policy. The ordinary transport compiler and
+ground probe planner consume that review; the main track width is not copied
+onto a narrower pit. Published ordinary pavement is supported without inventing
+oval banking/apron profiles. The new circuit-pit record class is separate;
+existing ordinary and oval classes remain unchanged.
+
+Controlled full-branch, alternate-finish, speed/merge, prediction and generated
+authority checks pass. The existing licensed-car browser fixture was inspected
+at entry, mid-pit and exit with zero boundary contacts or penalties. This is
+shared support, not a native circuit pit or completed geographic pack.
+
 ## Open-stage source and path preparation
 
 Schema-two `open-stage-v1` sources retain the original motor-road tags and exact

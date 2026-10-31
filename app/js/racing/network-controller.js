@@ -5,7 +5,7 @@ import {raceFormationActions} from './ai-controller.js';
 import {projectRacePosition} from './course-rules.js';
 import {ovalTrackZone,ovalPaceActions,ovalDraftActor,ovalDraftReduction} from './oval-rules.js';
 import {raceVehicleSpeedMetersPerSecond} from './vehicle-controller.js';
-import {createRacePitGeometry,racePitPavementAt} from './pit-lane-rules.js';
+import {createRacePitGeometry,racePitPavementAt,circuitPitPaceActions} from './pit-lane-rules.js';
 const stopped=state=>({...state,speed:0,vFwd:0,vLat:0,vx:0,vz:0,yawRate:0,steerAngle:0,steerSm:0,rearSlip:0,throttleSm:0,engineLoad:0,engineRpm:850,driveGear:1,shiftTime:0,driftAngle:0,isDrifting:false});
 export function raceNetworkProfile(configuration,course){
  if(configuration?.physicsVersion!==racePhysicsVersion(course))throw Error('race_physics_version_changed');
@@ -45,6 +45,7 @@ export function createNetworkRaceController({context,course,connection,uid,isAdm
      const actors=latest.players.filter(p=>p.uid!==uid&&p.vehicleState&&handlingByUid.has(p.uid)).map(p=>ovalDraftActor(p.uid,p.vehicleState,handlingByUid.get(p.uid),p.trackZone,raceVehicleSpeedMetersPerSecond(p.vehicleState),!p.dnf&&!p.disconnected&&!p.progress?.finished));
      draftReduction=ovalDraftReduction(subject,actors,course.metersPerUnit,{enabled:!yellow});
     }
+    else if(pitGeometry)controls=circuitPitPaceActions(actions,raceVehicleSpeedMetersPerSecond(frame),player.pit?.active);
     stepRaceVehicle(racePitPavementAt(course,pitGeometry,raceVehicleGroundPose(frame),player.pit),frame,controls,dt,profile,{draftReduction});
    }
    else if(course.discipline==='oval')stepRaceVehicle(course,frame,raceFormationActions(course,frame,player.progress,profile,player.slot),dt,profile);

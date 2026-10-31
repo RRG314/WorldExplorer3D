@@ -1,5 +1,6 @@
 // Original game format constants. The existing session owns the clock and
 // actors; these values confer no venue, road or result authority.
+import {restrictedRaceSpeedActions} from './speed-controls.js';
 export const OVAL_FORMATION_DURATION_MS=4000;
 export const OVAL_PACE_METERS_PER_SECOND=10;
 export const OVAL_FORMATION_DISTANCE_METERS=OVAL_PACE_METERS_PER_SECOND*OVAL_FORMATION_DURATION_MS/1000;
@@ -21,8 +22,7 @@ export function ovalTrackZone(projection){
  return (innerPositive?l>high:l<low)?'apron':'outside';
 }
 export function ovalPaceActions(actions,speedMetersPerSecond,restricted){
- if(!restricted||Math.abs(speedMetersPerSecond)<=OVAL_PACE_METERS_PER_SECOND)return actions;
- return {...actions,throttle:0,reverse:0,serviceBrake:Math.max(actions.serviceBrake||0,Math.min(1,(Math.abs(speedMetersPerSecond)-OVAL_PACE_METERS_PER_SECOND)*.35))};
+ return restrictedRaceSpeedActions(actions,speedMetersPerSecond,restricted,OVAL_PACE_METERS_PER_SECOND);
 }
 export function ovalDistanceGap(from,to,length){return ((to-from+length*1.5)%length)-length/2;}
 export function ovalDraftActor(uid,car,handling,zone,speedMetersPerSecond,active=true){

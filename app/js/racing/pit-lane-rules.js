@@ -1,6 +1,13 @@
 import {raceSegmentAtDistance,sampleRaceSegmentY,projectRacePosition} from './course-rules.js';
 import {racePavementCrossSection} from './pavement-cross-section.js';
 import {ovalDistanceGap,ovalTrackZone} from './oval-rules.js';
+import {restrictedRaceSpeedActions} from './speed-controls.js';
+
+// Original game circuit policy, not an official venue/series speed claim.
+export const CIRCUIT_PIT_SPEED_METERS_PER_SECOND=60/3.6;
+export const CIRCUIT_PIT_PENALTY_MS=5000;
+export const CIRCUIT_PIT_MERGE_CLEARANCE_METERS=10;
+export const circuitPitPaceActions=(actions,speed,restricted)=>restrictedRaceSpeedActions(actions,speed,restricted,CIRCUIT_PIT_SPEED_METERS_PER_SECOND);
 
 function gateAt(course,distanceMeters){
  const s=raceSegmentAtDistance(course,distanceMeters),t=Math.max(0,Math.min(1,(distanceMeters-s.startMeters)/s.lengthMeters)),section=racePavementCrossSection(s,t),offset=section?.racingOffsetMeters||0;
@@ -33,5 +40,6 @@ export function racePitPavementAt(course,geometry,pose,{active=false,approach=fa
  if(!geometry)return course;
  if(active){const d=(pitProjection||projectRacePosition(geometry.pitPavement,pose))?.distanceMeters??0;return d<15||d>geometry.pitPavement.lengthMeters-15?geometry.union:geometry.pitPavement;}
  if(approach)return geometry.union;
- const projection=mainProjection||projectRacePosition(course,pose);return ovalTrackZone(projection)==='apron'&&racePitEntryNearby(course,geometry,projection)?geometry.union:course;
+ const projection=mainProjection||projectRacePosition(course,pose);
+ return (course.discipline==='circuit'||ovalTrackZone(projection)==='apron')&&racePitEntryNearby(course,geometry,projection)?geometry.union:course;
 }

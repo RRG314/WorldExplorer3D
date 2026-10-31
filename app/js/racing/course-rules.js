@@ -320,7 +320,7 @@ export function createRaceCourse(graph,path,settings={}){
   if(!isClosedRaceDiscipline(discipline)||!graph.venueSource?.pitSourceFeatureIds||!Array.isArray(settings.pitPath)||!settings.pitPath.length||settings.pitPath.length>512)throw Error('race_pit_source_required');
   const pitEdges=settings.pitPath.map(id=>byId.get(id)),allowed=new Set(graph.venueSource.pitSourceFeatureIds),mainSources=new Set(edges.map(e=>e.sourceId));
   if(pitEdges.some(e=>!e||![...allowed].some(id=>e.sourceId.startsWith(id+':'))||mainSources.has(e.sourceId))||new Set(settings.pitPath).size!==settings.pitPath.length)throw Error('race_invalid_pit_path');
-  if(pitEdges.some(e=>e.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||e.heightSamples?.some(row=>!Number.isFinite(row.racingWidthMeters))))throw Error('race_pit_pavement_required');
+  if(discipline==='oval'&&pitEdges.some(e=>e.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||e.heightSamples?.some(row=>!Number.isFinite(row.racingWidthMeters))))throw Error('race_pit_pavement_required');
   const pit=createRaceCourse(graph,settings.pitPath,{locationId:course.locationId,locationLabel:course.locationLabel,anchor:course.anchor,discipline:'sprint',participants:1,name:course.name+' · pit lane',gateSpacingMeters:15});
   if(pit.lengthMeters>2000)throw Error('race_pit_length');
   const entryNode=pitEdges[0].from,exitNode=pitEdges.at(-1).to,mainNodes=new Set(edges.map(e=>e.from));

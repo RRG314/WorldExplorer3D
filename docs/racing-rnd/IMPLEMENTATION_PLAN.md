@@ -167,6 +167,11 @@ interval/width policy, directed path reconstruction and generated-engine parity.
 Controlled source/browser checks pass; actual stage course creation and world
 adoption remain explicitly unavailable pending B3. This is not a playable pack.
 
+B2 shared circuit pit support is implemented with separate width review,
+standing-start policy, ordinary published support, speed/merge rules, prediction
+and record class. Controlled full-branch and real-model browser checks pass.
+Native per-circuit pit inputs, sectors/cuts and pack acceptance remain open.
+
 | Work package | Depends on | Concrete completion gate |
 | --- | --- | --- |
 | A. Baseline and architecture | Existing source/evidence | Preserve pending work; identify shared owners, contracts and accepted evidence. This plan ends the architecture lookup phase. |
