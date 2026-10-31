@@ -7917,7 +7917,7 @@
         "sourceDocument": "https://www.usgs.gov/3d-elevation-program",
         "modified": true
       },
-      "url": "/app/assets/ground/daytona/ground-artifact.json"
+      "url": "./daytona/ground-artifact.json"
     }
   ]
 }
