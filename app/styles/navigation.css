@@ -219,6 +219,7 @@
 .racing-hub [data-race-detail],.racing-hub [data-race-record] {font-size:13px;}
 .racing-options {display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .racing-options label {margin:12px 0;}
+.racing-hub [hidden] {display:none!important;}
 .racing-hub details {border-top:1px solid var(--wx-line-soft);margin-top:12px;padding-top:8px;}
 .racing-hub summary {cursor:pointer;min-height:44px;padding:12px 0;font-size:14px;font-weight:600;}
 .racing-hub [data-race-status] {min-height:24px;font-size:12px;margin:4px 0 10px;}
