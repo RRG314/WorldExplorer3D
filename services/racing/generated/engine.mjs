@@ -5434,23 +5434,23 @@ async function reconstructPublishedRace(reference, facts) {
   const fingerprint = await raceDistrictFingerprint(facts), graph = buildRaceRoadGraph(facts.roads, { metersPerUnit: facts.metersPerUnit, venueSource: facts.venueSource });
   return restoreRaceCourse(normalizeRaceRouteReference(reference), facts, graph, fingerprint);
 }
-async function rebaseRaceReference(reference, approvedFacts, localFacts) {
+async function rebaseRaceReference(reference, approvedFacts, localFacts, options) {
   const route = normalizeRaceRouteReference(reference);
   if (route.districtFingerprint !== await raceDistrictFingerprint(localFacts)) throw Error("race_roads_changed_requalify_route");
   const next = { ...route, districtFingerprint: await raceDistrictFingerprint(approvedFacts) };
   const course = await reconstructPublishedRace(next, approvedFacts);
-  assertRaceCourseInDistrict(course, localFacts);
+  assertRaceCourseInDistrict(course, localFacts, options);
   return next;
 }
-function assertRaceCourseInDistrict(course, localFacts) {
+function assertRaceCourseInDistrict(course, localFacts, { allowVenueSubset = false } = {}) {
   if (course.locationId !== localFacts.locationId || Math.abs(course.anchor.lat - localFacts.anchor.lat) > 1e-7 || Math.abs(course.anchor.lon - localFacts.anchor.lon) > 1e-7 || course.metersPerUnit !== localFacts.metersPerUnit) throw Error("race_course_wrong_world");
   const graph = buildRaceRoadGraph(localFacts.roads, { metersPerUnit: localFacts.metersPerUnit, venueSource: localFacts.venueSource }), byId = new Map(graph.edges.map((e) => [e.id, e]));
   const local = createRaceCourse(graph, course.sourcePath, { ...course, eventRules: course.eventRules || null });
-  if (local.surfaceModel !== course.surfaceModel || local.pavementModel !== course.pavementModel || !sameRaceVenueSource(local.venueSource, course.venueSource)) throw Error("race_roads_changed_requalify_route");
+  if (local.surfaceModel !== course.surfaceModel || local.pavementModel !== course.pavementModel || !sameRaceVenueSource(local.venueSource, course.venueSource) && !(allowVenueSubset && !course.venueSource)) throw Error("race_roads_changed_requalify_route");
   if (local.segments.length !== course.segments.length) throw Error("race_roads_changed_requalify_route");
   for (let i = 0; i < course.segments.length; i++) {
     const a = course.segments[i], b = local.segments[i];
-    if (a.pavementModel !== b.pavementModel || a.structure !== b.structure || a.widthMeters > b.widthMeters + 3e-3 || a.clearanceMeters > b.clearanceMeters + 3e-3 || !byId.has(course.sourcePath[Math.min(i, course.sourcePath.length - 1)])) throw Error("race_roads_changed_requalify_route");
+    if (a.surfaceKind !== b.surfaceKind || a.pavementModel !== b.pavementModel || a.structure !== b.structure || a.widthMeters > b.widthMeters + 3e-3 || a.clearanceMeters > b.clearanceMeters + 3e-3 || !byId.has(course.sourcePath[Math.min(i, course.sourcePath.length - 1)])) throw Error("race_roads_changed_requalify_route");
     for (const key of ["a", "b"]) if (Math.hypot(a[key].x - b[key].x, a[key].z - b[key].z) * course.metersPerUnit > 0.01) throw Error("race_roads_changed_requalify_route");
     const steps = Math.ceil(a.lengthMeters / 4);
     if (a.pavementModel || a.surfaceKind === "ground") {
