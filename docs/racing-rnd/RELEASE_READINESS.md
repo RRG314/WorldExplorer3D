@@ -92,3 +92,20 @@ physical-phone acceptance remain unverified. The owner has explicitly chosen
 not to wait for hardware they do not own. Location-based play, optional
 continuous exploration, buildings, Ocean, Space, saves and platform launch
 owners remain in place. This package does not claim a new native-store release.
+
+## Frozen candidate
+
+Production-configured candidate: `5.6.1+7470b7c0b029.8666d3757ffa2717.production`.
+Frozen source: `7470b7c0b0293ae22bb6e677fd9304b8f575c62b`.
+Asset-manifest SHA256: `175d4ad691e2adedcdc2105497bb5fbb616bfb80e9e5aa7f9c4dc69d38140c72`.
+
+Artifact verification and the existing configuration-only promotion validator
+pass. The retention-only packager change preserves the same shipped game-source
+digest as the played native package. The resulting immutable generation also
+passes an actual production-configured startup using explicit local staging
+credentials, with zero page/console/cleanup errors. This is not production
+attestation. All 84 ground files and the code of the exact current-production
+predecessor are retained by verified hashes, protecting already-open worlds.
+The matching service/Functions source, indexes and reviewed catalogue are
+identified in the release receipt. Production remains unchanged. The Silverstone
+pit scope exception above remains explicit.
