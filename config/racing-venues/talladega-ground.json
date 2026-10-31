@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "venueId": "talladega-tri-oval",
+  "providerId": "usgs-3dep-best-available",
+  "sourceRelease": "USGS-3DEP:AL_17County_2020_B20:20220728",
+  "sourceCrs": "EPSG:26916+5703",
+  "sourceClassification": "bare-earth-dtm",
+  "sourceVerticalAccuracyMeters": null,
+  "sourceAccuracyStatement": "USGS tile metadata identifies one-metre bare-earth data acquired 2020-12-09 through 2021-02-23 and published 2022-07-28. It refers to original product metadata for vertical accuracy and does not state a tile RMSE. The datum-operation uncertainty excludes that unknown source accuracy; no total terrain accuracy is claimed.",
+  "attribution": "U.S. Geological Survey, 3D Elevation Program (3DEP); World Explorer 3D extracted unchanged native pixels, resampled and normalized heights, and quantized the delivery grid. No USGS endorsement.",
+  "licenseDocument": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/AL_17County_2020_B20/metadata/USGS_1M_16_x58y372_AL_17County_2020_B20.xml",
+  "sourceDocument": "https://www.usgs.gov/3d-elevation-program",
+  "raster": {
+    "filename": "talladega-native-window-v1/native-window.f32",
+    "bytes": 9315012,
+    "sha256": "82f032b81490608ea9e9d63af041606e07d5bfc4e2dd79f8ddf85d8fe38235f1",
+    "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/AL_17County_2020_B20/TIFF/USGS_1M_16_x58y372_AL_17County_2020_B20.tif",
+    "sourceEtag": "\"8aa7442d5db5b105749b258b3d9ea699-65\"",
+    "sourceDimensions": [
+      10012,
+      10012
+    ],
+    "metadata": {
+      "filename": "talladega-native-window-v1/metadata.json",
+      "bytes": 1336,
+      "sha256": "8404b5226fad8ec006c233e05fb2aa78af17567686884abe3ff16110a6fbe4d4"
+    },
+    "authorityMetadata": {
+      "filename": "talladega-usgs-metadata-v1.xml",
+      "bytes": 12209,
+      "sha256": "d608ba15cb3290cab78614a698eb693898c2ba149b5e42a3607e77f989aac398",
+      "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/AL_17County_2020_B20/metadata/USGS_1M_16_x58y372_AL_17County_2020_B20.xml"
+    }
+  },
+  "grids": [
+    {
+      "filename": "grids/us_nga_egm08_25.tif",
+      "bytes": 80585622,
+      "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
+      "url": "https://cdn.proj.org/us_nga_egm08_25.tif"
+    },
+    {
+      "filename": "grids/us_noaa_g2018u0.tif",
+      "url": "https://cdn.proj.org/us_noaa_g2018u0.tif",
+      "bytes": 16742155,
+      "sha256": "fa9a407ac7ee3f5a3694008e4bcd09ce9cc250452f0c3b11700a4960340abce2"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+      "bytes": 3522682,
+      "sha256": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+      "bytes": 39965338,
+      "sha256": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+      "bytes": 42709110,
+      "sha256": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+      "bytes": 9111570,
+      "sha256": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff"
+    }
+  ],
+  "patches": [
+    {
+      "id": "talladega-tri-oval-fine-v1",
+      "westMeters": -9581536,
+      "eastMeters": -9580110,
+      "southMeters": 3969694,
+      "northMeters": 3971992,
+      "spacingMeters": 2,
+      "quantizationMeters": 0.01
+    }
+  ]
+}

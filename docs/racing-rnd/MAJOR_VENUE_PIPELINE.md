@@ -1,5 +1,45 @@
 # Major venue source pipeline
 
+## Additional circuit and oval inputs
+
+The source recipes now retain three additional complete ordered layouts and
+separate native pit branches. These are source inputs, not admitted playable
+packs. Their conservative six-metre eligibility corridor is not a physical
+pavement-width survey.
+
+| Source | Ordered ways / spans | Mapped / reference length | Separate pit |
+| --- | --- | --- | --- |
+| Spa GP | 30 / 329 | 6,994.658 / 7,004 m | 719.478 m |
+| Monza GP road circuit | 20 / 293 | 5,794.073 / 5,793 m | 741.826 m |
+| Talladega tri-oval | 4 / 71 | 4,308.723 / 4,280.970 m | 764.413 m |
+
+The GP selections exclude motorcycle, kart and historic alternatives while
+retaining their original source context. Monza's finite map parts each bind
+their original response bytes and coverage. The shared intake rejects holes,
+overlaps, changed payloads and conflicting way revisions; it cannot silently
+choose a newer fragment. Mapper account metadata is omitted as before.
+
+Talladega also has a pinned USGS one-metre native window and a normalized ground
+artifact through the existing compiler. The 1,211 × 1,923 window retains
+9,315,012 unchanged pixel bytes; 21 bounded ranges transferred 12,386,304 bytes
+from the 340,283,361-byte source object. Offline replay reproduces its exact
+pixel and metadata digests. The delivered two-metre Web Mercator grid contains
+821,100 samples in 2,190,571 JSON bytes, with centimetre quantization.
+
+The TIFF's declared NAD83 UTM zone 16 is checked against the native keys; the
+USGS adapter no longer assumes zone 17 for every venue. The same pinned offline
+datum pipeline reports 5.125 m operation uncertainty, excluding unknown source
+vertical accuracy. Quantization is delivery precision, not total terrain
+accuracy. Every centre and ±6 m probe along the main and pit source is finite.
+The raw lateral-edge diagnostic includes a 23.16% local along-route gradient;
+the existing 22% road admission gate remains unchanged for pavement review.
+
+Ground artifacts and source files are not registered for automatic world/race
+admission until their required pavement, structures, rules and publication are
+ready. Bristol and Indianapolis inputs still require length reconciliation;
+their mapped/reference differences exceed the existing one-percent source guard.
+Do not stretch geometry or change that guard merely to claim completed inputs.
+
 ## Shared circuit pit support
 
 Circuit pits now use the existing branch geometry, physical contact and ordered

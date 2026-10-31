@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "talladega-tri-oval-fine-v1",
+  "providerId": "usgs-3dep-best-available",
+  "sourceRelease": "USGS-3DEP:AL_17County_2020_B20:20220728",
+  "contentSha256": "d85b5d701a1d401dcaf5831fd7ef3bd90cbfdc37a88eb0a714ad923e70be8175",
+  "spacingMeters": 2,
+  "coverage": {
+    "south": 33.558662371933046,
+    "north": 33.57586312700978,
+    "west": -86.0724023414142,
+    "east": -86.05959236546266
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "bare-earth-dtm",
+    "sourceCrs": "EPSG:26916+5703",
+    "targetCrs": "EPSG:9056+3855",
+    "sourceConfigurationSha256": "7aa1351bd0af4386693713cd1fb32ef4c0f6465c118757aef8ef46d31210fe80",
+    "raster": {
+      "filename": "talladega-native-window-v1/native-window.f32",
+      "bytes": 9315012,
+      "sha256": "82f032b81490608ea9e9d63af041606e07d5bfc4e2dd79f8ddf85d8fe38235f1",
+      "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/AL_17County_2020_B20/TIFF/USGS_1M_16_x58y372_AL_17County_2020_B20.tif",
+      "sourceEtag": "\"8aa7442d5db5b105749b258b3d9ea699-65\"",
+      "sourceDimensions": [
+        10012,
+        10012
+      ],
+      "metadata": {
+        "filename": "talladega-native-window-v1/metadata.json",
+        "bytes": 1336,
+        "sha256": "8404b5226fad8ec006c233e05fb2aa78af17567686884abe3ff16110a6fbe4d4"
+      },
+      "authorityMetadata": {
+        "filename": "talladega-usgs-metadata-v1.xml",
+        "bytes": 12209,
+        "sha256": "d608ba15cb3290cab78614a698eb693898c2ba149b5e42a3607e77f989aac398",
+        "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/AL_17County_2020_B20/metadata/USGS_1M_16_x58y372_AL_17County_2020_B20.xml"
+      }
+    },
+    "nativeWindow": {
+      "schemaVersion": 1,
+      "encoding": "float32-native-window-v1",
+      "byteOrder": "little-endian",
+      "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/AL_17County_2020_B20/TIFF/USGS_1M_16_x58y372_AL_17County_2020_B20.tif",
+      "sourceEtag": "\"8aa7442d5db5b105749b258b3d9ea699-65\"",
+      "sourceFileBytes": 340283361,
+      "sourceWindow": [
+        6091,
+        4478,
+        7302,
+        6401
+      ],
+      "sourceOrigin": [
+        579993.999663192,
+        3720006.000305541,
+        0
+      ],
+      "origin": [
+        586084.999663192,
+        3715528.000305541
+      ],
+      "resolution": [
+        1,
+        -1
+      ],
+      "width": 1211,
+      "height": 1923,
+      "keys": {
+        "GTModelTypeGeoKey": 1,
+        "GTRasterTypeGeoKey": 1,
+        "GTCitationGeoKey": "NAD83 / UTM zone 16N",
+        "GeogCitationGeoKey": "NAD83",
+        "GeogAngularUnitsGeoKey": 9102,
+        "ProjectedCSTypeGeoKey": 26916,
+        "ProjLinearUnitsGeoKey": 9001
+      },
+      "nodata": -999999,
+      "filename": "native-window.f32",
+      "bytes": 9315012,
+      "sha256": "82f032b81490608ea9e9d63af041606e07d5bfc4e2dd79f8ddf85d8fe38235f1",
+      "minimum": 150.59490966796875,
+      "maximum": 169.36590576171875,
+      "missing": 0,
+      "nativeValuesUnchanged": true,
+      "sourceClassification": "bare-earth-dtm",
+      "sourceCrs": "EPSG:26916+5703",
+      "preparationCoordinateSha256": "ed98687c8a3cfef6a923817f79c6489e89cc132ac423a98b503856974416a713"
+    },
+    "resampling": "bilinear at native one-metre pixel centres; every contributor required; no nodata or edge fill",
+    "sourceVerticalAccuracyMeters": null,
+    "sourceAccuracyStatement": "USGS tile metadata identifies one-metre bare-earth data acquired 2020-12-09 through 2021-02-23 and published 2022-07-28. It refers to original product metadata for vertical accuracy and does not state a tile RMSE. The datum-operation uncertainty excludes that unknown source accuracy; no total terrain accuracy is claimed.",
+    "normalizationUncertaintyIncludesSourceAccuracy": false,
+    "quantization": {
+      "scaleMeters": 0.01,
+      "maximumErrorMeters": 0.004999994563036125
+    },
+    "normalization": {
+      "source": "EPSG:9056+3855",
+      "target": "EPSG:26916+5703",
+      "definition": "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad step proj=vgridshift grids=us_nga_egm08_25.tif multiplier=1 step proj=cart ellps=WGS84 step proj=helmert x=0.99343 y=-1.90331 z=-0.52655 rx=0.02591467 ry=0.00942644999999999 rz=0.01159935 s=0.00171504 dx=0.00079 dy=-0.0006 dz=-0.00134 drx=6.667e-05 dry=-0.00075744 drz=-5.133e-05 ds=-0.00010201 t_epoch=1997 convention=coordinate_frame step inv proj=cart ellps=GRS80 step inv proj=vgridshift grids=us_noaa_g2018u0.tif multiplier=1 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=16 ellps=GRS80",
+      "description": "axis order change (2D) + Inverse of WGS 84 to EGM2008 height (1) using WGS 84 to WGS 84 (G1674) + Inverse of Conversion from WGS 84 (G1674) (geocentric) to WGS 84 (G1674) (geog3D) + WGS 84 (G1674) to ITRF2008 (1) + ITRF2008 to NAD83(2011) (1) + Inverse of Conversion from NAD83(2011) (geog3D) to NAD83(2011) (geocentric) + NAD83(2011) to NAVD88 height (3) + Inverse of NAD83 to NAD83(2011) (NADCON5, CONUS) + UTM zone 16N",
+      "accuracyMeters": 5.125,
+      "pyprojVersion": "3.7.2",
+      "projVersion": "9.5.1",
+      "grids": [
+        {
+          "filename": "grids/us_nga_egm08_25.tif",
+          "bytes": 80585622,
+          "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
+          "url": "https://cdn.proj.org/us_nga_egm08_25.tif"
+        },
+        {
+          "filename": "grids/us_noaa_g2018u0.tif",
+          "url": "https://cdn.proj.org/us_noaa_g2018u0.tif",
+          "bytes": 16742155,
+          "sha256": "fa9a407ac7ee3f5a3694008e4bcd09ce9cc250452f0c3b11700a4960340abce2"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+          "bytes": 3522682,
+          "sha256": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+          "bytes": 39965338,
+          "sha256": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+          "bytes": 42709110,
+          "sha256": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a"
+        },
+        {
+          "filename": "grids/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+          "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+          "bytes": 9111570,
+          "sha256": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff"
+        }
+      ]
+    }
+  },
+  "attribution": {
+    "notice": "U.S. Geological Survey, 3D Elevation Program (3DEP); World Explorer 3D extracted unchanged native pixels, resampled and normalized heights, and quantized the delivery grid. No USGS endorsement.",
+    "licenseDocument": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/AL_17County_2020_B20/metadata/USGS_1M_16_x58y372_AL_17County_2020_B20.xml",
+    "sourceDocument": "https://www.usgs.gov/3d-elevation-program",
+    "modified": true
+  }
+}

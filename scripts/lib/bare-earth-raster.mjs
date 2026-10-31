@@ -1,5 +1,11 @@
 // Offline source decoding only. Every output still enters the existing
 // accepted-ground compiler; this module owns no runtime height or actor state.
+// USGS standard CONUS one-metre products declare NAD83 UTM plus NAVD88.
+// The declared zone must still match the actual pinned TIFF/window keys.
+export function nad83UtmNavd88HorizontalEpsg(crs){
+ const match=/^EPSG:(269(?:0[1-9]|1[0-9]|2[0-3]))\+5703$/.exec(crs);
+ return match?Number(match[1]):null;
+}
 export function nativeRasterMetadata(image,{horizontalEpsg,verticalEpsg=null,errorPrefix='ground'}={}){
  const keys=image.getGeoKeys(),matrix=image.fileDirectory.getValue('ModelTransformation');
  const fail=reason=>{throw Error(`${errorPrefix}_raster_${reason}`);};

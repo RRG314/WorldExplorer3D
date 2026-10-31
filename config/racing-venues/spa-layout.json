@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "venueId": "spa-grand-prix",
+  "readiness": "source-only",
+  "source": {
+    "provider": "OpenStreetMap native API",
+    "format": "osm-api-map-json-v1",
+    "endpoint": "https://api.openstreetmap.org/api/0.6/map.json?bbox=5.9551257,50.4253513,5.9807,50.4485831",
+    "coverage": {
+      "south": 50.4253513,
+      "west": 5.9551257,
+      "north": 50.4485831,
+      "east": 5.9807
+    },
+    "observedAt": "2026-10-31T02:21:32.000Z",
+    "responseSha256": "d626e3fb5473a8aeb2645e0773027ffa57a0511c6341863e9b84887faf1a4a4a"
+  },
+  "layout": {
+    "name": "Spa-Francorchamps · Grand Prix",
+    "closed": true,
+    "wayIds": [
+      24449918,
+      126807113,
+      175195997,
+      126807111,
+      126807112,
+      1359025268,
+      126807106,
+      1359025267,
+      126807103,
+      126807101,
+      126807109,
+      126807116,
+      175371353,
+      175371365,
+      126807100,
+      176133746,
+      126807114,
+      176133745,
+      178964809,
+      126807105,
+      637268672,
+      613486590,
+      126807099,
+      175178443,
+      175178448,
+      126807110,
+      126835639,
+      126835637,
+      126835638,
+      1430527230
+    ],
+    "referenceLengthMeters": 7004,
+    "usableWidthMeters": 6,
+    "referenceUrl": "https://www.formula1.com/en/information/belgium-circuit-de-spa-francorchamps.3LltuYaAXVRU8iezEsjzGw",
+    "widthEvidence": "Six-metre conservative eligibility corridor only. Physical pavement width, banking, ground and complete venue admission remain pending review."
+  },
+  "preparedSourceSha256": "6d47f5669bf45ed4bf92f6a4502499c04ff893dbcee7593b212f2b4b0c11a52c"
+}

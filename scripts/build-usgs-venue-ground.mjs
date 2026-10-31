@@ -7,14 +7,15 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {createGroundGridPatch} from './lib/ground-artifact-builder.mjs';
-import {decodeNativeRasterWindow,sampleNativeRaster} from './lib/bare-earth-raster.mjs';
+import {decodeNativeRasterWindow,sampleNativeRaster,nad83UtmNavd88HorizontalEpsg} from './lib/bare-earth-raster.mjs';
 import {encodeEaGround} from './lib/ea-ground-grid.mjs';
 import {compileGroundArtifact} from '../app/js/terrain/ground-artifact.js';
 const flag=name=>process.argv.find(a=>a.startsWith(name+'='))?.slice(name.length+1),configPath=flag('--config'),dataDir=flag('--data-dir'),outputDir=flag('--output-dir');
 if(!configPath||!dataDir||!outputDir)throw Error('--config=FILE --data-dir=DIR --output-dir=NEW_DIR required');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),configBytes=await fs.readFile(configPath),config=JSON.parse(configBytes),source=config.raster;
+const horizontalEpsg=nad83UtmNavd88HorizontalEpsg(config.sourceCrs);
 if(config.schemaVersion!==1||config.providerId!=='usgs-3dep-best-available'||!config.venueId||!config.sourceRelease||
- config.sourceCrs!=='EPSG:26917+5703'||config.sourceClassification!=='bare-earth-dtm'||!source||
+ !horizontalEpsg||config.sourceClassification!=='bare-earth-dtm'||!source||
  !Array.isArray(config.grids)||config.grids.length!==6||!Array.isArray(config.patches)||config.patches.length!==1||
  config.sourceVerticalAccuracyMeters!==null||!config.sourceAccuracyStatement)throw Error('invalid_usgs_venue_configuration');
 if(await fs.stat(outputDir).catch(()=>null))throw Error('output_directory_already_exists');
@@ -27,7 +28,7 @@ for(const item of [...config.grids,source,source.metadata,source.authorityMetada
 }
 const metadata=JSON.parse(await fs.readFile(inputPath(source.metadata.filename))),bytes=await fs.readFile(inputPath(source.filename));
 if(metadata.sha256!==source.sha256||metadata.sourceCrs!==config.sourceCrs||metadata.sourceClassification!==config.sourceClassification||metadata.sourceUrl!==source.sourceUrl||metadata.sourceEtag!==source.sourceEtag)throw Error('usgs_native_source_binding');
-const raster=decodeNativeRasterWindow(metadata,bytes,{horizontalEpsg:26917,sourceDimensions:source.sourceDimensions,errorPrefix:'usgs'});
+const raster=decodeNativeRasterWindow(metadata,bytes,{horizontalEpsg,sourceDimensions:source.sourceDimensions,errorPrefix:'usgs'});
 await fs.mkdir(outputDir,{recursive:true});const work=path.join(outputDir,'work');await fs.mkdir(work);
 const patch=config.patches[0],part=createGroundGridPatch({...patch,maxSamples:1500000}),grid=part.grid,planFile=path.join(work,patch.id+'.plan.json');
 const space=await fs.statfs(outputDir);if(space.bavail*space.bsize<1024**3)throw Error('usgs_ground_disk_guard');

@@ -2,6 +2,9 @@
 export const currentContractTests = [
   'tests/racing-stage-source-current.test.mjs',
   'tests/racing-circuit-pit-current.test.mjs',
+  'tests/racing-venue-mosaic-source-current.test.mjs',
+  'tests/racing-remaining-venue-sources-current.test.mjs',
+  'tests/racing-talladega-ground-current.test.mjs',
   'tests/acceptance-inputs-current.test.mjs',
   'tests/activity-command-ownership-current.test.mjs',
   'tests/drone-command-ownership-current.test.mjs',

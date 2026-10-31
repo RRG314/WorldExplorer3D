@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "venueId": "monza-grand-prix",
+  "readiness": "source-only",
+  "source": {
+    "provider": "OpenStreetMap native API",
+    "format": "osm-api-map-bundle-json-v1",
+    "coverage": {
+      "south": 45.6011,
+      "west": 9.2626,
+      "north": 45.6371,
+      "east": 9.3026
+    },
+    "observedAt": "2026-10-31T02:29:18.000Z",
+    "parts": [
+      {
+        "format": "osm-api-map-json-v1",
+        "endpoint": "https://api.openstreetmap.org/api/0.6/map.json?bbox=9.2626,45.6011,9.2826,45.6191",
+        "coverage": {
+          "south": 45.6011,
+          "west": 9.2626,
+          "north": 45.6191,
+          "east": 9.2826
+        },
+        "observedAt": "2026-10-31T02:29:14.000Z",
+        "responseSha256": "4acef4e87dc0b4958e026730beea21260518c72e48c1a2159b1eea23d6f98afc"
+      },
+      {
+        "format": "osm-api-map-json-v1",
+        "endpoint": "https://api.openstreetmap.org/api/0.6/map.json?bbox=9.2826,45.6011,9.3026,45.6191",
+        "coverage": {
+          "south": 45.6011,
+          "west": 9.2826,
+          "north": 45.6191,
+          "east": 9.3026
+        },
+        "observedAt": "2026-10-31T02:29:15.000Z",
+        "responseSha256": "b1381bffe9589a926b47b2c6d8456f6a6590c26b9780dd69261f9655481eaffd"
+      },
+      {
+        "format": "osm-api-map-json-v1",
+        "endpoint": "https://api.openstreetmap.org/api/0.6/map.json?bbox=9.2626,45.6191,9.2826,45.6371",
+        "coverage": {
+          "south": 45.6191,
+          "west": 9.2626,
+          "north": 45.6371,
+          "east": 9.2826
+        },
+        "observedAt": "2026-10-31T02:29:17.000Z",
+        "responseSha256": "01775e90f9be5e135d81bcbc4eaff4e94ca3ff6c9d57fd67da2d6e80b6d54758"
+      },
+      {
+        "format": "osm-api-map-json-v1",
+        "endpoint": "https://api.openstreetmap.org/api/0.6/map.json?bbox=9.2826,45.6191,9.3026,45.6371",
+        "coverage": {
+          "south": 45.6191,
+          "west": 9.2826,
+          "north": 45.6371,
+          "east": 9.3026
+        },
+        "observedAt": "2026-10-31T02:29:18.000Z",
+        "responseSha256": "cb7573860295a03ed69f8168b443ad59275868eaf7b48b82e3a9d15f8d7a3f9b"
+      }
+    ],
+    "responseSha256": "497a546f6dee90efe17e4179c9f0dedb5d9f03f9ef57c44f1ac8b62011004446"
+  },
+  "layout": {
+    "name": "Monza · Grand Prix road circuit",
+    "closed": true,
+    "wayIds": [
+      19842206,
+      179968242,
+      179968264,
+      179968220,
+      179968262,
+      179968245,
+      179968263,
+      179968229,
+      179968251,
+      179968230,
+      179968252,
+      179968228,
+      1443867792,
+      1443867793,
+      179968254,
+      179968226,
+      179968249,
+      179968239,
+      179968257,
+      179968234
+    ],
+    "referenceLengthMeters": 5793,
+    "usableWidthMeters": 6,
+    "referenceUrl": "https://www.monzanet.it/en/circuit/",
+    "widthEvidence": "Six-metre conservative eligibility corridor only. Physical pavement width, banking, ground and complete venue admission remain pending review."
+  },
+  "preparedSourceSha256": "337e463193d09f2acbb0a38b84cba83676bfffecc8506d7443929b351fbec0c0"
+}

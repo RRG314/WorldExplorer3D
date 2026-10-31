@@ -34,6 +34,12 @@ Mile conversions are arithmetic using 1609.344 m/mile; quoted circuit distances 
 
 ## What a finished venue must contain
 
+Additional source/ground intake is recorded in `MAJOR_VENUE_PIPELINE.md`: exact
+Spa GP, Monza GP and Talladega main/pit geometry, plus normalized Talladega
+terrain. These inputs do not add playable packs to this register. Bristol and
+Indianapolis retain explicit source-length discrepancies. Zero packs have
+completed the full acceptance below.
+
 1. A versioned geographic pack with independently reusable rights-cleared source geometry, source identifiers, survey date, length reconciliation, direction, elevation, banking, usable width and vertically separate crossings. No hand-drawn approximate oval standing in for a real tri-oval.
 2. Admission through existing world publication, transport support, collision and session owners. Complete required road/support data must be ready before the race; no forced reload travel or second terrain source that disagrees with ordinary exploration. Preserve nearby mapped buildings, waterways, entrances and real identities.
 3. Surface/collision agreement at all four wheels, including kerbs, crests, banking transitions, tunnels and bridge decks. Missing bank heights cannot be filled with flat terrain and called correct.

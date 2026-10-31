@@ -5,11 +5,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fromUrl} from 'geotiff';
-import {nativeRasterMetadata,decodeNativeRasterWindow} from '../lib/bare-earth-raster.mjs';
+import {nativeRasterMetadata,decodeNativeRasterWindow,nad83UtmNavd88HorizontalEpsg} from '../lib/bare-earth-raster.mjs';
 const flag=name=>process.argv.find(a=>a.startsWith(name+'='))?.slice(name.length+1),manifestPath=flag('--manifest'),out=flag('--output-dir');
 if(!manifestPath||!out)throw Error('--manifest=FILE --output-dir=NEW_DIR required');
 const manifest=JSON.parse(await fs.readFile(manifestPath)),m=manifest.sourceEvidence?.nativeWindow,s=manifest.sourceEvidence?.raster;
-if(manifest.providerId!=='usgs-3dep-best-available'||!m||!s||m.sourceUrl!==s.sourceUrl||m.sourceEtag!==s.sourceEtag||
+const horizontalEpsg=nad83UtmNavd88HorizontalEpsg(manifest.sourceEvidence?.sourceCrs);
+if(manifest.providerId!=='usgs-3dep-best-available'||!horizontalEpsg||m?.sourceCrs!==manifest.sourceEvidence.sourceCrs||!m||!s||m.sourceUrl!==s.sourceUrl||m.sourceEtag!==s.sourceEtag||
  !m.sourceUrl.startsWith('https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/')||
  !Number.isSafeInteger(m.sourceFileBytes)||m.sourceFileBytes<1||m.bytes>16*1024**2||!/^[-a-zA-Z0-9_.]+$/.test(m.filename))throw Error('invalid_native_window_source');
 if(await fs.stat(out).catch(()=>null))throw Error('preserve_existing_native_window');
@@ -27,12 +28,12 @@ globalThis.fetch=async(input,init={})=>{
  return new Response(bytes,{status:206,headers:response.headers});
 };
 try{
- tiff=await fromUrl(m.sourceUrl,{headers:{'If-Match':m.sourceEtag},allowFullFile:false,blockSize:65536,cacheSize:128});const image=await tiff.getImage(),native=nativeRasterMetadata(image,{horizontalEpsg:26917,errorPrefix:'usgs'});
+ tiff=await fromUrl(m.sourceUrl,{headers:{'If-Match':m.sourceEtag},allowFullFile:false,blockSize:65536,cacheSize:128});const image=await tiff.getImage(),native=nativeRasterMetadata(image,{horizontalEpsg,errorPrefix:'usgs'});
  if(image.getWidth()!==s.sourceDimensions[0]||image.getHeight()!==s.sourceDimensions[1]||native.origin.some((v,i)=>v!==m.sourceOrigin[i])||native.resolution.some((v,i)=>v!==m.resolution[i])||native.nodata!==m.nodata)throw Error('native_window_grid_changed');
  const data=await image.readRasters({window:m.sourceWindow,interleave:true,samples:[0]});if(!(data instanceof Float32Array)||data.byteLength!==m.bytes)throw Error('native_window_shape');
  const bytes=Buffer.alloc(data.byteLength);for(let i=0;i<data.length;i++)bytes.writeFloatLE(data[i],i*4);
  if(hash(bytes)!==s.sha256||hash(bytes)!==m.sha256)throw Error('native_window_pixels_changed');
- decodeNativeRasterWindow(m,bytes,{horizontalEpsg:26917,sourceDimensions:s.sourceDimensions,errorPrefix:'usgs'});
+ decodeNativeRasterWindow(m,bytes,{horizontalEpsg,sourceDimensions:s.sourceDimensions,errorPrefix:'usgs'});
  const metadata=JSON.stringify(m,null,2)+'\n';if(hash(metadata)!==s.metadata.sha256)throw Error('native_window_metadata_changed');
  await fs.writeFile(path.join(out,m.filename),bytes);await fs.writeFile(path.join(out,'metadata.json'),metadata);
  console.log(JSON.stringify({bytes:bytes.length,sha256:hash(bytes),requests:requests.length,downloadedBytes:total}));

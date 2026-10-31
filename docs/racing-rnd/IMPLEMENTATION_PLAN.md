@@ -172,6 +172,12 @@ standing-start policy, ordinary published support, speed/merge rules, prediction
 and record class. Controlled full-branch and real-model browser checks pass.
 Native per-circuit pit inputs, sectors/cuts and pack acceptance remain open.
 
+C has complete additional source extracts for Spa, Monza and Talladega, plus
+Talladega's pinned native/normalized ground through the existing compiler.
+Source/terrain checks do not complete physical publication or pack acceptance.
+Bristol/Indianapolis source lengths remain unreconciled. B3 and the remaining
+geographic inputs, all-pack presentation and final release gates remain open.
+
 | Work package | Depends on | Concrete completion gate |
 | --- | --- | --- |
 | A. Baseline and architecture | Existing source/evidence | Preserve pending work; identify shared owners, contracts and accepted evidence. This plan ends the architecture lookup phase. |
