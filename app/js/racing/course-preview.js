@@ -5,7 +5,7 @@ export function raceCourseDisplayName(course) {
  return prefix&&course.name.startsWith(prefix)?course.name.slice(prefix.length):course.name;
 }
 export function raceDisciplineLabel(discipline) {
- return ({sprint:'Sprint',circuit:'Circuit','time-trial':'Time trial',oval:'Oval'})[discipline]||'Road race';
+ return ({sprint:'Sprint',circuit:'Circuit','time-trial':'Time trial',oval:'Oval',rally:'Rally stage'})[discipline]||'Road race';
 }
 export function createRaceRouteMap({roads=[],course,locationLabel='',creatorSegments=[],creatorPoints=[],onPoint}={}) {
  const points=roads.flatMap(road=>[road.a,road.b]);

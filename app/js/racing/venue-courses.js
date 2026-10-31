@@ -55,7 +55,12 @@ export function prepareVenueRacePath(district,venue){
 
 export function buildVenueRaceCourses(district,venue){
  const {graph,path,label,pitPath,startOffsetMeters,diagnostics}=prepareVenueRacePath(district,venue);
- if(graph.venueSource?.stage)throw Error('race_stage_runtime_unavailable');
+ if(graph.venueSource?.stage){
+  if(!graph.venueSource.stage.rally)throw Error('race_stage_runtime_unavailable');
+  const course=createRaceCourse(graph,path,{locationId:district.locationId,locationLabel:district.locationLabel,anchor:district.anchor,
+   discipline:'rally',laps:1,participants:4,name:`${venue.name} · ${label} · stage`});
+  return {graph,events:[course],diagnostics};
+ }
  const discipline=venue.raceDiscipline||'circuit';if(!['circuit','oval'].includes(discipline))throw Error('race_venue_discipline_invalid');
  const settings={locationId:district.locationId,locationLabel:district.locationLabel,anchor:district.anchor,discipline,participants:4,
   ...(pitPath?{pitPath}:{}),

@@ -37,7 +37,7 @@ export function createNetworkRaceController({context,course,connection,uid,isAdm
    if(latest.phase==='complete'&&latest.settlement==='saved'&&!completed){completed=true;onComplete(latest);}
    if(player.progress?.finished||player.dnf||!connection.connected()||connection.isFresh?.()===false||!['running','countdown'].includes(latest.phase))return stopped(frame);
    connection.control(actions);
-   if(latest.phase==='running'){
+   if(latest.phase==='running'&&(!player.rally||latest.simulationAtMs>=player.rally.startAtMs)){
     let controls=actions,draftReduction=0;
     if(course.discipline==='oval'){
      const zone=player.pit?.active?'pit':ovalTrackZone(projectRacePosition(course,raceVehicleGroundPose(frame))),yellow=latest.raceControl?.flag==='yellow',subject=ovalDraftActor(uid,frame,profile.handling,zone,raceVehicleSpeedMetersPerSecond(frame));
@@ -50,15 +50,15 @@ export function createNetworkRaceController({context,course,connection,uid,isAdm
    }
    else if(course.discipline==='oval')stepRaceVehicle(course,frame,raceFormationActions(course,frame,player.progress,profile,player.slot),dt,profile);
    return snapshotRaceVehicle(frame);
-  },snapshot:()=>connection.snapshot(),presentationSnapshot(){
+  },recover(){if(!started||!current())throw Error('race_vehicle_or_world_changed');return connection.recover();},snapshot:()=>connection.snapshot(),presentationSnapshot(){
    // Reuse this controller's two observed authority packets. Rival display
    // follows one packet behind; no renderer timer or second actor owner.
    if(!previous||previous.id!==latest.id||latest.phase==='complete')return latest;
    const alpha=Math.max(0,Math.min(1,viewElapsedMs/Math.max(1,latest.serverAtMs-previous.serverAtMs)));
    return {...latest,players:latest.players.map(p=>{
     if(p.uid===uid&&frame)return {...p,vehicleState:frame,pose:raceVehicleGroundPose(frame)};
-    const before=previous.players.find(q=>q.uid===p.uid)?.vehicleState;
-    if(!before||!p.vehicleState||p.dnf||p.progress?.finished)return p;
+    const prior=previous.players.find(q=>q.uid===p.uid),before=prior?.vehicleState;
+    if(!before||!p.vehicleState||p.dnf||p.progress?.finished||p.rally&&p.rally.recoveries!==prior?.rally?.recoveries)return p;
     const state={...p.vehicleState};for(const key of ['x','y','z','terrainPitch','terrainRoll'])state[key]=before[key]+(state[key]-before[key])*alpha;
     const turn=state.angle-before.angle;state.angle=before.angle+Math.atan2(Math.sin(turn),Math.cos(turn))*alpha;
     return {...p,vehicleState:state,pose:raceVehicleGroundPose(state)};

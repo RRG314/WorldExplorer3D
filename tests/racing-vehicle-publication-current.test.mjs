@@ -4,11 +4,12 @@ import {createHash} from 'node:crypto';
 import {createFirestoreRaceStore} from '../services/racing/firestore-store.mjs';
 import {createRaceSession,createRaceVehicleProfile,buildRaceRoadGraph,createRaceCourse,raceVehicleWorldPose} from '../services/racing/generated/engine.mjs';
 import {VEHICLE_ROOT_TO_GROUND_METERS} from '../app/js/engine/vehicle-catalog.js';
+import {createRallyStageFixture} from './fixtures/rally-stage-format.js';
 
 // Exercise the actual transaction commands with an atomic in-memory adapter.
 // Live Firestore admission/results have separate evidence; this isolates the
 // world-pose handback without replaying a timed race or claiming cloud coverage.
-function fixture(){
+function fixture(courseOverride){
  const now=1700000000000,stamp=ms=>({toMillis:()=>ms}),rows=new Map();
  const reference=path=>({path,collection:name=>reference(path+'/'+name),doc:name=>reference(path+'/'+name)});
  const db={collection:reference,async runTransaction(operation){const writes=[];
@@ -16,7 +17,7 @@ function fixture(){
    update:(ref,data)=>writes.push([ref.path,data]),set:(ref,data)=>writes.push([ref.path,data])});
   for(const [path,data]of writes)rows.set(path,{...rows.get(path),...data});return value;
  }};
- const course=createRaceCourse(buildRaceRoadGraph([{sourceId:'graded-road',a:{x:0,y:10,z:0},b:{x:0,y:20,z:250},widthMeters:8,driveable:true,supported:true}]),['graded-road:forward'],{locationId:'controlled',locationLabel:'Controlled grade',anchor:{lat:43,lon:7},participants:1});
+ const course=courseOverride||createRaceCourse(buildRaceRoadGraph([{sourceId:'graded-road',a:{x:0,y:10,z:0},b:{x:0,y:20,z:250},widthMeters:8,driveable:true,supported:true}]),['graded-road:forward'],{locationId:'controlled',locationLabel:'Controlled grade',anchor:{lat:43,lon:7},participants:1});
  const profile=createRaceVehicleProfile('delorean'),session=createRaceSession({id:'race',course,creatorUid:'driver',createdAtMs:now});
  session.add({uid:'driver',profile,label:'Driver'});
  const race={id:'race',roomCode:'OWNED1',worldSeed:'seed',course,roster:new Map([['driver',{vehicleId:'delorean',profile}]]),session};
@@ -30,6 +31,32 @@ function fixture(){
  rows.set(carPath,{raceCustody:{id:'race',instanceId:'instance'},pose:initial});
  return {rows,carPath,race,session,initial,now,store:createFirestoreRaceStore({db,loadCourse:async()=>course})};
 }
+test('rally renew and release persist actual landing damage through the existing garage without healing or repeated revision writes',async()=>{
+ const {course}=createRallyStageFixture(),f=fixture(course),progressPath='users/driver/gameplay/vehicleUpgrades',progress=f.rows.get(progressPath);
+ f.rows.get('rooms/OWNED1').world={kind:'earth',seed:'seed',...course.anchor};
+ progress.garage={schemaVersion:1,revision:7,selectedId:'delorean',vehicles:{delorean:{id:'delorean',condition:1,homeId:'kept-home',acquiredAt:123}}};
+ f.session.setReady('driver',true);f.session.start('driver',f.now);
+ let sequence=0;for(let ms=50;ms<=20000;ms+=50){f.session.control('driver',sequence++,{throttle:1},f.now+ms);f.session.advance(f.now+ms);
+  if(ms%5000===0)await f.store.renew({race:f.race,instanceId:'instance',nowMs:f.now+ms});}
+ const player=f.session.snapshot().players[0];assert.ok(player.condition<1);assert.ok(player.vehicleState.landingDamage>0);
+ // Renew uses the trusted session frame while holding this exact reservation.
+ await f.store.renew({race:f.race,instanceId:'instance',nowMs:f.now+20000});
+ const garage=f.rows.get(progressPath).garage;assert.equal(garage.vehicles.delorean.condition,player.condition);assert.equal(garage.revision,8);assert.equal(garage.vehicles.delorean.homeId,'kept-home');
+ assert.equal(f.rows.get(f.carPath).condition,player.condition);
+ const admitted=await f.store.admit({race:f.race,uid:'driver',vehicleId:'delorean',instanceId:'instance',nowMs:f.now+20000,slot:0,reconnect:true});
+ assert.equal(admitted.profile,f.race.roster.get('driver').profile,'reconnect retains the original locked setup and existing damaged simulation');
+ assert.equal(f.session.snapshot().players[0].condition,player.condition);
+ await f.store.releaseParticipant({race:f.race,uid:'driver',instanceId:'instance',nowMs:f.now+20000});
+ assert.equal(f.rows.get(progressPath).garage.revision,8);assert.equal(f.rows.get(progressPath).raceReservation,null);assert.equal(f.rows.get(f.carPath).condition,player.condition);
+ await f.store.releaseParticipant({race:f.race,uid:'driver',instanceId:'instance',nowMs:f.now+20000});assert.equal(f.rows.get(progressPath).garage.revision,8);
+});
+test('a replaced rally garage reservation cannot be renewed or receive another authority’s condition writes',async()=>{
+ const f=fixture(createRallyStageFixture().course),path='users/driver/gameplay/vehicleUpgrades',progress=f.rows.get(path);
+ f.rows.get('rooms/OWNED1').world={kind:'earth',seed:'seed',...f.race.course.anchor};
+ progress.raceReservation={id:'replacement',instanceId:'new-owner'};const before=structuredClone(progress),car=f.rows.get(f.carPath);
+ await assert.rejects(f.store.renew({race:f.race,instanceId:'instance',nowMs:f.now}),/custody_ended/);
+ assert.deepEqual(f.rows.get(path),before);assert.equal(f.rows.get(f.carPath),car);
+});
 test('a lobby renew/release retains its existing world pose without inventing a ground offset',async()=>{
  const f=fixture();await f.store.renew({race:f.race,instanceId:'instance',nowMs:f.now});
  assert.deepEqual(f.rows.get(f.carPath).pose,f.initial);

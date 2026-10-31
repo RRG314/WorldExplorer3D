@@ -44,6 +44,7 @@ export function createPracticeRaceController({context,course,profile,rivals=[],u
    // still carrying race velocity into ordinary traffic.
    return player.progress?.finished||player.dnf?{...state,speed:0,vFwd:0,vLat:0,vx:0,vz:0,yawRate:0,
     steerAngle:0,steerSm:0,rearSlip:0,throttleSm:0,engineLoad:0,engineRpm:850,driveGear:1,shiftTime:0,driftAngle:0,isDrifting:false}:state;
-  },snapshot:()=>latest||session.snapshot(),presentationSnapshot:()=>scope.isActive()?presented||latest||session.snapshot():session.snapshot(),stop,
+  },recover(){if(!started||!current())throw Error('race_vehicle_or_world_changed');return session.recover(uid,sequence++,clock);},
+  snapshot:()=>latest||session.snapshot(),presentationSnapshot:()=>scope.isActive()?presented||latest||session.snapshot():session.snapshot(),stop,
   dispose:()=>stop('practice_disposed')});
 }

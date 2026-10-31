@@ -4,6 +4,18 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
 
 ## Implemented and evidenced
 
+- The shared rally foundation now binds asphalt, wet asphalt, gravel and snow/ice
+  conditions to approved source intervals. It uses individual staggered clocks,
+  ordered split timing, game-authored pace notes and the existing vertical physics
+  and condition owners. Recovery preserves the next gate and damage, clears
+  controls, and adds 15 seconds; cooldown, sequence and count fences apply.
+  Controlled browser/service/Functions replays agree. A real BMW browser fixture
+  shows crest flight, landing damage, recovery and staggered finishes, with zero
+  barrier contacts or WebGL errors. Direct transaction checks retain damage
+  through renewal/reconnect/release. These checks do not accept a real stage,
+  live cloud result, physical headset or release performance. Native stage world
+  admission remains closed pending source/access, support and clearance evidence.
+
 - Frozen `f37ddb8e` completes the native Daytona oval lap and full 40-checkpoint
   pit branch through the normal game session, Results and saved Journal, using
   controlled analogue input with zero barrier contacts or penalties. All 139

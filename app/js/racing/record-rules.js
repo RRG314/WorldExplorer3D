@@ -11,7 +11,12 @@ export const RACE_PROFILED_PAVEMENT_PHYSICS_VERSION='earth-profiled-pavement-202
 export const RACE_OVAL_PHYSICS_VERSION='earth-oval-2026-10-30.3';
 export const RACE_OVAL_PIT_PHYSICS_VERSION='earth-oval-pit-2026-10-30.1';
 export const RACE_CIRCUIT_PIT_PHYSICS_VERSION='earth-circuit-pit-2026-10-30.1';
+export const RACE_RALLY_PHYSICS_VERSION='earth-rally-2026-10-31.1';
 export function racePhysicsVersion(course){
+ if(course?.discipline==='rally'){
+  if(course.rally?.version!==1||!course.venueSource?.stage?.rally||course.pitLane||course.surfaceModel||course.pavementModel)throw Error('invalid_race_surface_model');
+  return RACE_RALLY_PHYSICS_VERSION;
+ }
  if(course?.discipline==='oval'){
   if(course.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL||course.surfaceModel!==BANKED_ROAD_MODEL)throw Error('invalid_race_surface_model');
   return course.pitLane?RACE_OVAL_PIT_PHYSICS_VERSION:RACE_OVAL_PHYSICS_VERSION;
@@ -26,7 +31,7 @@ export function racePhysicsVersion(course){
  if(course.surfaceModel===BANKED_ROAD_MODEL)return RACE_BANKED_PHYSICS_VERSION;
  throw Error('invalid_race_surface_model');
 }
-export const isCurrentRacePhysicsVersion=version=>version===RACE_PHYSICS_VERSION||version===RACE_BANKED_PHYSICS_VERSION||version===RACE_PROFILED_PAVEMENT_PHYSICS_VERSION||version===RACE_OVAL_PHYSICS_VERSION||version===RACE_OVAL_PIT_PHYSICS_VERSION||version===RACE_CIRCUIT_PIT_PHYSICS_VERSION;
+export const isCurrentRacePhysicsVersion=version=>version===RACE_PHYSICS_VERSION||version===RACE_BANKED_PHYSICS_VERSION||version===RACE_PROFILED_PAVEMENT_PHYSICS_VERSION||version===RACE_OVAL_PHYSICS_VERSION||version===RACE_OVAL_PIT_PHYSICS_VERSION||version===RACE_CIRCUIT_PIT_PHYSICS_VERSION||version===RACE_RALLY_PHYSICS_VERSION;
 export function raceRecordConfiguration(profile,{course}={}) {
  if(!profile?.vehicleId||!Number.isFinite(profile.conditionValue))throw Error('invalid_race_record_profile');
  return {physicsVersion:racePhysicsVersion(course),vehicleId:profile.vehicleId,condition:profile.conditionValue,
@@ -36,7 +41,8 @@ export function raceRecordConfiguration(profile,{course}={}) {
 // silently replace front-row times in the same competitive class.
 export function raceCompetitiveRecordConfiguration(profile,{slot,participants,course}){
  if(!Number.isInteger(participants)||participants<1||participants>4||!Number.isInteger(slot)||slot<0||slot>=participants)throw Error('invalid_race_record_grid');
- return {...raceRecordConfiguration(profile,{course}),gridRow:Math.floor(slot/2),gridParticipants:participants,timing:course.discipline==='oval'?'rolling-green-to-finish':'grid-to-finish'};
+ return {...raceRecordConfiguration(profile,{course}),gridRow:course?.discipline==='rally'?0:Math.floor(slot/2),gridParticipants:participants,
+  timing:course?.discipline==='rally'?'individual-stage-start-to-finish':course?.discipline==='oval'?'rolling-green-to-finish':'grid-to-finish'};
 }
 export async function racePracticeRecordKey(course,profile) {
  const encoded=new TextEncoder().encode(JSON.stringify({courseId:await raceCourseKey(course),...raceRecordConfiguration(profile,{course})}));

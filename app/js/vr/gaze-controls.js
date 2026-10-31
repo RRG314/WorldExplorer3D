@@ -10,12 +10,12 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
   const units=worldUnitsPerMeter;root.scale.setScalar(units);reticle.scale.setScalar(units);reticle.renderOrder=10002;
   const geometry=new THREE.PlaneGeometry(.37,.15),raycaster=new THREE.Raycaster(),direction=new THREE.Vector3(),origin=new THREE.Vector3(),point=new THREE.Vector3(),orientation=new THREE.Quaternion();
   scope.defer(()=>geometry.dispose(),'geometry');scope.defer(()=>reticle.geometry.dispose(),'geometry');scope.defer(()=>reticle.material.dispose(),'material');
-  const controls=[['toggle','Start'],['recenter','Recenter'],['exit','Exit VR']].map(([action,text],index)=>{
+  const controls=[['toggle','Start'],['recenter','Recenter'],['exit','Exit VR'],['recover','Recover +15s']].map(([action,text],index)=>{
     const canvas=documentRef.createElement('canvas');canvas.width=384;canvas.height=160;
     const texture=new THREE.CanvasTexture(canvas),material=new THREE.MeshBasicMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false,toneMapped:false});
     texture.encoding=THREE.sRGBEncoding;
     scope.defer(()=>texture.dispose(),'texture');scope.defer(()=>material.dispose(),'material');
-    const mesh=new THREE.Mesh(geometry,material);mesh.position.set((index-1)*.43,-.34,-1.5);mesh.renderOrder=10001;mesh.userData.action=action;
+    const mesh=new THREE.Mesh(geometry,material);mesh.position.set(index===3?0:(index-1)*.43,index===3?-.54:-.34,-1.5);mesh.visible=index!==3;mesh.renderOrder=10001;mesh.userData.action=action;
     function label(text){const draw=canvas.getContext('2d'),lines=text==='Waiting for motion'?['Waiting for','motion']:[text];draw.clearRect(0,0,384,160);draw.fillStyle=colors.surface;draw.fillRect(2,2,380,156);draw.strokeStyle=colors.line;draw.lineWidth=4;draw.strokeRect(3,3,378,154);draw.font=`600 ${Math.min(36*textScale,lines.length>1?52:72)}px system-ui`;draw.textAlign='center';draw.textBaseline='middle';draw.fillStyle=colors.text;lines.forEach((line,index)=>draw.fillText(line,192,80+(index-(lines.length-1)/2)*70,350));texture.needsUpdate=true;}
     label(text);root.add(mesh);return {mesh,label};
   });
@@ -29,13 +29,14 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
   let hover=null,since=0,latched=false,disposed=false,lastLabel='Start';
   function reset(){hover=null;since=0;latched=false;reticle.material.color.copy(normalColor);reticle.scale.setScalar(units);}
   return Object.freeze({
-    update({mountPosition,mountQuaternion,camera,timestamp,paused,tracking,message='',primaryLabel=null}){
+    update({mountPosition,mountQuaternion,camera,timestamp,paused,tracking,message='',primaryLabel=null,canRecover=false}){
       if(disposed)return;root.visible=true;reticle.visible=true;root.position.copy(mountPosition);root.quaternion.copy(mountQuaternion);root.updateMatrixWorld(true);
+      controls[3].mesh.visible=tracking&&!paused&&canRecover;
       // Ray requires a normalized world direction. Matrix decomposition can
       // leave a quaternion a few ulps off unit length; an unnormalized ray can
       // miss the shared diagonal of r128's two button triangles at its centre.
       camera.getWorldDirection(direction);camera.getWorldPosition(origin);camera.getWorldQuaternion(orientation);raycaster.ray.set(origin,direction);
-      const hit=raycaster.intersectObjects(meshes,false)[0];
+      const hit=raycaster.intersectObjects(meshes.filter(mesh=>mesh.visible),false)[0];
       point.copy(hit?.point||origin).addScaledVector(direction,hit?-.002:1.5*units);
       reticle.position.copy(point);reticle.quaternion.copy(orientation);
       const label=!tracking?'Waiting for motion':primaryLabel||(paused?'Start':'Pause');if(label!==lastLabel){controls[0].label(label);lastLabel=label;}
@@ -52,7 +53,7 @@ export function createVrGazeControls({THREE,scene,worldUnitsPerMeter,onAction,do
     selectRay(origin,direction){
       if(disposed||!root.visible)return false;
       if(![origin.x,origin.y,origin.z,direction.x,direction.y,direction.z].every(Number.isFinite)||direction.lengthSq()===0)return false;
-      raycaster.ray.set(origin,direction);raycaster.ray.direction.normalize();const action=raycaster.intersectObjects(meshes,false)[0]?.object?.userData.action;
+      raycaster.ray.set(origin,direction);raycaster.ray.direction.normalize();const action=raycaster.intersectObjects(meshes.filter(mesh=>mesh.visible),false)[0]?.object?.userData.action;
       if(!action)return false;reset();onAction(action);return true;
     },
     dispose(){if(disposed)return;disposed=true;scope.dispose('VR controls ended');scene=null;}

@@ -19,3 +19,11 @@ test('controller and transient selection use a finite normalized ray and reject 
   assert.equal(controls.selectRay(new T.Vector3(),new T.Vector3(.43,-.34,-1.5)),true);assert.deepEqual(actions,['exit']);
   assert.equal(controls.selectRay(new T.Vector3(),new T.Vector3(0,1,0)),false);assert.equal(controls.selectRay(new T.Vector3(),new T.Vector3(NaN,0,0)),false);controls.dispose();
 });
+test('the rally recovery button is reachable only with active tracking, permission and unpaused controls',()=>{
+ const scene=new T.Scene(),actions=[],controls=createVrGazeControls({THREE:T,scene,worldUnitsPerMeter:1,documentRef,onAction:action=>actions.push(action)}),camera=new T.PerspectiveCamera(),
+  args={mountPosition:new T.Vector3(),mountQuaternion:new T.Quaternion(),camera,timestamp:0,paused:false,tracking:true,canRecover:true},ray=new T.Vector3(0,-.54,-1.5);
+ controls.update({...args,canRecover:false});assert.equal(controls.selectRay(new T.Vector3(),ray),false);
+ controls.update(args);assert.equal(controls.selectRay(new T.Vector3(),ray),true);assert.deepEqual(actions,['recover']);
+ for(const state of [{paused:true},{tracking:false},{canRecover:false}]){controls.update({...args,...state});assert.equal(controls.selectRay(new T.Vector3(),ray),false);}
+ controls.dispose();
+});

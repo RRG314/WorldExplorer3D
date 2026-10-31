@@ -74,6 +74,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
   try{controls=createControls({THREE,scene:presentation.scene,worldUnitsPerMeter:units,onAction:action=>{
     if(action==='exit'){stop();return;}
     if(action==='recenter'){recenter();return;}
+    if(action==='recover'){try{if(tracking&&vrRaceStatus(ctx)?.canRecover)ctx.roadRaceController?.recover?.();}catch{ctx.showToast?.('Recovery is unavailable.');}return;}
     if(action==='toggle'){
       if(tracking&&vrRaceStatus(ctx)?.resultsReady){stop('race-results');return;}
       if(!tracking)return;if(userPaused&&roadRideMustPause(ride))ride.takeManual();userPaused=!userPaused;input.reset();ctx.setPauseReason?.('vr-user',userPaused);ctx.clearControlInputState?.('vr-tracked-toggle');
@@ -130,7 +131,7 @@ export function createTrackedVrSession({ctx,THREE,captureSession,ride=null,targe
       if(!api.guard())return false;if(!tracking)return true;
       updateMount();if(body)body.visible=false;
       const race=vrRaceStatus(ctx);
-      controls.update({mountPosition:mount.position,mountQuaternion:mount.quaternion,camera:presentation.camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:race?.message||roadRideMessage(ride,ctx.paused),primaryLabel:race?.primaryLabel});return true;
+      controls.update({mountPosition:mount.position,mountQuaternion:mount.quaternion,camera:presentation.camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:race?.message||roadRideMessage(ride,ctx.paused),primaryLabel:race?.primaryLabel,canRecover:race?.canRecover});return true;
     },
     render(){
       if(!api.guard()||!tracking)return false;

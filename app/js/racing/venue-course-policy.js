@@ -2,6 +2,7 @@
 // retain their existing fences and immutable identities. This portable header
 // grants no world authority: intake still requires the private source survey,
 // accepted published pavement and a current world publication.
+import {normalizeRallyStage} from './rally-rules.js';
 const fail=()=>{throw Error('race_invalid_venue_extent');};
 const sourceId=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9:_.\/-]{0,179}$/.test(value);
 export function normalizeRaceVenueSource(value){
@@ -33,7 +34,8 @@ function normalizeStage(value,sourceIds){
   legs.push(Object.freeze({sourceFeatureId:leg.sourceFeatureId,startSegment:leg.startSegment,endSegment:leg.endSegment,direction:leg.direction}));
  }
  if(JSON.stringify(ids)!==JSON.stringify(sourceIds))fail();
- return Object.freeze({kind:'open-stage-v1',minimumWidthMeters:value.minimumWidthMeters,startNodeId:value.startNodeId,finishNodeId:value.finishNodeId,legs:Object.freeze(legs)});
+ const rally=normalizeRallyStage(value.rally,legs);
+ return Object.freeze({kind:'open-stage-v1',minimumWidthMeters:value.minimumWidthMeters,startNodeId:value.startNodeId,finishNodeId:value.finishNodeId,legs:Object.freeze(legs),...(rally?{rally}:{})});
 }
 // Callers normalize the header before using its scoped admission policy.
 export const raceVenueMinimumWidth=venue=>venue?.version===2?venue.stage.minimumWidthMeters:6;

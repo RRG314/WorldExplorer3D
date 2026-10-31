@@ -41,6 +41,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
     controls=createControls({THREE,scene:presentation.scene,worldUnitsPerMeter:units,onAction:action=>{
       if(action==='exit'){stop();return;}
       if(action==='recenter'){tracker.recenter();controls.reset();return;}
+      if(action==='recover'){try{if(vrRaceStatus(ctx)?.canRecover)ctx.roadRaceController?.recover?.();}catch{ctx.showToast?.('Recovery is unavailable.');}return;}
       if(action==='toggle'){
         if(vrRaceStatus(ctx)?.resultsReady){stop('race-results');return;}
         if(userPaused&&roadRideMustPause(ride))ride.takeManual();
@@ -67,7 +68,7 @@ export function createPhoneVrSession({ctx,THREE,optics,captureSession,ride=null,
       const camera=presentation.camera;camera.position.copy(mount.position);camera.quaternion.copy(mount.quaternion).multiply(head);camera.updateMatrixWorld(true);
       if(body)body.visible=false;
       const race=vrRaceStatus(ctx);
-      controls.update({mountPosition,mountQuaternion,camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:race?.message||roadRideMessage(ride,ctx.paused),primaryLabel:race?.primaryLabel});return true;
+      controls.update({mountPosition,mountQuaternion,camera,timestamp:frame.timestamp,paused:ctx.paused,tracking,message:race?.message||roadRideMessage(ride,ctx.paused),primaryLabel:race?.primaryLabel,canRecover:race?.canRecover});return true;
     },
     render(){if(!api.guard())return false;stereo.render(presentation.scene,presentation.camera);return true;},
     async start(){

@@ -3,9 +3,9 @@ import {createRaceSession,racePhysicsVersion,raceRecordConfiguration,raceCourseK
 
 export const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const CODE=/^[A-Z0-9]{6}$/;
-const types=new Set(['join','ready','start','control','leave']);
+const types=new Set(['join','ready','start','control','recover','leave']);
 const allowed={join:['type','roomCode','worldSeed','courseId','vehicleId','sessionId'],ready:['type','ready'],start:['type'],
- control:['type','sequence','actions'],leave:['type']};
+ control:['type','sequence','actions'],recover:['type','sequence'],leave:['type']};
 export function readCommand(raw) {
  if(typeof raw!=='string'||Buffer.byteLength(raw)>8192)throw Error('race_message_too_large');
  let v;try{v=JSON.parse(raw);}catch{throw Error('invalid_race_message');}
@@ -76,6 +76,7 @@ export function createRaceAuthority({store,now=()=>Date.now(),instanceId=randomU
   }
   const race=client.race;if(!race||connections.get(client.uid)!==client)throw Error('race_not_joined');
   if(v.type==='control')race.session.control(client.uid,v.sequence,v.actions,now());
+  if(v.type==='recover')race.session.recover(client.uid,v.sequence,now());
   if(v.type==='ready'){if(race.starting)throw Error('race_roster_locked');race.session.setReady(client.uid,v.ready);}
   if(v.type==='start'){
    const state=race.session.snapshot();if(state.phase!=='lobby')throw Error('race_roster_locked');if(state.leaderUid!==client.uid)throw Error('race_leader_required');

@@ -9,5 +9,5 @@ export function raceMaximumDurationMs(course){
  // Ten metres/second plus two minutes of recovery, rounded to a whole minute.
  // Short city events retain their existing ten-minute allowance. The absolute
  // 45-minute bound fits the existing one-hour service connection lifecycle.
- return Math.max(RACE_MINIMUM_DURATION_MS,Math.min(RACE_MAXIMUM_DURATION_MS,Math.ceil((length*laps/10+120)/60)*60000));
+ return Math.max(RACE_MINIMUM_DURATION_MS,Math.min(RACE_MAXIMUM_DURATION_MS,Math.ceil((length*laps/10+120)/60)*60000+(course.discipline==='rally'?90000:0)));
 }

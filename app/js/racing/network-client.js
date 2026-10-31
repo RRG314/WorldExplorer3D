@@ -57,6 +57,7 @@ export function createRaceConnection({uid,endpoint,credentials,join,isCurrent,We
   }catch(error){if(error.message==='race_course_wrong_world'){onError(error.message);stop('race_protocol_error');return;}if(active()&&request===revision){connecting=false;nextAttempt=now()+1000;attempts++;onConnection('reconnecting');}}
  }
  return Object.freeze({connect,stop,send,snapshot:()=>latest,receivedAt:()=>receivedAt,connected:()=>joined,isFresh:()=>joined&&now()-receivedAt<=500,
+  recover(){if(!joined||!latest?.players.find(p=>p.uid===uid)?.rally?.canRecover)return false;return send({type:'recover',sequence:sequence++});},
   pump(){if(!active()){stop('race_session_changed');return;}
    if(joined&&now()-receivedAt>5000){const previous=socket;revision++;socket=null;joined=false;connecting=false;nextAttempt=now()+500;attempts++;previous?.close();onConnection('reconnecting');}
    if(connecting&&now()>=nextAttempt){socket?.close();socket=null;connecting=false;revision++;attempts++;}

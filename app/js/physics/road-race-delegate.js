@@ -14,9 +14,12 @@ export function advanceRoadRaceFrame(context,dt,actions) {
  if(!controller)return false;
  if(!canOwnRoadRace(context)||!controller.isCurrent()) {controller.stop('race_vehicle_or_world_changed');return false;}
  const state=controller.step(dt,actions);if(!state)return false;
- if(!RACE_VEHICLE_NUMERIC_FIELDS.every(key=>Number.isFinite(state[key]))||typeof state.isDrifting!=='boolean') {controller.stop('invalid_race_vehicle_state');return false;}
+ if(!RACE_VEHICLE_NUMERIC_FIELDS.every(key=>Number.isFinite(state[key]))||typeof state.isDrifting!=='boolean'||typeof state.isAirborne!=='boolean') {controller.stop('invalid_race_vehicle_state');return false;}
  for(const key of RACE_VEHICLE_NUMERIC_FIELDS)context.car[key]=state[key];
  context.car.isDrifting=state.isDrifting;context.car.boost=false;
- context.car.onRoad=true;context.car.isAirborne=false;context.car.vy=0;
+ context.car.onRoad=!state.isAirborne;context.car.isAirborne=state.isAirborne;
+ // Ordinary physics resumes with the same last known support after leave.
+ // A valid flight is not replaced by a ground snap or a second pose writer.
+ if(controller.course?.discipline==='rally')context.car._lastRawSurfaceY=context.car._lastSurfaceY=state.raceSupportY;
  return true;
 }

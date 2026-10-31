@@ -4,6 +4,7 @@ import {carSpeedToMph}from'../physics/vehicle-speed-units.js?v=2';
 import {projectRacePosition,sampleRaceSegmentY,raceSegmentAtDistance,isClosedRaceDiscipline}from'./course-rules.js';
 import {raceVehicleGroundPose,raceVehicleSpeedMetersPerSecond}from'./vehicle-controller.js';
 import {OVAL_PACE_METERS_PER_SECOND} from './oval-rules.js';
+import {rallySurfaceDynamics} from './rally-rules.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const wrap=v=>Math.atan2(Math.sin(v),Math.cos(v));
 export function pointOnRaceCourse(course,distanceMeters,laneOffsetMeters=0){
@@ -18,7 +19,7 @@ export function pointOnRaceCourse(course,distanceMeters,laneOffsetMeters=0){
 export function raceAiActions(course,car,progress,profile,{difficulty=.65,formation=false,laneOffsetMeters=0,paceMetersPerSecond=10}={}){
  if(progress.finished)return {steer:0,throttle:0,serviceBrake:1};
  const goal=course.gates[progress.nextGate],pose=raceVehicleGroundPose(car),speed=Math.abs(raceVehicleSpeedMetersPerSecond(car));
- const projection=projectRacePosition(course,pose,formation?{}:{minimumMeters:Math.max(0,(course.gates[progress.nextGate-1]?.distanceMeters||0)-8),maximumMeters:Math.min(course.lengthMeters,goal.distanceMeters+15)});
+ const projection=projectRacePosition(course,pose,{...(formation?{}:{minimumMeters:Math.max(0,(course.gates[progress.nextGate-1]?.distanceMeters||0)-8),maximumMeters:Math.min(course.lengthMeters,goal.distanceMeters+15)}),flight:course.discipline==='rally'&&car.isAirborne});
  if(!projection)return {steer:0,throttle:0,serviceBrake:1};
  const oval=course.discipline==='oval',look=oval?clamp(4+speed*.8,6,45):clamp(3.5+speed*.6,4,15),target=pointOnRaceCourse(course,projection.distanceMeters+look,laneOffsetMeters);
  const dx=(target.x-car.x)*course.metersPerUnit,dz=(target.z-car.z)*course.metersPerUnit,heading=Math.atan2(dx,dz),
@@ -28,7 +29,8 @@ export function raceAiActions(course,car,progress,profile,{difficulty=.65,format
  const maxAngle=steering.maxSteeringAngle*profile.handling.steeringScale*profile.condition.steeringScale;
  const steer=clamp(desiredAngle/Math.max(.1,maxAngle)*1.35,-1,1);
  let targetSpeed=formation?paceMetersPerSecond:oval?Math.min(profile.handling.topSpeedMph*.44704*(.55+.3*clamp(difficulty,0,1)),65):Math.min(profile.handling.topSpeedMph*.44704*(.32+.25*clamp(difficulty,0,1)),23);
- const gripAcceleration=profile.config.gripRoad*profile.surface.grip*profile.handling.gripScale*profile.condition.gripScale*profile.upgrades.gripScale*9.81;
+ const surface=rallySurfaceDynamics(course,projection.index,profile.surface);
+ const gripAcceleration=profile.config.gripRoad*surface.grip*profile.handling.gripScale*profile.condition.gripScale*profile.upgrades.gripScale*9.81;
  const planningDeceleration=Math.max(1.2,Math.min(4,gripAcceleration*.45,profile.config.brake*.22352*profile.handling.brakeScale*.65));
  const horizon=Math.min(180,Math.max(70,speed*speed/(2*planningDeceleration)+look+15));
  for(let index=0;index<course.segments.length;index++){
@@ -40,7 +42,7 @@ export function raceAiActions(course,car,progress,profile,{difficulty=.65,format
   const bend=Math.acos(clamp(previous.forward.x*segment.forward.x+previous.forward.z*segment.forward.z,-1,1));
   if(bend<.12)continue;
   const radius=(previous.lengthMeters+segment.lengthMeters)*.5/bend,
-   corner=oval?Math.sqrt(Math.max(1,radius)*gripAcceleration*.55):Math.max(2.8,Math.min(15,4.5/bend))*Math.sqrt(profile.surface.grip),brakeDistance=Math.max(0,ahead-look*.35);
+   corner=oval?Math.sqrt(Math.max(1,radius)*gripAcceleration*.55):Math.max(2.8,Math.min(15,4.5/bend))*Math.sqrt(Math.min(surface.grip,rallySurfaceDynamics(course,index,profile.surface).grip)),brakeDistance=Math.max(0,ahead-look*.35);
   targetSpeed=Math.min(targetSpeed,Math.sqrt(corner*corner+2*planningDeceleration*brakeDistance));
  }
  targetSpeed*=clamp(1-Math.abs(error)*.32,.25,1);

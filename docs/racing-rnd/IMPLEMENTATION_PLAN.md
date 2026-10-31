@@ -172,11 +172,24 @@ standing-start policy, ordinary published support, speed/merge rules, prediction
 and record class. Controlled full-branch and real-model browser checks pass.
 Native per-circuit pit inputs, sectors/cuts and pack acceptance remain open.
 
+B3 now has a portable, source-bound rally contract: fixed versioned condition
+classes, complete directed intervals, ordered split planes and pace notes,
+individual staggered starts on the existing session clock, shared crest flight
+and landing damage, bounded penalized recovery, prediction and actor adoption.
+Controlled browser/service/Functions replay agrees. A real-model browser fixture
+shows flight, landing, recovery and both staggered finishes. The existing garage
+park transaction retains damage during renewal, reconnect and release. Desktop
+and VR consume the same timing/notes and recovery availability. These are
+controlled contract checks, not geographic stage or live-cloud acceptance.
+World intake still rejects stage admission until source-bound access, full
+chassis clearance and native published support are integrated and verified.
+
 C has complete additional source extracts for Spa, Monza and Talladega, plus
 Talladega's pinned native/normalized ground through the existing compiler.
 Source/terrain checks do not complete physical publication or pack acceptance.
-Bristol/Indianapolis source lengths remain unreconciled. B3 and the remaining
-geographic inputs, all-pack presentation and final release gates remain open.
+Bristol/Indianapolis source lengths remain unreconciled. Native rally admission,
+the remaining geographic inputs, all-pack presentation and final release gates
+remain open.
 
 | Work package | Depends on | Concrete completion gate |
 | --- | --- | --- |

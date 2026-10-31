@@ -1,6 +1,6 @@
 import {Timestamp} from 'firebase-admin/firestore';
 import {createHash} from 'node:crypto';
-import {createRaceVehicleProfile,raceVehicleWorldPose,normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById,
+import {createRaceVehicleProfile,raceVehicleWorldPose,prepareRaceConditionHandback,normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById,
  raceGridPose,raceRecordConfiguration,raceCompetitiveRecordConfiguration,racePhysicsVersion,RACE_PHYSICS_VERSION,prepareExplorerCreditAward,racingCareerContext,raceCourseProjection} from './generated/engine.mjs';
 import {digest} from './authority.mjs';
 const time=v=>v?.toMillis?.()??0;
@@ -49,7 +49,10 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    }
    const owned=normalizeVehicleGarage(progress.garage).vehicles[vehicleId];
    if(!owned)fail('race_owned_vehicle_required');
-   const profile=createRaceVehicleProfile(vehicleId,{condition:owned.condition,levels:progress.vehicles?.[personalVehicleIdentity(vehicleId)]||{}});
+   // A damaged in-progress car resumes its existing simulation/profile. The
+   // pre-race repair fence still applies to every fresh admission.
+   const profile=reconnect&&race.course.discipline==='rally'?race.roster.get(uid)?.profile:createRaceVehicleProfile(vehicleId,{condition:owned.condition,levels:progress.vehicles?.[personalVehicleIdentity(vehicleId)]||{}});
+   if(!profile)fail('race_reconnect_expired');
    if(profile.handling.width>race.course.vehicleEnvelope.widthMeters||profile.handling.length>race.course.vehicleEnvelope.lengthMeters||profile.handling.height>race.course.vehicleEnvelope.heightMeters)fail('race_vehicle_exceeds_course_envelope');
    if(progress.raceReservation&&time(progress.raceReservation.expiresAt)>nowMs&&progress.raceReservation.id!==race.id)fail('race_vehicle_busy');
    if(reconnect){if(car?.raceCustody?.id!==race.id||car?.raceCustody?.instanceId!==instanceId||time(car.raceCustody.expiresAt)<=nowMs)fail('race_vehicle_custody_ended');}
@@ -82,15 +85,21 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
     requireSeat(race,uid,value(rs),value(ps),value(cs),nowMs);const car=value(es);
     if(car?.raceCustody?.id!==race.id||car.raceCustody.instanceId!==instanceId)fail('race_vehicle_custody_ended');
     for(const otherUid of race.roster.keys())if(otherUid!==uid){const a=await tx.get(user(uid).collection('blockedPlayers').doc(otherUid));if(a.exists)fail('race_roster_unavailable');}
-    if(starting){const gs=await tx.get(user(uid).collection('gameplay').doc('vehicleUpgrades')),g=value(gs)||{},owned=normalizeVehicleGarage(g.garage).vehicles[p.vehicleId];
-     if(!owned||JSON.stringify(raceRecordConfiguration(createRaceVehicleProfile(p.vehicleId,{condition:owned.condition,levels:g.vehicles?.[personalVehicleIdentity(p.vehicleId)]||{}})))!==JSON.stringify(raceRecordConfiguration(p.profile)))fail('race_vehicle_setup_changed');}
-    rows.push([uid,p,car]);
+    let conditionGarage=null;
+    if(starting||race.course.discipline==='rally'){const gs=await tx.get(user(uid).collection('gameplay').doc('vehicleUpgrades')),g=value(gs)||{},owned=normalizeVehicleGarage(g.garage).vehicles[p.vehicleId];
+     if(race.course.discipline==='rally'){
+      if(g.raceReservation?.id!==race.id||g.raceReservation.instanceId!==instanceId)fail('race_vehicle_custody_ended');
+      conditionGarage=prepareRaceConditionHandback(g.garage,race.session.snapshot().players.find(row=>row.uid===uid));
+     }
+     if(starting&&(!owned||JSON.stringify(raceRecordConfiguration(createRaceVehicleProfile(p.vehicleId,{condition:owned.condition,levels:g.vehicles?.[personalVehicleIdentity(p.vehicleId)]||{}})))!==JSON.stringify(raceRecordConfiguration(p.profile))))fail('race_vehicle_setup_changed');}
+    rows.push([uid,p,car,conditionGarage]);
    }
    const until=nowMs+15000,expiresAt=ts(until),snapshot=race.session.snapshot();
    tx.update(lock(race),{expiresAt,updatedAt:ts(nowMs)});
-   for(const [uid,p,car]of rows){const pose=raceVehicleWorldPose(snapshot.players.find(row=>row.uid===uid))||car.pose;
-    tx.update(entity(race,uid,p.vehicleId),{raceCustody:{id:race.id,instanceId,expiresAt},leaseExpiresAt:expiresAt,pose,updatedAt:ts(nowMs)});
-    tx.set(user(uid).collection('gameplay').doc('vehicleUpgrades'),{raceReservation:{id:race.id,instanceId,expiresAt}},{merge:true});}
+   for(const [uid,p,car,conditionGarage]of rows){const actor=snapshot.players.find(row=>row.uid===uid),pose=raceVehicleWorldPose(actor)||car.pose;
+    tx.update(entity(race,uid,p.vehicleId),{raceCustody:{id:race.id,instanceId,expiresAt},leaseExpiresAt:expiresAt,pose,
+     ...(race.course.discipline==='rally'&&actor?.vehicleState?{condition:Math.min(car.condition??1,actor.condition)}:{}),updatedAt:ts(nowMs)});
+    tx.set(user(uid).collection('gameplay').doc('vehicleUpgrades'),{raceReservation:{id:race.id,instanceId,expiresAt},...(conditionGarage?{garage:conditionGarage}:{})},{merge:true});}
    return {leaseUntil:until};
   });
  }
@@ -100,9 +109,11 @@ export function createFirestoreRaceStore({db,loadCourse,now=()=>Date.now()}) {
    const ref=entity(race,uid,p.vehicleId),progressRef=user(uid).collection('gameplay').doc('vehicleUpgrades');
    const [es,gs]=await Promise.all([tx.get(ref),tx.get(progressRef)]),saved=value(es),progress=value(gs);
    if(saved?.raceCustody?.id!==race.id||saved.raceCustody.instanceId!==instanceId)return;
-   const pose=raceVehicleWorldPose(race.session?.snapshot().players.find(row=>row.uid===uid))||saved.pose;
-   tx.update(ref,{raceCustody:null,pose,leaseExpiresAt:ts(nowMs+15000),updatedAt:ts(nowMs)});
-   if(progress?.raceReservation?.id===race.id&&progress.raceReservation.instanceId===instanceId)tx.set(progressRef,{raceReservation:null},{merge:true});
+   const actor=race.session?.snapshot().players.find(row=>row.uid===uid),pose=raceVehicleWorldPose(actor)||saved.pose,
+    ownsReservation=progress?.raceReservation?.id===race.id&&progress.raceReservation.instanceId===instanceId,
+    conditionGarage=race.course.discipline==='rally'&&ownsReservation?prepareRaceConditionHandback(progress.garage,actor):null;
+   tx.update(ref,{raceCustody:null,pose,...(race.course.discipline==='rally'&&actor?.vehicleState?{condition:Math.min(saved.condition??1,actor.condition)}:{}),leaseExpiresAt:ts(nowMs+15000),updatedAt:ts(nowMs)});
+   if(ownsReservation)tx.set(progressRef,{raceReservation:null,...(conditionGarage?{garage:conditionGarage}:{})},{merge:true});
   });
  }
  async function release({race,instanceId,nowMs}){

@@ -51,7 +51,7 @@ var require_vehicle_garage_rules = __commonJS({
       normalizeVehicleGarage: () => normalizeVehicleGarage2,
       personalVehicleById: () => personalVehicleById2,
       personalVehicleIdentity: () => personalVehicleIdentity2,
-      prepareVehicleGarageChange: () => prepareVehicleGarageChange
+      prepareVehicleGarageChange: () => prepareVehicleGarageChange2
     });
     module.exports = __toCommonJS(vehicle_garage_rules_exports);
     var TRANSPORT_CATALOG_SCHEMA_VERSION2 = 1;
@@ -980,7 +980,7 @@ var require_vehicle_garage_rules = __commonJS({
       const selectedId = vehicles[raw?.selectedId] ? raw.selectedId : "bmw_e34";
       return { schemaVersion: 1, revision: Math.max(0, Number(raw?.revision) || 0), selectedId, vehicles };
     }
-    function prepareVehicleGarageChange(raw, command = {}, context = {}) {
+    function prepareVehicleGarageChange2(raw, command = {}, context = {}) {
       const garage = normalizeVehicleGarage2(raw), definition = personalVehicleById2(command.vehicleId);
       if (!definition) throw Error("vehicle_not_available");
       if (command.expectedRevision !== garage.revision) throw Error("vehicle_garage_changed");
@@ -1045,12 +1045,12 @@ var require_economy_authority = __commonJS({
       "vehicle-upgrade:reinforced-suspension:2": Object.freeze({ service: 6500 }),
       "vehicle-upgrade:reinforced-suspension:3": Object.freeze({ service: 12e3 })
     });
-    function finite(value, fallback = 0) {
+    function finite2(value, fallback = 0) {
       const number = Number(value);
       return Number.isFinite(number) ? number : fallback;
     }
     function integer(value, min, max, fallback = min) {
-      return Math.max(min, Math.min(max, Math.round(finite(value, fallback))));
+      return Math.max(min, Math.min(max, Math.round(finite2(value, fallback))));
     }
     function clean2(value, max = 180) {
       return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -1061,13 +1061,13 @@ var require_economy_authority = __commonJS({
       return exists ? snapshot.data() || {} : null;
     }
     function walletData(raw = {}) {
-      const legacy = finite(raw.currencyVersion) < CURRENCY_VERSION;
+      const legacy = finite2(raw.currencyVersion) < CURRENCY_VERSION;
       const scale = legacy && Object.keys(raw).length ? LEGACY_CURRENCY_SCALE : 1;
       return {
         authority: "explorer-wallet-v2",
-        credits: integer(finite(raw.credits, STARTING_CREDITS) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
-        lifetimeEarned: integer(finite(raw.lifetimeEarned, finite(raw.credits, STARTING_CREDITS)) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
-        lifetimeSpent: integer(finite(raw.lifetimeSpent) * scale, 0, MAX_CREDITS, 0),
+        credits: integer(finite2(raw.credits, STARTING_CREDITS) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
+        lifetimeEarned: integer(finite2(raw.lifetimeEarned, finite2(raw.credits, STARTING_CREDITS)) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
+        lifetimeSpent: integer(finite2(raw.lifetimeSpent) * scale, 0, MAX_CREDITS, 0),
         revision: integer(raw.revision, 0, MAX_CREDITS, 0),
         currencyVersion: CURRENCY_VERSION
       };
@@ -1254,7 +1254,7 @@ var require_economy_authority = __commonJS({
       nowMs = Date.now(),
       timestampFromMs
     }) {
-      const { normalizeVehicleGarage: normalizeVehicleGarage2, prepareVehicleGarageChange } = require_vehicle_garage_rules();
+      const { normalizeVehicleGarage: normalizeVehicleGarage2, prepareVehicleGarageChange: prepareVehicleGarageChange2 } = require_vehicle_garage_rules();
       if (!uid || !input.requestId || !["initialize", "buy", "select", "park", "home"].includes(input.action)) throw Error("invalid_vehicle_action");
       const fingerprint = JSON.stringify([input.action, input.vehicleId || "", input.homeId || "", input.condition ?? null, input.expectedRevision ?? null]);
       return runTransaction(async (tx) => {
@@ -1266,7 +1266,7 @@ var require_economy_authority = __commonJS({
         }
         const progress = snapshotData(saved) || {}, wallet = walletData(snapshotData(balance) || {});
         if (input.action !== "initialize" && (progress.raceReservation?.expiresAt?.toMillis?.() || 0) > nowMs) throw Error("vehicle_in_race");
-        const change = input.action === "initialize" ? { garage: normalizeVehicleGarage2(progress.garage), cost: 0 } : prepareVehicleGarageChange(progress.garage, input, { now: nowMs, ownsHome: (id) => id === input.homeId && snapshotData(property)?.ownerUid === uid });
+        const change = input.action === "initialize" ? { garage: normalizeVehicleGarage2(progress.garage), cost: 0 } : prepareVehicleGarageChange2(progress.garage, input, { now: nowMs, ownsHome: (id) => id === input.homeId && snapshotData(property)?.ownerUid === uid });
         if (change.cost > wallet.credits) throw Error("not_enough_credits");
         if (change.cost) tx.set(walletRef, {
           ...wallet,
@@ -1426,6 +1426,107 @@ function ovalDraftReduction(subject, actors, metersPerUnit, { enabled = true } =
   return reduction;
 }
 
+// app/js/racing/rally-rules.js
+var RALLY_START_INTERVAL_MS = 3e4;
+var RALLY_RECOVERY_PENALTY_MS = 15e3;
+var RALLY_RECOVERY_COOLDOWN_MS = 1e4;
+var RALLY_MAXIMUM_RECOVERIES = 3;
+var RALLY_MAXIMUM_FLIGHT_HEIGHT_METERS = 20;
+var surface = (topSpeed, rolling, accel, grip, drift) => Object.freeze({ topSpeed, rolling, accel, grip, drift });
+var RALLY_SURFACES = Object.freeze({
+  "asphalt-dry": surface(1, 1, 1, 1, 1),
+  "asphalt-wet": surface(0.93, 1, 1, 0.72, 1.08),
+  "gravel-dry": surface(0.85, 1.8, 0.88, 0.62, 1.15),
+  "snow-ice": surface(0.7, 2.1, 0.72, 0.3, 1.28)
+});
+var calls = /* @__PURE__ */ new Set([
+  "left-1",
+  "left-2",
+  "left-3",
+  "left-4",
+  "left-5",
+  "left-6",
+  "right-1",
+  "right-2",
+  "right-3",
+  "right-4",
+  "right-5",
+  "right-6",
+  "hairpin-left",
+  "hairpin-right",
+  "crest",
+  "jump",
+  "caution",
+  "keep-left",
+  "keep-right"
+]);
+function normalizeRallyStage(value, legs) {
+  if (value === void 0) return void 0;
+  const fail4 = () => {
+    throw Error("race_invalid_rally_stage");
+  };
+  if (value?.version !== 1 || !Array.isArray(value.legSurfaces) || value.legSurfaces.length !== legs.length || value.legSurfaces.some((id) => !Object.hasOwn(RALLY_SURFACES, id)) || !Array.isArray(value.splits) || !value.splits.length || value.splits.length > 16 || !Array.isArray(value.paceNotes) || value.paceNotes.length > 128) fail4();
+  const position = (row, kind) => {
+    const leg = legs[row?.legIndex];
+    if (!Number.isInteger(row?.legIndex) || !leg || !Number.isInteger(row.segment) || row.segment < leg.startSegment || row.segment >= leg.endSegment || !Number.isFinite(row.fraction) || row.fraction < 0 || row.fraction > 1) fail4();
+    const text = kind === "call" ? row.call : row.label;
+    if (typeof text !== "string" || (kind === "call" ? !calls.has(text) : !text.trim() || text.length > 40 || /[\u0000-\u001f\u007f]/.test(text))) fail4();
+    return Object.freeze({ legIndex: row.legIndex, segment: row.segment, fraction: row.fraction, [kind]: text });
+  };
+  return Object.freeze({
+    version: 1,
+    legSurfaces: Object.freeze([...value.legSurfaces]),
+    splits: Object.freeze(value.splits.map((row) => position(row, "label"))),
+    paceNotes: Object.freeze(value.paceNotes.map((row) => position(row, "call")))
+  });
+}
+function prepareRallyRoute(venue, edges) {
+  const stage = venue?.stage, policy = stage?.rally;
+  if (!policy) throw Error("race_stage_runtime_unavailable");
+  const rows = [], surfaces = [];
+  let cursor = 0, distance2 = 0;
+  for (const [legIndex, leg] of stage.legs.entries()) {
+    const reverse = leg.direction === "reverse", segments = Array.from({ length: leg.endSegment - leg.startSegment }, (_, i) => leg.startSegment + i);
+    if (reverse) segments.reverse();
+    for (const segment of segments) {
+      let fraction = reverse ? 1 : 0;
+      do {
+        const edge = edges[cursor++], prefix = leg.sourceFeatureId + ":", parts = edge?.sourceId.startsWith(prefix) ? edge.sourceId.slice(prefix.length).split(":").map(Number) : [];
+        if (!edge || parts.length !== 3 || parts.some((n) => !Number.isFinite(n)) || parts[0] !== segment || parts[1] < 0 || parts[2] > 1 || parts[1] >= parts[2] || !edge.id.endsWith(":" + leg.direction) || Math.abs(fraction - (reverse ? parts[2] : parts[1])) > 1e-9) throw Error("race_rally_path_incomplete");
+        fraction = reverse ? parts[1] : parts[2];
+        rows.push({ legIndex, segment, start: parts[1], end: parts[2], reverse, distance: distance2, length: edge.length });
+        surfaces.push(policy.legSurfaces[legIndex]);
+        distance2 += edge.length;
+      } while (Math.abs(fraction - (reverse ? 0 : 1)) > 1e-9);
+    }
+  }
+  if (cursor !== edges.length || Math.abs(distance2 - venue.mappedLengthMeters) / venue.mappedLengthMeters > 0.01) throw Error("race_rally_path_incomplete");
+  const locate = (row) => {
+    const match = rows.find((r) => r.legIndex === row.legIndex && r.segment === row.segment && row.fraction >= r.start - 1e-9 && row.fraction <= r.end + 1e-9);
+    if (!match) throw Error("race_rally_timing_unavailable");
+    return match.distance + match.length * (match.reverse ? match.end - row.fraction : row.fraction - match.start) / (match.end - match.start);
+  };
+  const ordered2 = (values, spacing) => {
+    const result = values.map((row) => ({ ...row, distanceMeters: locate(row) }));
+    if (result.some((row, i) => row.distanceMeters < 15 || row.distanceMeters > distance2 - 15 || i > 0 && row.distanceMeters - result[i - 1].distanceMeters < spacing)) throw Error("race_rally_timing_order");
+    return result;
+  };
+  return {
+    version: 1,
+    startIntervalMs: RALLY_START_INTERVAL_MS,
+    recoveryPenaltyMs: RALLY_RECOVERY_PENALTY_MS,
+    segmentSurfaces: surfaces,
+    splits: ordered2(policy.splits, 20),
+    paceNotes: ordered2(policy.paceNotes, 5)
+  };
+}
+function rallySurfaceDynamics(course, index, base) {
+  if (course.discipline !== "rally") return base;
+  const value = RALLY_SURFACES[course.rally?.segmentSurfaces[index]];
+  if (!value) throw Error("race_rally_surface_missing");
+  return { ...value, grip: value.grip * base.grip };
+}
+
 // app/js/world/road-units.js
 var ROAD_SOURCE_MINIMUM_SPAN_METERS = 0.01;
 
@@ -1466,7 +1567,8 @@ function normalizeStage(value, sourceIds) {
     legs.push(Object.freeze({ sourceFeatureId: leg.sourceFeatureId, startSegment: leg.startSegment, endSegment: leg.endSegment, direction: leg.direction }));
   }
   if (JSON.stringify(ids) !== JSON.stringify(sourceIds)) fail();
-  return Object.freeze({ kind: "open-stage-v1", minimumWidthMeters: value.minimumWidthMeters, startNodeId: value.startNodeId, finishNodeId: value.finishNodeId, legs: Object.freeze(legs) });
+  const rally = normalizeRallyStage(value.rally, legs);
+  return Object.freeze({ kind: "open-stage-v1", minimumWidthMeters: value.minimumWidthMeters, startNodeId: value.startNodeId, finishNodeId: value.finishNodeId, legs: Object.freeze(legs), ...rally ? { rally } : {} });
 }
 var raceVenueMinimumWidth = (venue) => venue?.version === 2 ? venue.stage.minimumWidthMeters : 6;
 function raceVenueContainsInterval(venue, id, segment, start = 0, end = 1) {
@@ -1494,7 +1596,7 @@ var raceVenueMaximumLength = (venue) => venue ? Math.max(8e3, Math.min(3e4, venu
 var RACE_COURSE_VERSION = 1;
 var RACE_MAX_ROUTE_EDGES = 2048;
 var RACE_MINIMUM_SPAN_METERS = ROAD_SOURCE_MINIMUM_SPAN_METERS;
-var RACE_DISCIPLINES = Object.freeze(["sprint", "circuit", "time-trial", "oval"]);
+var RACE_DISCIPLINES = Object.freeze(["sprint", "circuit", "time-trial", "oval", "rally"]);
 var isClosedRaceDiscipline = (discipline) => discipline === "circuit" || discipline === "oval";
 var finitePoint = (p) => p && ["x", "y", "z"].every((k) => Number.isFinite(p[k]));
 var distance = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
@@ -1506,6 +1608,14 @@ var direction = (a, b) => {
 var clean = (s) => String(s || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 80);
 var spatialIndexes = /* @__PURE__ */ new WeakMap();
 function prepareRaceCourseGeometry(course) {
+  if (course.rally) {
+    for (const key of ["splits", "paceNotes"]) {
+      course.rally[key].forEach(Object.freeze);
+      Object.freeze(course.rally[key]);
+    }
+    Object.freeze(course.rally.segmentSurfaces);
+    Object.freeze(course.rally);
+  }
   if (course.pitLane) {
     prepareRaceCourseGeometry(course.pitLane.course);
     Object.freeze(course.pitLane);
@@ -1748,12 +1858,16 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth, maximumGra
   return { version: RACE_COURSE_VERSION, metersPerUnit, ...venue ? { venueSource: venue } : {}, nodes, edges, outgoing };
 }
 function createRaceCourse(graph, path, settings = {}) {
-  if (graph.venueSource?.stage) throw Error("race_stage_runtime_unavailable");
+  if (graph.venueSource?.stage && !graph.venueSource.stage.rally) throw Error("race_stage_runtime_unavailable");
   if (!Array.isArray(path) || path.length < 1 || path.length > RACE_MAX_ROUTE_EDGES) throw Error("invalid_race_route");
   const byId = new Map(graph.edges.map((e) => [e.id, e])), edges = path.map((id) => byId.get(id));
   if (edges.some((e) => !e)) throw Error("race_road_missing");
   const discipline = settings.discipline || "sprint";
   if (!RACE_DISCIPLINES.includes(discipline)) throw Error("invalid_race_discipline");
+  if (Boolean(graph.venueSource?.stage) !== (discipline === "rally")) throw Error("race_rally_source_required");
+  if (discipline === "rally" && (settings.startOffsetMeters != null || settings.pitPath !== void 0 || settings.laps !== void 0 && settings.laps !== 1)) throw Error("race_rally_settings_invalid");
+  const rally = discipline === "rally" ? prepareRallyRoute(graph.venueSource, edges) : null;
+  if (rally && edges.some((e) => e.surfaceModel || e.pavementModel || e.edgeBandModel)) throw Error("race_rally_surface_model_unavailable");
   const closed = edges.at(-1).to === edges[0].from;
   if (isClosedRaceDiscipline(discipline) && !closed) throw Error("race_circuit_not_closed");
   if (!isClosedRaceDiscipline(discipline) && closed) throw Error("race_sprint_is_closed");
@@ -1807,10 +1921,10 @@ function createRaceCourse(graph, path, settings = {}) {
     points.splice(0, points.length, { ...segments[0].a }, ...segments.map((segment) => ({ ...segment.b })));
   }
   const participants = Math.max(1, Math.min(4, Math.floor(Number(settings.participants) || 1)));
-  const gridLength = (Math.ceil(participants / 2) - 1) * 8 + 12;
+  const gridLength = rally ? 12 : (Math.ceil(participants / 2) - 1) * 8 + 12;
   let gridRun = 0;
   for (const segment of segments) {
-    if (angle(segments[0].forward, segment.forward) > 0.12 || segment.widthMeters < 6) break;
+    if (angle(segments[0].forward, segment.forward) > 0.12 || segment.widthMeters < (rally ? raceVenueMinimumWidth(graph.venueSource) : 6)) break;
     gridRun += segment.lengthMeters;
     if (gridRun >= gridLength) break;
   }
@@ -1831,6 +1945,7 @@ function createRaceCourse(graph, path, settings = {}) {
     discipline,
     laps,
     participants,
+    ...rally ? { rally } : {},
     vehicleEnvelope: { widthMeters: 2.35, lengthMeters: 6.5, heightMeters: 2.4 },
     metersPerUnit: graph.metersPerUnit,
     vehicleClass: settings.vehicleClass || "road",
@@ -1870,6 +1985,19 @@ function createRaceCourse(graph, path, settings = {}) {
   }
   const last = segments.at(-1);
   course.gates.push(last.pavementModel ? gateAt2(last, 1, lengthMeters) : { ...last.b, forward: last.forward, halfWidthMeters: last.widthMeters * 0.5, distanceMeters: lengthMeters });
+  if (rally) {
+    for (const [splitIndex, split] of rally.splits.entries()) {
+      const segment = raceSegmentAtDistance(course, split.distanceMeters), gate = gateAt2(segment, (split.distanceMeters - segment.startMeters) / segment.lengthMeters, split.distanceMeters);
+      course.gates = course.gates.filter((g) => Math.abs(g.distanceMeters - split.distanceMeters) > 0.01);
+      course.gates.push({ ...gate, splitIndex });
+    }
+    course.gates.sort((a, b) => a.distanceMeters - b.distanceMeters);
+    rally.splits = rally.splits.map((split, index) => ({ ...split, gateIndex: course.gates.findIndex((g) => g.splitIndex === index) }));
+    for (let i = 1; i < segments.length; i++) {
+      const a = segments[i - 1], b = segments[i], turn = angle(a.forward, b.forward), required = course.vehicleEnvelope.widthMeters + course.vehicleEnvelope.lengthMeters * Math.sin(turn / 2) + 0.4;
+      if (Math.min(a.widthMeters, b.widthMeters) < required) throw Error("race_rally_chassis_clearance");
+    }
+  }
   if (!course.locationId || !course.anchor || !Number.isFinite(course.anchor.lat) || Math.abs(course.anchor.lat) > 85 || !Number.isFinite(course.anchor.lon) || Math.abs(course.anchor.lon) > 180) throw Error("invalid_race_location");
   if (settings.pitPath !== void 0) {
     if (!isClosedRaceDiscipline(discipline) || !graph.venueSource?.pitSourceFeatureIds || !Array.isArray(settings.pitPath) || !settings.pitPath.length || settings.pitPath.length > 512) throw Error("race_pit_source_required");
@@ -1895,7 +2023,8 @@ function createRaceCourse(graph, path, settings = {}) {
   }
   return prepareRaceCourseGeometry(course);
 }
-function projectRacePosition(course, pose, { minimumMeters = -Infinity, maximumMeters = Infinity, pavementPaddingMeters } = {}) {
+function projectRacePosition(course, pose, { minimumMeters = -Infinity, maximumMeters = Infinity, pavementPaddingMeters, flight = false } = {}) {
+  if (flight && course.discipline !== "rally") throw Error("invalid_race_flight_projection");
   if (pavementPaddingMeters !== void 0 && (!Number.isFinite(pavementPaddingMeters) || pavementPaddingMeters < 0 || pavementPaddingMeters > 4)) throw Error("invalid_race_projection_padding");
   let nearest = null;
   function sample(index) {
@@ -1905,7 +2034,7 @@ function projectRacePosition(course, pose, { minimumMeters = -Infinity, maximumM
     const t = Math.max(lower, Math.min(upper, ((pose.x - s.a.x) * dx + (pose.z - s.a.z) * dz) / l2));
     const x = s.a.x + dx * t, z = s.a.z + dz * t, lateral = ((pose.x - x) * s.forward.z - (pose.z - z) * s.forward.x) * course.metersPerUnit, y = sampleRaceSegmentY(s, t, lateral);
     const error = Math.hypot(pose.x - x, pose.z - z) * course.metersPerUnit, vertical = Math.abs(pose.y - y) * course.metersPerUnit;
-    if (vertical > 2.5) return;
+    if (vertical > (flight ? RALLY_MAXIMUM_FLIGHT_HEIGHT_METERS : 2.5)) return;
     if (nearest && !(error < nearest.error || error === nearest.error && index < nearest.index)) return;
     const candidate = { index, t, x, y, z, lateralMeters: lateral, error, vertical, distanceMeters: s.startMeters + s.lengthMeters * t, widthMeters: s.widthMeters, ...s.pavementModel ? { pavement: racePavementCrossSection(s, t) } : {} };
     if (pavementPaddingMeters !== void 0 && raceProjectionOutsidePavement(candidate, -pavementPaddingMeters)) return;
@@ -1938,10 +2067,10 @@ function projectRacePosition(course, pose, { minimumMeters = -Infinity, maximumM
 function raceGridPose(course, index = 0, { rollingStagingMeters = course.discipline === "oval" ? OVAL_FORMATION_DISTANCE_METERS : 0 } = {}) {
   if (!Number.isInteger(index) || index < 0 || index >= course.participants) throw Error("invalid_race_grid_slot");
   if (!Number.isFinite(rollingStagingMeters) || rollingStagingMeters < 0 || rollingStagingMeters > 80 || rollingStagingMeters && course.discipline !== "oval") throw Error("invalid_race_rolling_grid");
-  const gridDistance = course.vehicleEnvelope.lengthMeters / 2 + 1 + (Math.ceil(course.participants / 2) - 1 - Math.floor(index / 2)) * 8, distanceMeters = rollingStagingMeters ? ((gridDistance - rollingStagingMeters) % course.lengthMeters + course.lengthMeters) % course.lengthMeters : gridDistance;
+  const gridDistance = course.vehicleEnvelope.lengthMeters / 2 + 1 + (course.discipline === "rally" ? 0 : (Math.ceil(course.participants / 2) - 1 - Math.floor(index / 2)) * 8), distanceMeters = rollingStagingMeters ? ((gridDistance - rollingStagingMeters) % course.lengthMeters + course.lengthMeters) % course.lengthMeters : gridDistance;
   const s = raceSegmentAtDistance(course, distanceMeters);
   const forward = s.forward, along = (distanceMeters - s.startMeters) / course.metersPerUnit;
-  const lateral = ((racePavementCrossSection(s, (distanceMeters - s.startMeters) / s.lengthMeters)?.racingOffsetMeters || 0) + (course.participants === 1 ? 0 : index % 2 === 0 ? -1.4 : 1.4)) / course.metersPerUnit;
+  const lateral = ((racePavementCrossSection(s, (distanceMeters - s.startMeters) / s.lengthMeters)?.racingOffsetMeters || 0) + (course.participants === 1 || course.discipline === "rally" ? 0 : index % 2 === 0 ? -1.4 : 1.4)) / course.metersPerUnit;
   return {
     x: s.a.x + forward.x * along + forward.z * lateral,
     y: sampleRaceSegmentY(s, along * course.metersPerUnit / s.lengthMeters, lateral * course.metersPerUnit),
@@ -1959,18 +2088,18 @@ function createRaceProgress(pose, nowMs) {
   if (!finitePoint(pose) || !Number.isFinite(nowMs)) throw Error("invalid_race_pose");
   return { nextGate: 0, lap: 1, finished: false, invalid: false, penaltyMs: 0, lastPose: { ...pose }, lastAtMs: nowMs, lapStartedAtMs: nowMs, lapTimes: [], bestLapMs: null };
 }
-function advanceRaceProgress(course, progress, pose, nowMs, { startedAtMs, maximumMetersPerSecond = 85 } = {}) {
+function advanceRaceProgress(course, progress, pose, nowMs, { startedAtMs, maximumMetersPerSecond = 85, flight = false } = {}) {
   if (progress.finished || progress.invalid) return progress;
   if (!Number.isFinite(startedAtMs) || !(maximumMetersPerSecond > 0 && maximumMetersPerSecond <= 150)) throw Error("invalid_race_clock");
   if (!finitePoint(pose) || !Number.isFinite(nowMs) || !(nowMs > progress.lastAtMs)) throw Error("invalid_race_pose");
   const elapsed = (nowMs - progress.lastAtMs) / 1e3, travel = distance(progress.lastPose, pose) * course.metersPerUnit;
   if (elapsed > 10 || travel > maximumMetersPerSecond * elapsed + 1.5) throw Error("implausible_race_motion");
-  const projection = projectRacePosition(course, pose);
+  const projection = projectRacePosition(course, pose, { flight });
   if (raceProjectionOutsidePavement(projection)) throw Error("outside_race_course");
   const sweepSteps = Math.ceil(travel / 2);
   if (sweepSteps > 750) throw Error("implausible_race_motion");
   for (let step = 1; step < sweepSteps; step++) {
-    const t = step / sweepSteps, from2 = progress.lastPose, sample = projectRacePosition(course, { x: from2.x + (pose.x - from2.x) * t, y: from2.y + (pose.y - from2.y) * t, z: from2.z + (pose.z - from2.z) * t });
+    const t = step / sweepSteps, from2 = progress.lastPose, sample = projectRacePosition(course, { x: from2.x + (pose.x - from2.x) * t, y: from2.y + (pose.y - from2.y) * t, z: from2.z + (pose.z - from2.z) * t }, { flight });
     if (raceProjectionOutsidePavement(sample)) throw Error("outside_race_course");
   }
   const next = { ...progress, lastPose: { ...pose }, lastAtMs: nowMs, lapTimes: [...progress.lapTimes] };
@@ -1992,7 +2121,7 @@ function advanceRaceProgress(course, progress, pose, nowMs, { startedAtMs, maxim
       const segment = raceSegmentAtDistance(course, gate.distanceMeters), station2 = (gate.distanceMeters - segment.startMeters) / segment.lengthMeters, section = racePavementCrossSection(segment, station2);
       if (section) gateY = sampleRaceSegmentY(segment, station2, section.racingOffsetMeters + lateral);
     }
-    if (Math.abs(lateral) > gate.halfWidthMeters || Math.abs(y - gateY) * course.metersPerUnit > 2) break;
+    if (Math.abs(lateral) > gate.halfWidthMeters || Math.abs(y - gateY) * course.metersPerUnit > (flight && course.discipline === "rally" ? RALLY_MAXIMUM_FLIGHT_HEIGHT_METERS : 2)) break;
     const crossedAt = progress.lastAtMs + (nowMs - progress.lastAtMs) * t;
     next.nextGate++;
     if (next.nextGate === course.gates.length) {
@@ -2308,11 +2437,11 @@ function stepVehiclePlanarDrive(car, dt, frame, environment) {
   }
   const earthSteering = earthDrivingSteeringProfile(carSpeedToMph(spdAbs));
   const maxSteer = planetary ? 1.02 + (0.28 - 1.02) * Math.max(0, Math.min(1, (spdAbs - 5) / 90)) : earthSteering.maxSteeringAngle * vehicleHandling.steeringScale * vehicleCondition.steeringScale * characterVehicle.steeringAngleScale;
-  const clamp01 = (n) => Math.max(0, Math.min(1, n));
+  const clamp012 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(car.steerSm);
-  const speedNorm = planetary ? clamp01((spdAbs - 8) / 70) : clamp01((carSpeedToMph(spdAbs) - 10) / 60);
-  const parkingTurnBlend = clamp01(1 - spdAbs / 14);
-  const reverseTurnBlend = car.speed < -1 ? clamp01((Math.abs(car.speed) - 1) / 12) : 0;
+  const speedNorm = planetary ? clamp012((spdAbs - 8) / 70) : clamp012((carSpeedToMph(spdAbs) - 10) / 60);
+  const parkingTurnBlend = clamp012(1 - spdAbs / 14);
+  const reverseTurnBlend = car.speed < -1 ? clamp012((Math.abs(car.speed) - 1) / 12) : 0;
   const lowSpeedTurnBoost = Math.max(parkingTurnBlend, reverseTurnBlend);
   const handbrakeTurnIntent = !planetary && braking && steerMag >= 0.1 && spdAbs >= 16;
   const handbrakeSteerBoost = handbrakeTurnIntent ? 1 + (0.2 + 0.35 * speedNorm) : 1;
@@ -3644,6 +3773,29 @@ function normalizeVehicleGarage(raw) {
   const selectedId = vehicles[raw?.selectedId] ? raw.selectedId : "bmw_e34";
   return { schemaVersion: 1, revision: Math.max(0, Number(raw?.revision) || 0), selectedId, vehicles };
 }
+function prepareVehicleGarageChange(raw, command = {}, context = {}) {
+  const garage = normalizeVehicleGarage(raw), definition = personalVehicleById(command.vehicleId);
+  if (!definition) throw Error("vehicle_not_available");
+  if (command.expectedRevision !== garage.revision) throw Error("vehicle_garage_changed");
+  const row = garage.vehicles[definition.id];
+  let cost = 0;
+  if (command.action === "buy") {
+    if (row) throw Error("vehicle_already_owned");
+    cost = definition.price;
+    garage.vehicles[definition.id] = { id: definition.id, condition: 1, homeId: "", acquiredAt: context.now || Date.now() };
+  } else if (!row) throw Error("vehicle_not_owned");
+  else if (command.action === "select") garage.selectedId = definition.id;
+  else if (command.action === "park") {
+    if (!Number.isFinite(command.condition) || command.condition < 0 || command.condition > 1) throw Error("invalid_vehicle_condition");
+    row.condition = Math.min(row.condition, command.condition);
+  } else if (command.action === "home") {
+    const homeId = String(command.homeId || "");
+    if (homeId && !context.ownsHome?.(homeId)) throw Error("vehicle_home_not_owned");
+    row.homeId = homeId;
+  } else throw Error("invalid_vehicle_action");
+  garage.revision++;
+  return { garage, cost };
+}
 
 // app/js/transport/vehicle-upgrades.js?v=1
 var VEHICLE_UPGRADE_DEFINITIONS = Object.freeze([
@@ -3679,6 +3831,166 @@ function vehicleUpgradeDynamics(levels = {}) {
   });
 }
 
+// app/js/physics/road-vehicle-airborne.js?v=1
+var EARTH_GRAVITY_MPS2 = 9.80665;
+function finite(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+function clamp2(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, finite(value)));
+}
+function updateRoadVehicleVerticalState(input = {}) {
+  const dt = clamp2(input.dt, 0, 0.05);
+  const metersPerWorldUnit = Math.max(0.01, Math.abs(finite(input.metersPerWorldUnit, 1.11)));
+  const bodyOffset = Math.max(0.2, finite(input.bodyOffset, 1.21));
+  const supportY = finite(input.supportY);
+  const targetY = supportY + bodyOffset;
+  const bodyY = finite(input.bodyY, targetY);
+  const groundedBodyY = Number.isFinite(Number(input.groundedBodyY)) ? Number(input.groundedBodyY) : targetY;
+  const previousSupportY = Number.isFinite(Number(input.previousSupportY)) ? Number(input.previousSupportY) : supportY;
+  const horizontalSpeedMps = Math.max(0, Math.abs(finite(input.horizontalSpeedMps)));
+  const previousPitch = finite(input.previousPitch);
+  const surfacePitch = finite(input.surfacePitch);
+  const airborneTime = Math.max(0, finite(input.airborneTime));
+  const gravityWorld = Math.max(0.1, finite(input.gravityMps2, EARTH_GRAVITY_MPS2)) / metersPerWorldUnit;
+  const supportDropMeters = Math.max(0, previousSupportY - supportY) * metersPerWorldUnit;
+  const crestRelease = previousPitch < -0.055 && surfacePitch - previousPitch > 0.035;
+  const droveOffEdge = supportDropMeters >= 0.72;
+  const fastEnoughToLaunch = horizontalSpeedMps >= (crestRelease ? 8 : 5.5);
+  if (input.isAirborne !== true && fastEnoughToLaunch && (crestRelease || droveOffEdge)) {
+    const rampVelocityMps = crestRelease ? clamp2(Math.sin(Math.abs(previousPitch)) * horizontalSpeedMps, 1.2, 8.5) : 0;
+    return Object.freeze({
+      y: Math.max(bodyY, targetY),
+      verticalVelocity: rampVelocityMps / metersPerWorldUnit,
+      isAirborne: true,
+      airborneTime: dt,
+      pitch: crestRelease ? previousPitch : Math.min(0, surfacePitch),
+      landed: false,
+      launched: true,
+      launchReason: crestRelease ? "ramp-crest" : "surface-edge",
+      landingImpactMps: 0,
+      landingDamageForce: 0
+    });
+  }
+  if (input.isAirborne === true) {
+    const nextAirborneTime = airborneTime + dt;
+    const nextVerticalVelocity = finite(input.verticalVelocity) - gravityWorld * dt;
+    const nextY = bodyY + nextVerticalVelocity * dt;
+    const surfaceCaughtVehicle = targetY >= bodyY - 0.05;
+    const canLand = nextAirborneTime >= 0.1 && nextY <= targetY && (nextVerticalVelocity <= 0 || surfaceCaughtVehicle);
+    if (canLand) {
+      const impactMps = Math.max(0, -nextVerticalVelocity * metersPerWorldUnit);
+      const suspensionResistance = clamp2(input.suspensionResistance, 0, 0.55);
+      const damagingSpeed = Math.max(0, impactMps - 4.2);
+      return Object.freeze({
+        y: targetY,
+        verticalVelocity: 0,
+        isAirborne: false,
+        airborneTime: 0,
+        pitch: surfacePitch,
+        landed: true,
+        launched: false,
+        launchReason: "",
+        landingImpactMps: impactMps,
+        landingDamageForce: damagingSpeed * 9.5 * (1 - suspensionResistance)
+      });
+    }
+    const flightPitch = horizontalSpeedMps > 0.5 ? -Math.atan2(nextVerticalVelocity * metersPerWorldUnit, horizontalSpeedMps) : 0;
+    return Object.freeze({
+      y: nextY,
+      verticalVelocity: nextVerticalVelocity,
+      isAirborne: true,
+      airborneTime: nextAirborneTime,
+      pitch: clamp2(flightPitch, -0.48, 0.48),
+      landed: false,
+      launched: false,
+      launchReason: "",
+      landingImpactMps: 0,
+      landingDamageForce: 0
+    });
+  }
+  return Object.freeze({
+    y: groundedBodyY,
+    verticalVelocity: 0,
+    isAirborne: false,
+    airborneTime: 0,
+    pitch: surfacePitch,
+    landed: false,
+    launched: false,
+    launchReason: "",
+    landingImpactMps: 0,
+    landingDamageForce: 0
+  });
+}
+
+// app/js/transport/damage-model.js?v=1
+var TRANSPORT_DAMAGE_BANDS = Object.freeze([
+  Object.freeze({ id: "disabled", maximum: 0.05, label: "Disabled" }),
+  Object.freeze({ id: "critical", maximum: 0.25, label: "Critical" }),
+  Object.freeze({ id: "damaged", maximum: 0.55, label: "Damaged" }),
+  Object.freeze({ id: "worn", maximum: 0.82, label: "Worn" }),
+  Object.freeze({ id: "healthy", maximum: 1, label: "Healthy" })
+]);
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+function transportDamageBand(condition = 1) {
+  const normalized = clamp01(condition);
+  return TRANSPORT_DAMAGE_BANDS.find((band) => normalized <= band.maximum) || TRANSPORT_DAMAGE_BANDS.at(-1);
+}
+function transportDamagePresentation(condition = 1) {
+  const normalized = clamp01(condition);
+  const band = transportDamageBand(normalized);
+  return Object.freeze({
+    condition: normalized,
+    band: band.id,
+    label: band.label,
+    dirt: clamp01((1 - normalized) * 1.2),
+    panelDisplacement: band.id === "healthy" ? 0 : band.id === "worn" ? 0.015 : band.id === "damaged" ? 0.055 : band.id === "critical" ? 0.11 : 0.16,
+    glassDamage: ["damaged", "critical", "disabled"].includes(band.id),
+    lampFailure: ["critical", "disabled"].includes(band.id),
+    wheelDamage: ["critical", "disabled"].includes(band.id),
+    smoke: ["critical", "disabled"].includes(band.id),
+    operable: band.id !== "disabled"
+  });
+}
+function applyTransportDamage(target = {}, force = 0, options = {}) {
+  const before = clamp01(target.condition ?? 1);
+  const resistance = Math.max(0.1, Number(options.resistance ?? target.resistance) || 160);
+  const policy = String(options.durabilityPolicy || target.durabilityPolicy || TRANSPORT_DURABILITY_POLICIES.STANDARD);
+  const normalizedForce = Math.max(0, Number(force) || 0);
+  const cosmeticSeverity = clamp01(normalizedForce / Math.max(1, resistance));
+  if (policy === TRANSPORT_DURABILITY_POLICIES.EXPLORATION_UNLIMITED) {
+    target.condition = 1;
+    target.cosmeticImpact = Math.max(Number(target.cosmeticImpact || 0), cosmeticSeverity);
+    return Object.freeze({
+      before,
+      after: 1,
+      delta: 0,
+      destroyed: false,
+      disabled: false,
+      durabilityPolicy: policy,
+      cosmeticSeverity,
+      band: "healthy"
+    });
+  }
+  const resistanceScale = policy === TRANSPORT_DURABILITY_POLICIES.HEAVY_DUTY ? 1.45 : 1;
+  const after = clamp01(before - normalizedForce / (resistance * resistanceScale));
+  target.condition = after;
+  const presentation = transportDamagePresentation(after);
+  return Object.freeze({
+    before,
+    after,
+    delta: before - after,
+    destroyed: after <= 0,
+    disabled: !presentation.operable,
+    durabilityPolicy: policy,
+    cosmeticSeverity,
+    band: presentation.band
+  });
+}
+
 // app/js/racing/vehicle-controller.js
 function createRaceVehicleProfile(vehicleId, { condition = 1, levels = {}, grip = 1 } = {}) {
   const definition = personalVehicleById(vehicleId);
@@ -3711,21 +4023,36 @@ function createRaceVehicleState(pose, profile) {
     boostReady: false,
     vehicleVariantId: personalVehicleById(profile.vehicleId).variantId,
     isAirborne: false,
+    vy: 0,
+    _terrainAirTimer: 0,
+    raceSupportY: pose.y,
+    raceSupportPitch: 0,
+    raceSupportDistanceMeters: 0,
+    landingImpactMps: 0,
+    landingDamage: 0,
     barrierContacts: 0
   };
 }
 function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0 } = {}) {
   if (!(dt > 0 && dt <= 1 / 30)) throw Error("invalid_race_physics_step");
+  const rally = course.discipline === "rally", supportOptions = rally ? {
+    minimumMeters: Math.max(0, car.raceSupportDistanceMeters - 12),
+    maximumMeters: Math.min(course.lengthMeters, car.raceSupportDistanceMeters + 12),
+    flight: car.isAirborne === true
+  } : {};
+  const previousSupport = rally ? projectRacePosition(course, raceVehicleGroundPose(car), supportOptions) : null;
+  if (rally && !previousSupport) throw Error("race_surface_lost");
+  const surface2 = rally ? rallySurfaceDynamics(course, previousSupport.index, profile.surface) : profile.surface;
   const frame = prepareVehicleDriveFrame(car, { ...actions, boost: 0 }, dt, profile.config);
   const driving = stepVehiclePlanarDrive(car, dt, frame, {
     config: profile.config,
     planetary: false,
     metersPerWorldUnit: course.metersPerUnit,
-    ...course.surfaceModel === BANKED_ROAD_MODEL ? { roadPlane: { pitch: car.terrainPitch || 0, roll: car.terrainRoll || 0 } } : {},
+    ...course.surfaceModel === BANKED_ROAD_MODEL || rally ? { roadPlane: { pitch: car.terrainPitch || 0, roll: car.terrainRoll || 0 } } : {},
     ...course.discipline === "oval" || course.ovalAerodynamics === true ? { aerodynamicDrag: { coefficientPerMeter: OVAL_AERODYNAMIC_DRAG_PER_METER * Math.max(0.5, Math.min(1.8, profile.handling.width * profile.handling.height / 2.7)), reduction: draftReduction } } : {},
-    surfaceDynamics: profile.surface,
+    surfaceDynamics: surface2,
     vehicleHandling: profile.handling,
-    vehicleCondition: profile.condition,
+    vehicleCondition: rally ? vehicleConditionDynamics(car.condition) : profile.condition,
     vehicleUpgrades: profile.upgrades,
     characterVehicle: profile.character,
     maxSpd: Math.min(profile.config.maxSpd, mphToCarSpeed2(profile.handling.topSpeedMph)),
@@ -3734,7 +4061,7 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
   });
   car.steerAngle = driving.steerAngle;
   const next = integrateVehiclePlanarPosition(car, dt, driving, course.metersPerUnit, false);
-  const supportPose = { ...next, y: car.y - VEHICLE_ROOT_TO_GROUND_METERS }, support = course.fullRoadContactProjection ? projectRacePosition(course, supportPose, { pavementPaddingMeters: profile.handling.width * 0.5 + 0.2 }) || projectRacePosition(course, supportPose) : projectRacePosition(course, supportPose);
+  const supportPose = { ...next, y: car.y - VEHICLE_ROOT_TO_GROUND_METERS }, support = course.fullRoadContactProjection ? projectRacePosition(course, supportPose, { ...supportOptions, pavementPaddingMeters: profile.handling.width * 0.5 + 0.2 }) || projectRacePosition(course, supportPose, supportOptions) : projectRacePosition(course, supportPose, supportOptions);
   if (!support) throw Error("race_surface_lost");
   const margin = Math.max(0.3, (support.widthMeters - profile.handling.width) * 0.5 - 0.2);
   let x = next.x, z = next.z;
@@ -3774,9 +4101,41 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
   });
   car.x = x;
   car.z = z;
-  car.y = contact.y + VEHICLE_ROOT_TO_GROUND_METERS;
-  car.terrainPitch = contact.pitch;
-  car.terrainRoll = contact.roll;
+  if (rally) {
+    const vertical = updateRoadVehicleVerticalState({
+      bodyY: car.y,
+      groundedBodyY: contact.y + VEHICLE_ROOT_TO_GROUND_METERS,
+      bodyOffset: VEHICLE_ROOT_TO_GROUND_METERS,
+      supportY: contact.y,
+      previousSupportY: car.raceSupportY,
+      previousPitch: car.raceSupportPitch,
+      surfacePitch: contact.pitch,
+      verticalVelocity: car.vy,
+      isAirborne: car.isAirborne,
+      airborneTime: car._terrainAirTimer,
+      horizontalSpeedMps: Math.hypot(car.vx, car.vz) * course.metersPerUnit,
+      metersPerWorldUnit: course.metersPerUnit,
+      suspensionResistance: profile.upgrades.suspensionResistance,
+      dt
+    });
+    car.y = vertical.y;
+    car.vy = vertical.verticalVelocity;
+    car.isAirborne = vertical.isAirborne;
+    car._terrainAirTimer = vertical.airborneTime;
+    car.raceSupportY = contact.y;
+    car.raceSupportPitch = contact.pitch;
+    car.raceSupportDistanceMeters = support.distanceMeters;
+    car.terrainPitch = vertical.pitch;
+    car.terrainRoll = vertical.isAirborne ? car.terrainRoll : contact.roll;
+    if (vertical.landed) {
+      car.landingImpactMps = vertical.landingImpactMps;
+      car.landingDamage += applyTransportDamage(car, vertical.landingDamageForce).delta;
+    }
+  } else {
+    car.y = contact.y + VEHICLE_ROOT_TO_GROUND_METERS;
+    car.terrainPitch = contact.pitch;
+    car.terrainRoll = contact.roll;
+  }
   car.maximumWheelPenetration = contact.maximumWheelPenetration;
   car.maximumWheelGap = contact.maximumWheelGap;
   return driving;
@@ -3792,6 +4151,15 @@ function raceVehicleWorldPose(player) {
   if (!frame) return null;
   if (!["x", "y", "z", "angle", "terrainPitch", "terrainRoll"].every((key) => Number.isFinite(frame[key]))) throw Error("race_vehicle_frame_missing");
   return { x: frame.x, y: frame.y, z: frame.z, yaw: frame.angle, pitch: frame.terrainPitch, roll: frame.terrainRoll };
+}
+function prepareRaceConditionHandback(raw, player) {
+  if (!player?.vehicleState) return null;
+  const condition = player.condition;
+  if (!Number.isFinite(condition) || condition < 0 || condition > 1 || condition !== player.vehicleState.condition) throw Error("race_invalid_vehicle_condition");
+  const garage = normalizeVehicleGarage(raw), owned = garage.vehicles[player.vehicleId];
+  if (!owned) throw Error("race_owned_vehicle_required");
+  if (condition >= owned.condition) return null;
+  return prepareVehicleGarageChange(garage, { action: "park", vehicleId: player.vehicleId, condition, expectedRevision: garage.revision }).garage;
 }
 var RACE_VEHICLE_NUMERIC_FIELDS = Object.freeze([
   "x",
@@ -3820,38 +4188,47 @@ var RACE_VEHICLE_NUMERIC_FIELDS = Object.freeze([
   "maximumWheelGap",
   "_driveDirection",
   "_driftHoldTimer",
-  "driftAngle"
+  "driftAngle",
+  "vy",
+  "_terrainAirTimer",
+  "raceSupportY",
+  "raceSupportPitch",
+  "raceSupportDistanceMeters",
+  "landingImpactMps",
+  "landingDamage"
 ]);
 function snapshotRaceVehicle(car) {
   if (!car) return null;
   const frame = {};
   for (const key of RACE_VEHICLE_NUMERIC_FIELDS) frame[key] = Number(car[key] ?? (key === "_driveDirection" ? 1 : 0));
   frame.isDrifting = car.isDrifting === true;
+  frame.isAirborne = car.isAirborne === true;
   return frame;
 }
 
 // app/js/racing/ai-controller.js
-var clamp2 = (v, a, b) => Math.max(a, Math.min(b, v));
+var clamp3 = (v, a, b) => Math.max(a, Math.min(b, v));
 var wrap = (v) => Math.atan2(Math.sin(v), Math.cos(v));
 function pointOnRaceCourse(course, distanceMeters, laneOffsetMeters = 0) {
-  const distance2 = isClosedRaceDiscipline(course.discipline) ? (distanceMeters % course.lengthMeters + course.lengthMeters) % course.lengthMeters : clamp2(distanceMeters, 0, course.lengthMeters);
-  const segment = raceSegmentAtDistance(course, distance2), t = clamp2((distance2 - segment.startMeters) / segment.lengthMeters, 0, 1);
+  const distance2 = isClosedRaceDiscipline(course.discipline) ? (distanceMeters % course.lengthMeters + course.lengthMeters) % course.lengthMeters : clamp3(distanceMeters, 0, course.lengthMeters);
+  const segment = raceSegmentAtDistance(course, distance2), t = clamp3((distance2 - segment.startMeters) / segment.lengthMeters, 0, 1);
   const offset = (racePavementCrossSection(segment, t)?.racingOffsetMeters || 0) + laneOffsetMeters, unit = course.metersPerUnit;
   return { x: segment.a.x + (segment.b.x - segment.a.x) * t + segment.forward.z * offset / unit, y: sampleRaceSegmentY(segment, t, offset), z: segment.a.z + (segment.b.z - segment.a.z) * t - segment.forward.x * offset / unit, segment };
 }
 function raceAiActions(course, car, progress, profile, { difficulty = 0.65, formation = false, laneOffsetMeters = 0, paceMetersPerSecond = 10 } = {}) {
   if (progress.finished) return { steer: 0, throttle: 0, serviceBrake: 1 };
   const goal = course.gates[progress.nextGate], pose = raceVehicleGroundPose(car), speed = Math.abs(raceVehicleSpeedMetersPerSecond(car));
-  const projection = projectRacePosition(course, pose, formation ? {} : { minimumMeters: Math.max(0, (course.gates[progress.nextGate - 1]?.distanceMeters || 0) - 8), maximumMeters: Math.min(course.lengthMeters, goal.distanceMeters + 15) });
+  const projection = projectRacePosition(course, pose, { ...formation ? {} : { minimumMeters: Math.max(0, (course.gates[progress.nextGate - 1]?.distanceMeters || 0) - 8), maximumMeters: Math.min(course.lengthMeters, goal.distanceMeters + 15) }, flight: course.discipline === "rally" && car.isAirborne });
   if (!projection) return { steer: 0, throttle: 0, serviceBrake: 1 };
-  const oval = course.discipline === "oval", look = oval ? clamp2(4 + speed * 0.8, 6, 45) : clamp2(3.5 + speed * 0.6, 4, 15), target = pointOnRaceCourse(course, projection.distanceMeters + look, laneOffsetMeters);
+  const oval = course.discipline === "oval", look = oval ? clamp3(4 + speed * 0.8, 6, 45) : clamp3(3.5 + speed * 0.6, 4, 15), target = pointOnRaceCourse(course, projection.distanceMeters + look, laneOffsetMeters);
   const dx = (target.x - car.x) * course.metersPerUnit, dz = (target.z - car.z) * course.metersPerUnit, heading = Math.atan2(dx, dz), error = wrap(heading - car.angle + (oval ? Math.atan2((laneOffsetMeters - (projection.lateralMeters - (projection.pavement?.racingOffsetMeters || 0))) * 1.4, speed + 4) : 0));
   const steering = earthDrivingSteeringProfile(carSpeedToMph(Math.abs(car.speed)));
   const desiredAngle = Math.atan2(2 * profile.handling.wheelBase * Math.sin(error), Math.max(2, Math.hypot(dx, dz)));
   const maxAngle = steering.maxSteeringAngle * profile.handling.steeringScale * profile.condition.steeringScale;
-  const steer = clamp2(desiredAngle / Math.max(0.1, maxAngle) * 1.35, -1, 1);
-  let targetSpeed = formation ? paceMetersPerSecond : oval ? Math.min(profile.handling.topSpeedMph * 0.44704 * (0.55 + 0.3 * clamp2(difficulty, 0, 1)), 65) : Math.min(profile.handling.topSpeedMph * 0.44704 * (0.32 + 0.25 * clamp2(difficulty, 0, 1)), 23);
-  const gripAcceleration = profile.config.gripRoad * profile.surface.grip * profile.handling.gripScale * profile.condition.gripScale * profile.upgrades.gripScale * 9.81;
+  const steer = clamp3(desiredAngle / Math.max(0.1, maxAngle) * 1.35, -1, 1);
+  let targetSpeed = formation ? paceMetersPerSecond : oval ? Math.min(profile.handling.topSpeedMph * 0.44704 * (0.55 + 0.3 * clamp3(difficulty, 0, 1)), 65) : Math.min(profile.handling.topSpeedMph * 0.44704 * (0.32 + 0.25 * clamp3(difficulty, 0, 1)), 23);
+  const surface2 = rallySurfaceDynamics(course, projection.index, profile.surface);
+  const gripAcceleration = profile.config.gripRoad * surface2.grip * profile.handling.gripScale * profile.condition.gripScale * profile.upgrades.gripScale * 9.81;
   const planningDeceleration = Math.max(1.2, Math.min(4, gripAcceleration * 0.45, profile.config.brake * 0.22352 * profile.handling.brakeScale * 0.65));
   const horizon = Math.min(180, Math.max(70, speed * speed / (2 * planningDeceleration) + look + 15));
   for (let index = 0; index < course.segments.length; index++) {
@@ -3861,14 +4238,14 @@ function raceAiActions(course, car, progress, profile, { difficulty = 0.65, form
     if (ahead < 0 || ahead > horizon) continue;
     const previous = course.segments[(index + course.segments.length - 1) % course.segments.length];
     if (!index && !isClosedRaceDiscipline(course.discipline)) continue;
-    const bend = Math.acos(clamp2(previous.forward.x * segment.forward.x + previous.forward.z * segment.forward.z, -1, 1));
+    const bend = Math.acos(clamp3(previous.forward.x * segment.forward.x + previous.forward.z * segment.forward.z, -1, 1));
     if (bend < 0.12) continue;
-    const radius = (previous.lengthMeters + segment.lengthMeters) * 0.5 / bend, corner = oval ? Math.sqrt(Math.max(1, radius) * gripAcceleration * 0.55) : Math.max(2.8, Math.min(15, 4.5 / bend)) * Math.sqrt(profile.surface.grip), brakeDistance = Math.max(0, ahead - look * 0.35);
+    const radius = (previous.lengthMeters + segment.lengthMeters) * 0.5 / bend, corner = oval ? Math.sqrt(Math.max(1, radius) * gripAcceleration * 0.55) : Math.max(2.8, Math.min(15, 4.5 / bend)) * Math.sqrt(Math.min(surface2.grip, rallySurfaceDynamics(course, index, profile.surface).grip)), brakeDistance = Math.max(0, ahead - look * 0.35);
     targetSpeed = Math.min(targetSpeed, Math.sqrt(corner * corner + 2 * planningDeceleration * brakeDistance));
   }
-  targetSpeed *= clamp2(1 - Math.abs(error) * 0.32, 0.25, 1);
+  targetSpeed *= clamp3(1 - Math.abs(error) * 0.32, 0.25, 1);
   const difference = targetSpeed - speed;
-  return { steer, throttle: difference > 0.2 ? clamp2(difference * 0.6, 0.12, 1) : 0, reverse: 0, brake: 0, serviceBrake: difference < -0.35 ? clamp2(-difference * 0.3, 0, 1) : 0 };
+  return { steer, throttle: difference > 0.2 ? clamp3(difference * 0.6, 0.12, 1) : 0, reverse: 0, brake: 0, serviceBrake: difference < -0.35 ? clamp3(-difference * 0.3, 0, 1) : 0 };
 }
 function raceFormationActions(course, car, progress, profile, slot) {
   if (course.discipline !== "oval" || !Number.isInteger(slot) || slot < 0 || slot >= course.participants) throw Error("invalid_race_formation");
@@ -3882,7 +4259,7 @@ var RACE_MAXIMUM_EVENT_DISTANCE_METERS = 64e3;
 function raceMaximumDurationMs(course) {
   const length = course?.lengthMeters, laps = course?.laps;
   if (!Number.isFinite(length) || length < 200 || length > 3e4 || !Number.isInteger(laps) || laps < 1 || laps > 8 || length * laps > RACE_MAXIMUM_EVENT_DISTANCE_METERS) throw Error("invalid_race_duration_course");
-  return Math.max(RACE_MINIMUM_DURATION_MS, Math.min(RACE_MAXIMUM_DURATION_MS, Math.ceil((length * laps / 10 + 120) / 60) * 6e4));
+  return Math.max(RACE_MINIMUM_DURATION_MS, Math.min(RACE_MAXIMUM_DURATION_MS, Math.ceil((length * laps / 10 + 120) / 60) * 6e4 + (course.discipline === "rally" ? 9e4 : 0)));
 }
 
 // app/js/racing/pit-lane-rules.js
@@ -3961,8 +4338,9 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
   maximumDurationMs ??= allowedDurationMs;
   if (!Number.isFinite(maximumDurationMs) || maximumDurationMs <= 0 || maximumDurationMs > allowedDurationMs) throw Error("invalid_race_duration");
   course = prepareRaceCourseGeometry(structuredClone(course));
-  const rolling = course.discipline === "oval", pitGeometry = createRacePitGeometry(course), players = /* @__PURE__ */ new Map();
+  const rolling = course.discipline === "oval", rally = course.discipline === "rally", pitGeometry = createRacePitGeometry(course), players = /* @__PURE__ */ new Map();
   let phase = "lobby", leaderUid = creatorUid, startAtMs = null, tick = 0, formationTick = 0, formationComplete = false, lastNow = createdAtMs, completedAtMs = null, reason = "", outcomeEmitted = false, cautionUntilMs = 0;
+  if (rally && !course.rally) throw Error("race_rally_source_required");
   const activeHumans = () => [...players.values()].filter((p) => !p.ai && !p.left);
   function participant(uid) {
     const p = players.get(uid);
@@ -4007,7 +4385,12 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       pitEntrySpeed: 0,
       pitVisits: 0,
       pitSpeedPenalized: false,
-      pitPenaltyReason: null
+      pitPenaltyReason: null,
+      startedAtMs: null,
+      recoveries: 0,
+      lastRecoveryAtMs: -Infinity,
+      recoveryQueued: false,
+      splits: []
     };
     players.set(uid, p);
     for (const other of players.values()) if (!other.ai) other.ready = false;
@@ -4032,8 +4415,9 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       p.car = createRaceVehicleState(raceGridPose(course, p.slot), p.profile);
       stepRaceVehicle(course, p.car, NEUTRAL, 1 / 60, p.profile);
       if (rolling) p.car.speed = p.car.vFwd = mphToCarSpeed(OVAL_PACE_METERS_PER_SECOND / METERS_PER_SECOND_PER_MPH);
+      p.startedAtMs = startAtMs + (rally ? p.slot * RALLY_START_INTERVAL_MS : 0);
       p.previousFrame = snapshotRaceVehicle(p.car);
-      p.progress = createRaceProgress(raceVehicleGroundPose(p.car), startAtMs);
+      p.progress = createRaceProgress(raceVehicleGroundPose(p.car), p.startedAtMs);
     }
     return snapshot();
   }
@@ -4057,6 +4441,35 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
   function caution(nowMs) {
     if (rolling && phase === "running") cautionUntilMs = Math.max(cautionUntilMs, nowMs + OVAL_CAUTION_DURATION_MS);
   }
+  function recover(uid, sequence, receivedAtMs) {
+    const p = participant(uid);
+    if (!rally || phase !== "running" || p.ai || p.left || p.dnf || p.progress?.finished || p.disconnectedAt !== null || receivedAtMs < p.startedAtMs) throw Error("race_recovery_unavailable");
+    if (!Number.isSafeInteger(sequence) || sequence <= p.lastSequence || !Number.isFinite(receivedAtMs) || receivedAtMs < lastNow - 1e3 || receivedAtMs > lastNow + 500) throw Error("obsolete_race_controls");
+    if (p.recoveryQueued || p.recoveries >= RALLY_MAXIMUM_RECOVERIES || receivedAtMs - p.lastRecoveryAtMs < RALLY_RECOVERY_COOLDOWN_MS) throw Error("race_recovery_rate_limited");
+    if (p.queue.length >= 32) throw Error("race_controls_rate_limited");
+    p.lastSequence = sequence;
+    p.recoveryQueued = true;
+    p.queue.push({ kind: "recover", at: receivedAtMs });
+    return true;
+  }
+  function applyRecovery(p, frameAt) {
+    const distance2 = p.progress.nextGate ? Math.max(4.25, course.gates[p.progress.nextGate - 1].distanceMeters - 5) : 4.25, segment = raceSegmentAtDistance(course, distance2), t = (distance2 - segment.startMeters) / segment.lengthMeters, pose = { x: segment.a.x + (segment.b.x - segment.a.x) * t, y: sampleRaceSegmentY(segment, t), z: segment.a.z + (segment.b.z - segment.a.z) * t, yaw: Math.atan2(segment.forward.x, segment.forward.z) }, old = p.car;
+    p.car = createRaceVehicleState(pose, { ...p.profile, conditionValue: old.condition });
+    p.car.barrierContacts = old.barrierContacts;
+    p.car.landingDamage = old.landingDamage;
+    p.car.landingImpactMps = old.landingImpactMps;
+    p.car.raceSupportDistanceMeters = distance2;
+    stepRaceVehicle(course, p.car, NEUTRAL, 1 / 60, p.profile);
+    p.progress = { ...p.progress, lastPose: raceVehicleGroundPose(p.car), lastAtMs: frameAt };
+    addPenalty(p, RALLY_RECOVERY_PENALTY_MS);
+    p.previousFrame = snapshotRaceVehicle(p.car);
+    p.queue = [];
+    p.actions = NEUTRAL;
+    p.lastControlAt = -Infinity;
+    p.recoveries++;
+    p.lastRecoveryAtMs = frameAt;
+    p.recoveryQueued = false;
+  }
   function disconnect(uid, nowMs) {
     const p = participant(uid);
     if (p.ai) return;
@@ -4064,6 +4477,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     if (phase === "lobby") p.ready = false;
     else if (!p.dnf && !p.progress?.finished) caution(Math.max(lastNow, nowMs));
     p.queue = [];
+    p.recoveryQueued = false;
     p.actions = NEUTRAL;
   }
   function reconnect(uid, nowMs) {
@@ -4174,7 +4588,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
       p.pitSpeedPenalized = false;
     }
     if (!p.pitProgress) {
-      p.progress = advanceRaceProgress(course, p.progress, pose, frameAt, { startedAtMs: startAtMs });
+      p.progress = advanceRaceProgress(course, p.progress, pose, frameAt, { startedAtMs: p.startedAtMs, flight: rally && (p.car.isAirborne || p.previousFrame.isAirborne) });
       return;
     }
     const pitProjection = projectRacePosition(pitGeometry.pitPavement, pose);
@@ -4282,11 +4696,22 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           p.dnf = true;
           continue;
         }
+        if (rally && frameAt <= p.startedAtMs) {
+          p.queue = p.queue.filter((command) => command.at >= p.startedAtMs);
+          continue;
+        }
+        let recovered = false;
         while (p.queue.length && p.queue[0].at <= frameAt) {
           const command = p.queue.shift();
+          if (command.kind === "recover") {
+            applyRecovery(p, frameAt);
+            recovered = true;
+            break;
+          }
           p.actions = command.actions;
           p.lastControlAt = command.at;
         }
+        if (recovered) continue;
         const row = before?.get(p.uid);
         let actions = p.ai ? raceAiActions(p.pitCommitted ? pitGeometry.pitPavement : course, p.car, p.pitCommitted ? p.pitProgress : p.progress, p.profile, {
           difficulty: p.difficulty,
@@ -4298,7 +4723,14 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
         p.previousFrame = snapshotRaceVehicle(p.car);
         if (rolling) p.ovalDraft = ovalDraftReduction(before.get(p.uid).draftActor, draftActors, course.metersPerUnit, { enabled: !yellow });
         stepRaceVehicle(pitGeometry ? pitPhysicalCourse(p, row) : course, p.car, actions, 1 / 60, p.profile, { draftReduction: p.ovalDraft });
+        const beforeGate = p.progress.nextGate;
         advancePlayerProgress(p, raceVehicleGroundPose(p.car), frameAt, row);
+        if (rally) {
+          for (const split of course.rally.splits) if (split.gateIndex >= beforeGate && split.gateIndex < p.progress.nextGate) {
+            const gate = course.gates[split.gateIndex], a = p.previousFrame, b = p.car, f = gate.forward, from = (a.x - gate.x) * f.x + (a.z - gate.z) * f.z, to = (b.x - gate.x) * f.x + (b.z - gate.z) * f.z, fraction = -from / (to - from), crossedAt = frameAt - STEP_MS + STEP_MS * fraction;
+            p.splits.push({ label: split.label, elapsedMs: crossedAt - p.startedAtMs + p.progress.penaltyMs });
+          }
+        }
       }
       if (rolling) {
         const after = trackPositions();
@@ -4371,6 +4803,13 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
           condition: p.car?.condition ?? p.profile.conditionValue,
           barrierContacts: p.car?.barrierContacts ?? 0,
           vehicleState: frame,
+          ...rally ? { rally: {
+            startAtMs: p.startedAtMs,
+            recoveries: p.recoveries,
+            canRecover: phase === "running" && !p.ai && !p.dnf && !p.left && !p.progress?.finished && p.disconnectedAt === null && lastNow >= p.startedAtMs && !p.recoveryQueued && p.recoveries < RALLY_MAXIMUM_RECOVERIES && lastNow - p.lastRecoveryAtMs >= RALLY_RECOVERY_COOLDOWN_MS,
+            splits: p.splits.map((row) => ({ ...row })),
+            nextPaceNote: course.rally.paceNotes.find((note) => note.distanceMeters >= (p.car?.raceSupportDistanceMeters || 0)) || null
+          } } : {},
           ...rolling ? { trackZone: p.ovalZone, ovalPenaltyReason: p.ovalPenaltyReason, draftingReduction: phase === "running" && !p.progress?.finished ? p.ovalDraft : 0 } : {},
           ...pitGeometry ? { pit: {
             active: p.pitCommitted,
@@ -4398,6 +4837,7 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     setReady,
     start,
     control,
+    recover,
     advance,
     disconnect,
     reconnect,
@@ -4506,7 +4946,12 @@ var RACE_PROFILED_PAVEMENT_PHYSICS_VERSION = "earth-profiled-pavement-2026-10-30
 var RACE_OVAL_PHYSICS_VERSION = "earth-oval-2026-10-30.3";
 var RACE_OVAL_PIT_PHYSICS_VERSION = "earth-oval-pit-2026-10-30.1";
 var RACE_CIRCUIT_PIT_PHYSICS_VERSION = "earth-circuit-pit-2026-10-30.1";
+var RACE_RALLY_PHYSICS_VERSION = "earth-rally-2026-10-31.1";
 function racePhysicsVersion(course) {
+  if (course?.discipline === "rally") {
+    if (course.rally?.version !== 1 || !course.venueSource?.stage?.rally || course.pitLane || course.surfaceModel || course.pavementModel) throw Error("invalid_race_surface_model");
+    return RACE_RALLY_PHYSICS_VERSION;
+  }
   if (course?.discipline === "oval") {
     if (course.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL || course.surfaceModel !== BANKED_ROAD_MODEL) throw Error("invalid_race_surface_model");
     return course.pitLane ? RACE_OVAL_PIT_PHYSICS_VERSION : RACE_OVAL_PHYSICS_VERSION;
@@ -4523,7 +4968,7 @@ function racePhysicsVersion(course) {
   if (course.surfaceModel === BANKED_ROAD_MODEL) return RACE_BANKED_PHYSICS_VERSION;
   throw Error("invalid_race_surface_model");
 }
-var isCurrentRacePhysicsVersion = (version) => version === RACE_PHYSICS_VERSION || version === RACE_BANKED_PHYSICS_VERSION || version === RACE_PROFILED_PAVEMENT_PHYSICS_VERSION || version === RACE_OVAL_PHYSICS_VERSION || version === RACE_OVAL_PIT_PHYSICS_VERSION || version === RACE_CIRCUIT_PIT_PHYSICS_VERSION;
+var isCurrentRacePhysicsVersion = (version) => version === RACE_PHYSICS_VERSION || version === RACE_BANKED_PHYSICS_VERSION || version === RACE_PROFILED_PAVEMENT_PHYSICS_VERSION || version === RACE_OVAL_PHYSICS_VERSION || version === RACE_OVAL_PIT_PHYSICS_VERSION || version === RACE_CIRCUIT_PIT_PHYSICS_VERSION || version === RACE_RALLY_PHYSICS_VERSION;
 function raceRecordConfiguration(profile, { course } = {}) {
   if (!profile?.vehicleId || !Number.isFinite(profile.conditionValue)) throw Error("invalid_race_record_profile");
   return {
@@ -4538,7 +4983,12 @@ function raceRecordConfiguration(profile, { course } = {}) {
 }
 function raceCompetitiveRecordConfiguration(profile, { slot, participants, course }) {
   if (!Number.isInteger(participants) || participants < 1 || participants > 4 || !Number.isInteger(slot) || slot < 0 || slot >= participants) throw Error("invalid_race_record_grid");
-  return { ...raceRecordConfiguration(profile, { course }), gridRow: Math.floor(slot / 2), gridParticipants: participants, timing: course.discipline === "oval" ? "rolling-green-to-finish" : "grid-to-finish" };
+  return {
+    ...raceRecordConfiguration(profile, { course }),
+    gridRow: course?.discipline === "rally" ? 0 : Math.floor(slot / 2),
+    gridParticipants: participants,
+    timing: course?.discipline === "rally" ? "individual-stage-start-to-finish" : course?.discipline === "oval" ? "rolling-green-to-finish" : "grid-to-finish"
+  };
 }
 
 // app/js/racing/venue-courses.js
@@ -4910,6 +5360,7 @@ export {
   RACE_OVAL_PIT_PHYSICS_VERSION,
   RACE_PHYSICS_VERSION,
   RACE_PROFILED_PAVEMENT_PHYSICS_VERSION,
+  RACE_RALLY_PHYSICS_VERSION,
   RACING_CAREER_LIMITS,
   assertRaceCourseInDistrict,
   buildRaceRoadGraph,
@@ -4925,6 +5376,7 @@ export {
   personalVehicleById,
   personalVehicleIdentity,
   export_prepareExplorerCreditAward as prepareExplorerCreditAward,
+  prepareRaceConditionHandback,
   prepareRaceDistrictStorage,
   prepareVenueRacePath,
   raceCompetitiveRecordConfiguration,

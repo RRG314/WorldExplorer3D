@@ -1,6 +1,7 @@
 import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import {resolveControlState} from '../transport/control-state.js';
+import {rallyPaceNoteText} from './rally-rules.js';
 import {collectRaceDistrict,recommendRaceCourses} from './world-course-source.js';
 import {buildVenueRaceCourses} from './venue-courses.js';
 import {raceMaximumDurationMs} from './session-limits.js';
@@ -89,7 +90,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    <p data-race-feedback></p></section><footer class="racing-result-actions" data-race-result-actions hidden><button type="button" data-race-retry-save hidden>Retry Journal save</button><button type="button" data-race-again>Race again</button><button type="button" data-race-times>My times</button><button type="button" data-race-submit hidden>Submit route for review</button><button type="button" data-race-career-results>Rivals &amp; crews</button><button type="button" data-race-explore>Return to exploration</button></footer>`;
   document.body.append(dialog);
   hud=document.createElement('section');hud.id='roadRaceHud';hud.className='road-race-hud';hud.hidden=true;hud.setAttribute('aria-label','Race progress');
-  hud.innerHTML='<p data-race-phase aria-live="polite"></p><strong data-race-clock></strong><span data-race-progress></span><span data-race-speed></span><div class="road-race-actions"><button type="button" data-race-leave>Leave race</button><button type="button" data-race-vr>VR view</button></div>';document.body.append(hud);
+  hud.innerHTML='<p data-race-phase aria-live="polite"></p><strong data-race-clock></strong><span data-race-progress></span><span data-race-speed></span><span data-race-pace aria-live="polite"></span><div class="road-race-actions"><button type="button" data-race-recover hidden>Recover +15s</button><button type="button" data-race-leave>Leave race</button><button type="button" data-race-vr>VR view</button></div>';document.body.append(hud);
   dialog.querySelector('[data-race-close]').onclick=()=>dialog.close();
   dialog.addEventListener('keydown',event=>{if(event.code==='Escape'){event.preventDefault();event.stopImmediatePropagation();dialog.close();}});
   dialog.addEventListener('close',()=>{careerOpen=false;el('[data-race-career-view]').hidden=el('[data-race-career-actions]').hidden=true;disposeCareer();releaseLocationPreview();if(online&&!controller)stop('lobby_closed');if(busy&&!controller){loadScope?.dispose('menu_closed');if(raceScope)stop('menu_closed');busy=false;}if(lastResult&&controller)stop('results_closed');c.setPauseReason?.('racing-menu',false);c.clearControlInputState?.('racing-menu-closed');if(controller)requestWorldFocus();else returnFocus?.focus?.({preventScroll:true});});
@@ -115,6 +116,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   el('[data-race-publish-test]').onclick=()=>void testForPublication();
   el('[data-race-submit]').onclick=()=>void submitRoute();
   hud.querySelector('[data-race-leave]').onclick=()=>{stop('left_race');void open();};
+  hud.querySelector('[data-race-recover]').onclick=()=>{try{controller?.recover();}catch{c.showToast?.('Recovery is unavailable. Wait for the next recovery window.');}};
   hud.querySelector('[data-race-vr]').onclick=()=>{void c.openVrSettings?.().catch(error=>c.showToast?.(error.message||'VR setup could not open.'));};
   el('[data-race-explore]').onclick=()=>{stop('return_to_exploration');dialog.close();requestWorldFocus();};
   el('[data-race-again]').onclick=()=>{if(!resultSaved){el('[data-race-save-state]').textContent='Retry the Journal save before starting another race.';return;}if(lastResult?.receipt){stop('next_online_race');lastResult=null;void open();}else void begin(lastResultCourse||customCourse||events[selected]);};
@@ -460,11 +462,13 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   const snapshot=controller.snapshot();presentation?.update(controller.presentationSnapshot?.()||snapshot,controller.uid,dt);
   const fresh=!online||online.connected()&&online.isFresh(),changed=fresh!==lastUiFresh;lastUiFresh=fresh;
   if(snapshot.serverAtMs-lastUiAt<100&&snapshot.phase==='running'&&!changed)return;lastUiAt=snapshot.serverAtMs;
-  const player=snapshot.players.find(p=>p.uid===controller.uid),left=Math.max(0,(snapshot.startAtMs||0)-snapshot.serverAtMs);
+  const player=snapshot.players.find(p=>p.uid===controller.uid),startAt=player?.rally?.startAtMs??snapshot.startAtMs,left=Math.max(0,(startAt||0)-snapshot.serverAtMs);
   const flag=snapshot.raceControl?.flag,raceOrder=`${player?.position||1} / ${snapshot.players.length}`;
-  hud.querySelector('[data-race-phase]').textContent=online&&(!online.connected()||!online.isFresh())?'Reconnecting…':snapshot.phase==='countdown'?`${snapshot.raceControl?.start==='rolling'?'Rolling start':'Ready'} · ${Math.max(1,Math.ceil(left/1000))}`:player?.progress?.finished?'Finished · waiting for rivals':flag==='yellow'?`Yellow · no passing · ${raceOrder}`:player?.pit?.active?`Pit lane · ${raceOrder}`:flag==='white'?`Final lap · ${raceOrder}`:raceOrder;
-  hud.querySelector('[data-race-clock]').textContent=formatTime(player?.progress?.elapsedMs??Math.max(0,snapshot.serverAtMs-(snapshot.startAtMs||0)));
-  hud.querySelector('[data-race-progress]').textContent=`Lap ${player?.progress?.lap||1}/${controller.course.laps} · Gate ${Math.min((player?.progress?.nextGate||0)+1,controller.course.gates.length)}/${controller.course.gates.length}${player?.progress?.penaltyMs?` · +${player.progress.penaltyMs/1000}s penalty`:''}`;
+  hud.querySelector('[data-race-phase]').textContent=online&&(!online.connected()||!online.isFresh())?'Reconnecting…':snapshot.phase==='countdown'||left>0?`${snapshot.raceControl?.start==='rolling'?'Rolling start':'Ready'} · ${Math.max(1,Math.ceil(left/1000))}`:player?.progress?.finished?'Finished · waiting for rivals':flag==='yellow'?`Yellow · no passing · ${raceOrder}`:player?.pit?.active?`Pit lane · ${raceOrder}`:flag==='white'?`Final lap · ${raceOrder}`:raceOrder;
+  hud.querySelector('[data-race-clock]').textContent=formatTime(player?.progress?.elapsedMs??Math.max(0,snapshot.serverAtMs-(startAt||0)));
+  hud.querySelector('[data-race-progress]').textContent=`${player?.rally?`Stage · Split ${player.rally.splits.length}/${controller.course.rally.splits.length}`:`Lap ${player?.progress?.lap||1}/${controller.course.laps}`} · Gate ${Math.min((player?.progress?.nextGate||0)+1,controller.course.gates.length)}/${controller.course.gates.length}${player?.progress?.penaltyMs?` · +${player.progress.penaltyMs/1000}s penalty`:''}`;
+  hud.querySelector('[data-race-pace]').textContent=rallyPaceNoteText(player);
+  const recovery=hud.querySelector('[data-race-recover]');recovery.hidden=!player?.rally;recovery.disabled=!fresh||!player?.rally?.canRecover;
   hud.querySelector('[data-race-speed]').textContent=`${Math.round(Math.abs(carSpeedToMph(player?.speed||0)))} MPH · Condition ${Math.round((player?.condition??1)*100)}%${flag==='yellow'||player?.trackZone==='apron'||player?.pit?.active?' · 22 MPH pace · no passing':snapshot.phase==='running'&&player?.draftingReduction>.04?' · Drafting':''}`;
   if(snapshot.phase==='cancelled') {stop(snapshot.reason);c.showToast?.('Race ended. Normal exploration is available.');}
  }
