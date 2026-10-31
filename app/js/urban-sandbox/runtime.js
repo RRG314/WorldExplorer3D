@@ -3577,6 +3577,7 @@ Object.assign(appCtx, {
   canReleaseUrbanVehicle:()=>!activeRuntime?.transition,
   cancelPersonalVehicleSelection:()=>activePersonalVehicleRuntime()?.cancelSelection(),
   getVehicleGarage:()=>activePersonalVehicleRuntime()?.snapshot(),
+  checkpointPersonalVehicle:()=>activePersonalVehicleRuntime()?.checkpoint(true),
   getVehicleGarageHomes:()=>activePersonalVehicleRuntime()?.homes()||[],
   changeVehicleGarage:command=>activePersonalVehicleRuntime()?.change(command),
   selectPersonalVehicle:(id,options)=>options?.intent==='ensure-room-lease'?activePersonalVehicleRuntime()?.ensureRoomVehicleLease(id):activePersonalVehicleRuntime()?.selectAndDrive(id),

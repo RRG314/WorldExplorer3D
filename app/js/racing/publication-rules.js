@@ -24,7 +24,7 @@ export function assertRaceCourseInDistrict(course,localFacts){
  const graph=buildRaceRoadGraph(localFacts.roads,{metersPerUnit:localFacts.metersPerUnit,venueSource:localFacts.venueSource}),byId=new Map(graph.edges.map(e=>[e.id,e]));
  // Rebuild the entire path using currently published and collision-qualified
  // spans, including direction, decks, water, width and tunnel admission.
- const local=createRaceCourse(graph,course.sourcePath,{...course});
+ const local=createRaceCourse(graph,course.sourcePath,{...course,eventRules:course.eventRules||null});
  if(local.surfaceModel!==course.surfaceModel||local.pavementModel!==course.pavementModel||!sameRaceVenueSource(local.venueSource,course.venueSource))throw Error('race_roads_changed_requalify_route');
  if(local.segments.length!==course.segments.length)throw Error('race_roads_changed_requalify_route');
  for(let i=0;i<course.segments.length;i++){

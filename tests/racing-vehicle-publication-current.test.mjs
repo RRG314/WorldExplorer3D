@@ -27,7 +27,7 @@ function fixture(courseOverride,vehicleId='delorean'){
  rows.set('rooms/OWNED1/racing/current',{id:'race',instanceId:'instance',expiresAt:stamp(now+15000)});
  rows.set('rooms/OWNED1/players/driver',{uid:'driver',lastSeenAt:stamp(now),expiresAt:stamp(now+90000)});
  rows.set('users/driver/consents/community',{version:'community-2026-10-24'});
- rows.set('users/driver/gameplay/vehicleUpgrades',{raceReservation:{id:'race',instanceId:'instance'}});
+ rows.set('users/driver/gameplay/vehicleUpgrades',{raceReservation:{id:'race',instanceId:'instance'},garage:{schemaVersion:1,revision:0,selectedId:vehicleId,vehicles:{[vehicleId]:{id:vehicleId,condition:1,homeId:'',acquiredAt:0}}}});
  rows.set(carPath,{raceCustody:{id:'race',instanceId:'instance'},pose:initial});
  return {rows,carPath,race,session,initial,now,store:createFirestoreRaceStore({db,loadCourse:async()=>course})};
 }

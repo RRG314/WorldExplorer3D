@@ -473,6 +473,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   if(snapshot.phase==='cancelled') {stop(snapshot.reason);c.showToast?.('Race ended. Normal exploration is available.');}
  }
  function stop(reason='racing_closed') {
+  if(controller&&!online)void c.checkpointPersonalVehicle?.();
   releaseRoadRaceMotion(c,controller);
   if(controller&&c.roadRaceController===controller)c.roadRaceController=null;
   controller?.stop(reason);controller=null;presentation=null;raceScope?.dispose(reason);raceScope=null;online?.stop(reason);online=null;onlineCourse=null;onlineRoster='';onlineVisualRevision++;onlinePreparing=false;if(hud)hud.hidden=true;

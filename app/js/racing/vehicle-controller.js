@@ -11,6 +11,23 @@ import {OVAL_AERODYNAMIC_DRAG_PER_METER} from './oval-rules.js';
 import {updateRoadVehicleVerticalState} from '../physics/road-vehicle-airborne.js?v=1';
 import {applyTransportDamage} from '../transport/damage-model.js?v=1';
 import {rallySurfaceDynamics} from './rally-rules.js';
+import {raceHasDamage} from './event-rules.js';
+import {resolveCrashImpact} from '../urban-sandbox/crash-physics.js?v=1';
+
+// The same world-impact impulse and damage curve as ordinary driving. The
+// accepted course supplies only its inward position correction/contact normal.
+export function applyRaceBarrierImpact(course,car,profile,normal){
+ if(!raceHasDamage(course)){for(const key of ['speed','vFwd','vx','vz'])car[key]*=.35;car.vLat*=.2;return;}
+ const response=resolveCrashImpact({moverMassKg:profile.handling.massKg||1520,targetMassKg:1e9,
+  moverVelocity:{x:(car.vx||0)*course.metersPerUnit,z:(car.vz||0)*course.metersPerUnit},normal,targetKind:'world'});
+ if(!response.applied)return;
+ const v=response.moverVelocity,s=Math.sin(car.angle),c=Math.cos(car.angle);
+ car.vx=v.x/course.metersPerUnit;car.vz=v.z/course.metersPerUnit;
+ car.speed=car.vFwd=mphToCarSpeed((v.x*s+v.z*c)*2.2369362921);car.vLat=mphToCarSpeed((v.x*c-v.z*s)*2.2369362921);
+ car.yawRate=(car.yawRate||0)+response.moverYawImpulse;car.rearSlip=(car.rearSlip||0)+response.moverYawImpulse*.42;
+ car.collisionDamage=(car.collisionDamage||0)+applyTransportDamage(car,response.moverDamageForce).delta;
+ car.collisionImpactMps=response.closingMps;
+}
 
 export function createRaceVehicleProfile(vehicleId,{condition=1,levels={},grip=1}={}){
  const definition=personalVehicleById(vehicleId);if(!definition)throw Error('race_vehicle_unknown');
@@ -40,7 +57,7 @@ export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}
  const driving=stepVehiclePlanarDrive(car,dt,frame,{config:profile.config,planetary:false,metersPerWorldUnit:course.metersPerUnit,
   ...(course.surfaceModel===BANKED_ROAD_MODEL||rally?{roadPlane:{pitch:car.terrainPitch||0,roll:car.terrainRoll||0}}:{}),
   ...(course.discipline==='oval'||course.ovalAerodynamics===true?{aerodynamicDrag:{coefficientPerMeter:OVAL_AERODYNAMIC_DRAG_PER_METER*Math.max(.5,Math.min(1.8,profile.handling.width*profile.handling.height/2.7)),reduction:draftReduction}}:{}),
-  surfaceDynamics:surface,vehicleHandling:profile.handling,vehicleCondition:rally?vehicleConditionDynamics(car.condition):profile.condition,vehicleUpgrades:profile.upgrades,
+  surfaceDynamics:surface,vehicleHandling:profile.handling,vehicleCondition:raceHasDamage(course)?vehicleConditionDynamics(car.condition):profile.condition,vehicleUpgrades:profile.upgrades,
   characterVehicle:profile.character,maxSpd:Math.min(profile.config.maxSpd,mphToCarSpeed(profile.handling.topSpeedMph)),
   friction:profile.config.friction,accel:profile.config.accel*profile.handling.accelerationScale});
  car.steerAngle=driving.steerAngle;
@@ -54,11 +71,12 @@ export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}
   const padding=profile.handling.width*.5+.2,minimum=support.pavement.minimumMeters+padding,maximum=support.pavement.maximumMeters-padding;
   if(minimum>maximum)throw Error('race_vehicle_pavement_too_narrow');
   const lateral=Math.max(minimum,Math.min(maximum,support.lateralMeters));
-  if(lateral!==support.lateralMeters){const f=course.segments[support.index].forward,correction=(lateral-support.lateralMeters)/course.metersPerUnit;x+=f.z*correction;z-=f.x*correction;car.speed*=.35;car.vFwd*=.35;car.vLat*=.2;car.barrierContacts++;}
+  if(lateral!==support.lateralMeters){const f=course.segments[support.index].forward,correction=(lateral-support.lateralMeters)/course.metersPerUnit;x+=f.z*correction;z-=f.x*correction;
+   applyRaceBarrierImpact(course,car,profile,{x:-Math.sign(correction)*f.z,z:Math.sign(correction)*f.x});car.barrierContacts++;}
  }else if(support.error>margin){
   const distance=Math.hypot(x-support.x,z-support.z),scale=margin/Math.max(.001,distance*course.metersPerUnit);
   x=support.x+(x-support.x)*scale;z=support.z+(z-support.z)*scale;
-  car.speed*=.35;car.vFwd*=.35;car.vLat*=.2;car.barrierContacts++;
+  applyRaceBarrierImpact(course,car,profile,{x:(next.x-x)/Math.max(.000001,Math.hypot(next.x-x,next.z-z)),z:(next.z-z)/Math.max(.000001,Math.hypot(next.x-x,next.z-z))});car.barrierContacts++;
  }
  const segment=course.segments[support.index];
  const sampleSurface=(px,pz)=>projectRacePosition(course,{x:px,z:pz,y:support.y},course.fullRoadContactProjection?{pavementPaddingMeters:0}:{minimumMeters:Math.max(0,segment.startMeters-12),maximumMeters:Math.min(course.lengthMeters,segment.startMeters+segment.lengthMeters+12)})?.y;
@@ -124,7 +142,7 @@ export function prepareRaceConditionHandback(raw,player){
 export const RACE_VEHICLE_NUMERIC_FIELDS=Object.freeze(['x','y','z','angle','speed','vFwd','vLat','vx','vz','yawRate',
  'steerAngle','steerSm','rearSlip','throttleSm','terrainPitch','terrainRoll','engineRpm','engineRedlineRpm','engineLoad',
  'driveGear','shiftTime','condition','maximumWheelPenetration','maximumWheelGap','_driveDirection','_driftHoldTimer','driftAngle',
- 'vy','_terrainAirTimer','raceSupportY','raceSupportPitch','raceSupportDistanceMeters','landingImpactMps','landingDamage']);
+ 'vy','_terrainAirTimer','raceSupportY','raceSupportPitch','raceSupportDistanceMeters','landingImpactMps','landingDamage','collisionDamage','collisionImpactMps']);
 export function snapshotRaceVehicle(car) {
  if(!car)return null;const frame={};
  for(const key of RACE_VEHICLE_NUMERIC_FIELDS)frame[key]=Number(car[key]??(key==='_driveDirection'?1:0));

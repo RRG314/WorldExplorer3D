@@ -10,7 +10,7 @@ export function raceCourseProjection(course,courseId){
  return {type:'RaceCourseProjection',version:1,courseId,physicsVersion:racePhysicsVersion(course),
   ...(course.venueSource?{venueSource:normalizeRaceVenueSource(course.venueSource)}:{}),locationId:course.locationId,locationLabel:course.locationLabel,
   anchor:{lat:course.anchor.lat,lon:course.anchor.lon},name:course.name,description:course.description,
-  discipline:course.discipline,laps:course.laps,participants:course.participants,lengthMeters:course.lengthMeters,metersPerUnit:course.metersPerUnit,
+  discipline:course.discipline,laps:course.laps,participants:course.participants,lengthMeters:course.lengthMeters,metersPerUnit:course.metersPerUnit,...(course.eventRules?{eventRules:course.eventRules}:{}),
   ...(course.surfaceModel?{surfaceModel:course.surfaceModel}:{}),...(course.pavementModel?{pavementModel:course.pavementModel}:{})};
 }
 const ordered=value=>Array.isArray(value)?value.map(ordered):value&&typeof value==='object'?

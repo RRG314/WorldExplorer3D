@@ -1,4 +1,5 @@
 import {racePavementCrossSection} from './pavement-cross-section.js';
+import {RACE_CONTACT_RULES,normalizeRaceEventRules} from './event-rules.js';
 import {OVAL_FORMATION_DISTANCE_METERS} from './oval-rules.js';
 import {prepareRallyRoute,RALLY_MAXIMUM_FLIGHT_HEIGHT_METERS} from './rally-rules.js';
 // Portable race-course facts and rules. The world compiler supplies road facts;
@@ -249,6 +250,7 @@ export function shortestRacePath(graph,start,finish,{excludedEdges=new Set()}={}
 }
 
 export function createRaceCourse(graph,path,settings={}){
+ const eventRules=normalizeRaceEventRules(settings.eventRules===undefined?RACE_CONTACT_RULES:settings.eventRules);
  // Source/path preparation must not silently expose an unfinished rally as a
  // sprint. Stage motion, staggered clocks and recovery are a separate contract.
  if(graph.venueSource?.stage&&!graph.venueSource.stage.rally)throw Error('race_stage_runtime_unavailable');
@@ -299,7 +301,7 @@ export function createRaceCourse(graph,path,settings={}){
   gridRun+=segment.lengthMeters;if(gridRun>=gridLength)break;
  }
  if(gridRun<gridLength)throw Error('race_grid_has_no_clearance');
- const course={version:RACE_COURSE_VERSION,...(graph.venueSource?{venueSource:graph.venueSource}:{}),sourcePath:[...path],startOffsetMeters:closed?Number(settings.startOffsetMeters??edges[0].length*.5):null,name:clean(settings.name)||'Mapped road run',description:String(settings.description||'').trim().slice(0,400),
+ const course={version:RACE_COURSE_VERSION,...(eventRules?{eventRules}:{}),...(graph.venueSource?{venueSource:graph.venueSource}:{}),sourcePath:[...path],startOffsetMeters:closed?Number(settings.startOffsetMeters??edges[0].length*.5):null,name:clean(settings.name)||'Mapped road run',description:String(settings.description||'').trim().slice(0,400),
   ...(edges.some(e=>e.surfaceModel===BANKED_ROAD_MODEL)?{surfaceModel:BANKED_ROAD_MODEL}:{}),
   ...(edges.some(e=>e.edgeBandModel===AUTHORED_ROAD_EDGE_MODEL)?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
   ...(edges.some(e=>e.pavementModel===PROFILED_ROAD_PAVEMENT_MODEL)?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL}:{}),

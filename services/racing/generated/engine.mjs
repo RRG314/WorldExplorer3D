@@ -1045,12 +1045,12 @@ var require_economy_authority = __commonJS({
       "vehicle-upgrade:reinforced-suspension:2": Object.freeze({ service: 6500 }),
       "vehicle-upgrade:reinforced-suspension:3": Object.freeze({ service: 12e3 })
     });
-    function finite2(value, fallback = 0) {
+    function finite3(value, fallback = 0) {
       const number = Number(value);
       return Number.isFinite(number) ? number : fallback;
     }
     function integer(value, min, max, fallback = min) {
-      return Math.max(min, Math.min(max, Math.round(finite2(value, fallback))));
+      return Math.max(min, Math.min(max, Math.round(finite3(value, fallback))));
     }
     function clean2(value, max = 180) {
       return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -1061,13 +1061,13 @@ var require_economy_authority = __commonJS({
       return exists ? snapshot.data() || {} : null;
     }
     function walletData(raw = {}) {
-      const legacy = finite2(raw.currencyVersion) < CURRENCY_VERSION;
+      const legacy = finite3(raw.currencyVersion) < CURRENCY_VERSION;
       const scale = legacy && Object.keys(raw).length ? LEGACY_CURRENCY_SCALE : 1;
       return {
         authority: "explorer-wallet-v2",
-        credits: integer(finite2(raw.credits, STARTING_CREDITS) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
-        lifetimeEarned: integer(finite2(raw.lifetimeEarned, finite2(raw.credits, STARTING_CREDITS)) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
-        lifetimeSpent: integer(finite2(raw.lifetimeSpent) * scale, 0, MAX_CREDITS, 0),
+        credits: integer(finite3(raw.credits, STARTING_CREDITS) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
+        lifetimeEarned: integer(finite3(raw.lifetimeEarned, finite3(raw.credits, STARTING_CREDITS)) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
+        lifetimeSpent: integer(finite3(raw.lifetimeSpent) * scale, 0, MAX_CREDITS, 0),
         revision: integer(raw.revision, 0, MAX_CREDITS, 0),
         currencyVersion: CURRENCY_VERSION
       };
@@ -1379,6 +1379,15 @@ function racePavementCrossSection(segment, t) {
     racingWidthMeters: mix(a.racingWidthMeters ?? segment.racingWidthMeters, b.racingWidthMeters ?? segment.racingWidthMeters)
   };
 }
+
+// app/js/racing/event-rules.js
+var RACE_CONTACT_RULES = Object.freeze({ version: 1, damage: "standard" });
+function normalizeRaceEventRules(value) {
+  if (value == null) return null;
+  if (value.version !== 1 || value.damage !== "standard" || Object.keys(value).some((k) => !["version", "damage"].includes(k))) throw Error("invalid_race_event_rules");
+  return { ...RACE_CONTACT_RULES };
+}
+var raceHasDamage = (course) => course?.discipline === "rally" || course?.eventRules?.version === 1 && course.eventRules.damage === "standard";
 
 // app/js/racing/speed-controls.js
 function restrictedRaceSpeedActions(actions, speedMetersPerSecond, restricted, limitMetersPerSecond) {
@@ -1858,6 +1867,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth, maximumGra
   return { version: RACE_COURSE_VERSION, metersPerUnit, ...venue ? { venueSource: venue } : {}, nodes, edges, outgoing };
 }
 function createRaceCourse(graph, path, settings = {}) {
+  const eventRules = normalizeRaceEventRules(settings.eventRules === void 0 ? RACE_CONTACT_RULES : settings.eventRules);
   if (graph.venueSource?.stage && !graph.venueSource.stage.rally) throw Error("race_stage_runtime_unavailable");
   if (!Array.isArray(path) || path.length < 1 || path.length > RACE_MAX_ROUTE_EDGES) throw Error("invalid_race_route");
   const byId = new Map(graph.edges.map((e) => [e.id, e])), edges = path.map((id) => byId.get(id));
@@ -1931,6 +1941,7 @@ function createRaceCourse(graph, path, settings = {}) {
   if (gridRun < gridLength) throw Error("race_grid_has_no_clearance");
   const course = {
     version: RACE_COURSE_VERSION,
+    ...eventRules ? { eventRules } : {},
     ...graph.venueSource ? { venueSource: graph.venueSource } : {},
     sourcePath: [...path],
     startOffsetMeters: closed ? Number(settings.startOffsetMeters ?? edges[0].length * 0.5) : null,
@@ -3578,14 +3589,14 @@ function vehicleMassKg(variantOrId = "sedan") {
   return masses[style] || (style.includes("van") ? 2480 : 1520);
 }
 function vehicleConditionDynamics(condition = 1) {
-  const normalized = Math.max(0, Math.min(1, Number(condition) || 0));
+  const normalized2 = Math.max(0, Math.min(1, Number(condition) || 0));
   return Object.freeze({
-    operable: normalized > 0.05,
-    topSpeedScale: 0.5 + normalized * 0.5,
-    accelerationScale: 0.3 + normalized * 0.7,
-    steeringScale: 0.72 + normalized * 0.28,
-    gripScale: 0.78 + normalized * 0.22,
-    brakeScale: 0.65 + normalized * 0.35
+    operable: normalized2 > 0.05,
+    topSpeedScale: 0.5 + normalized2 * 0.5,
+    accelerationScale: 0.3 + normalized2 * 0.7,
+    steeringScale: 0.72 + normalized2 * 0.28,
+    gripScale: 0.78 + normalized2 * 0.22,
+    brakeScale: 0.65 + normalized2 * 0.35
   });
 }
 function vehicleWheelContactLayout(variant = {}) {
@@ -3955,17 +3966,17 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
 }
 function transportDamageBand(condition = 1) {
-  const normalized = clamp01(condition);
-  return TRANSPORT_DAMAGE_BANDS.find((band) => normalized <= band.maximum) || TRANSPORT_DAMAGE_BANDS.at(-1);
+  const normalized2 = clamp01(condition);
+  return TRANSPORT_DAMAGE_BANDS.find((band) => normalized2 <= band.maximum) || TRANSPORT_DAMAGE_BANDS.at(-1);
 }
 function transportDamagePresentation(condition = 1) {
-  const normalized = clamp01(condition);
-  const band = transportDamageBand(normalized);
+  const normalized2 = clamp01(condition);
+  const band = transportDamageBand(normalized2);
   return Object.freeze({
-    condition: normalized,
+    condition: normalized2,
     band: band.id,
     label: band.label,
-    dirt: clamp01((1 - normalized) * 1.2),
+    dirt: clamp01((1 - normalized2) * 1.2),
     panelDisplacement: band.id === "healthy" ? 0 : band.id === "worn" ? 0.015 : band.id === "damaged" ? 0.055 : band.id === "critical" ? 0.11 : 0.16,
     glassDamage: ["damaged", "critical", "disabled"].includes(band.id),
     lampFailure: ["critical", "disabled"].includes(band.id),
@@ -4010,7 +4021,122 @@ function applyTransportDamage(target = {}, force = 0, options = {}) {
   });
 }
 
+// app/js/urban-sandbox/crash-physics.js?v=1
+var MPH_PER_MPS = 2.2369362921;
+function finite2(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+function vector(input = {}) {
+  return { x: finite2(input.x), z: finite2(input.z) };
+}
+function normalized(input = {}, fallback = { x: 0, z: 1 }) {
+  const value = vector(input);
+  const length = Math.hypot(value.x, value.z);
+  if (length <= 1e-6) return normalized(fallback, { x: 0, z: 1 });
+  return { x: value.x / length, z: value.z / length };
+}
+function classifyCrash(energyJoules, closingMps) {
+  const speedMph = Math.max(0, finite2(closingMps)) * MPH_PER_MPS;
+  const energy = Math.max(0, finite2(energyJoules));
+  if (speedMph < 3 || energy < 900) return "contact";
+  if (energy < 12e3) return "minor";
+  if (energy < 52e3) return "major";
+  return "severe";
+}
+function roadCollisionDamageForce(deltaV) {
+  return 160 * Math.min(0.88, Math.pow(Math.max(0, Number(deltaV || 0) - 2.5) / 25, 1.65));
+}
+function resolveCrashImpact(options = {}) {
+  const moverMassKg = Math.max(40, finite2(options.moverMassKg, 1520));
+  const targetMassKg = Math.max(40, finite2(options.targetMassKg, 1520));
+  const moverVelocity = vector(options.moverVelocity);
+  const targetVelocity = vector(options.targetVelocity);
+  const normal = normalized(options.normal, moverVelocity);
+  const tangent = { x: -normal.z, z: normal.x };
+  const relative = {
+    x: moverVelocity.x - targetVelocity.x,
+    z: moverVelocity.z - targetVelocity.z
+  };
+  const closingMps = relative.x * normal.x + relative.z * normal.z;
+  if (closingMps <= 0.01) {
+    return Object.freeze({ applied: false, severity: "contact", closingMps: 0, energyJoules: 0 });
+  }
+  const targetKind = String(options.targetKind || "vehicle");
+  const restitution = Math.max(0, Math.min(0.35, finite2(options.restitution, targetKind.includes("npc") ? 0.04 : 0.16)));
+  const inverseMass = 1 / moverMassKg + 1 / targetMassKg;
+  const normalImpulse = (1 + restitution) * closingMps / inverseMass;
+  const relativeTangent = relative.x * tangent.x + relative.z * tangent.z;
+  const desiredFrictionImpulse = relativeTangent / inverseMass;
+  const frictionLimit = normalImpulse * Math.max(0.05, Math.min(0.8, finite2(options.friction, 0.42)));
+  const frictionImpulse = Math.max(-frictionLimit, Math.min(frictionLimit, desiredFrictionImpulse));
+  const impulse = {
+    x: normal.x * normalImpulse + tangent.x * frictionImpulse,
+    z: normal.z * normalImpulse + tangent.z * frictionImpulse
+  };
+  const moverAfter = {
+    x: moverVelocity.x - impulse.x / moverMassKg,
+    z: moverVelocity.z - impulse.z / moverMassKg
+  };
+  const targetAfterRaw = {
+    x: targetVelocity.x + impulse.x / targetMassKg,
+    z: targetVelocity.z + impulse.z / targetMassKg
+  };
+  const targetCap = targetKind.includes("npc") ? 18 : 28;
+  const targetSpeed = Math.hypot(targetAfterRaw.x, targetAfterRaw.z);
+  const targetScale = targetSpeed > targetCap ? targetCap / targetSpeed : 1;
+  const targetAfter = { x: targetAfterRaw.x * targetScale, z: targetAfterRaw.z * targetScale };
+  const reducedMass = 1 / inverseMass;
+  const energyJoules = 0.5 * reducedMass * closingMps * closingMps;
+  let severity = classifyCrash(energyJoules, closingMps);
+  if (targetKind.includes("npc")) {
+    const closingMph = closingMps * MPH_PER_MPS;
+    severity = closingMph >= 45 ? "severe" : closingMph >= 22 ? "major" : closingMph >= 3 ? "minor" : "contact";
+  }
+  const glancing = Math.max(-1, Math.min(1, relativeTangent / Math.max(0.1, Math.hypot(relative.x, relative.z))));
+  const energyRoot = Math.sqrt(energyJoules);
+  return Object.freeze({
+    applied: true,
+    severity,
+    closingMps,
+    closingMph: closingMps * MPH_PER_MPS,
+    energyJoules,
+    normalImpulse,
+    moverVelocity: Object.freeze(moverAfter),
+    targetVelocity: Object.freeze(targetAfter),
+    moverYawImpulse: Math.max(-0.72, Math.min(0.72, -glancing * closingMps * 0.045)),
+    targetYawImpulse: Math.max(-1.4, Math.min(1.4, glancing * closingMps * 0.085)),
+    moverDamageForce: severity === "contact" ? 0 : roadCollisionDamageForce(Math.hypot(moverAfter.x - moverVelocity.x, moverAfter.z - moverVelocity.z)),
+    targetDamageForce: severity === "contact" ? 0 : targetKind.includes("npc") ? Math.min(150, energyRoot * 1.08) : roadCollisionDamageForce(Math.hypot(targetAfter.x - targetVelocity.x, targetAfter.z - targetVelocity.z)),
+    knockdownSeconds: targetKind.includes("npc") && severity !== "contact" ? Math.min(8, 1.4 + closingMps * 0.28) : 0
+  });
+}
+
 // app/js/racing/vehicle-controller.js
+function applyRaceBarrierImpact(course, car, profile, normal) {
+  if (!raceHasDamage(course)) {
+    for (const key of ["speed", "vFwd", "vx", "vz"]) car[key] *= 0.35;
+    car.vLat *= 0.2;
+    return;
+  }
+  const response = resolveCrashImpact({
+    moverMassKg: profile.handling.massKg || 1520,
+    targetMassKg: 1e9,
+    moverVelocity: { x: (car.vx || 0) * course.metersPerUnit, z: (car.vz || 0) * course.metersPerUnit },
+    normal,
+    targetKind: "world"
+  });
+  if (!response.applied) return;
+  const v = response.moverVelocity, s = Math.sin(car.angle), c = Math.cos(car.angle);
+  car.vx = v.x / course.metersPerUnit;
+  car.vz = v.z / course.metersPerUnit;
+  car.speed = car.vFwd = mphToCarSpeed2((v.x * s + v.z * c) * 2.2369362921);
+  car.vLat = mphToCarSpeed2((v.x * c - v.z * s) * 2.2369362921);
+  car.yawRate = (car.yawRate || 0) + response.moverYawImpulse;
+  car.rearSlip = (car.rearSlip || 0) + response.moverYawImpulse * 0.42;
+  car.collisionDamage = (car.collisionDamage || 0) + applyTransportDamage(car, response.moverDamageForce).delta;
+  car.collisionImpactMps = response.closingMps;
+}
 function createRaceVehicleProfile(vehicleId, { condition = 1, levels = {}, grip = 1 } = {}) {
   const definition = personalVehicleById(vehicleId);
   if (!definition) throw Error("race_vehicle_unknown");
@@ -4071,7 +4197,7 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
     ...course.discipline === "oval" || course.ovalAerodynamics === true ? { aerodynamicDrag: { coefficientPerMeter: OVAL_AERODYNAMIC_DRAG_PER_METER * Math.max(0.5, Math.min(1.8, profile.handling.width * profile.handling.height / 2.7)), reduction: draftReduction } } : {},
     surfaceDynamics: surface2,
     vehicleHandling: profile.handling,
-    vehicleCondition: rally ? vehicleConditionDynamics(car.condition) : profile.condition,
+    vehicleCondition: raceHasDamage(course) ? vehicleConditionDynamics(car.condition) : profile.condition,
     vehicleUpgrades: profile.upgrades,
     characterVehicle: profile.character,
     maxSpd: Math.min(profile.config.maxSpd, mphToCarSpeed2(profile.handling.topSpeedMph)),
@@ -4092,18 +4218,14 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
       const f = course.segments[support.index].forward, correction = (lateral - support.lateralMeters) / course.metersPerUnit;
       x += f.z * correction;
       z -= f.x * correction;
-      car.speed *= 0.35;
-      car.vFwd *= 0.35;
-      car.vLat *= 0.2;
+      applyRaceBarrierImpact(course, car, profile, { x: -Math.sign(correction) * f.z, z: Math.sign(correction) * f.x });
       car.barrierContacts++;
     }
   } else if (support.error > margin) {
     const distance2 = Math.hypot(x - support.x, z - support.z), scale = margin / Math.max(1e-3, distance2 * course.metersPerUnit);
     x = support.x + (x - support.x) * scale;
     z = support.z + (z - support.z) * scale;
-    car.speed *= 0.35;
-    car.vFwd *= 0.35;
-    car.vLat *= 0.2;
+    applyRaceBarrierImpact(course, car, profile, { x: (next.x - x) / Math.max(1e-6, Math.hypot(next.x - x, next.z - z)), z: (next.z - z) / Math.max(1e-6, Math.hypot(next.x - x, next.z - z)) });
     car.barrierContacts++;
   }
   const segment = course.segments[support.index];
@@ -4240,7 +4362,9 @@ var RACE_VEHICLE_NUMERIC_FIELDS = Object.freeze([
   "raceSupportPitch",
   "raceSupportDistanceMeters",
   "landingImpactMps",
-  "landingDamage"
+  "landingDamage",
+  "collisionDamage",
+  "collisionImpactMps"
 ]);
 function snapshotRaceVehicle(car) {
   if (!car) return null;
@@ -4476,11 +4600,11 @@ function createRaceSession({ id, course, creatorUid, createdAtMs, maximumDuratio
     if (!["countdown", "running"].includes(phase)) throw Error("race_not_running");
     if (p.ai || p.left || p.dnf || p.progress?.finished) throw Error("race_controls_unavailable");
     if (!Number.isSafeInteger(sequence) || sequence <= p.lastSequence || !Number.isFinite(receivedAtMs) || receivedAtMs < lastNow - 1e3) throw Error("obsolete_race_controls");
-    const normalized = normalizeRaceActions(actions);
+    const normalized2 = normalizeRaceActions(actions);
     if (phase === "countdown" && receivedAtMs < startAtMs) p.queue = [];
     if (p.queue.length >= 32) throw Error("race_controls_rate_limited");
     p.lastSequence = sequence;
-    p.queue.push({ actions: normalized, at: receivedAtMs });
+    p.queue.push({ actions: normalized2, at: receivedAtMs });
     return true;
   }
   function caution(nowMs) {
@@ -4905,8 +5029,10 @@ function normalizeRaceRouteReference(value) {
   if (offset !== null && (!Number.isFinite(offset) || offset <= 0)) throw Error("invalid_saved_race_route");
   const pit = value.pitPath;
   if (pit !== void 0 && (!Array.isArray(pit) || !pit.length || pit.length > 512 || pit.some((id) => typeof id !== "string" || id.length > 190) || new Set(pit).size !== pit.length)) throw Error("invalid_saved_race_pit_route");
+  const rules = normalizeRaceEventRules(value.eventRules);
   return {
     version: 1,
+    ...rules ? { eventRules: rules } : {},
     districtFingerprint: value.districtFingerprint,
     path: [...value.path],
     discipline: value.discipline,
@@ -4952,6 +5078,7 @@ function raceCourseReference(course, districtFingerprint) {
     participants: course.participants,
     startOffsetMeters: course.startOffsetMeters,
     name: course.name,
+    eventRules: course.eventRules,
     ...course.pitPath ? { pitPath: course.pitPath } : {}
   });
 }
@@ -4960,6 +5087,7 @@ function restoreRaceCourse(reference, district, graph, fingerprint) {
   if (route.districtFingerprint !== fingerprint) throw Error("race_roads_changed_requalify_route");
   return createRaceCourse(graph, route.path, {
     ...route,
+    eventRules: route.eventRules || null,
     locationId: district.locationId,
     locationLabel: district.locationLabel,
     anchor: district.anchor,
@@ -4969,6 +5097,7 @@ function restoreRaceCourse(reference, district, graph, fingerprint) {
 async function raceCourseKey(course) {
   const data = new TextEncoder().encode(JSON.stringify({
     version: course.version,
+    ...course.eventRules ? { eventRules: normalizeRaceEventRules(course.eventRules) } : {},
     ...course.venueSource ? { venueSource: normalizeRaceVenueSource(course.venueSource) } : {},
     location: course.locationId,
     anchor: course.anchor,
@@ -4993,6 +5122,10 @@ var RACE_OVAL_PIT_PHYSICS_VERSION = "earth-oval-pit-2026-10-30.1";
 var RACE_CIRCUIT_PIT_PHYSICS_VERSION = "earth-circuit-pit-2026-10-30.1";
 var RACE_RALLY_PHYSICS_VERSION = "earth-rally-2026-10-31.2";
 function racePhysicsVersion(course) {
+  const base = raceBasePhysicsVersion(course);
+  return course?.eventRules?.version === 1 ? base + "-contacts1" : base;
+}
+function raceBasePhysicsVersion(course) {
   if (course?.discipline === "rally") {
     if (course.rally?.version !== 1 || !course.venueSource?.stage?.rally || course.pitLane || course.surfaceModel || course.pavementModel) throw Error("invalid_race_surface_model");
     return RACE_RALLY_PHYSICS_VERSION;
@@ -5013,7 +5146,7 @@ function racePhysicsVersion(course) {
   if (course.surfaceModel === BANKED_ROAD_MODEL) return RACE_BANKED_PHYSICS_VERSION;
   throw Error("invalid_race_surface_model");
 }
-var isCurrentRacePhysicsVersion = (version) => version === RACE_PHYSICS_VERSION || version === RACE_BANKED_PHYSICS_VERSION || version === RACE_PROFILED_PAVEMENT_PHYSICS_VERSION || version === RACE_OVAL_PHYSICS_VERSION || version === RACE_OVAL_PIT_PHYSICS_VERSION || version === RACE_CIRCUIT_PIT_PHYSICS_VERSION || version === RACE_RALLY_PHYSICS_VERSION;
+var isCurrentRacePhysicsVersion = (version) => [RACE_PHYSICS_VERSION, RACE_BANKED_PHYSICS_VERSION, RACE_PROFILED_PAVEMENT_PHYSICS_VERSION, RACE_OVAL_PHYSICS_VERSION, RACE_OVAL_PIT_PHYSICS_VERSION, RACE_CIRCUIT_PIT_PHYSICS_VERSION, RACE_RALLY_PHYSICS_VERSION].some((base) => version === base || version === base + "-contacts1");
 function raceRecordConfiguration(profile, { course } = {}) {
   if (!profile?.vehicleId || !Number.isFinite(profile.conditionValue)) throw Error("invalid_race_record_profile");
   return {
@@ -5132,6 +5265,7 @@ function raceCourseProjection(course, courseId) {
     participants: course.participants,
     lengthMeters: course.lengthMeters,
     metersPerUnit: course.metersPerUnit,
+    ...course.eventRules ? { eventRules: course.eventRules } : {},
     ...course.surfaceModel ? { surfaceModel: course.surfaceModel } : {},
     ...course.pavementModel ? { pavementModel: course.pavementModel } : {}
   };
@@ -5264,9 +5398,9 @@ async function readRaceDistrictFacts(record, readChunk) {
   for (const descriptor of manifest.chunks) {
     const chunk = await readChunk(descriptor.index);
     if (chunk?.type !== "RaceDistrictRoadChunk" || chunk.version !== 1 || chunk.index !== descriptor.index || !Array.isArray(chunk.roads) || chunk.roads.length !== descriptor.roadCount) fail3();
-    const normalized = canonicalRaceDistrict({ ...manifest.header, roads: chunk.roads }, { partialVenue: true }).roads;
-    if (size(normalized) !== descriptor.bytes || await hash(normalized) !== descriptor.contentSha256) fail3();
-    roads.push(...normalized);
+    const normalized2 = canonicalRaceDistrict({ ...manifest.header, roads: chunk.roads }, { partialVenue: true }).roads;
+    if (size(normalized2) !== descriptor.bytes || await hash(normalized2) !== descriptor.contentSha256) fail3();
+    roads.push(...normalized2);
   }
   const facts = canonicalRaceDistrict({ ...manifest.header, roads });
   if (size(facts) !== manifest.bytes) fail3();
@@ -5289,7 +5423,7 @@ async function rebaseRaceReference(reference, approvedFacts, localFacts) {
 function assertRaceCourseInDistrict(course, localFacts) {
   if (course.locationId !== localFacts.locationId || Math.abs(course.anchor.lat - localFacts.anchor.lat) > 1e-7 || Math.abs(course.anchor.lon - localFacts.anchor.lon) > 1e-7 || course.metersPerUnit !== localFacts.metersPerUnit) throw Error("race_course_wrong_world");
   const graph = buildRaceRoadGraph(localFacts.roads, { metersPerUnit: localFacts.metersPerUnit, venueSource: localFacts.venueSource }), byId = new Map(graph.edges.map((e) => [e.id, e]));
-  const local = createRaceCourse(graph, course.sourcePath, { ...course });
+  const local = createRaceCourse(graph, course.sourcePath, { ...course, eventRules: course.eventRules || null });
   if (local.surfaceModel !== course.surfaceModel || local.pavementModel !== course.pavementModel || !sameRaceVenueSource(local.venueSource, course.venueSource)) throw Error("race_roads_changed_requalify_route");
   if (local.segments.length !== course.segments.length) throw Error("race_roads_changed_requalify_route");
   for (let i = 0; i < course.segments.length; i++) {
