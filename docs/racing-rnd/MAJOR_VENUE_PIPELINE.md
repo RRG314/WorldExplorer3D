@@ -536,3 +536,34 @@ entire terminal vehicle/timing state exactly, including zero barrier contacts.
 Its single controlled CPU run took about 0.44 seconds versus the retained prior
 2.74 seconds. This measures numeric simulation only; it is not browser FPS,
 mobile, real-time networking or finished-venue acceptance.
+
+## Three-pack launch presentation, October 31
+
+The current launch scope is Silverstone GP, Nordschleife T13 and Daytona only.
+The remaining nine source preparations are retained for later releases.
+
+Silverstone now retains 22 exact OpenStreetMap `building=grandstand` outlines
+with way IDs, source versions and timestamps in `silverstone-grandstand-survey`.
+The native map window is `-1.039,52.060,-0.998,52.084`, read through the public
+OSM 0.6 map API on October 31. Mapper account fields are excluded. Seating,
+roof/frame dimensions and row counts are original estimates, not official
+structural surveys. Existing building reservation, post-transport publication,
+collision replacement and LOD/resource owners publish these interpretations.
+The repeated terrace recipe is shared with Daytona's already accepted low stands.
+
+Silverstone's 326 closed grass, meadow and woodland ways from that window are
+pinned in `app/assets/racing/silverstone/landscape.json`. None is a multipolygon
+member in the retained source window; no unrepresented inner rings are filled.
+Daytona's sidecar retains OSM ways 1037457928 (Infield grass) and 119970289
+(Lake Lloyd) from its previously retained native map. Both sidecars bind to the
+unchanged road-source digest and load through the existing venue preparation.
+Ordinary landuse/water publication and accepted ground retain their authority;
+these are geographic cover plans, not new road, pavement or height facts.
+OpenStreetMap contributors / ODbL-1.0 attribution and derivative-data obligations
+apply. Original research imagery is not distributed as game textures.
+
+The GP bend-edge red/white treatment is flat original paint on qualified
+pavement; it does not claim raised surveyed kerbs or alter physics/times.
+Reviewed Nord woodland uses denser placements within an explicit 2,200-tree
+base cap through the existing forest masks, road/building/water exclusions,
+cooperative replacement and model LOD owners. Ordinary city placement is unchanged.

@@ -36,3 +36,9 @@ test('paint is one bounded vertex buffer and follows real grade/crossfall in met
  const a=raceCourseSurfacePoint(c,120,-2),b=raceCourseSurfacePoint(c,120,2);assert.ok(b.y>a.y);
  assert.ok(paint.rectangles.every(r=>r.start>=0&&r.end<=c.lengthMeters));
 });
+test('GP bend paint remains on qualified pavement without changing the course or ordinary paint',()=>{
+ const point=i=>i<=5?{x:0,y:0,z:i*10}:{x:(1-Math.cos((i-5)*.1))*100,y:0,z:50+Math.sin((i-5)*.1)*100},roads=Array.from({length:30},(_,i)=>({sourceId:'bend:'+i,a:point(i),b:point(i+1),widthMeters:9,driveable:true,supported:true,heightSampleSpanMeters:1.2,heightSamples:[{t:0,y:0,leftY:0,rightY:0},{t:1,y:0,leftY:0,rightY:0}]})),g=buildRaceRoadGraph(roads,{metersPerUnit:1}),c=createRaceCourse(g,g.edges.filter(e=>e.id.endsWith(':forward')).map(e=>e.id),{locationId:'test',anchor:{lat:43,lon:7},participants:4}),copy=structuredClone(c);
+ const unchanged=structuredClone(c),plain=buildRacePaint(c),gp=buildRacePaint(c,{venueId:'silverstone-grand-prix'});
+ assert.deepEqual(c,unchanged);assert.ok(gp.positions.length>plain.positions.length);assert.equal(gp.colors.length,gp.positions.length);assert.ok(gp.colors.some((v,i)=>i%3===1&&Math.abs(v-.035)<1e-6));
+ assert.ok(gp.rectangles.every(r=>r.start>=0&&r.end<=c.lengthMeters&&Math.abs(r.left)<=4.5&&Math.abs(r.right)<=4.5));assert.deepEqual(buildRacePaint(copy),buildRacePaint(copy,{venueId:'ordinary-city'}));
+});

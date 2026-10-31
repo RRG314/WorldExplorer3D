@@ -11,7 +11,7 @@ export function raceCourseSurfacePoint(course,distanceMeters,lateralMeters=0,lif
   y:sampleRaceSegmentY(segment,t,lateralMeters)+liftMeters/unit,
   z:segment.a.z+(segment.b.z-segment.a.z)*t-forward.x*lateralMeters/unit};
 }
-export function buildRacePaint(course,{filtered=true}={}) {
+export function buildRacePaint(course,{filtered=true,venueId=course.venueSource?.id}={}) {
  const positions=[],colors=[],rectangles=[],strokeCoverage=[];
  const sectionAt=d=>{const s=raceSegmentAtDistance(course,Math.max(0,Math.min(course.lengthMeters,d)));return racePavementCrossSection(s,(d-s.startMeters)/s.lengthMeters);},valueAt=(v,d)=>typeof v==='function'?v(d):v,bankRelative=offset=>course.pavementModel?(d=>(sectionAt(d)?.racingOffsetMeters||0)+offset):offset;
  function clip(points,distance){const out=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length],da=distance(a),db=distance(b),ia=da>=-1e-9,ib=db>=-1e-9;if(ia)out.push(a);if(ia!==ib){const t=da/(da-db);out.push({d:a.d+(b.d-a.d)*t,l:a.l+(b.l-a.l)*t});}}return out;}
@@ -26,7 +26,7 @@ export function buildRacePaint(course,{filtered=true}={}) {
   function emit(points){
    for(let i=1;i<points.length-1;i++)for(const q of [points[0],points[i],points[i+1]]){
     const p=raceCourseSurfacePoint(course,q.d,q.l,.018),lo=valueAt(left,q.d),hi=valueAt(right,q.d);
-    positions.push(p.x,p.y,p.z);colors.push(color,color,color);strokeCoverage.push(q.d-center,q.l-(lo+hi)/2,filterStroke?halfLength:-1,filterStroke?(hi-lo)/2:-1);
+    positions.push(p.x,p.y,p.z);colors.push(...(Array.isArray(color)?color:[color,color,color]));strokeCoverage.push(q.d-center,q.l-(lo+hi)/2,filterStroke?halfLength:-1,filterStroke?(hi-lo)/2:-1);
    }
   }
   for(let i=1;i<splits.length;i++){
@@ -48,6 +48,18 @@ export function buildRacePaint(course,{filtered=true}={}) {
  for(const segment of course.venueSource?.id==='daytona-tri-oval'?[]:course.segments)for(const side of [-1,1]) {
   const edge=side*(segment.widthMeters/2-.32);
   if(segment.pavementModel){const edgeAt=d=>{const s=sectionAt(d);return side<0?s.minimumMeters+.32:s.maximumMeters-.32;};rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,d=>edgeAt(d)-.06,d=>edgeAt(d)+.06,.88,false);}else rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,edge-.06,edge+.06,.88,false);
+ }
+ // Flat original red/white bend-edge paint for the GP pack. It follows the
+ // existing qualified pavement; it creates no raised support or physics class.
+ if(venueId==='silverstone-grand-prix'){
+  for(let i=1;i<course.segments.length-1;i++){
+   const a=course.segments[i-1],b=course.segments[i],turn=Math.atan2(a.forward.x*b.forward.z-a.forward.z*b.forward.x,a.forward.x*b.forward.x+a.forward.z*b.forward.z);
+   if(Math.abs(turn)<.07||Math.abs(turn)>1.8)continue;
+   const side=Math.sign(turn),start=Math.max(0,b.startMeters-8),end=Math.min(course.lengthMeters,b.startMeters+14);
+   for(let d=start;d<end;d+=1){const edge=at=>{const seg=raceSegmentAtDistance(course,at);return side*(seg.widthMeters/2-.75);};
+    rectangle(d,Math.min(end,d+1),at=>edge(at)-.32,at=>edge(at)+.32,Math.floor(d)%2?[.78,.035,.025]:[.9,.9,.87],false);
+   }
+  }
  }
  const last=course.segments.at(-1),width=Math.min(16,(racePavementCrossSection(last,1)?.racingWidthMeters??last.widthMeters)-.4),columns=Math.max(2,Math.ceil(width/.6));
  for(let row=0;row<2;row++)for(let col=0;col<columns;col++){

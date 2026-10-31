@@ -1,3 +1,4 @@
+import {reserveSilverstoneStandRepresentations,createSilverstoneGrandstandExteriors,isSilverstoneStandRepresentation} from './silverstone-grandstand-exterior.js';
 import {AQUARIUM_EXTERIOR_PARTS} from './aquarium-exterior-survey.js';
 import {AQUARIUM_GEOGRAPHY} from '../interiors/aquarium-geography.js';
 import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
@@ -208,6 +209,7 @@ export function publishReviewedVenueExteriors(ctx,THREE){
   added.push(root);
  }
  const published=added.map(r=>r.name),venue=ctx.worldLoadRuntimeState?.venuePack,sequence=ctx._worldLoadSequence;
+ reserveSilverstoneStandRepresentations(ctx);
  reserveDaytonaGrandstandRepresentations(ctx);
  reserveDaytonaPaddockRepresentations(ctx);
  // The existing transport-dependent publication phase runs after final road
@@ -224,6 +226,17 @@ export function publishReviewedVenueExteriors(ctx,THREE){
    venueComponentCollider(stand.root.userData.sourceBuildingId,stand.footprint,stand.bottom,stand.top)
   ]);
   ctx.addEarthWorldObject(stand.root);ctx.buildingMeshes.push(stand.root);published.push(stand.root.name);
+ });
+ if(venue?.id==='silverstone-grand-prix'&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
+  if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
+  for(const exterior of createSilverstoneGrandstandExteriors(THREE,ctx)){
+   const matches=data=>isSilverstoneStandRepresentation(data,exterior)||data?.deferredReviewedExterior==='silverstone-stand:'+exterior.sourceBuildingId;
+   const retired=new Set(ctx.buildingMeshes.filter(m=>matches(m.userData)));
+   for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
+   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
+   replaceVenueCollision(ctx,(ctx.buildings||[]).filter(matches),[venueComponentCollider(exterior.sourceBuildingId,exterior.footprint,exterior.bottom,exterior.top)]);
+   ctx.addEarthWorldObject(exterior.root);ctx.buildingMeshes.push(exterior.root);published.push(exterior.root.name);
+  }
  });
  if(venue?.id==='daytona-tri-oval'&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
   if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;

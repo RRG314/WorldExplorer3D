@@ -1,3 +1,4 @@
+import {mergeReviewedVenueLandscape,annotateReviewedVenueLandscape} from './venue-landscape-source.js';
 import {normalizeRaceVenueSource} from './venue-course-policy.js';
 import {compileMappedVenueLayout,compileMappedVenuePitLayout,geographicVenueDistance} from './venue-layout.js';
 import {authorVenueEdgeRecipes} from './venue-edge-authoring.js';
@@ -12,6 +13,7 @@ import {REVIEWED_CORRIDOR_OUTER_MARGIN_METERS,REVIEWED_PAVEMENT_BOUNDARY_POLICY}
 // requires the existing world publication and racing surface qualification.
 export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  id:'silverstone-grand-prix',name:'Silverstone',anchor:Object.freeze({lat:52.0713,lon:-1.0168}),
+ reviewedLandscape:Object.freeze({url:'/app/assets/racing/silverstone/landscape.json',contentSha256:'b9a51532833c1700967bb7e31472b9ea72b24e5268ef33a494cf2bc3e6c046c4'}),
  sourceUrl:'/app/assets/racing/silverstone/source.json',sourceSha256:'c41a9f0d43e21af306fbf3261996e997a036778205acaa28df2697ef424c2b00',
  groundArtifactId:'silverstone-gp-fine-v1',groundContentSha256:'1b1f66af6f8bcbd9db84abe0b123d69bb016955d06afcb55d2a0aee782c306bd',
  maximumCrossfall:.15,qualificationRadiusWorld:1200
@@ -44,6 +46,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
   coverage:Object.freeze({south:50.33179264672786,north:50.38642068124047,west:6.911350335124666,east:7.014189468850645})})
 }),Object.freeze({
  id:'daytona-tri-oval',name:'Daytona International Speedway',anchor:Object.freeze({lat:29.185,lon:-81.071}),
+ reviewedLandscape:Object.freeze({url:'/app/assets/racing/daytona/landscape.json',contentSha256:'9cd9b10308df19926fe8d1443ab5a48fdb6c7bf7e4ab6df1f06b9b919a68dc07'}),
  sourceUrl:'/app/assets/racing/daytona/source.json',sourceSha256:'f0512eb33c8e4101a349d53c52dacc9ae03a7030ebff7585534328dd2f1ec5dc',
  groundArtifactId:'daytona-tri-oval-fine-v3',groundContentSha256:'54ab1fad6a2a80f7f62178ab7d58a2433e386d6360eaea1d583fef1ae0117942',
  reviewedPavementSections:Object.freeze({url:'/app/assets/racing/daytona/pavement-sections-v3.json',contentSha256:'07dd9be2492c9cd216c43ab85dc92cb24b9e0293e44c0a69a75b90d14f077d69'}),
@@ -223,7 +226,8 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
    groundArtifactId:descriptor.groundArtifactId,groundContentSha256:descriptor.groundContentSha256,groundArtifacts:required});
   elements.set(`way:${raw.id}`,way);
  }
- return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({id:descriptor.id,name:descriptor.name,status:'source-prepared',
+ const landscapeWays=mergeReviewedVenueLandscape(elements,descriptor,source);
+ return {data:{...data,elements:[...elements.values()]},metadata:Object.freeze({landscapeWays,id:descriptor.id,name:descriptor.name,status:'source-prepared',
   ...(startLine?{startLine,layoutLabel:descriptor.layoutLabel||'Circuit'}:{}),
   ...(stage?{layoutLabel:descriptor.layoutLabel||'Stage'}:{}),
   ...(descriptor.presentationStatus?{presentationStatus:descriptor.presentationStatus}:{}),
@@ -245,6 +249,15 @@ export async function loadRacingVenueSource(descriptor,{fetchImpl=globalThis.fet
  if(text.length>2000000||await sha256Text(text)!==descriptor.sourceSha256)throw Error('venue_source_integrity_failed');
  if(signal?.aborted)throw signal.reason||new DOMException('Cancelled','AbortError');
  const source=JSON.parse(text),profile=descriptor.reviewedDeckProfiles;
+ if(descriptor.reviewedLandscape){
+  const cover=descriptor.reviewedLandscape;
+  if(typeof cover.url!=='string'||!/^\/app\/assets\/racing\/[A-Za-z0-9_/-]+\.json$/.test(cover.url)||!/^[a-f0-9]{64}$/.test(cover.contentSha256))throw Error('venue_landscape_descriptor_invalid');
+  const response=await fetchImpl(cover.url,{signal});if(!response.ok)throw Error('venue_landscape_fetch_failed');const coverText=await response.text();
+  if(coverText.length>1000000||await sha256Text(coverText)!==cover.contentSha256)throw Error('venue_landscape_integrity_failed');
+  if(signal?.aborted)throw signal.reason||new DOMException('Cancelled','AbortError');
+  annotateReviewedVenueLandscape(source,descriptor,JSON.parse(coverText));
+ }
+
  if(profile){
   if(typeof profile.url!=='string'||!/^\/app\/assets\/racing\/[A-Za-z0-9_/-]+\.json$/.test(profile.url)||!/^[a-f0-9]{64}$/.test(profile.contentSha256))throw Error('venue_deck_descriptor_invalid');
   const response=await fetchImpl(profile.url,{signal});if(!response.ok)throw Error('venue_deck_source_fetch_failed');

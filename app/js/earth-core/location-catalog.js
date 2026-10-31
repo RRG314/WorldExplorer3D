@@ -8,6 +8,8 @@ export const LOCS = {
   monaco: { name: 'Monaco', lat: 43.7384, lon: 7.4246, countryCode: 'MC' },
   nurburgring: { name: 'Nürburgring', lat: 50.3356, lon: 6.9475, countryCode: 'DE' },
   silverstone: { name: 'Silverstone', lat: 52.0713, lon: -1.0168, countryCode: 'GB' },
+  nordschleife: { name: 'Nordschleife · T13', lat: 50.359, lon: 6.963, countryCode: 'DE' },
+  daytona: { name: 'Daytona International Speedway', lat: 29.185, lon: -81.071, countryCode: 'US' },
   lasvegas: { name: 'Las Vegas', lat: 36.1699, lon: -115.1398, countryCode: 'US' },
   london: { name: 'London', lat: 51.5074, lon: -0.1278, countryCode: 'GB' },
   paris: { name: 'Paris', lat: 48.8566, lon: 2.3522, countryCode: 'FR' },

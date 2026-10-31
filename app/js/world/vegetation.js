@@ -223,14 +223,14 @@ function* vegetationPlacementSteps() {
   const budgetScale = 1;
   const tropicalCanopy = isTropicalCanopyLocation();
   const performanceTier = appCtx.getDynamicBudgetState?.().tier === 'performance';
+  const reviewedWoodland=!!appCtx.worldLoadRuntimeState?.venuePack?.landscapeRefinement&&!tropicalCanopy&&
+    (appCtx.terrainGroup?.children||[]).some(mesh=>[-80,0,80].some(dx=>[-80,0,80].some(dz=>forestAt(mesh,focus.x+dx,focus.z+dz)>.7)));
   const maxTrees = Math.max(120, Math.floor(
-    (tropicalCanopy ? MAX_TROPICAL_TREE_INSTANCES * (performanceTier ? 0.5 : 1) : MAX_GENERATED_TREE_INSTANCES) *
+    (tropicalCanopy ? MAX_TROPICAL_TREE_INSTANCES * (performanceTier ? 0.5 : 1) : reviewedWoodland ? 2200 : MAX_GENERATED_TREE_INSTANCES) *
     budgetScale *
     worldDensityScale
   ));
   let placementLimit=maxTrees;
-  const reviewedWoodland=!!appCtx.worldLoadRuntimeState?.venuePack?.landscapeRefinement&&!tropicalCanopy&&
-    (appCtx.terrainGroup?.children||[]).some(mesh=>[-80,0,80].some(dx=>[-80,0,80].some(dz=>forestAt(mesh,focus.x+dx,focus.z+dz)>.7)));
   const pushPlacement = (placement) => {
     if (!placement || placements.length >= placementLimit) return false;
     if (!Number.isFinite(placement.x) || !Number.isFinite(placement.z)) return false;
@@ -309,7 +309,7 @@ function* vegetationPlacementSteps() {
   // Long reviewed venues can spend the whole cap on farther mapped polygons.
   // Keep explicit trees/rows first, then leave part of the SAME capacity for
   // the accepted foreground canopy field. Ordinary placement stays unchanged.
-  if(reviewedWoodland)placementLimit=Math.max(placements.length,Math.floor(maxTrees*.7));
+  if(reviewedWoodland)placementLimit=Math.max(placements.length,Math.floor(maxTrees*.45));
   const prioritizedLanduses = [...(appCtx.landuses || [])].sort((a,b) => {
     const distance=lu=>lu?.bounds ? Math.hypot(Math.max(lu.bounds.minX-focus.x,0,focus.x-lu.bounds.maxX),Math.max(lu.bounds.minZ-focus.z,0,focus.z-lu.bounds.maxZ)) : Infinity;
     return distance(a)-distance(b) || String(a?.sourceFeatureId||'').localeCompare(String(b?.sourceFeatureId||''));
@@ -445,11 +445,11 @@ function* vegetationPlacementSteps() {
     for (let meshIndex = 0; meshIndex < semanticMeshes.length && placements.length < placementLimit; meshIndex += 1) {
       yield;
       const mesh = semanticMeshes[meshIndex];
-      const perMeshBudget = Math.min(tropicalCanopy ? 1600 : 400,maxTrees-placements.length);
+      const perMeshBudget = Math.min(tropicalCanopy || reviewedWoodland ? 1600 : 400,maxTrees-placements.length);
       const bounds=terrainVegetationBounds(mesh,farSurface);if(!bounds)continue;
       const area={minX:Math.max(focus.x-900,bounds.minX),maxX:Math.min(focus.x+900,bounds.maxX),minZ:Math.max(focus.z-900,bounds.minZ),maxZ:Math.min(focus.z+900,bounds.maxZ)};
       if(area.minX>=area.maxX || area.minZ>=area.maxZ) continue;
-      const spacing=tropicalCanopy ? 12 : 18;
+      const spacing=tropicalCanopy || reviewedWoodland ? 12 : 18;
       let accepted = 0;
       for (const {cx,cz} of nearbyVegetationCells(area,spacing,perMeshBudget*5,focus)) {
         yield;
