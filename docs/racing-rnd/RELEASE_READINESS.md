@@ -5,6 +5,47 @@ T13 and Daytona tri-oval**, with the shared real cars and existing racing
 product. The other nine researched layouts are deferred. Nothing in this
 candidate has been deployed to production.
 
+## Creator and damage extension
+
+The replacement candidate includes the October 31 creator/contact scope. One
+Racing workspace supports overhead connected-road selection, drive-to-create
+and roadless ground anchors, with preview, undo, test, save and room sharing.
+Recorded road laps retain graph choices; ground samples become clean editable
+anchors. Checked courses receive a continuous highlighted perimeter and event
+barriers that close unused road mouths. Ground equipment follows accepted
+terrain. Existing mapped bridges, tunnels and reviewed venues retain their
+established support and presentation owners.
+
+In the native world, a four-anchor 294.49 m ground circuit completed both laps
+in 2:04.095, saved its Journal result and returned cleanly. All 245 measured
+poses supported four wheels; maximum gap was 2.48 cm and penetration 1.22 cm.
+The exact final production-configured package also recorded an ordinary drive:
+71 samples became nine anchors and a checked 286.36 m circuit. It saved and
+started through the existing race controller. A subsequent held accelerator /
+brake check measured 210 frames, 50 ms maximum, no frames over 250 ms, no
+barrier contacts and unchanged condition. Equipment and controller cleared on
+leave, with no page, console, WebGL or cleanup errors. These local functional
+checks explicitly use staging configuration and attestation.
+
+Native barrier impact reduced condition from 100% to 87.81%; that exact
+condition returned to the garage. Shared-rule checks cover glancing/hard
+impact, parking contact, disabled cars, handling loss and historical record
+identity. Three actual Auth/Firestore emulator accounts using the real car
+IDs finished through the room WebSocket authority, saved a replay-safe
+unranked receipt and received no Credits, public board or career wins. A
+separate affected-boundary check confirmed impact condition of 95.75% survived
+reconnect and returned exactly to the garage, releasing custody. Creator
+account deletion removed the room publication. This is local backend evidence,
+not a new production App Check claim.
+
+Room courses are scoped to the current world, expire within 24 hours, respect
+blocked/closing accounts and use existing car ownership/custody. Private room
+records are separated by initial car setup and grid. Global competition keeps
+its reviewed-source, moderation and reward rules. Desktop, portrait and short
+landscape editor layouts pass actual-markup/map browser checks. Existing live
+city, full venue, garage, ranked results and VR lifecycle evidence is retained
+at its unchanged boundaries. See [design and limits](CREATOR_AND_DAMAGE.md).
+
 ## Three native main courses
 
 | Course | Retained complete practice | Changed presentation and moving desktop check |
@@ -108,18 +149,21 @@ owners remain in place. This package does not claim a new native-store release.
 
 ## Frozen candidate
 
-Production-configured build: `5.6.1+7d8b3d29bfe0.67f217596d32efb3.production`.
-Frozen source: `7d8b3d29bfe0b4b08f72e897eb22f536d06773f4`.
-Asset-manifest SHA256: `b1b2a229c25a4529f6f3215218e173120a459e2e993d1a078dd1f14ad55de64f`.
+Production-configured build: `5.6.1+c390d3a00ea4.11e2ccd419ea2e2b.production`.
+Frozen runtime source: `c390d3a00ea47d8a019c64559a700eaf9a26d868`.
+Asset-manifest SHA256: `38913eb9d44bdda4c0801ff256cc44f1e468f60c0990d6e85cd54e80d3005ac7`.
 
-Artifact verification and the existing configuration-only promotion validator
-pass. The played complete pit source and this artifact have identical shipped
-game-source files, independently compared in Git. The exact production-configured
-artifact loads Silverstone in 28.5 seconds, qualifies all 589 main/pit spans and
-passes the changed-fork check above with zero page, console or cleanup errors.
-These functional checks explicitly use staging configuration; production
-attestation is a rollout check. Matching Functions/service source archives,
-indexes, reviewed catalogue and deployment configuration are frozen in the
-release handoff. Current-production code and all 84 predecessor ground files
-remain retained by verified hashes. Production and the prior rollback are
-unchanged. The Silverstone pit requirement is completed; no pit deferral remains.
+Both artifact roots pass byte verification. Staging and production share the
+same current runtime generation; promotion validates the explicit environment
+configuration differences and retained production generation. The exact
+production-configured package passed the creator/ground recording journey
+above, loading its native world in 28.2 seconds. Full main courses, both pit
+branches and prior moving budgets are retained evidence for their unchanged
+geographic support. New damage and room classes have their own acceptance.
+
+The release packet freezes new matching Functions/service archives, indexes,
+three reviewed catalogue datasets, backend file hashes and explicit Hosting
+configuration. Current-production code and all 84 predecessor ground files
+remain retained by verified hashes. Production, saves and rollback builds are
+unchanged. The earlier three-pack packet remains historical; deploy this
+coordinated creator/contact candidate using the updated rollout instructions.

@@ -4,7 +4,10 @@ The release comprises Silverstone's full GP loop and complete pit branch, full N
 Daytona tri-oval and its complete pit branch, and the real BMW M3 E46, M3 E92
 race car and Porsche 911 Carrera 4S. Existing garage/upgrades, rivals/crews,
 Journal, creator moderation, room racing and class leaderboards use their
-existing owners. Other nine venue layouts are deferred.
+existing owners. The same release includes overhead road creation, ordinary
+driving capture, supported open-ground tracks, room-only sharing and standard
+barrier damage with durable garage handback. Other nine venue layouts are
+deferred.
 
 Silverstone's complete 73-checkpoint pit journey passes native publication,
 four-wheel contact and clean entry/exit. Its authored usable corridor compiles
@@ -71,14 +74,20 @@ The explicit service-origin option checks the exact project endpoint and health
 before changing `serviceConfig/racing`. Other fields in that existing document
 are preserved. Without the option, the importer does not enable the service.
 
-Required changed Functions for this racing/vehicle scope:
+Required changed Functions for this racing/vehicle and room-cleanup scope:
 
 ```text
 getRacingService getRacingRecords getRacingCatalog getMyRacingRoutes
 commitRacingRoute reviewRacingRoutes getRacingCareer commitRacingCareer
-projectRacingCareer cleanupRacingDeletedAccount
+projectRacingCareer cleanupRacingDeletedAccount deleteAccount
 commitExplorerVehicleAction claimUrbanVehicle updateUrbanVehicle releaseUrbanVehicle
 ```
+
+The Functions archive includes the new room-publication module and account
+cleanup projection. Deploy `deleteAccount` too so its room-tree fallback retires
+room racing collections. No broader Firestore rules are required. New standard
+contact classes and room-only records coexist with historical courses and times;
+do not overwrite old publications or migrate old results into the new class.
 
 Confirm hosted build/asset identities after deployment. The owner performs
 production deployment separately; local acceptance does not assert production

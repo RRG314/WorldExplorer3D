@@ -4,7 +4,9 @@ The October 31 owner request adds three creator entry points to the accepted
 three-venue candidate: overhead selection of existing roads, recording a drive,
 and a clean marked course on supported open ground. All feed one editable route,
 one test flow, the existing activity library and existing room race authority.
-The prior candidate remains preserved; it does not include this new scope.
+The prior candidate remains preserved. The replacement coordinated candidate
+includes this scope; acceptance and delivery identities are recorded in
+[release readiness](RELEASE_READINESS.md).
 
 ## Design evidence
 
@@ -85,5 +87,6 @@ a custom room road corridor must be at least six metres wide.
 
 The accepted three-pack candidate predates this creator/contact scope. Its
 complete venue laps and pits remain evidence for unchanged support geometry;
-the changed creator, contact, room authority and delivery boundaries require
-their own checks before the replacement candidate is accepted.
+the changed creator, contact, room authority and delivery boundaries have their
+own accepted native, browser, database and artifact checks. Their scopes and
+limits are listed in the readiness document.

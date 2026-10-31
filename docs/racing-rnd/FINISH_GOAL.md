@@ -15,6 +15,12 @@ explicitly requires Silverstone pit completion before release; its separate
 73-checkpoint native journey and matching candidate now pass as recorded in
 [RELEASE_READINESS.md](RELEASE_READINESS.md). Production rollout is separate.
 
+The October 31 creator extension is included: clean overhead road layouts,
+ordinary drive recording, supported roadless tracks, scoped room sharing,
+continuous race closures and damage/garage handback. Its acceptance is recorded
+separately in [RELEASE_READINESS.md](RELEASE_READINESS.md); prior accepted venue
+laps, pits and unaffected exploration owners remain retained evidence.
+
 The finish line is one versioned release candidate, with these outcomes checked
 once on the final affected paths. A failed check is repaired and rechecked at its
 failure boundary; it does not restart the whole release sequence.
