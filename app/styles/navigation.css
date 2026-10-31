@@ -274,7 +274,7 @@ body.activity-racing-open :is(#hudBox,#hudMap,#hudUtilities,#floatMenuContainer,
  .racing-hub {padding:16px;max-height:calc(100dvh - 24px);}
  .racing-hub[open] {height:calc(100dvh - 24px);}
  .racing-hub header h2 {font-size:30px;}
- .racing-layout {grid-template-columns:1fr;gap:12px;}
+ .racing-layout {grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:max-content;align-content:start;gap:12px;}
  .racing-setup,.racing-event-detail {display:contents;}
  .racing-layout [data-race-events] {order:1;}
  .racing-summary {order:2;}
