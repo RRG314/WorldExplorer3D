@@ -92,7 +92,8 @@ function polylineLength(points = []) {
 }
 
 function classifyAreaKind(options, metrics) {
-  const explicit = normalizeWaterKind(options.kindHint || options.waterKind || options.layer);
+  const explicit = normalizeWaterKind(options.kindHint) || normalizeWaterKind(options.waterKind) ||
+    normalizeWaterKind(options.surfaceType) || normalizeWaterKind(options.layer);
   if (explicit === WATER_KIND.OPEN_OCEAN || explicit === WATER_KIND.LAKE) return explicit;
   const surfaceY = finiteNumber(options.surfaceY);
   if (surfaceY !== null && surfaceY > 12) return WATER_KIND.LAKE;

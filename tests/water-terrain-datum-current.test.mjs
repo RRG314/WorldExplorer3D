@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {waterTerrainBedY} from '../app/js/terrain/water-terrain-mask.js';
 import {normalizeWaterBody} from '../app/js/world/water-body-contract.js';
+
+test('a mapped water subtype survives a generic natural-water hint at a low-elevation large lake',()=>{
+ const pts=[{x:0,z:0},{x:600,z:0},{x:600,z:800},{x:0,z:800}];
+ assert.equal(normalizeWaterBody({pts,surfaceY:5.54,kindHint:'water',surfaceType:'lake'}).kind,'lake');
+ assert.equal(normalizeWaterBody({pts,surfaceY:5.54,kindHint:'water',surfaceType:'reservoir'}).kind,'lake');
+ assert.equal(normalizeWaterBody({pts,surfaceY:0,kindHint:'sea',surfaceType:'lake'}).kind,'open_ocean');
+ assert.equal(normalizeWaterBody({pts,surfaceY:0,kindHint:'water'}).kind,'coastal');
+});
 import {sampleWaterPolygonInteriorHeights} from '../app/js/world/load-landuse-pass.js';
 test('partly loaded inland water excludes unavailable samples rather than inventing ocean datum',()=>{
  const ring=[{x:0,z:0},{x:7,z:0},{x:7,z:7},{x:0,z:7}];
