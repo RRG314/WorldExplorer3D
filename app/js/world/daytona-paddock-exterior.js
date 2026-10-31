@@ -138,11 +138,11 @@ export function createDaytonaPaddockExteriors(T,ctx){
    results.push(paddockBleachers(T,{...plan,pitRoad},{root,local,world,center,footprint,floor,bottom}));continue;
   }
   const material=(color,roughness=.85,metalness=0)=>{const m=new T.MeshStandardMaterial({color,roughness,metalness,side:T.DoubleSide});m.color.convertSRGBToLinear();return m;},
-   wall=material(0xd5cfb7,.95),roof=material(plan.kind==='club'?0x75655b:0xc6ccca,.55,.45),dark=material(0x364147,.9),trim=material(0x818f92,.5,.45),glass=material(0x2e515b,.3,.35),yellow=material(0xc1a14f,.75),foundation=material(0xb4b3a7,.97),
+   wall=material(plan.kind==='support-trailer'?0xe5e7e3:0xd5cfb7,.95),roof=material(plan.kind==='club'?0x75655b:0xc6ccca,.55,.45),dark=material(0x364147,.9),trim=material(0x818f92,.5,.45),glass=material(0x2e515b,.3,.35),yellow=material(0xc1a14f,.75),foundation=material(0xb4b3a7,.97),
    materials=[wall,roof,dark,trim,glass,yellow,foundation],lod=new T.LOD();root.add(lod);
   const minV=Math.min(...local.map(p=>p.v)),maxV=Math.max(...local.map(p=>p.v)),bays=Math.max(1,Math.round((maxV-minV)/12)),bay=(maxV-minV)/bays;
   const triangles=T.ShapeUtils.triangulateShape(local.map(p=>new T.Vector2(p.u,p.v)),[]).map(t=>t.map(i=>local[i]));
-  let bayCount=0;
+  let bayCount=0;const trailerColliders=[];
   function level(detail){
    const group=new T.Group(),buffers=materials.map(()=>[]),vertex=(p,y)=>{const w=world(p.u,p.v);return [w.x-center.x,y/unit,w.z-center.z];},
     poly=(points,height,mat)=>{for(let i=1;i<points.length-1;i++)buffers[mat].push(...vertex(points[0],height(points[0])),...vertex(points[i],height(points[i])),...vertex(points[i+1],height(points[i+1])));},
@@ -151,8 +151,14 @@ export function createDaytonaPaddockExteriors(T,ctx){
     const a=local[i],b=local[(i+1)%local.length],length=Math.hypot(b.u-a.u,b.v-a.v),du=(b.u-a.u)/length,dv=(b.v-a.v)/length;
     if(length<.01)continue;
     const p=world(a.u,a.v),q=world(b.u,b.v),lo=(Math.min(ctx.elevationWorldYAtWorldXZ(p.x,p.z),ctx.elevationWorldYAtWorldXZ(q.x,q.z))-floor)*unit;
-    panel(a,b,lo,0,6);panel(a,b,0,plan.eavesMeters,0);
+    if(plan.kind==='support-trailer'){panel(a,b,.45,.65,2);panel(a,b,.65,plan.eavesMeters,0);}else{panel(a,b,lo,0,6);panel(a,b,0,plan.eavesMeters,0);}
     if(!detail||length<6)continue;
+    if(plan.kind==='support-trailer'){
+     const middle={u:(a.u+b.u)/2,v:(a.v+b.v)/2},test=world(middle.u-dv*.3,middle.v+du*.3),out=inside(test,footprint)?-1:1,at=(d,offset=.05)=>({u:a.u+du*d-dv*offset*out,v:a.v+dv*d+du*offset*out});
+     panel(at(.2),at(length-.2),.9,.96,3);panel(at(.2),at(length-.2),plan.eavesMeters-.2,plan.eavesMeters-.12,3);
+     for(const f of [.25,.65]){const d=length*f,w=Math.min(1.5,length*.12);panel(at(d-w/2),at(d+w/2),1.25,2.65,2);panel(at(d-w/2-.04,.07),at(d+w/2+.04,.07),1.2,1.28,3);panel(at(d,.08),at(d+.06,.08),1.75,2.0,3);}
+     continue;
+    }
     if(plan.kind!=='garage'&&plan.kind!=='inspection'){
      const count=Math.max(1,Math.floor((length-1)/3.1)),pitch=length/count,middle={u:(a.u+b.u)/2,v:(a.v+b.v)/2},test=world(middle.u-dv*.3,middle.v+du*.3),out=inside(test,footprint)?-1:1,
       at=(s,offset=.05)=>({u:a.u+du*s-dv*offset*out,v:a.v+dv*s+du*offset*out}),floors=plan.kind==='club'?2:plan.kind==='media'?2:1,step=plan.kind==='club'?4.4:plan.kind==='media'?2.65:3.1;
@@ -199,13 +205,27 @@ export function createDaytonaPaddockExteriors(T,ctx){
     const roofY=p=>{const f=((p.v-minV)/bay)%1;return plan.eavesMeters+(plan.ridgeMeters-plan.eavesMeters)*(1-Math.abs(f-.5)*2);};
     for(let j=1;j<cuts.length;j++){const at=t=>({u:a.u+(b.u-a.u)*t,v:a.v+(b.v-a.v)*t}),p=at(cuts[j-1]),q=at(cuts[j]);buffers[0].push(...vertex(p,plan.eavesMeters),...vertex(q,plan.eavesMeters),...vertex(q,roofY(q)),...vertex(p,plan.eavesMeters),...vertex(q,roofY(q)),...vertex(p,roofY(p)));}
    }
+   if(detail&&plan.kind==='support-trailer'){
+    const wheelAt=[.64,.77,.9].map(f=>lowU+(highU-lowU)*f);
+    for(const u of wheelAt)for(const v of [lowV+.16,highV-.16]){
+     const p=world(u,v);if(!inside(p,footprint))continue;const ground=ctx.elevationWorldYAtWorldXZ(p.x,p.z),centerY=ground-floor+.38/unit,axis=new T.Vector3(-uz,0,ux);
+     for(const [radius,depth,mat]of [[.38,.22,dark],[.17,.24,trim]]){const geometry=new T.CylinderGeometry(radius/unit,radius/unit,depth/unit,16),wheel=new T.Mesh(geometry,mat);wheel.position.set(p.x-center.x,centerY,p.z-center.z);wheel.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),axis);wheel.castShadow=wheel.receiveShadow=true;group.add(wheel);}
+     const pts=[[-.38,-.12],[.38,-.12],[.38,.12],[-.38,.12]].map(([du,dv])=>world(u+du,v+dv));trailerColliders.push(venueComponentCollider(plan.sourceBuildingId,pts,ground,ground+.76/unit));
+    }
+   }
    for(const [i,positions]of buffers.entries())if(positions.length){const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.computeVertexNormals();const m=new T.Mesh(g,materials[i]);m.castShadow=m.receiveShadow=true;group.add(m);}
    batchOwnedStaticStructure(T,group);return group;
   }
   lod.addLevel(level(true),0);lod.addLevel(level(false),330/unit);lod.addLevel(new T.Group(),1100/unit);
   root.userData.architecture={kind:plan.kind,garages:plan.kind==='garage'?1:0,closedServiceBays:bayCount,roofBays:bays,lodLevels:3,eavesMeters:plan.eavesMeters,ridgeMeters:plan.ridgeMeters};
   const used=new Set();root.traverse(m=>{if(m.material)used.add(m.material);});for(const m of materials)if(!used.has(m))m.dispose();
-  finishVenueSurface(T,root,foundation,'../../assets/textures/earth/concrete_diffuse.jpg',4);
-  results.push({root,footprint,bottom,top:floor+(plan.ridgeMeters+.35)/unit,sourceBuildingId:plan.sourceBuildingId});
+  if(plan.kind!=='support-trailer')finishVenueSurface(T,root,foundation,'../../assets/textures/earth/concrete_diffuse.jpg',4);
+  const top=floor+(plan.ridgeMeters+.35)/unit;if(plan.kind==='support-trailer'){
+   trailerColliders.unshift(venueComponentCollider(plan.sourceBuildingId,footprint,floor+.65/unit,top));
+   // The low chassis is a perimeter frame, not an invisible floor across the
+   // entire void below the body. Keep its visible members and wheel volumes.
+   for(let i=0;i<footprint.length;i++){const a=footprint[i],b=footprint[(i+1)%footprint.length],dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);if(length<.01/unit)continue;const nx=-dz/length*.02/unit,nz=dx/length*.02/unit,pts=[{x:a.x-nx,z:a.z-nz},{x:b.x-nx,z:b.z-nz},{x:b.x+nx,z:b.z+nz},{x:a.x+nx,z:a.z+nz}];trailerColliders.push(venueComponentCollider(plan.sourceBuildingId,pts,floor+.45/unit,floor+.65/unit));}
+   root.userData.sourceClaim='Pinned Overture 2026-09-23.1 plan; NAIP temporary paddock support unit; original unbranded trailer, estimated dimensions and wheels; no drivable vehicle or interior admission';root.userData.architecture.temporarySupport=true;root.userData.architecture.componentColliders=trailerColliders.length;}
+  results.push({root,footprint,bottom,top,sourceBuildingId:plan.sourceBuildingId,...(trailerColliders.length?{colliders:trailerColliders}:{})});
  }return results;
 }

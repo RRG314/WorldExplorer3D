@@ -103,6 +103,16 @@ building heights and closed exterior admission, and replacement collision.
 The changed views were inspected. Additional generic entry buildings remain;
 this accepts the nine source-bound replacements, not complete paddock context.
 
+Finish and full-class grid paint now uses the same filtered coverage, with
+padding clipped to qualified pavement and split at its lateral creases. Existing
+event-edge vertices remain unchanged. The native rolling-grid view confirms
+continuous markings and the real models. A subsequent 60.03-second moving desktop
+window recorded 3,121 moving frames: 51.99 FPS, p95 33.4 ms, p99 35.3 ms, maximum
+83.2 ms, zero frames over 250 ms and zero barrier contacts. Controlled analogue
+input used the normal input port and was restored before leaving. This is an
+initial budget for the then-current art and paint, not another completed lap,
+human/phone smoothness or the final coordinated release budget.
+
 Complete venue presentation, changed live multiplayer/catalogue acceptance and
 the final moving-scene budget remain open; no major pack is accepted. Circuit
 pit gameplay is still explicitly unavailable.

@@ -16,7 +16,7 @@ test('mapped garage reservation distinguishes neighbouring sources and waits for
 });
 test('three mapped garages retain indented roof plans, metre-scale detail, bounded LODs and exactly owned resources',()=>{
  for(const unit of [1,1.11]){
-  const c=fixture(unit),exteriors=createDaytonaPaddockExteriors(T,c);assert.equal(exteriors.length,22);assert.equal(exteriors.filter(e=>e.root.userData.paddockGarage).length,3);assert.ok(c.reads()>100);
+  const c=fixture(unit),exteriors=createDaytonaPaddockExteriors(T,c);assert.equal(exteriors.length,26);assert.equal(exteriors.filter(e=>e.root.userData.paddockGarage).length,3);assert.ok(c.reads()>100);
   for(const [i,e]of exteriors.entries()){
    const {root,footprint}=e,source=DAYTONA_PADDOCK_BUILDINGS[i],lod=root.children[0];assert.equal(root.userData.sourceBuildingId,source.sourceBuildingId);assert.equal(root.userData.exteriorOnly,true);assert.equal(lod.levels.length,3);assert.equal(lod.levels[2].object.children.length,0);if(source.kind==='garage')assert.ok(root.userData.architecture.closedServiceBays>15);else assert.equal(root.userData.architecture.garages,0);
    assert.ok(Math.abs((e.top-root.position.y)*unit-source.ridgeMeters-(['pit-canopy','paddock-bleachers'].includes(source.kind)?0:.35))<1e-9);assert.ok(lod.levels[0].object.children.length<=7);assert.ok(lod.levels[1].object.children.length<=3);
@@ -32,8 +32,8 @@ test('three mapped garages retain indented roof plans, metre-scale detail, bound
 test('unknown or excessive ground variation keeps the existing representation',()=>{
  const c=fixture();c.elevationWorldYAtWorldXZ=()=>NaN;assert.deepEqual(createDaytonaPaddockExteriors(T,c),[]);c.elevationWorldYAtWorldXZ=x=>x;assert.deepEqual(createDaytonaPaddockExteriors(T,c),[]);
 });
-test('only the five reviewed canopy identities lose inferred rooms, and their actual component collision leaves passage below the roof',()=>{
- const c=fixture(),all=createDaytonaPaddockExteriors(T,c),exteriors=all.filter(e=>e.root.userData.architecture.openCanopy);assert.equal(exteriors.length,5);
+test('only the eight reviewed canopy identities lose inferred rooms, and their actual component collision leaves passage below the roof',()=>{
+ const c=fixture(),all=createDaytonaPaddockExteriors(T,c),exteriors=all.filter(e=>e.root.userData.architecture.openCanopy);assert.equal(exteriors.length,8);
  for(const e of exteriors){assert.equal(reviewedDaytonaPitCanopy(c,e.sourceBuildingId)?.kind,'pit-canopy');assert.equal(reviewedDaytonaPitCanopy({...c,worldLoadRuntimeState:{venuePack:{id:'city'}}},e.sourceBuildingId),null);
   assert.equal(canContainWalkableInterior(e.root.userData),false);const query=createBuildingCollisionQuery({buildings:[],dynamicBuildingColliders:e.colliders}),center=e.root.position;
   assert.equal(query(center.x,center.z,.3,{actorBaseY:center.y,actorHeight:2}).collision,false,'the old full-height solid building must not remain under an open roof');
@@ -47,15 +47,22 @@ test('the existing publication owner retires only the matching bodies and adjunc
  const retired=[];for(const p of plans){const m=new T.Mesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial());m.userData={sourceBuildingId:p.sourceBuildingId,buildingFootprint:p.footprint};scene.add(m);c.buildingMeshes.push(m);retired.push(m);}
  const roof=new T.Mesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial());roof.userData={sourceBuildingId:plans[0].sourceBuildingId,isRoofDetail:true};scene.add(roof);c.buildingMeshes.push(roof);retired.push(roof);
  const neighbour=new T.Mesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial());neighbour.userData={sourceBuildingId:'unrelated'};scene.add(neighbour);c.buildingMeshes.push(neighbour);
- publishReviewedVenueExteriors(c,T);const callback=c.deferredTransportLandmarkPublishers.at(-1);assert.equal(c.reads(),0);c._worldLoadSequence=8;callback();assert.equal(c.reads(),0);assert.equal(c.buildingMeshes.length,24);
- c._worldLoadSequence=7;callback();assert.equal(c.buildingMeshes.filter(m=>m.userData.paddockStructure).length,22);assert.ok(retired.every(m=>m.parent===null));assert.equal(neighbour.parent,scene);const count=c.buildingMeshes.filter(m=>m.userData.paddockStructure).reduce((n,m)=>n+(m.userData.architecture.componentColliders||1),0);assert.equal(c.dynamicBuildingColliders.length,count);assert.ok(c.buildings.every(b=>b.collisionReplacedByVenue));callback();assert.equal(c.dynamicBuildingColliders.length,count);
+ publishReviewedVenueExteriors(c,T);const callback=c.deferredTransportLandmarkPublishers.at(-1);assert.equal(c.reads(),0);c._worldLoadSequence=8;callback();assert.equal(c.reads(),0);assert.equal(c.buildingMeshes.length,28);
+ c._worldLoadSequence=7;callback();assert.equal(c.buildingMeshes.filter(m=>m.userData.paddockStructure).length,26);assert.ok(retired.every(m=>m.parent===null));assert.equal(neighbour.parent,scene);const count=c.buildingMeshes.filter(m=>m.userData.paddockStructure).reduce((n,m)=>n+(m.userData.architecture.componentColliders||1),0);assert.equal(c.dynamicBuildingColliders.length,count);assert.ok(c.buildings.every(b=>b.collisionReplacedByVenue));callback();assert.equal(c.dynamicBuildingColliders.length,count);
  for(const m of c.buildingMeshes)disposeLandmarkModel(m);
 });
 
 test('reviewed low support buildings retain their exact source identity and explicit closed exterior admission',()=>{
- const c=fixture(),added=DAYTONA_PADDOCK_BUILDINGS.slice(13);assert.equal(added.length,9);assert.equal(added.filter(p=>p.kind==='paddock-bleachers').length,1);
+ const c=fixture(),added=DAYTONA_PADDOCK_BUILDINGS.slice(13);assert.equal(added.length,13);assert.equal(added.filter(p=>p.kind==='paddock-bleachers').length,1);
  for(const p of added){assert.equal(reviewedDaytonaPaddockBuilding(c,p.sourceBuildingId),p);assert.equal(reviewedDaytonaPaddockBuilding({...c,worldLoadRuntimeState:{venuePack:{id:'ordinary-city'}}},p.sourceBuildingId),null);assert.ok(p.ridgeMeters<=4.4);}
  assert.equal(canContainWalkableInterior({buildingType:'yes',bodyHeightMeters:4}),true,'ordinary supported buildings keep admission');
  assert.equal(canContainWalkableInterior({buildingType:'yes',bodyHeightMeters:4,buildingSemantics:{exteriorOnly:true}}),false,'the canonical building semantics retain closed service admission');
  assert.equal(canContainWalkableInterior({buildingType:'yes',bodyHeightMeters:4,exteriorOnly:true}),false,'the corresponding reviewed visual also stays closed');
+});
+
+test('the temporary support trailer has actual wheel/body volumes and clear space below its chassis',()=>{
+ const all=createDaytonaPaddockExteriors(T,fixture()),e=all.find(e=>e.root.userData.architecture.temporarySupport);assert.ok(e);assert.equal(e.colliders.length,7+e.footprint.length);const query=createBuildingCollisionQuery({buildings:[],dynamicBuildingColliders:e.colliders}),p=e.root.position;
+ assert.equal(query(p.x,p.z,.1,{actorBaseY:p.y,actorHeight:.4}).collision,false);assert.equal(query(p.x,p.z,.1,{actorBaseY:p.y,actorHeight:1.8}).collision,true);
+ const wheel=e.colliders[1],center=wheel.pts.reduce((p,q)=>({x:p.x+q.x/4,z:p.z+q.z/4}),{x:0,z:0});assert.equal(query(center.x,center.z,.1,{actorBaseY:wheel.minY,actorHeight:.4}).collision,true);
+ for(const e of all)disposeLandmarkModel(e.root);
 });

@@ -1,6 +1,6 @@
 # Racing release readiness
 
-Updated October 31, 2026. **Full racing is not release-ready.** No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
+Updated October 31, 2026. **The three-venue candidate is being completed.** The owner reduced launch scope to Silverstone, Nordschleife and Daytona; the other nine layouts are deferred. No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
 
 ## Implemented and evidenced
 
@@ -210,7 +210,7 @@ Updated October 31, 2026. **Full racing is not release-ready.** No production de
 
 ## Remaining release blockers
 
-1. Complete the balanced major-venue packs and their presentation. Three venues have accepted native private-practice journeys; zero of the twelve packs have full acceptance. Nine venue integrations and all-pack presentation remain open. Shared circuit/oval/rally rules do not certify geographic support or a finished venue by themselves.
+1. Complete presentation and affected acceptance for Silverstone, Nordschleife and Daytona. Their complete native private-practice journeys pass and must be reused. The other nine layouts are deferred, not launch blockers. Shared circuit/oval/rally rules do not certify geographic support or a finished venue by themselves.
 2. Complete the final coordinated build and its affected distribution checks after the shared-vehicle publication correction. Keep the existing garage, ordinary travel, VR, creator, career and trusted-result evidence; do not restart historical release sweeps.
 3. Major-venue performance remains to be measured with those actual packs. The current city/shared-race desktop budget passed in one live 60-second window: 40.45 FPS, p95 34.1 ms, p99 50.0 ms, worst 100.1 ms, no frame over 250 ms. Earlier failures remain retained; this is not physical-phone or unbuilt-venue acceptance.
 

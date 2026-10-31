@@ -2,7 +2,16 @@
 
 Owner decision, October 28, 2026: **balanced circuits, stock-car ovals and rally stages**, with Open rivals and racing crews as the primary progression and optional collector/skill goals integrated with the existing Explorer. No purchase or production deployment.
 
-## Exact initial coverage
+## Three-venue launch scope
+
+The owner's October 31 correction supersedes the twelve-pack launch requirement.
+This release contains **Silverstone GP, full Nordschleife T13 and Daytona
+tri-oval**. Complete native private-practice journeys already pass for all three;
+presentation and changed release integration still need final acceptance.
+The other nine references below are deferred. Retain their source work without
+enabling unfinished packs or treating their production as a launch blocker.
+
+## Retained coverage register
 
 The source register is `app/js/racing/venue-catalog.js`. It contains twelve **researched layout references**, four in each group. **Zero are complete playable venue packs.** The existing Monaco district practice run is a qualified 705.99 m city route, not the Monaco Grand Prix circuit. Course names, target lengths and references do not certify geometry or provide a content licence.
 

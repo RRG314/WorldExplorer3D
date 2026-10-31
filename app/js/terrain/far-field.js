@@ -419,7 +419,7 @@ function createFarFieldTerrainApi(deps = {}) {
       if (!Number.isFinite(groundMeters)) { rejectedBuildings.missingGround++; continue; }
       const areaWorld = Number(building.areaMeters) * unitsPerMeter * unitsPerMeter;
       const massing = packedDescriptors ? (building.validMassing ? building.massing : null)
-        : resolveFarBuildingMassing(building, null, areaWorld, unitsPerMeter);
+        : resolveFarBuildingMassing(building, null, areaWorld, unitsPerMeter, {venuePack:appCtx.worldLoadRuntimeState?.venuePack});
       if (!massing) { rejectedBuildings.implausibleMassing++; continue; }
       const baseY = groundMeters * unitsPerMeter * yExaggeration + 0.25;
       const footprint = farBuildingRenderFootprint(building, appCtx.geoToWorld, unitsPerMeter);
@@ -521,6 +521,7 @@ function createFarFieldTerrainApi(deps = {}) {
         {
           signal,
           concurrency: spec.travelRefresh ? 4 : 8,
+          venuePack: appCtx.worldLoadRuntimeState?.venuePack ? {id:appCtx.worldLoadRuntimeState.venuePack.id,sourceSha256:appCtx.worldLoadRuntimeState.venuePack.sourceSha256} : null,
           detailedBuildingFrame: { origin: {lat: appCtx.LOC.lat, lon: appCtx.LOC.lon}, scale: appCtx.SCALE,
             radius: Number(appCtx.worldLoadRuntimeState?.buildingVisibleRadiusWorld) },
           roadCoverageFrame: { bounds: spec.contextOuter, geoToWorld: appCtx.geoToWorld,

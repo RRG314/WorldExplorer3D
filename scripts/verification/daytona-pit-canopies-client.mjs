@@ -11,7 +11,7 @@ const server=verifyExisting?null:await startStaticServer({rootDir:process.cwd(),
  const states=await Promise.all([0,1,2].map(i=>readFile(`${out}/state-${i}.json`,'utf8').then(JSON.parse)));assert.deepEqual(states.map(s=>s.view),[1,2,0]);
  // Seven near meshes per mapped structure, plus sixteen for the shared car
  // and controlled ground. This fixture is not the native moving-scene budget.
- for(const s of states){assert.equal(s.glError,0);assert.ok(s.drawCalls<=s.garages.length*7+16&&s.triangles<105000+s.garages.length*7000);assert.equal(s.garages.length,22);assert.equal(s.garages.filter(g=>g.kind==='garage').length,3);assert.equal(s.garages.filter(g=>g.openCanopy).length,5);assert.ok(s.garages.every(g=>g.lodLevels===3));}
+ for(const s of states){assert.equal(s.glError,0);assert.ok(s.drawCalls<=s.garages.length*7+16&&s.triangles<105000+s.garages.length*7000);assert.equal(s.garages.length,26);assert.equal(s.garages.filter(g=>g.kind==='garage').length,3);assert.equal(s.garages.filter(g=>g.openCanopy).length,8);assert.ok(s.garages.every(g=>g.lodLevels===3));}
  assert.equal((await readdir(out)).filter(f=>/^errors-\d+\.json$/.test(f)).length,0);
  await writeFile(out+'/report.json',JSON.stringify({passed:true,reusedCapture:verifyExisting,scope:'Four mapped open pit canopies among thirteen paddock exteriors, component detail and shared real-car scale; controlled ground, native venue acceptance remains separate',states},null,2));
 }finally{await server?.close();}

@@ -5,6 +5,7 @@ import {prepareKennedyBuildingWays} from './kennedy-facility.js';
 import {publishKennedyExterior} from './kennedy-exterior.js';
 import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
 import {isSilverstoneWing} from './silverstone-wing-exterior.js';
+import {prepareDaytonaBuildingMassing} from './daytona-building-massing.js';
 import {reviewedDaytonaPaddockBuilding} from './daytona-paddock-survey.js';
 import {publishReviewedVenueExteriors} from './reviewed-venue-exteriors.js';
 import {resolveBuildingFoundation} from './building-foundation.js';
@@ -56,6 +57,7 @@ async function buildBuildingGeometryWithStorage(options, arenas) {
   const kennedy=prepareKennedyBuildingWays(appCtx,Array.isArray(options.buildingWays)?options.buildingWays:[],options.nodes||{},options.lodThresholds?.farVisible);
   const buildingWays = prepareLaunchPadBuildingWays(appCtx,kennedy.ways,kennedy.nodes,options.lodThresholds?.farVisible);
   const nodes = kennedy.nodes;
+  const infieldFallbackHeight=prepareDaytonaBuildingMassing(appCtx);
   const buildingGeometryGuards = options.buildingGeometryGuards || {};
   const lodThresholds = options.lodThresholds || {};
   const loadMetrics = options.loadMetrics || {};
@@ -299,9 +301,10 @@ async function buildBuildingGeometryWithStorage(options, arenas) {
       reviewedType=reviewedCanopy?'canopy':reviewedPaddock?.kind==='paddock-bleachers'?'grandstand':way.tags.building || way.tags['building:part'] || 'yes',
       semanticTags=reviewedPaddock?{...way.tags,building:reviewedType,'building:part':undefined,height:String(reviewedPaddock.ridgeMeters),'roof:height':String(reviewedPaddock.ridgeMeters-reviewedPaddock.eavesMeters),'building:levels':undefined,min_height:undefined,'building:min_level':undefined,level:undefined}:way.tags;
     const bt = reviewedType;
+    const contextFallback=way.tags['building:part']?null:infieldFallbackHeight(pts,bt,footprintArea*(appCtx.METERS_PER_WORLD_UNIT||1)**2);
     const fallbackHeight = way.tags['building:part'] ?
       10 :
-      inferFallbackBuildingHeightMeters(bt, footprintArea, footprintWidth, footprintDepth, br1);
+      contextFallback??inferFallbackBuildingHeightMeters(bt, footprintArea, footprintWidth, footprintDepth, br1);
     const structureSemantics = classifyStructureSemantics(semanticTags || {}, { featureKind: 'building', subtype: bt });
     const buildingSemantics = interpretBuildingSemantics(semanticTags || {}, {
       buildingType: bt,
@@ -311,6 +314,7 @@ async function buildBuildingGeometryWithStorage(options, arenas) {
       footprintWidth,
       footprintDepth
     });
+    if(contextFallback!==null&&buildingSemantics.heightSource==='fallback')buildingSemantics.heightSource='reviewed_venue_context_estimate';
     if(reviewedPaddock){buildingSemantics.heightSource=reviewedCanopy?'reviewed_canopy_estimate':'reviewed_paddock_estimate';buildingSemantics.exteriorOnly=true;const providerHeight=Number.parseFloat(way.tags.height);if(Number.isFinite(providerHeight))buildingSemantics.providerHeightMeters=providerHeight;}
     // The provider's 6.27 m estimate contradicts the photographed three-storey
     // facade. Preserve it as source evidence, not as a surveyed constraint.

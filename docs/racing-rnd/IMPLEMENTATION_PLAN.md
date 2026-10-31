@@ -1,7 +1,10 @@
 # Racing release architecture and execution plan
 
-Updated October 30, 2026. This plan supersedes the historical sequence below.
-The fixed scope is [FINISH_GOAL.md](FINISH_GOAL.md): all twelve layouts in
+Updated October 31, 2026. The owner reduced launch scope to three complete
+packs: Silverstone GP, Nordschleife T13 and Daytona tri-oval. Reuse accepted
+complete laps and smoothness evidence. All other venue intake and real rally
+packs are deferred. This correction supersedes the historical sequence below.
+The fixed scope is [FINISH_GOAL.md](FINISH_GOAL.md): the three launch layouts in
 [RACE_VENUE_COVERAGE.md](RACE_VENUE_COVERAGE.md), shared real vehicles, garage,
 upgrades, rivals/crews, multiplayer, Journal and trusted leaderboards. No purchase
 or production deployment is part of implementation. This is a work order, not
