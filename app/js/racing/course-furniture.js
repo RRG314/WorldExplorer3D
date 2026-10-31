@@ -1,5 +1,5 @@
 import {racePavementCrossSection} from './pavement-cross-section.js';
-import {sampleRaceSegmentY,raceSegmentAtDistance} from './course-rules.js';
+import {sampleRaceSegmentY,raceSegmentAtDistance,projectRacePosition,raceProjectionOutsidePavement} from './course-rules.js';
 import {raceCourseSurfacePoint} from './course-markings.js';
 import {createChainLinkTexture} from '../world/chain-link-texture.js';
 
@@ -16,14 +16,19 @@ export function buildRaceFurniture(course) {
  // controller. The upper wall recedes from the admitted chassis envelope.
  const profile=guardrail?[[.04,0],[-.14,.045],[-.2,.11],[-.14,.175],[.04,.22]]:[[-.2,0],[-.2,.18],[.06,.36],[.18,.86],[.38,.86],[.5,0]];
  const levels=guardrail?[.31,.60,.89]:[0];
+ const pitCourse=course.pitLane?.course,pitBounds=pitCourse?pitCourse.points.reduce((b,p)=>({minX:Math.min(b.minX,p.x),maxX:Math.max(b.maxX,p.x),minZ:Math.min(b.minZ,p.z),maxZ:Math.max(b.maxZ,p.z)}),{minX:Infinity,maxX:-Infinity,minZ:Infinity,maxZ:-Infinity}):null;
+ const pitIntersects=p=>{if(!pitCourse||p.x<pitBounds.minX-16/unit||p.x>pitBounds.maxX+16/unit||p.z<pitBounds.minZ-16/unit||p.z>pitBounds.maxZ+16/unit)return false;return !raceProjectionOutsidePavement(projectRacePosition(pitCourse,p),1);};
+ const pitOpening=d=>course.pitLane&&[course.pitLane.entryDistanceMeters,course.pitLane.exitDistanceMeters].some(at=>Math.abs(((d-at+course.lengthMeters*1.5)%course.lengthMeters)-course.lengthMeters/2)<25);
  const edgeAt=(segment,t,side)=>{const s=racePavementCrossSection(segment,t);return s?(side<0?-s.minimumMeters:s.maximumMeters):segment.widthMeters/2;},edgeAtDistance=(d,side,extra)=>{const s=raceSegmentAtDistance(course,d);return side*(edgeAt(s,(d-s.startMeters)/s.lengthMeters,side)+extra);};
  for(const segment of permanentOval?[]:course.segments) {
   const count=Math.max(1,Math.ceil(segment.lengthMeters/4));
   for(let i=0;i<count;i++) {
    const start=segment.startMeters+i*segment.lengthMeters/count,end=segment.startMeters+(i+1)*segment.lengthMeters/count;
+   if(pitOpening((start+end)/2))continue;
    const chunk=chunkAt((start+end)/2),t0=i/count,t1=(i+1)/count;
    for(const side of [-1,1]) {
     const edge=segment.widthMeters/2;
+    if([t0,(t0+t1)/2,t1].some(t=>pitIntersects(point(segment,t,side*(edgeAt(segment,t,side)-.2)))))continue;
     for(const level of levels){
      const ring=t=>profile.map(([offset,height])=>point(segment,t,side*((segment.pavementModel?edgeAt(segment,t,side):edge)+offset),height+level));
      const a=ring(t0),b=ring(t1);
@@ -37,8 +42,8 @@ export function buildRaceFurniture(course) {
    }
   }
  }
- if(!permanentOval)for(let d=0;d<course.lengthMeters;d+=8){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.posts.push(raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,guardrail ? .75 : .36),guardrail?0:.86));}
- if(guardrail)for(let d=0;d<course.lengthMeters;d+=4){const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1])chunk.railPosts.push(raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,.10)));}
+ if(!permanentOval)for(let d=0;d<course.lengthMeters;d+=8){if(pitOpening(d))continue;const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1]){const p=raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,guardrail ? .75 : .36),guardrail?0:.86);if(!pitIntersects(p))chunk.posts.push(p);}}
+ if(guardrail)for(let d=0;d<course.lengthMeters;d+=4){if(pitOpening(d))continue;const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1]){const p=raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,.10));if(!pitIntersects(p))chunk.railPosts.push(p);}}
  let previousTurn=-Infinity;
  for(let d=180;d<course.lengthMeters-30;d+=15) {
   const a=raceSegmentAtDistance(course,d-30).forward,b=raceSegmentAtDistance(course,d+30).forward;

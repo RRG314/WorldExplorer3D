@@ -11,7 +11,7 @@ export function raceCourseSurfacePoint(course,distanceMeters,lateralMeters=0,lif
   y:sampleRaceSegmentY(segment,t,lateralMeters)+liftMeters/unit,
   z:segment.a.z+(segment.b.z-segment.a.z)*t-forward.x*lateralMeters/unit};
 }
-export function buildRacePaint(course,{filtered=true,venueId=course.venueSource?.id}={}) {
+export function buildRacePaint(course,{filtered=true,venueId=course.venueSource?.id,pitBranch=false}={}) {
  const positions=[],colors=[],rectangles=[],strokeCoverage=[];
  const sectionAt=d=>{const s=raceSegmentAtDistance(course,Math.max(0,Math.min(course.lengthMeters,d)));return racePavementCrossSection(s,(d-s.startMeters)/s.lengthMeters);},valueAt=(v,d)=>typeof v==='function'?v(d):v,bankRelative=offset=>course.pavementModel?(d=>(sectionAt(d)?.racingOffsetMeters||0)+offset):offset;
  function clip(points,distance){const out=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length],da=distance(a),db=distance(b),ia=da>=-1e-9,ib=db>=-1e-9;if(ia)out.push(a);if(ia!==ib){const t=da/(da-db);out.push({d:a.d+(b.d-a.d)*t,l:a.l+(b.l-a.l)*t});}}return out;}
@@ -61,6 +61,11 @@ export function buildRacePaint(course,{filtered=true,venueId=course.venueSource?
    }
   }
  }
+ if(course.discipline==='circuit'&&course.pitLane&&!pitBranch){
+  const branch=buildRacePaint(course.pitLane.course,{filtered,venueId:'circuit-pit',pitBranch:true});
+  for(const v of branch.positions)positions.push(v);for(const v of branch.colors)colors.push(v);for(const v of branch.strokeCoverage)strokeCoverage.push(v);
+ }
+ if(!pitBranch){
  const last=course.segments.at(-1),width=Math.min(16,(racePavementCrossSection(last,1)?.racingWidthMeters??last.widthMeters)-.4),columns=Math.max(2,Math.ceil(width/.6));
  for(let row=0;row<2;row++)for(let col=0;col<columns;col++){
   const left=-width/2+col*width/columns;
@@ -76,6 +81,7 @@ export function buildRacePaint(course,{filtered=true,venueId=course.venueSource?
   rectangle(center-halfLength,center+halfLength,bankRelative(lateral+halfWidth-.1),bankRelative(lateral+halfWidth),.88);
   rectangle(center-halfLength,center-halfLength+.1,bankRelative(lateral-halfWidth),bankRelative(lateral+halfWidth),.88);
   rectangle(center+halfLength-.1,center+halfLength,bankRelative(lateral-halfWidth),bankRelative(lateral+halfWidth),.88);
+ }
  }
  return {positions:new Float32Array(positions),colors:new Float32Array(colors),strokeCoverage:new Float32Array(strokeCoverage),rectangles};
 }

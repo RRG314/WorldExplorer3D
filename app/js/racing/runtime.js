@@ -27,7 +27,7 @@ import {racingServiceOptions,readRacingCatalog,commitRacingRoute} from './servic
 import {assertRaceCourseInDistrict,reconstructPublishedRace,rebaseRaceReference} from './publication-rules.js';
 import {releaseRoadRaceMotion} from '../physics/road-race-delegate.js';
 const formatTime=ms=>Number.isFinite(ms)?`${Math.floor(ms/60000)}:${((ms%60000)/1000).toFixed(2).padStart(5,'0')}`:'—';
-const messages={race_venue_timing_line_pending:'This circuit is under construction. Racing opens after its timing line and full course are verified. You can continue exploring here.',race_venue_surface_incomplete:'The full circuit surface could not be verified. Return to exploration or try this location again.',race_venue_direction_unavailable:'This circuit’s driving direction could not be verified. Return to exploration.',no_qualified_racing_roads:'No supported racing district is ready here. Continue loading nearby roads or choose another destination.',
+const messages={race_invalid_venue_extent:'The complete venue is not ready yet. Let nearby roads finish loading, then refresh roads.',race_venue_timing_line_pending:'This circuit is under construction. Racing opens after its timing line and full course are verified. You can continue exploring here.',race_venue_surface_incomplete:'The full circuit surface could not be verified. Return to exploration or try this location again.',race_venue_direction_unavailable:'This circuit’s driving direction could not be verified. Return to exploration.',no_qualified_racing_roads:'No supported racing district is ready here. Continue loading nearby roads or choose another destination.',
  no_qualified_race_route:'These roads do not yet form a safe race route. Choose another location or create a route on the map.',race_route_length:'Use a connected route between 200 m and 8 km.',
  race_grid_has_no_clearance:'Start on a longer, wider straight so the grid fits.',race_turn_too_sharp:'That route contains a turn too tight for the starting grid. Choose another approach.',
  disconnected_race_route:'Those junctions are not connected by a qualified driving route.',race_circuit_not_closed:'Add a route back to the start for a circuit.',
@@ -161,7 +161,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   // The captured publication belongs to this load scope; no late world may adopt it.
   const current=()=>scope.isActive()&&session.isCurrent()&&c.worldPublication===publication;
   scope.listen(session.signal,'abort',()=>{scope.dispose('world_changed');if(loadScope===scope){releaseLocationPreview();district=null;status('Location changed. Open Racing again here.');}});
-  busy=true;status('Checking roads…');render();
+  busy=true;delete dialog.dataset.raceQualificationError;status('Checking roads…');render();
   try {
    if(!c.gameStarted||resolveControlState(c).frame!=='surface')throw Error('race_world_changed');
    const venue=c.worldLoadRuntimeState?.venuePack;
@@ -177,7 +177,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    status(derived.events.length?`${venue?.presentationStatus==='under-construction'?'Venue in progress · ':''}${events.length} routes available`:'No suggested routes here. Create a route or change location.');
    // Store the identity on the local scope projection, not the world owner.
    loadPublication=publication;
-  } catch(error){if(current())status(message(error));}
+  } catch(error){if(current()){dialog.dataset.raceQualificationError=String(error?.message||'unknown');status(message(error));}}
   finally {if(loadScope===scope){busy=false;render();if(district)void refreshCatalog();}}
  }
 
@@ -469,7 +469,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   hud.querySelector('[data-race-progress]').textContent=`${player?.rally?`Stage · Split ${player.rally.splits.length}/${controller.course.rally.splits.length}`:`Lap ${player?.progress?.lap||1}/${controller.course.laps}`} · Gate ${Math.min((player?.progress?.nextGate||0)+1,controller.course.gates.length)}/${controller.course.gates.length}${player?.progress?.penaltyMs?` · +${player.progress.penaltyMs/1000}s penalty`:''}`;
   hud.querySelector('[data-race-pace]').textContent=rallyPaceNoteText(player);
   const recovery=hud.querySelector('[data-race-recover]');recovery.hidden=!player?.rally;recovery.disabled=!fresh||!player?.rally?.canRecover;
-  hud.querySelector('[data-race-speed]').textContent=`${Math.round(Math.abs(carSpeedToMph(player?.speed||0)))} MPH · Condition ${Math.round((player?.condition??1)*100)}%${flag==='yellow'||player?.trackZone==='apron'||player?.pit?.active?' · 22 MPH pace · no passing':snapshot.phase==='running'&&player?.draftingReduction>.04?' · Drafting':''}`;
+  hud.querySelector('[data-race-speed]').textContent=`${Math.round(Math.abs(carSpeedToMph(player?.speed||0)))} MPH · Condition ${Math.round((player?.condition??1)*100)}%${player?.pit?.active&&controller?.course?.discipline==='circuit'?' · 60 km/h pit limit':flag==='yellow'||player?.trackZone==='apron'||player?.pit?.active?' · 22 MPH pace · no passing':snapshot.phase==='running'&&player?.draftingReduction>.04?' · Drafting':''}`;
   if(snapshot.phase==='cancelled') {stop(snapshot.reason);c.showToast?.('Race ended. Normal exploration is available.');}
  }
  function stop(reason='racing_closed') {
