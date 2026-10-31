@@ -7,6 +7,7 @@ const json = value => `${JSON.stringify(value, null, 2)}\n`;
 const bundlePath = value => /^app\/js\/bundles\/[A-Za-z0-9_-]+\.js$/.test(value);
 const rootModulePath = value => /^js\/[A-Za-z0-9_./-]+\.js$/.test(value) && !value.split('/').includes('..');
 const sharedContext = 'app/js/shared-context.js';
+const groundRootPath = value => /^location-data\/ground\/[a-f0-9]{16}$/.test(value || '');
 
 export function runtimeGeneration(fingerprint, environment) {
   if (!/^[a-f0-9]{64}$/.test(fingerprint) || !['staging', 'production'].includes(environment)) throw Error('Invalid runtime generation inputs');
@@ -103,6 +104,14 @@ export async function retainRuntimeGenerations({ output, predecessors, environme
       : Object.keys(assets).filter(bundlePath);
     if (new Set(names).size !== names.length || names.some(relative => !retainedPath(relative, generation))) throw Error('Invalid predecessor runtime inventory');
     if (!names.some(bundlePath) || Object.values(build.runtimePackaging?.entries || {}).some(entry => !names.includes(`app/${entry}`))) throw Error('Predecessor runtime entry is missing');
+    const groundRoot=build.groundData?.outputRoot;
+    if(build.groundData){
+      const groundNames=Object.keys(assets).filter(p=>p.startsWith(`${groundRoot}/`));
+      if(!groundRootPath(groundRoot)||groundRoot!==`location-data/ground/${build.groundData.releaseId}`||
+        build.groundData.catalogUrl!==`/${groundRoot}/manifest-catalog.json`||!groundNames.includes(`${groundRoot}/manifest-catalog.json`)||
+        groundNames.length!==build.groundData.fileCount)throw Error('Invalid predecessor ground inventory');
+      names.push(...groundNames);
+    }
     if (!generation) {
       const roots=[sharedContext,...Object.keys(assets).filter(rootModulePath)];
       if(currentGeneration){
@@ -131,7 +140,7 @@ export async function retainRuntimeGenerations({ output, predecessors, environme
       files[relative] = assets[relative];
     }
     if (generation && (!Object.hasOwn(generation.files || {}, `${generation.prefix.slice(1)}/${sharedContext}`) || Object.entries(generation.files).some(([relative, digest]) => files[relative] !== digest))) throw Error('Predecessor root module snapshot is incomplete');
-    retained.push({ buildId: build.buildId, generationId: generation?.id || null, files, ...(legacyRootPaths.length?{legacyRootPaths}:{}) });
+    retained.push({ buildId: build.buildId, generationId: generation?.id || null, files, ...(groundRoot?{groundRoot,groundFileCount:build.groundData.fileCount}:{}), ...(legacyRootPaths.length?{legacyRootPaths}:{}) });
   }
   // Validate every input before writing; a rejected predecessor cannot partially
   // adopt an old generation into the new artifact.
@@ -154,10 +163,13 @@ export function verifyRuntimeGenerations(packaging, assets) {
   for (const predecessor of retained) {
     const previous = predecessor.generationId ? { id: predecessor.generationId } : null;
     const aliases=predecessor.legacyRootPaths||[];
+    const groundRoot=predecessor.groundRoot;
+    if(groundRoot!==undefined&&(!groundRootPath(groundRoot)||Object.keys(predecessor.files||{}).filter(p=>p.startsWith(`${groundRoot}/`)).length!==predecessor.groundFileCount||
+      !Object.hasOwn(predecessor.files||{},`${groundRoot}/manifest-catalog.json`)))throw Error('Invalid retained ground inventory');
     if(!Array.isArray(aliases)||new Set(aliases).size!==aliases.length||aliases.length&&
       (previous||!aliases.includes(sharedContext)||aliases.some(p=>(!rootModulePath(p)&&p!==sharedContext)||!Object.hasOwn(predecessor.files||{},p))))throw Error('Invalid legacy root aliases');
     for (const [relative, digest] of Object.entries(predecessor.files || {})) {
-      if (!retainedPath(relative, previous)&&!aliases.includes(relative)) throw Error('Unexpected retained runtime path');
+      if (!retainedPath(relative, previous)&&!aliases.includes(relative)&&!(groundRoot&&relative.startsWith(`${groundRoot}/`))) throw Error('Unexpected retained runtime path');
       if (allowed.has(relative) && allowed.get(relative) !== digest) throw Error('Conflicting retained runtime digest');
       allowed.set(relative, digest);
       if (bundlePath(relative)) retainedBundles.add(relative);

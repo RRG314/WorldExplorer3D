@@ -36,6 +36,25 @@ async function predecessor(t, {number='1', environment='staging', legacy=false, 
 }
 const retain = (output, predecessors) => retainRuntimeGenerations({output, predecessors, environment:'staging', projectId:'fixture-staging'});
 
+test('retained pages keep the exact immutable ground catalogue and artifacts with their old code',async t=>{
+ const old=await predecessor(t),next=await predecessor(t,{number:'2'}),groundRoot='location-data/ground/'+ 'a'.repeat(16);
+ const resources={[`${groundRoot}/manifest-catalog.json`]:'{"manifests":[{"url":"./site/ground.json"}]}',[`${groundRoot}/site/ground.json`]:'{"native":"retained source pixels"}'};
+ for(const [file,bytes]of Object.entries(resources)){await old.put(file,bytes);old.assets.files[file]=hash(bytes);}
+ old.build.groundData={releaseId:'a'.repeat(16),outputRoot:groundRoot,catalogUrl:`/${groundRoot}/manifest-catalog.json`,fileCount:2};
+ old.build.fileCount=Object.keys(old.assets.files).length;old.build.contentHash=hash(json(old.assets.files));old.build.assetManifestSha256=hash(json(old.assets));
+ old.build.buildId=`1.0+${'1'.repeat(12)}.${old.build.contentHash.slice(0,16)}.staging`;
+ await old.put('asset-manifest.json',json(old.assets));await old.put('build-manifest.json',json(old.build));
+ const compatibility=await retain(next.root,[old.root]);
+ for(const [file,bytes]of Object.entries(resources))assert.equal(await fs.readFile(path.join(next.root,file),'utf8'),bytes);
+ const assets={...next.assets.files,...compatibility[0].files},packaging={generation:next.build.runtimePackaging.generation,compatibility,
+  retainedBundlePaths:Object.keys(compatibility[0].files).filter(p=>p.startsWith('app/js/bundles/')).sort()};
+ assert.doesNotThrow(()=>verifyRuntimeGenerations(packaging,assets));
+ const damaged={...assets,[`${groundRoot}/site/ground.json`]:'0'.repeat(64)};
+ assert.throws(()=>verifyRuntimeGenerations(packaging,damaged),/manifest mismatch/);
+ await old.put(`${groundRoot}/site/ground.json`,'changed pixels');const rejected=await fixture(t);
+ await assert.rejects(retain(rejected.root,[old.root]),/hash mismatch/);assert.deepEqual(await fs.readdir(rejected.root),[]);
+});
+
 test('shared modules and HTML use one generation without changing app links, assets or external SDK URLs', () => {
   const g = runtimeGeneration('a'.repeat(64), 'staging');
   assert.deepEqual(g, runtimeGeneration('a'.repeat(64), 'production'), 'Promotion keeps code URLs identical across isolated origins');
