@@ -39,7 +39,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  // Original game timing on the retained T13 straight, aligned to the visible
  // transverse paint in RLP DOP20. This is not a surveyed official timing marker.
  startLine:Object.freeze({sourceFeatureId:'osm:way:41395670',segment:6,fraction:.725}),
- presentationStatus:'under-construction',edgeBandAuthoring:'mapped-bend-game-dressing-v1',
+ presentationStatus:'ready',edgeBandAuthoring:'mapped-bend-game-dressing-v1',
  // Wider visual relief uses the same native source plus its retained perimeter tiles.
  // Feather inside the outer coverage border; the physical road corridor is unchanged.
  landscapeRefinement:Object.freeze({radiusMeters:350,fullHeightRadiusMeters:150,spacingMeters:32,coverageFadeMeters:70,
@@ -55,7 +55,7 @@ export const RACING_VENUE_SOURCES=Object.freeze([Object.freeze({
  // Original game reference on the retained frontstretch. It is deliberately
  // separate from an official surveyed finish line and leaves source bytes intact.
  startLine:Object.freeze({sourceFeatureId:'osm:way:11371365',segment:0,fraction:.6}),
- raceAdmission:'practice',presentationStatus:'under-construction',layoutLabel:'Tri-oval',terrainEdgePolicy:REVIEWED_PAVEMENT_BOUNDARY_POLICY
+ raceAdmission:'practice',presentationStatus:'ready',layoutLabel:'Tri-oval',terrainEdgePolicy:REVIEWED_PAVEMENT_BOUNDARY_POLICY
 })]);
 export function racingVenueSourceAt(location){
  if(!location||!Number.isFinite(location.lat)||!Number.isFinite(location.lon))return null;

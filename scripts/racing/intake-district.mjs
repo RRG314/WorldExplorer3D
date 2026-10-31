@@ -9,8 +9,9 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {prepareRaceDistrictStorage,readRaceDistrictFacts,raceDistrictChunkPath} from '../../app/js/racing/district-storage.js';
 import {canonicalRaceDistrict} from '../../app/js/racing/district-facts.js';
-import {raceDistrictFingerprint} from '../../app/js/racing/course-library.js';
-import {raceLocationKey} from '../../app/js/racing/publication-rules.js';
+import {raceDistrictFingerprint,raceCourseKey,normalizeRaceRouteReference} from '../../app/js/racing/course-library.js';
+import {raceLocationKey,reconstructPublishedRace} from '../../app/js/racing/publication-rules.js';
+import {racePhysicsVersion} from '../../app/js/racing/record-rules.js';
 
 export async function prepareRacingDistrictIntake(input){
  const storage=await prepareRaceDistrictStorage(input?.facts),facts=storage.facts;
@@ -25,14 +26,22 @@ export async function prepareRacingDistrictIntake(input){
  const id=(await raceDistrictFingerprint(facts)).slice('race-district:'.length),locationKey=await raceLocationKey(facts.locationId),record={status:'approved',...storage.fields,credits,provenance};
  return {id,locationKey,record,chunks:storage.chunks,facts};
 }
-export async function publishPreparedRacingDistrict(db,prepared,reviewedAt){
+export async function publishPreparedRacingDistrict(db,prepared,reviewedAt,{courses=[]}={}){
  // Own a sealed-value snapshot across credential/database waits. A caller
  // cannot change the proposed geometry while the transaction is yielding.
  prepared=structuredClone(prepared);
+ courses=structuredClone(courses);
  const count=prepared.record?.factsManifest?.chunks?.length||0;
  if(prepared.record?.status!=='approved'||!Array.isArray(prepared.chunks)||prepared.chunks.length!==count||prepared.chunks.some((chunk,index)=>chunk.index!==index))throw Error('Invalid prepared district publication.');
  const facts=await readRaceDistrictFacts(prepared.record,index=>Promise.resolve(prepared.chunks[index]?.record));
  if(!facts||await raceDistrictFingerprint(facts)!==`race-district:${prepared.id}`||await raceLocationKey(facts.locationId)!==prepared.locationKey||JSON.stringify(canonicalRaceDistrict(facts))!==JSON.stringify(prepared.facts))throw Error('Prepared district identity conflict.');
+ if(!Array.isArray(courses)||courses.length>4||new Set(courses.map(c=>c.id)).size!==courses.length)throw Error('Invalid prepared platform courses.');
+ for(const {id,record} of courses){
+  const course=await reconstructPublishedRace(record.reference,facts),reference=normalizeRaceRouteReference(record.reference);
+  if(record.ownerUid!==null||record.status!=='approved'||record.districtId!==prepared.id||record.physicsVersion!==racePhysicsVersion(course)||
+   record.curation?.kind!=='reviewed-venue'||record.curation.version!==2||record.curation.revision!==record.revision||
+   record.revision!==await sha256Json({districtId:prepared.id,reference})||id!==await raceCourseKey(course))throw Error('Prepared platform course identity conflict.');
+ }
  const reference=path=>{const split=path.lastIndexOf('/');return db.collection(path.slice(0,split)).doc(path.slice(split+1));};
  return db.runTransaction(async tx=>{
   const ref=db.collection('racingDistricts').doc(prepared.id),old=await tx.get(ref);
@@ -49,12 +58,22 @@ export async function publishPreparedRacingDistrict(db,prepared,reviewedAt){
    if(existing.exists)throw Error('Unexpected orphaned district chunk. Inspect it before publication.');
    children.push({child,record:chunk.record});
   }
+  const courseWrites=[];
+  for(const course of courses){
+   const ref=db.collection('racingCourses').doc(course.id),existing=await tx.get(ref),previous=existing.exists?existing.data():null;
+   if(previous&&(previous.ownerUid!==null||previous.status!=='approved'||previous.revision!==course.record.revision||previous.physicsVersion!==course.record.physicsVersion||
+    JSON.stringify(normalizeRaceRouteReference(previous.reference))!==JSON.stringify(course.record.reference)||
+    previous.curation?.kind!=='reviewed-venue'||previous.curation?.sourceSha256!==course.record.curation.sourceSha256))throw Error('Existing course must be reviewed separately; it will not be overwritten.');
+   if(!previous)courseWrites.push({ref,record:course.record});
+  }
   for(const child of children)tx.create(child.child,child.record);
+  for(const course of courseWrites)tx.create(course.ref,{...course.record,updatedAt:reviewedAt});
   if(!old.exists)tx.create(ref,{...prepared.record,reviewedAt});
   else if(old.data().status!=='approved')tx.update(ref,{status:'approved',credits:prepared.record.credits,reviewedAt});
   tx.set(db.collection('racingLocations').doc(prepared.locationKey),{districtId:prepared.id,locationId:prepared.facts.locationId,updatedAt:reviewedAt});
  });
 }
+async function sha256Json(value){const {createHash}=await import('node:crypto');return createHash('sha256').update(JSON.stringify(value)).digest('hex');}
 async function main(){
  const args=process.argv.slice(2),inputPath=args[args.indexOf('--input')+1];
  if(!args.includes('--input')||!inputPath)throw Error('Usage: node scripts/racing/intake-district.mjs --input /private/reviewed-district.json [--approve --project we3d-staging-20260712]');

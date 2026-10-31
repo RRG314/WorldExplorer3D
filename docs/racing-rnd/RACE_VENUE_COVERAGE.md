@@ -7,20 +7,19 @@ Owner decision, October 28, 2026: **balanced circuits, stock-car ovals and rally
 The owner's October 31 correction supersedes the twelve-pack launch requirement.
 This release contains **Silverstone GP, full Nordschleife T13 and Daytona
 tri-oval**. Complete native private-practice journeys already pass for all three;
-presentation and changed release integration still need final acceptance.
+presentation, moving desktop budgets and changed shared catalogue admission now pass.
+The separate Silverstone pit lane is excluded pending the explicit release-scope
+choice recorded in RELEASE_READINESS.md; do not count it as completed.
 The other nine references below are deferred. Retain their source work without
 enabling unfinished packs or treating their production as a launch blocker.
 
 ## Retained coverage register
 
-The source register is `app/js/racing/venue-catalog.js`. It contains twelve **researched layout references**, four in each group. **Zero are complete playable venue packs.** The existing Monaco district practice run is a qualified 705.99 m city route, not the Monaco Grand Prix circuit. Course names, target lengths and references do not certify geometry or provide a content licence.
+The source register is `app/js/racing/venue-catalog.js`. It contains twelve **researched layout references**, four in each group. Three main courses are playable with retained complete native journeys; their current acceptance and explicit pit limitation are recorded in RELEASE_READINESS.md. The existing Monaco district practice run is a qualified 705.99 m city route, not the Monaco Grand Prix circuit. Course names, target lengths and references do not certify geometry or provide a content licence.
 
-Daytona has since completed native private oval practice with its full reviewed
-pit branch, normal Results and a saved Journal. Main/pit publication, portable
-authority reconstruction and the changed wheel-contact boundary pass. Remaining
-pit dressing, surrounding presentation, final performance and changed shared
-release paths still prevent pack acceptance; preserve the completed gameplay
-evidence rather than repeating that lap for each scenery edit.
+Daytona includes its accepted complete pit branch. Silverstone's main loop and
+Nordschleife T13 retain their completed practice journeys. The following table
+is historical source research; the other nine references are not enabled packs.
 
 | Group | Venue and exact layout | Reference length | Primary factual source |
 |---|---|---:|---|
@@ -46,8 +45,8 @@ Mile conversions are arithmetic using 1609.344 m/mile; quoted circuit distances 
 Additional source/ground intake is recorded in `MAJOR_VENUE_PIPELINE.md`: exact
 Spa GP, Monza GP and Talladega main/pit geometry, plus normalized Talladega
 terrain. These inputs do not add playable packs to this register. Bristol and
-Indianapolis retain explicit source-length discrepancies. Zero packs have
-completed the full acceptance below.
+Indianapolis retain explicit source-length discrepancies. The launch-specific acceptance and remaining Silverstone pit exception are
+recorded in RELEASE_READINESS.md; the general future-pack criteria remain below.
 
 1. A versioned geographic pack with independently reusable rights-cleared source geometry, source identifiers, survey date, length reconciliation, direction, elevation, banking, usable width and vertically separate crossings. No hand-drawn approximate oval standing in for a real tri-oval.
 2. Admission through existing world publication, transport support, collision and session owners. Complete required road/support data must be ready before the race; no forced reload travel or second terrain source that disagrees with ordinary exploration. Preserve nearby mapped buildings, waterways, entrances and real identities.

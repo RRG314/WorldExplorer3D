@@ -5114,14 +5114,14 @@ function prepareVenueRacePath(district, venue) {
 
 // app/js/racing/course-projection.js
 function raceCourseProjection(course, courseId) {
-  if (!course.venueSource) return course;
+  if (!course.venueSource && new TextEncoder().encode(JSON.stringify(course)).byteLength <= 64 * 1024) return course;
   if (!/^road-race-[a-f0-9]{32}$/.test(courseId || "")) throw Error("invalid_race_course_projection");
   return {
     type: "RaceCourseProjection",
     version: 1,
     courseId,
     physicsVersion: racePhysicsVersion(course),
-    venueSource: normalizeRaceVenueSource(course.venueSource),
+    ...course.venueSource ? { venueSource: normalizeRaceVenueSource(course.venueSource) } : {},
     locationId: course.locationId,
     locationLabel: course.locationLabel,
     anchor: { lat: course.anchor.lat, lon: course.anchor.lon },
@@ -5139,7 +5139,7 @@ function raceCourseProjection(course, courseId) {
 var ordered = (value) => Array.isArray(value) ? value.map(ordered) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, ordered(value[key])])) : value;
 function resolveRaceCourseProjection(value, expectedCourse, courseId) {
   if (value?.type !== "RaceCourseProjection") return value;
-  if (!expectedCourse?.venueSource || JSON.stringify(ordered(value)) !== JSON.stringify(ordered(raceCourseProjection(expectedCourse, courseId)))) throw Error("invalid_race_snapshot");
+  if (!expectedCourse || JSON.stringify(ordered(value)) !== JSON.stringify(ordered(raceCourseProjection(expectedCourse, courseId)))) throw Error("invalid_race_snapshot");
   return expectedCourse;
 }
 

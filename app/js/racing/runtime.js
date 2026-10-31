@@ -383,7 +383,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    if(!current())throw Error('race_world_changed');if(!lease?.ok)throw Error(lease?.reason||'race_personal_car_lease_required');
    assertRaceCourseInDistrict(course,district);
    const options=await racingServiceOptions(owner,request.signal),courseId=await raceCourseKey(course);if(!current())throw Error('race_world_changed');
-   const connection=createRaceConnection({...options,...(course.venueSource?{expectedCourse:course}:{}),physicsVersion:racePhysicsVersion(course),uid:owner,join:{roomCode:room.code,worldSeed:room.world.seed,courseId,vehicleId:c.car.personalVehicleId},isCurrent:current,
+   const connection=createRaceConnection({...options,expectedCourse:course,physicsVersion:racePhysicsVersion(course),uid:owner,join:{roomCode:room.code,worldSeed:room.world.seed,courseId,vehicleId:c.car.personalVehicleId},isCurrent:current,
     onError:reason=>{if(current()){if(!online?.snapshot()){stop('race_join_rejected');renderOnline();}else if(['race_reconnect_expired','race_account_changed','race_session_replaced','invalid_race_snapshot'].includes(reason)){stop(reason);c.clearControlInputState?.('race-ended');c.showToast?.(onlineMessage(reason));}status(onlineMessage(reason));}},onConnection:state=>{if(current()){if(state==='reconnecting')status('Reconnecting to the same race…');if(state==='connected')status(`Room ${room.code} · shared timing`);}},
     onSnapshot:(state,serverCourse)=>{if(!current())return;void acceptOnlineSnapshot(state,serverCourse,scope,current,owner).catch(error=>{if(current()){stop('race_start_failed');status(onlineMessage(error.message));renderOnline();}});}
    });
