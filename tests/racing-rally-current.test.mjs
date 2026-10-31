@@ -19,6 +19,9 @@ import {buildVenueRaceCourses} from '../app/js/racing/venue-courses.js';
 import {vrRaceStatus} from '../app/js/vr/race-status.js';
 import {readCommand,createRaceAuthority} from '../services/racing/authority.mjs';
 import {VEHICLE_ROOT_TO_GROUND_METERS} from '../app/js/engine/vehicle-catalog.js?v=6';
+import {vehicleWheelContactLayout} from '../app/js/engine/vehicle-catalog.js?v=6';
+import {projectRacePosition} from '../app/js/racing/course-rules.js';
+import * as THREE from 'three';
 const profile=createRaceVehicleProfile('bmw_m3_e92_race');
 function runSession(course,{engine={createRaceSession},two=false,recovery=false}={}){
  const session=engine.createRaceSession({id:'controlled-stage',course,creatorUid:'driver',createdAtMs:0});
@@ -44,7 +47,7 @@ test('complete source-bound open stages bind conditions, ordered splits, pace no
  assert.deepEqual(raceGridPose(course,0),raceGridPose(course,1),'staggered entrants use the same physical start');
  assert.deepEqual(course.rally.segmentSurfaces,['asphalt-dry','asphalt-dry','gravel-dry','gravel-dry','snow-ice']);
  assert.ok(Object.isFrozen(course.rally));assert.ok(Object.isFrozen(course.rally.splits[0]));
- assert.equal(racePhysicsVersion(course),'earth-rally-2026-10-31.1');
+ assert.equal(racePhysicsVersion(course),'earth-rally-2026-10-31.2');
  assert.equal(raceCompetitiveRecordConfiguration(profile,{course,slot:1,participants:2}).timing,'individual-stage-start-to-finish');
  assert.throws(()=>createRaceCourse(graph,path.slice(1),{...course}),/rally_path_incomplete/);
  assert.throws(()=>createRaceCourse(graph,path,{...course,discipline:'sprint'}),/rally_source_required/);
@@ -85,6 +88,23 @@ test('steady controls launch and land over a supported crest; missing support st
  assert.equal(p.rally.splits.length,2);assert.ok(p.rally.splits[0].elapsedMs<p.rally.splits[1].elapsedMs);
  const car=createRaceVehicleState(raceGridPose(course),profile);car.y+=100;
  assert.throws(()=>stepRaceVehicle(course,car,{throttle:1},1/60,profile),/surface_lost/);
+});
+test('actual render-matrix wheel positions clear takeoff and landing, and flight metrics report the real gap',()=>{
+ const {course}=createRallyStageFixture(),car=createRaceVehicleState(raceGridPose(course),profile),layout=vehicleWheelContactLayout(profile.variant),rotation=new THREE.Matrix4();
+ let airborneFrames=0,maximumGap=0;
+ for(let tick=0;tick<1800;tick++){
+  stepRaceVehicle(course,car,{throttle:1},1/60,profile);
+  rotation.makeRotationFromEuler(new THREE.Euler(car.terrainPitch,car.angle,car.terrainRoll,'YXZ'));const gaps=[];
+  for(const front of [-1,1])for(const side of [-1,1]){
+   const p=new THREE.Vector3(side*layout.halfTrack,0,front*layout.halfWheelbase).applyMatrix4(rotation).add(new THREE.Vector3(car.x,car.y-VEHICLE_ROOT_TO_GROUND_METERS,car.z)),
+    support=projectRacePosition(course,{x:p.x,y:car.raceSupportY,z:p.z},{minimumMeters:Math.max(0,car.raceSupportDistanceMeters-12),maximumMeters:car.raceSupportDistanceMeters+12});
+   assert.ok(support);gaps.push(p.y-support.y);
+  }
+  assert.ok(Math.min(...gaps)>-1e-7,'actual tilted wheels must never penetrate known pavement');
+  assert.ok(Math.abs(car.maximumWheelGap-Math.max(0,...gaps))<1e-7,'telemetry must use the actual pose, not a fitted ground pose');
+  if(car.isAirborne){airborneFrames++;maximumGap=Math.max(maximumGap,...gaps);}
+ }
+ assert.ok(airborneFrames>30);assert.ok(maximumGap*course.metersPerUnit>1);assert.equal(car.isAirborne,false);assert.ok(car.condition<1);
 });
 
 test('a second entrant waits at the same start and uses its own clock, including split and finish times',()=>{

@@ -176,6 +176,9 @@ B3 now has a portable, source-bound rally contract: fixed versioned condition
 classes, complete directed intervals, ordered split planes and pace notes,
 individual staggered starts on the existing session clock, shared crest flight
 and landing damage, bounded penalized recovery, prediction and actor adoption.
+The actual tilted four-wheel footprint owns takeoff contact and first-wheel
+landing; fitted ground attitude alone is insufficient. Current rally class is
+`earth-rally-2026-10-31.2`, with independent render-matrix contact checks.
 Controlled browser/service/Functions replay agrees. A real-model browser fixture
 shows flight, landing, recovery and both staggered finishes. The existing garage
 park transaction retains damage during renewal, reconnect and release. Desktop

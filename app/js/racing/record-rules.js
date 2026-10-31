@@ -11,7 +11,7 @@ export const RACE_PROFILED_PAVEMENT_PHYSICS_VERSION='earth-profiled-pavement-202
 export const RACE_OVAL_PHYSICS_VERSION='earth-oval-2026-10-30.3';
 export const RACE_OVAL_PIT_PHYSICS_VERSION='earth-oval-pit-2026-10-30.1';
 export const RACE_CIRCUIT_PIT_PHYSICS_VERSION='earth-circuit-pit-2026-10-30.1';
-export const RACE_RALLY_PHYSICS_VERSION='earth-rally-2026-10-31.1';
+export const RACE_RALLY_PHYSICS_VERSION='earth-rally-2026-10-31.2';
 export function racePhysicsVersion(course){
  if(course?.discipline==='rally'){
   if(course.rally?.version!==1||!course.venueSource?.stage?.rally||course.pitLane||course.surfaceModel||course.pavementModel)throw Error('invalid_race_surface_model');

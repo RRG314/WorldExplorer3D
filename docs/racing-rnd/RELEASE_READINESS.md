@@ -1,6 +1,6 @@
 # Racing release readiness
 
-Updated October 30, 2026. **Full racing is not release-ready.** No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
+Updated October 31, 2026. **Full racing is not release-ready.** No production deployment or purchase is authorised by this package. Production remains the previously released web build; local racing commits are separate.
 
 ## Implemented and evidenced
 
@@ -17,6 +17,11 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
   preparation now has explicit source-bound access and narrow-width contracts,
   verified through controlled source/transport/publication checks. No real rally
   pack is registered; native support and clearance acceptance remain open.
+  Current rally class `earth-rally-2026-10-31.2` measures the actual tilted
+  chassis at all four wheels, keeps rear-wheel contact clear during takeoff,
+  and lands on first supported wheel contact. Independent render-matrix checks
+  and fresh real-model flight/landing captures pass. Fitted ground-plane gaps
+  alone cannot certify airborne contact.
 
 - Frozen `f37ddb8e` completes the native Daytona oval lap and full 40-checkpoint
   pit branch through the normal game session, Results and saved Journal, using
@@ -205,7 +210,7 @@ Updated October 30, 2026. **Full racing is not release-ready.** No production de
 
 ## Remaining release blockers
 
-1. Complete the balanced major-venue packs and appropriate circuit/oval/rally rules and presentation. Twelve researched references remain zero playable major packs. The city-road adapter cannot certify Nordschleife, high-banked ovals or jumping rally stages by raising limits.
+1. Complete the balanced major-venue packs and their presentation. Three venues have accepted native private-practice journeys; zero of the twelve packs have full acceptance. Nine venue integrations and all-pack presentation remain open. Shared circuit/oval/rally rules do not certify geographic support or a finished venue by themselves.
 2. Complete the final coordinated build and its affected distribution checks after the shared-vehicle publication correction. Keep the existing garage, ordinary travel, VR, creator, career and trusted-result evidence; do not restart historical release sweeps.
 3. Major-venue performance remains to be measured with those actual packs. The current city/shared-race desktop budget passed in one live 60-second window: 40.45 FPS, p95 34.1 ms, p99 50.0 ms, worst 100.1 ms, no frame over 250 ms. Earlier failures remain retained; this is not physical-phone or unbuilt-venue acceptance.
 

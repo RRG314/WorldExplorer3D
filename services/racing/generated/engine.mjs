@@ -3723,6 +3723,25 @@ function resolveVehicleRoadContactPose(options = {}) {
     authority: "published-road-four-wheel-contact"
   });
 }
+function measureVehicleRoadWheelClearance({ x, y, z, yaw, pitch, roll, variant, sampleSurface }) {
+  if (![x, y, z, yaw, pitch, roll].every(Number.isFinite) || typeof sampleSurface !== "function") throw Error("invalid_vehicle_wheel_pose");
+  const layout = vehicleWheelContactLayout(variant), forwardX = Math.sin(yaw), forwardZ = Math.cos(yaw), rightX = Math.cos(yaw), rightZ = -Math.sin(yaw);
+  let minimumGap = Infinity, maximumGap = -Infinity, sampledWheelContacts = 0;
+  for (const contact of WHEEL_CONTACTS) {
+    const localX = contact.side * layout.halfTrack, localZ = contact.front * layout.halfWheelbase, lateral = Math.cos(roll) * localX, longitudinal = Math.sin(pitch) * Math.sin(roll) * localX + Math.cos(pitch) * localZ, px = x + rightX * lateral + forwardX * longitudinal, pz = z + rightZ * lateral + forwardZ * longitudinal, py = y + Math.cos(pitch) * Math.sin(roll) * localX - Math.sin(pitch) * localZ, support = sampleSurface(px, pz, contact);
+    if (support == null || !Number.isFinite(support)) continue;
+    const gap = py - support;
+    sampledWheelContacts++;
+    minimumGap = Math.min(minimumGap, gap);
+    maximumGap = Math.max(maximumGap, gap);
+  }
+  return Object.freeze({
+    sampledWheelContacts,
+    minimumGap: sampledWheelContacts ? minimumGap : null,
+    maximumWheelPenetration: sampledWheelContacts ? Math.max(0, -minimumGap) : null,
+    maximumWheelGap: sampledWheelContacts ? Math.max(0, maximumGap) : null
+  });
+}
 
 // app/js/transport/vehicle-garage-rules.js
 var prices = {
@@ -4088,6 +4107,7 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
     car.barrierContacts++;
   }
   const segment = course.segments[support.index];
+  const sampleSurface = (px, pz) => projectRacePosition(course, { x: px, z: pz, y: support.y }, course.fullRoadContactProjection ? { pavementPaddingMeters: 0 } : { minimumMeters: Math.max(0, segment.startMeters - 12), maximumMeters: Math.min(course.lengthMeters, segment.startMeters + segment.lengthMeters + 12) })?.y;
   const contact = resolveVehicleRoadContactPose({
     ...course.surfaceModel === BANKED_ROAD_MODEL ? { maximumRoll: BANKED_ROAD_MAXIMUM_ROLL } : {},
     x,
@@ -4097,12 +4117,13 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
     variant: profile.variant,
     pitch: car.terrainPitch || 0,
     roll: car.terrainRoll || 0,
-    sampleSurface: (px, pz) => projectRacePosition(course, { x: px, z: pz, y: support.y }, course.fullRoadContactProjection ? { pavementPaddingMeters: 0 } : { minimumMeters: Math.max(0, segment.startMeters - 12), maximumMeters: Math.min(course.lengthMeters, segment.startMeters + segment.lengthMeters + 12) })?.y
+    sampleSurface
   });
   car.x = x;
   car.z = z;
   if (rally) {
-    const vertical = updateRoadVehicleVerticalState({
+    if (contact.sampledWheelContacts !== 4) throw Error("race_surface_lost");
+    const verticalInput = {
       bodyY: car.y,
       groundedBodyY: contact.y + VEHICLE_ROOT_TO_GROUND_METERS,
       bodyOffset: VEHICLE_ROOT_TO_GROUND_METERS,
@@ -4117,7 +4138,29 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
       metersPerWorldUnit: course.metersPerUnit,
       suspensionResistance: profile.upgrades.suspensionResistance,
       dt
+    };
+    let vertical = updateRoadVehicleVerticalState(verticalInput);
+    const clearanceAt = (state) => measureVehicleRoadWheelClearance({
+      x,
+      z,
+      y: state.y - VEHICLE_ROOT_TO_GROUND_METERS,
+      yaw: car.angle,
+      pitch: state.pitch,
+      roll: state.isAirborne ? car.terrainRoll || 0 : contact.roll,
+      variant: profile.variant,
+      sampleSurface
     });
+    let clearance = clearanceAt(vertical);
+    if (clearance.sampledWheelContacts !== 4) throw Error("race_surface_lost");
+    if (vertical.isAirborne && clearance.maximumWheelPenetration > 1e-7 && vertical.airborneTime < 0.1) {
+      vertical = { ...vertical, y: vertical.y + clearance.maximumWheelPenetration };
+      clearance = clearanceAt(vertical);
+    } else if (vertical.isAirborne && clearance.maximumWheelPenetration > 1e-7) {
+      vertical = updateRoadVehicleVerticalState({ ...verticalInput, supportY: vertical.y - VEHICLE_ROOT_TO_GROUND_METERS + clearance.maximumWheelPenetration });
+      if (!vertical.landed) throw Error("race_landing_contact_unresolved");
+      vertical = { ...vertical, y: contact.y + VEHICLE_ROOT_TO_GROUND_METERS };
+      clearance = clearanceAt(vertical);
+    }
     car.y = vertical.y;
     car.vy = vertical.verticalVelocity;
     car.isAirborne = vertical.isAirborne;
@@ -4127,6 +4170,8 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
     car.raceSupportDistanceMeters = support.distanceMeters;
     car.terrainPitch = vertical.pitch;
     car.terrainRoll = vertical.isAirborne ? car.terrainRoll : contact.roll;
+    car.maximumWheelPenetration = clearance.maximumWheelPenetration;
+    car.maximumWheelGap = clearance.maximumWheelGap;
     if (vertical.landed) {
       car.landingImpactMps = vertical.landingImpactMps;
       car.landingDamage += applyTransportDamage(car, vertical.landingDamageForce).delta;
@@ -4135,9 +4180,9 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
     car.y = contact.y + VEHICLE_ROOT_TO_GROUND_METERS;
     car.terrainPitch = contact.pitch;
     car.terrainRoll = contact.roll;
+    car.maximumWheelPenetration = contact.maximumWheelPenetration;
+    car.maximumWheelGap = contact.maximumWheelGap;
   }
-  car.maximumWheelPenetration = contact.maximumWheelPenetration;
-  car.maximumWheelGap = contact.maximumWheelGap;
   return driving;
 }
 function raceVehicleSpeedMetersPerSecond(car) {
@@ -4946,7 +4991,7 @@ var RACE_PROFILED_PAVEMENT_PHYSICS_VERSION = "earth-profiled-pavement-2026-10-30
 var RACE_OVAL_PHYSICS_VERSION = "earth-oval-2026-10-30.3";
 var RACE_OVAL_PIT_PHYSICS_VERSION = "earth-oval-pit-2026-10-30.1";
 var RACE_CIRCUIT_PIT_PHYSICS_VERSION = "earth-circuit-pit-2026-10-30.1";
-var RACE_RALLY_PHYSICS_VERSION = "earth-rally-2026-10-31.1";
+var RACE_RALLY_PHYSICS_VERSION = "earth-rally-2026-10-31.2";
 function racePhysicsVersion(course) {
   if (course?.discipline === "rally") {
     if (course.rally?.version !== 1 || !course.venueSource?.stage?.rally || course.pitLane || course.surfaceModel || course.pavementModel) throw Error("invalid_race_surface_model");

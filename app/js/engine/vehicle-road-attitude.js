@@ -135,4 +135,21 @@ function resolveVehicleRoadContactPose(options = {}) {
   });
 }
 
-export { directedSurfacePitch, resolveVehicleRoadContactPose };
+// Read the ACTUAL chassis attitude, including flight, rather than the fitted
+// ground attitude. This is a contact measurement, never another pose writer.
+function measureVehicleRoadWheelClearance({x,y,z,yaw,pitch,roll,variant,sampleSurface}){
+  if(![x,y,z,yaw,pitch,roll].every(Number.isFinite)||typeof sampleSurface!=='function')throw Error('invalid_vehicle_wheel_pose');
+  const layout=vehicleWheelContactLayout(variant),forwardX=Math.sin(yaw),forwardZ=Math.cos(yaw),rightX=Math.cos(yaw),rightZ=-Math.sin(yaw);
+  let minimumGap=Infinity,maximumGap=-Infinity,sampledWheelContacts=0;
+  for(const contact of WHEEL_CONTACTS){
+    const localX=contact.side*layout.halfTrack,localZ=contact.front*layout.halfWheelbase,
+      lateral=Math.cos(roll)*localX,longitudinal=Math.sin(pitch)*Math.sin(roll)*localX+Math.cos(pitch)*localZ,
+      px=x+rightX*lateral+forwardX*longitudinal,pz=z+rightZ*lateral+forwardZ*longitudinal,
+      py=y+Math.cos(pitch)*Math.sin(roll)*localX-Math.sin(pitch)*localZ,support=sampleSurface(px,pz,contact);
+    if(support==null||!Number.isFinite(support))continue;
+    const gap=py-support;sampledWheelContacts++;minimumGap=Math.min(minimumGap,gap);maximumGap=Math.max(maximumGap,gap);
+  }
+  return Object.freeze({sampledWheelContacts,minimumGap:sampledWheelContacts?minimumGap:null,
+    maximumWheelPenetration:sampledWheelContacts?Math.max(0,-minimumGap):null,maximumWheelGap:sampledWheelContacts?Math.max(0,maximumGap):null});
+}
+export { directedSurfacePitch, resolveVehicleRoadContactPose, measureVehicleRoadWheelClearance };

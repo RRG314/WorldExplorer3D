@@ -3,7 +3,7 @@ import {prepareVehicleDriveFrame,stepVehiclePlanarDrive,integrateVehiclePlanarPo
 import {ROAD_CAR_CONFIG}from'../physics/vehicle-config.js?v=1';
 import {carSpeedToMph,mphToCarSpeed,carSpeedToWorldUnitsPerSecond}from'../physics/vehicle-speed-units.js';
 import {VEHICLE_CATALOG,vehicleHandlingProfile,vehicleConditionDynamics,VEHICLE_ROOT_TO_GROUND_METERS}from'../engine/vehicle-catalog.js?v=6';
-import {resolveVehicleRoadContactPose}from'../engine/vehicle-road-attitude.js?v=3';
+import {resolveVehicleRoadContactPose,measureVehicleRoadWheelClearance}from'../engine/vehicle-road-attitude.js?v=3';
 import {vehicleUpgradeDynamics}from'../transport/vehicle-upgrades.js?v=1';
 import {personalVehicleById,normalizeVehicleGarage,prepareVehicleGarageChange}from'../transport/vehicle-garage-rules.js';
 import {projectRacePosition}from'./course-rules.js';
@@ -61,21 +61,40 @@ export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}
   car.speed*=.35;car.vFwd*=.35;car.vLat*=.2;car.barrierContacts++;
  }
  const segment=course.segments[support.index];
+ const sampleSurface=(px,pz)=>projectRacePosition(course,{x:px,z:pz,y:support.y},course.fullRoadContactProjection?{pavementPaddingMeters:0}:{minimumMeters:Math.max(0,segment.startMeters-12),maximumMeters:Math.min(course.lengthMeters,segment.startMeters+segment.lengthMeters+12)})?.y;
  const contact=resolveVehicleRoadContactPose({...(course.surfaceModel===BANKED_ROAD_MODEL?{maximumRoll:BANKED_ROAD_MAXIMUM_ROLL}:{}),x,z,y:support.y,yaw:car.angle,variant:profile.variant,
-  pitch:car.terrainPitch||0,roll:car.terrainRoll||0,
-  sampleSurface:(px,pz)=>projectRacePosition(course,{x:px,z:pz,y:support.y},course.fullRoadContactProjection?{pavementPaddingMeters:0}:{minimumMeters:Math.max(0,segment.startMeters-12),maximumMeters:Math.min(course.lengthMeters,segment.startMeters+segment.lengthMeters+12)})?.y});
+  pitch:car.terrainPitch||0,roll:car.terrainRoll||0,sampleSurface});
  car.x=x;car.z=z;
  if(rally){
-  const vertical=updateRoadVehicleVerticalState({bodyY:car.y,groundedBodyY:contact.y+VEHICLE_ROOT_TO_GROUND_METERS,bodyOffset:VEHICLE_ROOT_TO_GROUND_METERS,
+  if(contact.sampledWheelContacts!==4)throw Error('race_surface_lost');
+  const verticalInput={bodyY:car.y,groundedBodyY:contact.y+VEHICLE_ROOT_TO_GROUND_METERS,bodyOffset:VEHICLE_ROOT_TO_GROUND_METERS,
    supportY:contact.y,previousSupportY:car.raceSupportY,previousPitch:car.raceSupportPitch,surfacePitch:contact.pitch,
    verticalVelocity:car.vy,isAirborne:car.isAirborne,airborneTime:car._terrainAirTimer,
-   horizontalSpeedMps:Math.hypot(car.vx,car.vz)*course.metersPerUnit,metersPerWorldUnit:course.metersPerUnit,suspensionResistance:profile.upgrades.suspensionResistance,dt});
+   horizontalSpeedMps:Math.hypot(car.vx,car.vz)*course.metersPerUnit,metersPerWorldUnit:course.metersPerUnit,suspensionResistance:profile.upgrades.suspensionResistance,dt};
+  let vertical=updateRoadVehicleVerticalState(verticalInput);
+  const clearanceAt=state=>measureVehicleRoadWheelClearance({x,z,y:state.y-VEHICLE_ROOT_TO_GROUND_METERS,yaw:car.angle,pitch:state.pitch,
+   roll:state.isAirborne?car.terrainRoll||0:contact.roll,variant:profile.variant,sampleSurface});
+  let clearance=clearanceAt(vertical);if(clearance.sampledWheelContacts!==4)throw Error('race_surface_lost');
+  if(vertical.isAirborne&&clearance.maximumWheelPenetration>1e-7&&vertical.airborneTime<.1){
+   // During the existing short takeoff window a rear wheel can still meet
+   // the crest. Enforce that known contact while preserving launch velocity;
+   // the ground plane's fitted attitude cannot describe the tilted body.
+   vertical={...vertical,y:vertical.y+clearance.maximumWheelPenetration};clearance=clearanceAt(vertical);
+  }else if(vertical.isAirborne&&clearance.maximumWheelPenetration>1e-7){
+   // First wheel contact owns landing, even when the tilted airborne centre is
+   // still above the fitted road plane. Evaluate the SAME pure vertical step
+   // against that contact; never integrate time/gravity or write a pose twice.
+   vertical=updateRoadVehicleVerticalState({...verticalInput,supportY:vertical.y-VEHICLE_ROOT_TO_GROUND_METERS+clearance.maximumWheelPenetration});
+   if(!vertical.landed)throw Error('race_landing_contact_unresolved');
+   vertical={...vertical,y:contact.y+VEHICLE_ROOT_TO_GROUND_METERS};clearance=clearanceAt(vertical);
+  }
   car.y=vertical.y;car.vy=vertical.verticalVelocity;car.isAirborne=vertical.isAirborne;car._terrainAirTimer=vertical.airborneTime;
   car.raceSupportY=contact.y;car.raceSupportPitch=contact.pitch;car.raceSupportDistanceMeters=support.distanceMeters;
   car.terrainPitch=vertical.pitch;car.terrainRoll=vertical.isAirborne?car.terrainRoll:contact.roll;
+  car.maximumWheelPenetration=clearance.maximumWheelPenetration;car.maximumWheelGap=clearance.maximumWheelGap;
   if(vertical.landed){car.landingImpactMps=vertical.landingImpactMps;car.landingDamage+=applyTransportDamage(car,vertical.landingDamageForce).delta;}
- }else{car.y=contact.y+VEHICLE_ROOT_TO_GROUND_METERS;car.terrainPitch=contact.pitch;car.terrainRoll=contact.roll;}
- car.maximumWheelPenetration=contact.maximumWheelPenetration;car.maximumWheelGap=contact.maximumWheelGap;
+ }else{car.y=contact.y+VEHICLE_ROOT_TO_GROUND_METERS;car.terrainPitch=contact.pitch;car.terrainRoll=contact.roll;
+  car.maximumWheelPenetration=contact.maximumWheelPenetration;car.maximumWheelGap=contact.maximumWheelGap;}
  return driving;
 }
 export function raceVehicleSpeedMetersPerSecond(car){return carSpeedToMph(car.speed)*.44704;}
