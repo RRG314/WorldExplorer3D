@@ -7,10 +7,10 @@ export function raceCourseDisplayName(course) {
 export function raceDisciplineLabel(discipline) {
  return ({sprint:'Sprint',circuit:'Circuit','time-trial':'Time trial',oval:'Oval',rally:'Rally stage'})[discipline]||'Road race';
 }
-export function createRaceRouteMap({roads=[],buildings=[],course,locationLabel='',creatorSegments=[],creatorPoints=[],player,onPoint}={}) {
+export function createRaceRouteMap({roads=[],buildings=[],course,locationLabel='',creatorSegments=[],creatorPoints=[],player,onPoint,initialView}={}) {
  const points=[...roads.flatMap(r=>[r.a,r.b]),...creatorPoints,...(course?.points||[])];if(!points.length)points.push({x:(player?.x||0)-150,z:(player?.z||0)-150},{x:(player?.x||0)+150,z:(player?.z||0)+150});
  const padding=48,minX=Math.min(...points.map(p=>p.x))-padding,minZ=Math.min(...points.map(p=>p.z))-padding,width=Math.max(...points.map(p=>p.x))-minX+padding,height=Math.max(...points.map(p=>p.z))-minZ+padding;
- const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');let view={x:minX,z:minZ,w:width,h:height};
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');let view=initialView?{...initialView}:{x:minX,z:minZ,w:width,h:height};svg.getMapView=()=>({...view});
  const applyView=()=>svg.setAttribute('viewBox',`${view.x} ${view.z} ${view.w} ${view.h}`);applyView();svg.setAttribute('role','img');svg.setAttribute('tabindex','0');svg.style.touchAction='none';
  svg.setAttribute('aria-label',`${locationLabel} overhead track map. Roads, buildings, start and finish are marked. Arrow keys pan, plus and minus zoom, Enter adds the centre.`);
  const path=(pts,color,lineWidth)=>{const p=document.createElementNS(ns,'polyline');p.setAttribute('points',pts.map(p=>`${p.x},${p.z}`).join(' '));p.setAttribute('fill','none');p.setAttribute('stroke',color);p.setAttribute('stroke-width',lineWidth);p.setAttribute('stroke-linecap','round');p.setAttribute('stroke-linejoin','round');p.setAttribute('vector-effect','non-scaling-stroke');svg.append(p);};

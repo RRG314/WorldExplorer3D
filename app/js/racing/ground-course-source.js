@@ -23,10 +23,10 @@ export async function collectGroundRaceDistrict(context,raw,{current=()=>true,yi
   for(let j=0;j<=count;j++){
    const t=j/count,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,y=sample(x,z),leftY=sample(x-dz*1.2/unit,z+dx*1.2/unit),rightY=sample(x+dz*1.2/unit,z-dx*1.2/unit);
    if(Math.max(Math.abs(leftY-y),Math.abs(rightY-y))*unit/1.2>.15)throw Error('race_ground_grade');
-   for(let offset=-draft.widthMeters/2;offset<=draft.widthMeters/2+.01;offset+=1){const actual=sample(x+dz*offset/unit,z-dx*offset/unit),expected=y+(rightY-leftY)*offset/2.4;
-    if(Math.abs(actual-expected)*unit>.035)throw Error('race_ground_rough');}
+   const offsets=[...new Set([-draft.widthMeters/2,-1.2,0,1.2,draft.widthMeters/2,...Array.from({length:draft.widthMeters+1},(_,i)=>i-draft.widthMeters/2)])].sort((a,b)=>a-b),lateralSamples=offsets.map(offset=>({offsetMeters:offset,y:sample(x+dz*offset/unit,z-dx*offset/unit)}));
+   for(let k=1;k<lateralSamples.length;k++){const a=lateralSamples[k-1],b=lateralSamples[k];if(Math.abs(b.y-a.y)*unit/(b.offsetMeters-a.offsetMeters)>.15)throw Error('race_ground_grade');}
    if(heightSamples.length&&Math.abs(y-heightSamples.at(-1).y)*unit/(length/count)>.15)throw Error('race_ground_grade');
-   heightSamples.push({t,y,leftY,rightY});
+   heightSamples.push({t,y,leftY,rightY,lateralSamples});
   }
   roads.push({sourceId:'authored-ground:'+i,sourceFeatureId:'authored-ground',surfaceKind:'ground',label:'Marked terrain course',a:{...a,y:heightSamples[0].y,connectionLayer:'authored-ground'},b:{...b,y:heightSamples.at(-1).y,connectionLayer:'authored-ground'},widthMeters:draft.widthMeters,driveable:true,supported:true,structure:'surface',direction:'forward',heightSamples,heightSampleSpanMeters:1.2});
   if(i%8===0)await yieldWork();

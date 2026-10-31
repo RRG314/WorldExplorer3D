@@ -1365,7 +1365,7 @@ function station(segment, t) {
   return { a, b, u };
 }
 function racePavementLateralOffsets(segment, t) {
-  if (segment.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL) return null;
+  if (segment.pavementModel !== PROFILED_ROAD_PAVEMENT_MODEL && segment.surfaceKind !== "ground") return null;
   const { a, b, u } = station(segment, t);
   return a.lateralSamples.map((p, i) => p.offsetMeters + (b.lateralSamples[i].offsetMeters - p.offsetMeters) * u);
 }
@@ -1727,9 +1727,9 @@ function lateralPatchHeight(lower, upper, u, offset) {
   const v = (offset - b.offsetMeters - (c.offsetMeters - b.offsetMeters) * u) / highWidth;
   return b.y * (1 - u) + c.y * (u - v) + d.y * v;
 }
-function validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, maximumCrossfall = BANKED_ROAD_MAXIMUM_CROSSFALL, maximumPlaneGradient = Infinity, profiled = false) {
+function validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, maximumCrossfall = BANKED_ROAD_MAXIMUM_CROSSFALL, maximumPlaneGradient = Infinity, profiled = false, ground = false) {
   if (!heights.some((s) => s.lateralSamples !== void 0)) return true;
-  if (model !== BANKED_ROAD_MODEL || width > 30) return false;
+  if (model !== BANKED_ROAD_MODEL && !ground || width > 30) return false;
   let previous = null;
   for (const station2 of heights) {
     const points = station2.lateralSamples;
@@ -1751,7 +1751,8 @@ function validLateralHeights(heights, width, metersPerUnit, span, length, maximu
   }
   return true;
 }
-function validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, edgeBandModel, pavementModel) {
+function validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, edgeBandModel, pavementModel, surfaceKind) {
+  if (surfaceKind === "ground") return !model && !edgeBandModel && !pavementModel && validLateralHeights(heights, width, metersPerUnit, span, length, 0.15, void 0, 0.15, 0.22, false, true);
   const profiled = pavementModel === PROFILED_ROAD_PAVEMENT_MODEL;
   const authored = edgeBandModel === AUTHORED_ROAD_EDGE_MODEL;
   if (!authored) return !heights.some((s) => Array.isArray(s.lateralSamples) && s.lateralSamples.some((p) => p?.baseY !== void 0)) && validLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, model, void 0, void 0, profiled);
@@ -1817,7 +1818,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth, maximumGra
       if (heights && (!Array.isArray(heights) || heights.length < 2 || heights.length > 250 || heights.some((s, i) => !Number.isFinite(s.t) || !Number.isFinite(s.y) || s.t < 0 || s.t > 1 || i > 0 && s.t <= heights[i - 1].t) || heights[0].t !== 0 || heights.at(-1).t !== 1)) throw Error("invalid_race_road_heights");
       if (heights) {
         const span = Number(road.heightSampleSpanMeters ?? 1.2);
-        if (!validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, road.surfaceModel, road.edgeBandModel, road.pavementModel) || !(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > (road.surfaceModel === BANKED_ROAD_MODEL ? BANKED_ROAD_MAXIMUM_CROSSFALL : 0.15)))) throw Error("invalid_race_road_heights");
+        if (!validRoadLateralHeights(heights, width, metersPerUnit, span, length, maximumGrade, road.surfaceModel, road.edgeBandModel, road.pavementModel, road.surfaceKind) || !(span >= 0.2 && span <= 4) || Math.abs(heights[0].y - road.a.y) > 1e-3 || Math.abs(heights.at(-1).y - road.b.y) > 1e-3 || heights.some((s, i) => i > 0 && Math.abs(s.y - heights[i - 1].y) * metersPerUnit / ((s.t - heights[i - 1].t) * length) > maximumGrade || (s.leftY !== void 0 || s.rightY !== void 0) && (!Number.isFinite(s.leftY) || !Number.isFinite(s.rightY) || Math.max(Math.abs(s.leftY - s.y), Math.abs(s.rightY - s.y)) * metersPerUnit / span > (road.surfaceModel === BANKED_ROAD_MODEL ? BANKED_ROAD_MAXIMUM_CROSSFALL : 0.15)))) throw Error("invalid_race_road_heights");
       }
       const id = `${String(road.sourceId).slice(0, 180)}:${reverse ? "reverse" : "forward"}`, edge = {
         id,
@@ -5452,7 +5453,7 @@ function assertRaceCourseInDistrict(course, localFacts) {
     if (a.pavementModel !== b.pavementModel || a.structure !== b.structure || a.widthMeters > b.widthMeters + 3e-3 || a.clearanceMeters > b.clearanceMeters + 3e-3 || !byId.has(course.sourcePath[Math.min(i, course.sourcePath.length - 1)])) throw Error("race_roads_changed_requalify_route");
     for (const key of ["a", "b"]) if (Math.hypot(a[key].x - b[key].x, a[key].z - b[key].z) * course.metersPerUnit > 0.01) throw Error("race_roads_changed_requalify_route");
     const steps = Math.ceil(a.lengthMeters / 4);
-    if (a.pavementModel) {
+    if (a.pavementModel || a.surfaceKind === "ground") {
       const stations = new Set(Array.from({ length: steps + 1 }, (_, j) => j / steps));
       for (const segment of [a, b]) {
         const range = segment.heightSampleRange || { start: 0, end: 1 };
@@ -5463,7 +5464,7 @@ function assertRaceCourseInDistrict(course, localFacts) {
       }
       for (const t of stations) {
         const left = racePavementCrossSection(a, t), right = racePavementCrossSection(b, t);
-        if (["minimumMeters", "maximumMeters", "racingOffsetMeters", "racingWidthMeters"].some((k) => Math.abs(left[k] - right[k]) > 3e-3)) throw Error("race_roads_changed_requalify_route");
+        if (a.pavementModel && ["minimumMeters", "maximumMeters", "racingOffsetMeters", "racingWidthMeters"].some((k) => Math.abs(left[k] - right[k]) > 3e-3)) throw Error("race_roads_changed_requalify_route");
         for (const offset of [...racePavementLateralOffsets(a, t), ...racePavementLateralOffsets(b, t)]) if (Math.abs(sampleRaceSegmentY(a, t, offset) - sampleRaceSegmentY(b, t, offset)) * course.metersPerUnit > 0.01) throw Error("race_roads_changed_requalify_route");
       }
     }

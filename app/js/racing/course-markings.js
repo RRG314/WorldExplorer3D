@@ -1,3 +1,4 @@
+import {raceEdgeInsideAnotherSpan} from './course-boundary.js';
 import {racePavementCrossSection,racePavementLateralOffsets} from './pavement-cross-section.js';
 import {sampleRaceSegmentY,raceSegmentAtDistance} from './course-rules.js';
 

@@ -122,7 +122,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   el('[data-race-record]').onclick=()=>startRecording();
   el('[data-race-preview-draft]').onclick=()=>void previewDraft();
   for(const button of dialog.querySelectorAll('[data-race-map-zoom]'))button.onclick=()=>el('[data-race-map] svg')?.zoomBy(Number(button.dataset.raceMapZoom));
-  el('[data-race-map-reset]').onclick=()=>map();
+  el('[data-race-map-reset]').onclick=()=>map(undefined,true);
   el('[data-race-room-share]').onclick=()=>void shareWithRoom();
   el('[data-race-test]').onclick=async()=>{const course=await previewDraft();if(course)void begin(course);};
   el('[data-race-save]').onclick=()=>void saveRoute();
@@ -278,11 +278,11 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    onUnavailable:()=>{if(c.worldPublication===publication){el('[data-race-image-empty]').textContent='Location view unavailable. Use the route map.';showPreview('map');}}
   });
  }
- function map(course=customCourse||events[selected]) {
-  const host=el('[data-race-map]');host.replaceChildren();if(!graph)return;
+ function map(course=customCourse||events[selected],reset=false) {
+  const host=el('[data-race-map]'),initialView=reset?null:host.querySelector('svg')?.getMapView?.();host.replaceChildren();if(!graph)return;
   let creatorSegments=creatorPath.map(id=>{const e=graph.edges.find(edge=>edge.id===id);return [graph.nodes[e.from],graph.nodes[e.to]];});
   if(creatorMode==='ground'&&groundAnchors.length>1)try{const pts=cleanGroundRaceLayout(groundDraft(),district.metersPerUnit);creatorSegments=pts.slice(1).map((p,i)=>[pts[i],p]);}catch{creatorSegments=groundAnchors.slice(1).map((p,i)=>[groundAnchors[i],p]);}
-  const svg=createRaceRouteMap({roads:district.roads,buildings:c.buildings,course,locationLabel:district.locationLabel,creatorSegments,creatorPoints:creatorMode==='ground'?groundAnchors:creatorNodes.map(id=>graph.nodes[id]),player:c.car,
+  const svg=createRaceRouteMap({roads:district.roads,buildings:c.buildings,course,locationLabel:district.locationLabel,creatorSegments,initialView,creatorPoints:creatorMode==='ground'?groundAnchors:creatorNodes.map(id=>graph.nodes[id]),player:c.car,
    onPoint:at=>{if(!el('[data-race-creator]').open||busy)return;if(creatorMode==='ground'){if(groundAnchors.length>=80){status('Use at most 80 anchors.');return;}groundAnchors.push({x:at.x,z:at.y});rebuildCreator();return;}
     const node=graph.nodes.reduce((best,n)=>!best||Math.hypot(n.x-at.x,n.z-at.y)<Math.hypot(best.x-at.x,best.z-at.y)?n:best,null);
     if(!node||Math.hypot(node.x-at.x,node.z-at.y)*district.metersPerUnit>35){status('Choose a highlighted road junction, or switch to Open ground.');return;}addJunction(node.id);}});if(svg)host.append(svg);
@@ -369,7 +369,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
  async function begin(course) {
   if(getCurrentRoom())return shareWithRoom(course);
   if(busy||!course)return;if(lastResult&&!resultSaved){el('[data-race-save-state]').textContent='Save your previous result before starting another run.';el('[data-race-retry-save]').hidden=false;return;}busy=true;status('Preparing your car and rivals…');
-  stop('race_replaced');const scope=createLifecycleScope('racing-run'),session=captureEnvironmentSession(),request=new AbortController(),publication=c.worldPublication;
+  delete dialog.dataset.raceStartError;stop('race_replaced');const scope=createLifecycleScope('racing-run'),session=captureEnvironmentSession(),request=new AbortController(),publication=c.worldPublication;
   raceScope=scope;scope.defer(()=>request.abort(),'preparation');scope.listen(session.signal,'abort',()=>stop('world_changed'));
   const ownerUid=getCurrentUser()?.uid||'',uid=ownerUid||'practice-player',current=()=>scope.isActive()&&session.isCurrent()&&publication===c.worldPublication&&(getCurrentUser()?.uid||'')===ownerUid;
   try {
@@ -393,7 +393,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    scope.defer(()=>{run.stop('race_scope_closed');if(c.roadRaceController===run)c.roadRaceController=null;},'road-controller');
    adoptRun(run,prepared,scope,current);
    update(0);
-  }catch(error){if(raceScope===scope){stop('race_start_failed');status(error.message==='race_live_gps_active'?'Stop Live GPS before racing.':error.message==='practice_leave_room_first'?'Leave the shared exploration room before starting private practice.':error.message==='stop_before_racing'?'Stop your car before entering a race.':error.message==='race_previous_result_unsaved'?'Retry saving your previous race result before starting another run.':message(error));}}
+  }catch(error){if(raceScope===scope){dialog.dataset.raceStartError=String(error.message||'unknown');stop('race_start_failed');status(error.message==='race_live_gps_active'?'Stop Live GPS before racing.':error.message==='practice_leave_room_first'?'Leave the shared exploration room before starting private practice.':error.message==='stop_before_racing'?'Stop your car before entering a race.':error.message==='race_previous_result_unsaved'?'Retry saving your previous race result before starting another run.':message(error));}}
   finally {busy=false;}
  }
  function adoptRun(run,prepared,scope,current){

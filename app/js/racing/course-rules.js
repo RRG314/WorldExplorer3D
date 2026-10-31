@@ -97,9 +97,9 @@ function lateralPatchHeight(lower,upper,u,offset){
  const v=(offset-b.offsetMeters-(c.offsetMeters-b.offsetMeters)*u)/highWidth;
  return b.y*(1-u)+c.y*(u-v)+d.y*v;
 }
-function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,maximumCrossfall=BANKED_ROAD_MAXIMUM_CROSSFALL,maximumPlaneGradient=Infinity,profiled=false){
+function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,maximumCrossfall=BANKED_ROAD_MAXIMUM_CROSSFALL,maximumPlaneGradient=Infinity,profiled=false,ground=false){
  if(!heights.some(s=>s.lateralSamples!==undefined))return true;
- if(model!==BANKED_ROAD_MODEL||width>30)return false;
+ if(model!==BANKED_ROAD_MODEL&&!ground||width>30)return false;
  let previous=null;
  for(const station of heights){
   const points=station.lateralSamples;
@@ -128,7 +128,8 @@ function validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrad
  }
  return true;
 }
-function validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,edgeBandModel,pavementModel){
+function validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,edgeBandModel,pavementModel,surfaceKind){
+ if(surfaceKind==='ground')return !model&&!edgeBandModel&&!pavementModel&&validLateralHeights(heights,width,metersPerUnit,span,length,.15,undefined,.15,.22,false,true);
  const profiled=pavementModel===PROFILED_ROAD_PAVEMENT_MODEL;
  const authored=edgeBandModel===AUTHORED_ROAD_EDGE_MODEL;
  if(!authored)return !heights.some(s=>Array.isArray(s.lateralSamples)&&s.lateralSamples.some(p=>p?.baseY!==undefined))&&validLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,model,undefined,undefined,profiled);
@@ -208,7 +209,7 @@ export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth,maximumGr
    if(heights&&(!Array.isArray(heights)||heights.length<2||heights.length>250||heights.some((s,i)=>!Number.isFinite(s.t)||!Number.isFinite(s.y)||s.t<0||s.t>1||i>0&&s.t<=heights[i-1].t)||heights[0].t!==0||heights.at(-1).t!==1))throw Error('invalid_race_road_heights');
    if(heights){
     const span=Number(road.heightSampleSpanMeters??1.2);
-    if(!validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,road.surfaceModel,road.edgeBandModel,road.pavementModel)||!(span>=.2&&span<=4)||Math.abs(heights[0].y-road.a.y)>.001||Math.abs(heights.at(-1).y-road.b.y)>.001||heights.some((s,i)=>
+    if(!validRoadLateralHeights(heights,width,metersPerUnit,span,length,maximumGrade,road.surfaceModel,road.edgeBandModel,road.pavementModel,road.surfaceKind)||!(span>=.2&&span<=4)||Math.abs(heights[0].y-road.a.y)>.001||Math.abs(heights.at(-1).y-road.b.y)>.001||heights.some((s,i)=>
       i>0&&Math.abs(s.y-heights[i-1].y)*metersPerUnit/((s.t-heights[i-1].t)*length)>maximumGrade ||
       (s.leftY!==undefined||s.rightY!==undefined)&&(!Number.isFinite(s.leftY)||!Number.isFinite(s.rightY)||Math.max(Math.abs(s.leftY-s.y),Math.abs(s.rightY-s.y))*metersPerUnit/span>
         (road.surfaceModel===BANKED_ROAD_MODEL?BANKED_ROAD_MAXIMUM_CROSSFALL:.15))))throw Error('invalid_race_road_heights');

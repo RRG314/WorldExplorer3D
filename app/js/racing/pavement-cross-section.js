@@ -9,7 +9,7 @@ function station(segment,t){
  const a=rows[lo],b=rows[hi],u=Math.max(0,Math.min(1,(t-a.t)/(b.t-a.t)));return {a,b,u};
 }
 export function racePavementLateralOffsets(segment,t){
- if(segment.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL)return null;
+ if(segment.pavementModel!==PROFILED_ROAD_PAVEMENT_MODEL&&segment.surfaceKind!=='ground')return null;
  const {a,b,u}=station(segment,t);return a.lateralSamples.map((p,i)=>p.offsetMeters+(b.lateralSamples[i].offsetMeters-p.offsetMeters)*u);
 }
 export function racePavementCrossSection(segment,t){
