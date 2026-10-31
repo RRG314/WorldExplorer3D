@@ -59,3 +59,31 @@ corridors rather than silently moving them through buildings or water.
   no equipment or controller remains after leave or location change.
 - Authenticated room race, replay-safe unranked result, no public rewards,
   production-configured artifact and coordinated backend/source identity.
+
+## Shipped design boundaries
+
+The creator is one Racing workspace with a map beside its settings. Recorded
+roads retain their qualified source path; repeated laps become one layout and
+intermediate survey nodes do not become hundreds of numbered checkpoints.
+Ground recording removes steering noise, keeps the end of an open route and
+recognizes a completed loop. The preview qualifies the resulting corridor;
+recording alone cannot make an obstructed or unsupported route raceable.
+
+Surface courses derive continuous inner and outer equipment/paint boundaries
+with the existing street polygon kernel. Bridges, tunnels and reviewed venue
+perimeters retain their established presentation. Temporary equipment and map
+resize observers retire through their existing race/UI owners.
+
+Room tracks last up to 24 hours and are limited to eight active tracks per room.
+Their bounded geometry must match the current room world and each driver's
+loaded, qualified surfaces. They use standard damage, shared timing and the
+existing vehicle custody. Room results save as unranked Journal practice,
+separated by car setup and starting grid. They create no public board, Credits
+or career wins. Approved venue competition, moderation and public records keep
+their existing rules. Narrow reviewed venues use their complete approved event;
+a custom room road corridor must be at least six metres wide.
+
+The accepted three-pack candidate predates this creator/contact scope. Its
+complete venue laps and pits remain evidence for unchanged support geometry;
+the changed creator, contact, room authority and delivery boundaries require
+their own checks before the replacement candidate is accepted.

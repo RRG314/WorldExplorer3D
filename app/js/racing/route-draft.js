@@ -48,3 +48,19 @@ export function recordRaceRoadSpan(graph,pose,previous){
  }
  return best?.edge||null;
 }
+
+export function recordedGroundRaceDraft(points,metersPerUnit=1){
+ const rawMeters=points.slice(1).reduce((sum,p,i)=>sum+distance(points[i],p)*metersPerUnit,0),closed=points.length>2&&rawMeters>=200&&distance(points[0],points.at(-1))*metersPerUnit<=10;
+ let tolerance=3,anchors=simplifyRaceDrive(points,tolerance/metersPerUnit);
+ while(anchors.length>80&&tolerance<24){tolerance=Math.min(24,tolerance*1.5);anchors=simplifyRaceDrive(points,tolerance/metersPerUnit);}
+ if(closed)while(anchors.length>3&&distance(anchors[0],anchors.at(-1))*metersPerUnit<12)anchors.pop();
+ if(anchors.length>2){const cleaned=[anchors[0]];for(const p of anchors.slice(1,-1))if(distance(cleaned.at(-1),p)*metersPerUnit>=12)cleaned.push(p);
+  const end=anchors.at(-1);while(cleaned.length>1&&distance(cleaned.at(-1),end)*metersPerUnit<12)cleaned.pop();cleaned.push(end);anchors=cleaned;}
+ return {anchors,closed,rawMeters};
+}
+export function recordedRoadRacePath(path,graph){
+ const edges=new Map(graph.edges.map(e=>[e.id,e])),first=edges.get(path[0]);if(!first)return [];
+ const repeated=path.indexOf(path[0],1);
+ if(repeated>0&&edges.get(path[repeated-1])?.to===first.from&&path.slice(repeated).every((id,i)=>id===path[i%repeated]))return path.slice(0,repeated);
+ return [...path];
+}

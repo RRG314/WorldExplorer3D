@@ -330,3 +330,8 @@ body.activity-racing-open :is(#hudBox,#hudMap,#hudUtilities,#floatMenuContainer,
  .racing-hub[data-race-view="creator"] .racing-map svg {height:230px;}
  .racing-hub[data-race-view="creator"] .racing-extra {width:100%;}
 }
+
+@media(orientation:landscape) and (max-height:500px){
+ .racing-hub[data-race-view="creator"] :is(.racing-map,.racing-course-view) {min-height:0;}
+ .racing-hub[data-race-view="creator"] .racing-map svg {height:clamp(110px,calc(100dvh - 250px),180px);}
+}

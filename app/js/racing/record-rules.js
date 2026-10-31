@@ -48,8 +48,9 @@ export function raceCompetitiveRecordConfiguration(profile,{slot,participants,co
  return {...raceRecordConfiguration(profile,{course}),gridRow:course?.discipline==='rally'?0:Math.floor(slot/2),gridParticipants:participants,
   timing:course?.discipline==='rally'?'individual-stage-start-to-finish':course?.discipline==='oval'?'rolling-green-to-finish':'grid-to-finish'};
 }
-export async function racePracticeRecordKey(course,profile) {
- const encoded=new TextEncoder().encode(JSON.stringify({courseId:await raceCourseKey(course),...raceRecordConfiguration(profile,{course})}));
+export async function racePracticeRecordKey(course,profile,grid) {
+ const configuration=grid?raceCompetitiveRecordConfiguration(profile,{...grid,course}):raceRecordConfiguration(profile,{course});
+ const encoded=new TextEncoder().encode(JSON.stringify({courseId:await raceCourseKey(course),...configuration}));
  const digest=await crypto.subtle.digest('SHA-256',encoded);
  return 'race-practice-'+Array.from(new Uint8Array(digest).slice(0,16),b=>b.toString(16).padStart(2,'0')).join('');
 }

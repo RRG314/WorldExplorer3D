@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {applyRaceBarrierImpact,createRaceVehicleProfile,createRaceVehicleState,stepRaceVehicle} from '../app/js/racing/vehicle-controller.js';
 import {buildRaceRoadGraph,createRaceCourse,raceGridPose} from '../app/js/racing/course-rules.js';
 import {raceCourseKey,raceCourseReference,restoreRaceCourse,raceDistrictFingerprint} from '../app/js/racing/course-library.js';
-import {racePhysicsVersion,isCurrentRacePhysicsVersion} from '../app/js/racing/record-rules.js';
+import {racePhysicsVersion,isCurrentRacePhysicsVersion,racePracticeRecordKey} from '../app/js/racing/record-rules.js';
 const facts={locationId:'contact',locationLabel:'Contact',anchor:{lat:43,lon:7},metersPerUnit:1,roads:[{sourceId:'straight',a:{x:0,y:0,z:0},b:{x:0,y:0,z:500},widthMeters:12,structure:'surface',driveable:true,supported:true}]};
 const graph=buildRaceRoadGraph(facts.roads,{metersPerUnit:1}),course=createRaceCourse(graph,['straight:forward'],{...facts,participants:1});
 test('parking, glancing, hard and outgoing contact use impact energy; velocity stays coherent',()=>{
@@ -24,4 +24,10 @@ test('new contact classes have distinct course/record identities; old references
  assert.equal(restoreRaceCourse(reference,facts,graph,fp).eventRules,undefined);
  assert.notEqual(await raceCourseKey(old),await raceCourseKey(course));assert.notEqual(racePhysicsVersion(old),racePhysicsVersion(course));assert.ok(isCurrentRacePhysicsVersion(racePhysicsVersion(course)));
  assert.deepEqual(restoreRaceCourse(raceCourseReference(course,fp),facts,graph,fp).eventRules,course.eventRules);
+});
+
+test('unranked room Journal keys keep grid and car classes separate while ordinary practice keys remain stable',async()=>{
+ const p=createRaceVehicleProfile('bmw_e34'),practice=await racePracticeRecordKey(course,p),front=await racePracticeRecordKey(course,p,{slot:0,participants:4}),rear=await racePracticeRecordKey(course,p,{slot:2,participants:4});
+ assert.notEqual(practice,front);assert.notEqual(front,rear);assert.equal(front,await racePracticeRecordKey(course,p,{slot:1,participants:4}));assert.notEqual(front,await racePracticeRecordKey(course,createRaceVehicleProfile('porsche_carrera_4s'),{slot:0,participants:4}));
+ assert.equal(practice,await racePracticeRecordKey(structuredClone(course),createRaceVehicleProfile('bmw_e34')));
 });

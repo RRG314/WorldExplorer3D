@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {cleanGroundRaceLayout,simplifyRaceDrive,recordRaceRoadSpan} from '../app/js/racing/route-draft.js';
+import {cleanGroundRaceLayout,simplifyRaceDrive,recordRaceRoadSpan,recordedGroundRaceDraft,recordedRoadRacePath} from '../app/js/racing/route-draft.js';
 import {collectGroundRaceDistrict} from '../app/js/racing/ground-course-source.js';
 import {buildRaceRoadGraph,createRaceCourse} from '../app/js/racing/course-rules.js';
 import {raceDistrictFingerprint,raceCourseReference,restoreRaceCourse} from '../app/js/racing/course-library.js';
@@ -38,4 +38,14 @@ test('drive cleanup removes wobble and road recording respects topology, heading
 test('an internal selected junction edge is removed while an outside branch boundary stays solid',()=>{
  const g=buildRaceRoadGraph([{sourceId:'a',a:{x:0,y:0,z:0},b:{x:0,y:0,z:120},widthMeters:10,supported:true,driveable:true},{sourceId:'b',a:{x:0,y:0,z:120},b:{x:120,y:0,z:120},widthMeters:10,supported:true,driveable:true}]),course=createRaceCourse(g,['a:forward','b:forward'],{locationId:'test',anchor:{lat:43,lon:7},participants:1});
  assert.equal(raceEdgeInsideAnotherSpan(course,{x:4.8,y:0,z:119},course.segments[0]),true);assert.equal(raceEdgeInsideAnotherSpan(course,{x:-4.8,y:0,z:60},course.segments[0]),false);
+});
+
+test('recording cleans steering noise, infers a completed ground loop and preserves open endpoints',()=>{
+ const points=[];for(const [a,b]of [[{x:0,z:0},{x:160,z:0}],[{x:160,z:0},{x:160,z:120}],[{x:160,z:120},{x:0,z:120}],[{x:0,z:120},{x:0,z:0}]])for(let i=0;i<60;i++)points.push({x:a.x+(b.x-a.x)*i/60+Math.sin(i)*.4,z:a.z+(b.z-a.z)*i/60+Math.sin(i*2)*.4});points.push({x:0,z:0});
+ const result=recordedGroundRaceDraft(points);assert.equal(result.closed,true);assert.equal(result.anchors.length,4);assert.ok(cleanGroundRaceLayout({version:1,widthMeters:8,closed:true,anchors:result.anchors}).length>12);
+ const open=recordedGroundRaceDraft(points.slice(0,55));assert.equal(open.closed,false);assert.deepEqual(open.anchors[0],points[0]);assert.deepEqual(open.anchors.at(-1),points[54]);
+});
+test('repeated complete road laps reduce to one clean layout without replacing an intentional different branch',()=>{
+ const graph={edges:[{id:'a',from:0,to:1},{id:'b',from:1,to:2},{id:'c',from:2,to:0},{id:'d',from:1,to:3}]};
+ assert.deepEqual(recordedRoadRacePath(['a','b','c','a','b','c','a'],graph),['a','b','c']);assert.deepEqual(recordedRoadRacePath(['a','b','c','a','d'],graph),['a','b','c','a','d']);
 });
