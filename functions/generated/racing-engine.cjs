@@ -4265,7 +4265,7 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
     config: profile.config,
     planetary: false,
     metersPerWorldUnit: course.metersPerUnit,
-    ...course.surfaceModel === BANKED_ROAD_MODEL || rally ? { roadPlane: { pitch: car.terrainPitch || 0, roll: car.terrainRoll || 0 } } : {},
+    ...course.surfaceModel === BANKED_ROAD_MODEL || rally || course.surfaceKind === "ground" ? { roadPlane: { pitch: car.terrainPitch || 0, roll: car.terrainRoll || 0 } } : {},
     ...course.discipline === "oval" || course.ovalAerodynamics === true ? { aerodynamicDrag: { coefficientPerMeter: OVAL_AERODYNAMIC_DRAG_PER_METER * Math.max(0.5, Math.min(1.8, profile.handling.width * profile.handling.height / 2.7)), reduction: draftReduction } } : {},
     surfaceDynamics: surface2,
     vehicleHandling: profile.handling,

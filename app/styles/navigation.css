@@ -315,3 +315,18 @@ body.activity-racing-open :is(#hudBox,#hudMap,#hudUtilities,#floatMenuContainer,
 .racing-career-view {flex:1;min-height:0;overflow:auto;padding:4px 5px 16px 2px;}
 .racing-career-actions {flex:none;padding-top:10px;border-top:1px solid var(--wx-line-soft);}
 .racing-career-view[hidden],.racing-career-actions[hidden] {display:none;}
+
+/* A single creator workspace keeps its overhead layout beside the draft. */
+.racing-hub[data-race-view="creator"] :is(.racing-setup,.racing-summary,.racing-online,.racing-start-bar,.racing-view-switch,.racing-extra > details:not([data-race-creator])) {display:none;}
+.racing-hub[data-race-view="creator"] .racing-layout {grid-template-columns:1fr;}
+.racing-hub[data-race-view="creator"] .racing-event-detail {display:grid;grid-template-columns:minmax(0,1.8fr) minmax(270px,1fr);gap:24px;align-items:start;}
+.racing-hub[data-race-view="creator"] .racing-preview-panel {position:sticky;top:0;}
+.racing-hub[data-race-view="creator"] .racing-map svg {height:clamp(300px,48dvh,520px);}
+.racing-hub[data-race-view="creator"] [data-race-creator] {margin-top:0;}
+.racing-hub[data-race-view="creator"] [data-race-creator] > p {font-size:13px;line-height:1.55;}
+@media(max-width:650px){
+ .racing-hub[data-race-view="creator"] .racing-event-detail {display:flex;flex-direction:column;gap:12px;}
+ .racing-hub[data-race-view="creator"] .racing-preview-panel {position:relative;width:100%;}
+ .racing-hub[data-race-view="creator"] .racing-map svg {height:230px;}
+ .racing-hub[data-race-view="creator"] .racing-extra {width:100%;}
+}

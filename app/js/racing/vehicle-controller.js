@@ -55,7 +55,7 @@ export function stepRaceVehicle(course,car,actions,dt,profile,{draftReduction=0}
  const surface=rally?rallySurfaceDynamics(course,previousSupport.index,profile.surface):course.surfaceKind==='ground'?{...profile.surface,topSpeed:.8,rolling:1.5,accel:.75,grip:profile.surface.grip*.78}:profile.surface;
  const frame=prepareVehicleDriveFrame(car,{...actions,boost:0},dt,profile.config);
  const driving=stepVehiclePlanarDrive(car,dt,frame,{config:profile.config,planetary:false,metersPerWorldUnit:course.metersPerUnit,
-  ...(course.surfaceModel===BANKED_ROAD_MODEL||rally?{roadPlane:{pitch:car.terrainPitch||0,roll:car.terrainRoll||0}}:{}),
+  ...(course.surfaceModel===BANKED_ROAD_MODEL||rally||course.surfaceKind==='ground'?{roadPlane:{pitch:car.terrainPitch||0,roll:car.terrainRoll||0}}:{}),
   ...(course.discipline==='oval'||course.ovalAerodynamics===true?{aerodynamicDrag:{coefficientPerMeter:OVAL_AERODYNAMIC_DRAG_PER_METER*Math.max(.5,Math.min(1.8,profile.handling.width*profile.handling.height/2.7)),reduction:draftReduction}}:{}),
   surfaceDynamics:surface,vehicleHandling:profile.handling,vehicleCondition:raceHasDamage(course)?vehicleConditionDynamics(car.condition):profile.condition,vehicleUpgrades:profile.upgrades,
   characterVehicle:profile.character,maxSpd:Math.min(profile.config.maxSpd,mphToCarSpeed(profile.handling.topSpeedMph)),

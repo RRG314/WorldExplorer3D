@@ -3,6 +3,7 @@ import {cleanGroundRaceLayout,simplifyRaceDrive,recordRaceRoadSpan} from '../app
 import {collectGroundRaceDistrict} from '../app/js/racing/ground-course-source.js';
 import {buildRaceRoadGraph,createRaceCourse} from '../app/js/racing/course-rules.js';
 import {raceDistrictFingerprint,raceCourseReference,restoreRaceCourse} from '../app/js/racing/course-library.js';
+import {buildRacePaint} from '../app/js/racing/course-markings.js';
 import {buildRaceFurniture} from '../app/js/racing/course-furniture.js';
 import {raceEdgeInsideAnotherSpan} from '../app/js/racing/course-boundary.js';
 const draft={version:1,widthMeters:8,closed:true,anchors:[{x:0,z:0},{x:160,z:0},{x:160,z:120},{x:0,z:120}]};
@@ -15,6 +16,7 @@ test('a sparse terrain draft produces rounded ordered support, a usable grid, cl
  const {facts,graph,course}=await build();assert.equal(course.surfaceKind,'ground');assert.ok(course.lengthMeters>450&&course.lengthMeters<560);assert.ok(facts.roads.every(r=>r.surfaceKind==='ground'&&!r.surfaceModel));
  const restored=restoreRaceCourse(raceCourseReference(course,await raceDistrictFingerprint(facts)),facts,graph,await raceDistrictFingerprint(facts));assert.equal(restored.lengthMeters,course.lengthMeters);assert.deepEqual(restored.groundDraft,draft);
  const layout=cleanGroundRaceLayout(draft);assert.ok(layout.length>12);assert.ok(layout.every(p=>!draft.anchors.some(a=>p.x===a.x&&p.z===a.z)),'corner apex is rounded, not an angular steering trace');
+ const paint=buildRacePaint(course);assert.ok(paint.positions.length>3000&&paint.positions.every(Number.isFinite));
  const furniture=buildRaceFurniture(course);assert.equal(furniture.perimeter,'marked-ground');assert.ok(furniture.chunks.every(c=>c.fencePositions.length===0));assert.ok(furniture.chunks.some(c=>c.positions.length>0));
  const changed=await collectGroundRaceDistrict(context({height:(x,z)=>x*.02+z*.01+.1}),draft,{yieldWork:async()=>{}});assert.throws(()=>restoreRaceCourse(raceCourseReference(course,awaitNever),changed,graph,'bad'));
 });
