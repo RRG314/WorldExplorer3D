@@ -1,4 +1,4 @@
-import {raceEdgeInsideAnotherSpan} from './course-boundary.js';
+import {raceCoursePerimeter,racePerimeterPoint,raceEdgeInsideAnotherSpan} from './course-boundary.js';
 import {racePavementCrossSection} from './pavement-cross-section.js';
 import {sampleRaceSegmentY,raceSegmentAtDistance,projectRacePosition,raceProjectionOutsidePavement} from './course-rules.js';
 import {raceCourseSurfacePoint} from './course-markings.js';
@@ -21,7 +21,8 @@ export function buildRaceFurniture(course) {
  const pitIntersects=p=>{if(!pitCourse||p.x<pitBounds.minX-16/unit||p.x>pitBounds.maxX+16/unit||p.z<pitBounds.minZ-16/unit||p.z>pitBounds.maxZ+16/unit)return false;return !raceProjectionOutsidePavement(projectRacePosition(pitCourse,p),1);};
  const pitOpening=d=>course.pitLane&&[course.pitLane.entryDistanceMeters,course.pitLane.exitDistanceMeters].some(at=>Math.abs(((d-at+course.lengthMeters*1.5)%course.lengthMeters)-course.lengthMeters/2)<25);
  const edgeAt=(segment,t,side)=>{const s=racePavementCrossSection(segment,t);return s?(side<0?-s.minimumMeters:s.maximumMeters):segment.widthMeters/2;},edgeAtDistance=(d,side,extra)=>{const s=raceSegmentAtDistance(course,d);return side*(edgeAt(s,(d-s.startMeters)/s.lengthMeters,side)+extra);};
- for(const segment of permanentOval?[]:course.segments) {
+ const perimeter=raceCoursePerimeter(course);
+ for(const segment of permanentOval||perimeter?[]:course.segments) {
   const count=Math.max(1,Math.ceil(segment.lengthMeters/4));
   for(let i=0;i<count;i++) {
    const start=segment.startMeters+i*segment.lengthMeters/count,end=segment.startMeters+(i+1)*segment.lengthMeters/count;
@@ -43,7 +44,11 @@ export function buildRaceFurniture(course) {
    }
   }
  }
- if(!permanentOval&&!ground)for(let d=0;d<course.lengthMeters;d+=8){if(pitOpening(d))continue;const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1]){const p=raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,guardrail ? .75 : .36),guardrail?0:.86);if(!pitIntersects(p)&&!raceEdgeInsideAnotherSpan(course,p,segment))chunk.posts.push(p);}}
+ if(perimeter){let nextPost=0,walked=0;for(const edge of perimeter){const count=Math.max(1,Math.ceil(edge.lengthMeters/4)),chunk=chunkAt(edge.distanceMeters);for(let i=0;i<count;i++){const t0=i/count,t1=(i+1)/count,a=profile.map(([offset,height])=>racePerimeterPoint(course,edge,t0,offset,height)),b=profile.map(([offset,height])=>racePerimeterPoint(course,edge,t1,offset,height));for(let j=0;j<profile.length;j++){const k=(j+1)%profile.length;quad(chunk.positions,chunk.uvs,[a[j],b[j],b[k],a[k]],walked/2,(walked+edge.lengthMeters/count)/2,profile[j][1]/2,profile[k][1]/2);}
+   if(!ground)quad(chunk.fencePositions,chunk.fenceUvs,[racePerimeterPoint(course,edge,t0,.36,.86),racePerimeterPoint(course,edge,t1,.36,.86),racePerimeterPoint(course,edge,t1,.36,2.5),racePerimeterPoint(course,edge,t0,.36,2.5)],walked/.12,(walked+edge.lengthMeters/count)/.12,0,(2.5-.86)/.12);
+   if(!ground&&walked>=nextPost){chunk.posts.push(racePerimeterPoint(course,edge,t0,.36,.86));nextPost=walked+8;}walked+=edge.lengthMeters/count;
+  }}}
+ if(!permanentOval&&!ground&&!perimeter)for(let d=0;d<course.lengthMeters;d+=8){if(pitOpening(d))continue;const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1]){const p=raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,guardrail ? .75 : .36),guardrail?0:.86);if(!pitIntersects(p)&&!raceEdgeInsideAnotherSpan(course,p,segment))chunk.posts.push(p);}}
  if(guardrail)for(let d=0;d<course.lengthMeters;d+=4){if(pitOpening(d))continue;const segment=raceSegmentAtDistance(course,d),chunk=chunkAt(d);for(const side of [-1,1]){const p=raceCourseSurfacePoint(course,d,edgeAtDistance(d,side,.10));if(!pitIntersects(p))chunk.railPosts.push(p);}}
  let previousTurn=-Infinity;
  for(let d=180;d<course.lengthMeters-30;d+=15) {

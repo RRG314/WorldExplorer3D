@@ -1,4 +1,4 @@
-import {raceEdgeInsideAnotherSpan} from './course-boundary.js';
+import {raceCoursePerimeter,racePerimeterPoint,raceEdgeInsideAnotherSpan} from './course-boundary.js';
 import {racePavementCrossSection,racePavementLateralOffsets} from './pavement-cross-section.js';
 import {sampleRaceSegmentY,raceSegmentAtDistance} from './course-rules.js';
 
@@ -46,10 +46,12 @@ export function buildRacePaint(course,{filtered=true,venueId=course.venueSource?
  }
  // White event boundaries remain inside the admitted pavement. They are
  // flat paint on its accepted surface, not invented raised kerb geometry.
- for(const segment of course.venueSource?.id==='daytona-tri-oval'?[]:course.segments)for(const side of [-1,1]) {
+ const perimeter=raceCoursePerimeter(course);
+ for(const segment of course.venueSource?.id==='daytona-tri-oval'||perimeter?[]:course.segments)for(const side of [-1,1]) {
   const edge=side*(segment.widthMeters/2-.32);
   if(segment.pavementModel){const edgeAt=d=>{const s=sectionAt(d);return side<0?s.minimumMeters+.32:s.maximumMeters-.32;};rectangle(segment.startMeters,segment.startMeters+segment.lengthMeters,d=>edgeAt(d)-.06,d=>edgeAt(d)+.06,.88,false);}else for(let d=segment.startMeters;d<segment.startMeters+segment.lengthMeters;d+=2){const end=Math.min(segment.startMeters+segment.lengthMeters,d+2),p=raceCourseSurfacePoint(course,(d+end)/2,edge);if(!raceEdgeInsideAnotherSpan(course,p,segment))rectangle(d,end,edge-.09,edge+.09,course.surfaceKind==='ground'?[.9,.72,.24]:.88,false);}
  }
+ if(perimeter)for(const edge of perimeter){const count=Math.max(1,Math.ceil(edge.lengthMeters));for(let i=0;i<count;i++){const corners=[[i/count,-.41],[(i+1)/count,-.41],[(i+1)/count,-.23],[i/count,-.23]].map(([t,offset])=>racePerimeterPoint(course,edge,t,offset,.018));for(const index of [0,1,2,0,2,3]){const p=corners[index];positions.push(p.x,p.y,p.z);colors.push(...(course.surfaceKind==='ground'?[.96,.75,.18]:[.88,.88,.88]));strokeCoverage.push(0,0,-1,-1);}}}
  if(!course.venueSource)for(let d=25;d<course.lengthMeters-15;d+=30){
   for(let i=0;i<6;i++){const at=d+i*.25,lateral=(5-i)*.15;rectangle(at,at+.3,-lateral-.1,-lateral+.1,[.75,.93,.55],false);rectangle(at,at+.3,lateral-.1,lateral+.1,[.75,.93,.55],false);}
  }

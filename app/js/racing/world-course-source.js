@@ -19,7 +19,7 @@ import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_M
 // Read published world facts through their existing owners. Qualification never
 // replaces a road, runs a provider query, flattens terrain or changes residency.
 export async function collectRaceDistrict(context,{locationId,locationLabel,radiusWorld=270,sourceFeatureIds=null,current=()=>true,yieldWork=yieldToWorldFrame,allowEmpty=false}={}){
- const publication=context.worldPublication,traversal=context.buildTraversalNetworks?.()?.drive;
+ const publication=context.worldPublication,publishedTraversal=context.buildTraversalNetworks?.()?.drive,traversal=publishedTraversal?.segments?publishedTraversal:allowEmpty?{segments:[]}:null;
  if(!publication?.requestId||context.worldLoading||!traversal?.segments||!context.SurfaceQuery?.driveAt||!context.sampleFeatureSurfaceY)throw Error('race_world_not_ready');
  const metersPerUnit=Number(context.METERS_PER_WORLD_UNIT)||1.11,envelope={width:2.35,length:6.5,height:2.4};
  const runtime=context.worldLoadRuntimeState,pack=runtime&&runtime.sequence===publication.sequence?runtime.venuePack:null;

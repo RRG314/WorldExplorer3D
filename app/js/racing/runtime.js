@@ -81,7 +81,7 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    <div class="racing-view-switch" role="group" aria-label="Course preview"><button type="button" data-race-preview="scene" aria-pressed="true">Location view</button><button type="button" data-race-preview="map" aria-pressed="false">Route map</button></div>
    <div class="racing-course-view"><figure class="racing-location-view" data-race-scene><img data-race-image hidden alt=""><p data-race-image-empty>Loading location view…</p><figcaption data-race-image-credit hidden><span data-race-image-caption></span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></figcaption></figure><div class="racing-map" data-race-map hidden></div></div></div><div class="racing-extra">
    <details data-race-creator><summary>Create a track here</summary><p>Choose roads on the overhead map, or lay out a marked track on open ground. You can also drive the route first. Preview and test before sharing.</p><label>Build on<select data-race-creator-mode><option value="road">Existing roads</option><option value="ground">Open ground · no roads needed</option></select></label><label data-race-ground-width hidden>Track width<select data-race-width><option value="6">6 m · technical</option><option value="8" selected>8 m</option><option value="10">10 m</option><option value="12">12 m · wide</option></select></label><p data-race-creator-help>Click junctions in driving order. Arrows pan the map; + / − zoom. Enter adds the map centre.</p><div><button type="button" data-race-map-zoom=".65">Zoom in</button><button type="button" data-race-map-zoom="1.5">Zoom out</button><button type="button" data-race-map-reset>Fit track</button></div>
-   <label data-race-road-junction>Junction<select data-race-node aria-label="Route junction"></select></label><button type="button" data-race-add>Add junction</button><button type="button" data-race-undo>Undo last</button><button type="button" data-race-reset>Clear route</button><button type="button" data-race-close-loop>Close loop</button><button type="button" data-race-record>Drive to create</button>
+   <label data-race-road-junction>Junction<select data-race-node aria-label="Route junction"></select></label><button type="button" data-race-add>Add junction</button><button type="button" data-race-undo>Undo last</button><button type="button" data-race-reset>Clear route</button><button type="button" data-race-close-loop>Close loop</button><button type="button" data-race-record-drive>Drive to create</button>
    <p data-race-waypoints></p><label>Route name<input data-race-route-name maxlength="100" placeholder="My city run"></label>
    <label>Discipline<select data-race-discipline><option value="sprint">Sprint</option><option value="circuit">Circuit · 2 laps</option><option value="time-trial">Time trial</option></select></label>
    <button type="button" data-race-preview-draft>Preview track</button><button type="button" data-race-test>Test this route</button><button type="button" data-race-save>Save route</button><button type="button" data-race-room-share>Share with this room</button><button type="button" data-race-publish-test>Submit a public road route</button><p data-race-saved></p></details>
@@ -120,10 +120,10 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   el('[data-race-undo]').onclick=()=>{creatorMode==='ground'?groundAnchors.pop():creatorNodes.pop();rebuildCreator();};el('[data-race-reset]').onclick=()=>{creatorNodes=[];groundAnchors=[];rebuildCreator();};
   el('[data-race-creator-mode]').onchange=()=>{creatorMode=el('[data-race-creator-mode]').value;rebuildCreator();};el('[data-race-route-name]').oninput=()=>{creatorRevision++;customCourse=null;};el('[data-race-width]').onchange=()=>rebuildCreator();el('[data-race-discipline]').onchange=()=>rebuildCreator();
   el('[data-race-close-loop]').onclick=()=>{if(creatorMode==='road'&&creatorNodes.length>2)addJunction(creatorNodes[0]);el('[data-race-discipline]').value='circuit';rebuildCreator();};
-  el('[data-race-record]').onclick=()=>startRecording();
+  el('[data-race-record-drive]').onclick=()=>startRecording();
   el('[data-race-preview-draft]').onclick=()=>void previewDraft();
   for(const button of dialog.querySelectorAll('[data-race-map-zoom]'))button.onclick=()=>el('[data-race-map] svg')?.zoomBy(Number(button.dataset.raceMapZoom));
-  el('[data-race-map-reset]').onclick=()=>map(undefined,true);
+  el('[data-race-map-reset]').onclick=()=>map(undefined,true,true);
   el('[data-race-room-share]').onclick=()=>void shareWithRoom();
   el('[data-race-test]').onclick=async()=>{const course=await previewDraft();if(course)void begin(course);};
   el('[data-race-save]').onclick=()=>void saveRoute();
@@ -279,14 +279,14 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
    onUnavailable:()=>{if(c.worldPublication===publication){el('[data-race-image-empty]').textContent='Location view unavailable. Use the route map.';showPreview('map');}}
   });
  }
- function map(course=customCourse||events[selected],reset=false) {
+ function map(course=customCourse||events[selected],reset=false,fitTrack=false) {
   const host=el('[data-race-map]'),initialView=reset?null:host.querySelector('svg')?.getMapView?.();host.replaceChildren();if(!graph)return;
   let creatorSegments=creatorPath.map(id=>{const e=graph.edges.find(edge=>edge.id===id);return [graph.nodes[e.from],graph.nodes[e.to]];});
   if(creatorMode==='ground'&&groundAnchors.length>1)try{const pts=cleanGroundRaceLayout(groundDraft(),district.metersPerUnit);creatorSegments=pts.slice(1).map((p,i)=>[pts[i],p]);}catch{creatorSegments=groundAnchors.slice(1).map((p,i)=>[groundAnchors[i],p]);}
-  const svg=createRaceRouteMap({roads:district.roads,buildings:c.buildings,course,locationLabel:district.locationLabel,creatorSegments,initialView,creatorPoints:creatorMode==='ground'?groundAnchors:creatorNodes.map(id=>graph.nodes[id]),player:c.car,
+  const svg=createRaceRouteMap({roads:district.roads,buildings:c.buildings,course,locationLabel:district.locationLabel,creatorSegments,initialView,boundsPoints:fitTrack?(course?.points?.length?course.points:groundAnchors):null,creatorPoints:creatorMode==='ground'?groundAnchors:creatorNodes.map(id=>graph.nodes[id]),player:c.car,
    onPoint:at=>{if(!el('[data-race-creator]').open||busy)return;if(creatorMode==='ground'){if(groundAnchors.length>=80){status('Use at most 80 anchors.');return;}groundAnchors.push({x:at.x,z:at.y});rebuildCreator();return;}
     const node=graph.nodes.reduce((best,n)=>!best||Math.hypot(n.x-at.x,n.z-at.y)<Math.hypot(best.x-at.x,best.z-at.y)?n:best,null);
-    if(!node||Math.hypot(node.x-at.x,node.z-at.y)*district.metersPerUnit>35){status('Choose a highlighted road junction, or switch to Open ground.');return;}addJunction(node.id);}});if(svg)host.append(svg);
+    if(!node||Math.hypot(node.x-at.x,node.z-at.y)*district.metersPerUnit>35){status('Choose a highlighted road junction, or switch to Open ground.');return;}addJunction(node.id);}});if(svg){host.append(svg);svg.zoomBy(1);}
   const credit=document.createElement('a');credit.href='https://www.openstreetmap.org/copyright';credit.textContent='© OpenStreetMap contributors · ODbL';credit.target='_blank';credit.rel='noopener';credit.className='racing-map-credit';host.append(credit);
  }
  function currentVehicleProfile() {
@@ -341,12 +341,12 @@ export function createRacingRuntime(c,{closeMenus=()=>{},requestWorldFocus=()=>{
   const course=createRaceCourse(g,path,{locationId:facts.locationId,locationLabel:facts.locationLabel,anchor:facts.anchor,name:el('[data-race-route-name]').value.trim()||`${facts.locationLabel} · Your track`,discipline,laps:discipline==='circuit'?2:1,participants:discipline==='time-trial'?1:4,...(draft?{groundDraft:draft}:{})});
   if(draft)groundCourseFacts.set(course,facts);return course;
  }
- async function previewDraft(){if(busy)return null;busy=true;status('Checking the full track width…');try{const course=await buildCustom();customCourse=course;render();showPreview('map');status(`Track checked · ${(course.lengthMeters/1000).toFixed(2)} km. Test before sharing.`);return course;}catch(error){status(message(error));return null;}finally{busy=false;el('[data-race-start]').disabled=!!online||!(customCourse||events[selected]);el('[data-race-room-share]').disabled=!getCurrentRoom()||!!online;}}
+ async function previewDraft(){if(busy)return null;busy=true;status('Checking the full track width…');try{const course=await buildCustom();customCourse=course;render();showPreview('map');map(course,true,true);status(`Track checked · ${(course.lengthMeters/1000).toFixed(2)} km. Test before sharing.`);return course;}catch(error){status(message(error));return null;}finally{busy=false;el('[data-race-start]').disabled=!!online||!(customCourse||events[selected]);el('[data-race-room-share]').disabled=!getCurrentRoom()||!!online;}}
  async function saveRoute() {
   if(busy)return;busy=true;try {const course=customCourse||await buildCustom(),facts=groundCourseFacts.get(course)||district,reference=raceCourseReference(course,await raceDistrictFingerprint(facts)),id=await raceCourseKey(course);
    saveStoredActivity({id:`route-${id}`,templateId:'road-race',title:course.name,description:course.surfaceKind==='ground'?'Marked open-ground race':'Qualified mapped-road race',locationLabel:district.locationLabel,creatorId:getCurrentUser()?.uid||'',visibility:'private',status:'draft',raceRoute:reference,anchors:[],center:course.points[0]});
    customCourse=course;if(!events.includes(course))events.push(course);selected=events.indexOf(course);render();status('Track saved on this device. Ground tracks are checked again when opened.');
-  }catch(error){status(message(error));}finally{busy=false;el('[data-race-room-share]').disabled=!getCurrentRoom()||!!online;}
+  }catch(error){status(message(error));}finally{busy=false;el('[data-race-start]').disabled=!!online||!(customCourse||events[selected]);el('[data-race-room-share]').disabled=!getCurrentRoom()||!!online;}
  }
  function startRecording(){
   if(busy||controller||online||!district||resolveControlState(c).controller!=='drive'){status('Enter your car, then choose Drive to create.');return;}
