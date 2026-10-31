@@ -5,6 +5,7 @@ export {raceMaximumDurationMs,RACE_MAXIMUM_DURATION_MS} from '../../app/js/racin
 export {createRaceVehicleProfile,raceVehicleWorldPose} from '../../app/js/racing/vehicle-controller.js';
 export {raceRecordConfiguration,raceCompetitiveRecordConfiguration,RACE_PHYSICS_VERSION,RACE_BANKED_PHYSICS_VERSION,RACE_PROFILED_PAVEMENT_PHYSICS_VERSION,RACE_OVAL_PHYSICS_VERSION,RACE_OVAL_PIT_PHYSICS_VERSION,racePhysicsVersion,isCurrentRacePhysicsVersion} from '../../app/js/racing/record-rules.js';
 export {buildRaceRoadGraph,createRaceCourse,raceGridPose} from '../../app/js/racing/course-rules.js';
+export {prepareVenueRacePath} from '../../app/js/racing/venue-courses.js';
 export {raceCourseProjection,resolveRaceCourseProjection} from '../../app/js/racing/course-projection.js';
 export {raceCourseKey,raceDistrictFingerprint,restoreRaceCourse} from '../../app/js/racing/course-library.js';
 export {normalizeVehicleGarage,personalVehicleIdentity,personalVehicleById} from '../../app/js/transport/vehicle-garage-rules.js';

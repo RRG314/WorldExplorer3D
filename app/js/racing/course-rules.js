@@ -4,7 +4,7 @@ import {OVAL_FORMATION_DISTANCE_METERS} from './oval-rules.js';
 // this module cannot invent pavement, change a building or move a transport.
 import {ROAD_SOURCE_MINIMUM_SPAN_METERS} from '../world/road-units.js';
 import {BANKED_ROAD_MODEL,PROFILED_ROAD_PAVEMENT_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL,AUTHORED_ROAD_EDGE_MAXIMUM_LIFT_METERS,AUTHORED_ROAD_EDGE_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MAXIMUM_GRADE,AUTHORED_ROAD_EDGE_MAXIMUM_GRADIENT,AUTHORED_ROAD_EDGE_PUBLICATION_EPSILON_METERS} from '../physics/road-plane-dynamics.js';
-import {normalizeRaceVenueSource,assertRaceVenueRoads,raceVenueMaximumLength} from './venue-course-policy.js';
+import {normalizeRaceVenueSource,assertRaceVenueRoads,raceVenueMaximumLength,raceVenueMinimumWidth} from './venue-course-policy.js';
 export const RACE_COURSE_VERSION=1;
 export const RACE_MAX_ROUTE_EDGES=2048;
 // Keep source-node topology down to centimetres, above the approved snapshot's
@@ -163,9 +163,12 @@ function sliceHeightFields(segment,start,end){
 
 // The graph is a bounded derived index of published source roads, not another
 // geographic authority. Different vertical decks are never joined by XZ alone.
-export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth=6,maximumGrade=.22,venueSource,partialVenue=false}={}){
+export function buildRaceRoadGraph(roads,{metersPerUnit=1,minimumWidth,maximumGrade=.22,venueSource,partialVenue=false}={}){
  if(!(metersPerUnit>0&&metersPerUnit<=10)||!Array.isArray(roads)||roads.length>50000)throw Error('invalid_race_road_source');
  const venue=normalizeRaceVenueSource(venueSource);assertRaceVenueRoads(roads,venue,{partial:partialVenue});
+ const widthFloor=raceVenueMinimumWidth(venue);
+ minimumWidth=minimumWidth??widthFloor;
+ if(!Number.isFinite(minimumWidth)||minimumWidth<widthFloor)throw Error('invalid_race_minimum_width');
  const nodes=[],edges=[],outgoing=new Map(),buckets=new Map(),edgeIds=new Set();
  function node(point,layer){
   const gx=Math.round(point.x*2),gz=Math.round(point.z*2),key=`${gx}:${gz}:${layer}`;
@@ -241,6 +244,9 @@ export function shortestRacePath(graph,start,finish,{excludedEdges=new Set()}={}
 }
 
 export function createRaceCourse(graph,path,settings={}){
+ // Source/path preparation must not silently expose an unfinished rally as a
+ // sprint. Stage motion, staggered clocks and recovery are a separate contract.
+ if(graph.venueSource?.stage)throw Error('race_stage_runtime_unavailable');
  if(!Array.isArray(path)||path.length<1||path.length>RACE_MAX_ROUTE_EDGES)throw Error('invalid_race_route');
  const byId=new Map(graph.edges.map(e=>[e.id,e])),edges=path.map(id=>byId.get(id));if(edges.some(e=>!e))throw Error('race_road_missing');
  const discipline=settings.discipline||'sprint';if(!RACE_DISCIPLINES.includes(discipline))throw Error('invalid_race_discipline');

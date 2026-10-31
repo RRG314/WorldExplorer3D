@@ -13,7 +13,7 @@ import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.j
 import {assertReviewedSurfaceAccepted}from'../world/compiler/transport-surface-model.js?v=25';
 import {hasReviewedPavement}from'../world/compiler/reviewed-deck-profile.js';
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL,PROFILED_ROAD_PAVEMENT_MODEL}from'../physics/road-plane-dynamics.js';
-import {normalizeRaceVenueSource,assertRaceVenueRoads}from'./venue-course-policy.js';
+import {normalizeRaceVenueSource,assertRaceVenueRoads,raceVenueMinimumWidth,raceVenueContainsInterval}from'./venue-course-policy.js';
 import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
 
 // Read published world facts through their existing owners. Qualification never
@@ -42,9 +42,10 @@ export async function collectRaceDistrict(context,{locationId,locationLabel,radi
    if(Math.max(Math.hypot(p1.x,p1.z),Math.hypot(p2.x,p2.z))>radius)continue;
    const sourceFeatureId=String(feature.transportRecord?.identity||feature.sourceFeatureId||feature.sourceRoadId||feature.id||'');
    if(selectedSources&&!selectedSources.has(sourceFeatureId))continue;
+   if(!raceVenueContainsInterval(venueSource,sourceFeatureId,segIndex,sourceTStart,sourceTEnd))continue;
    const length=Math.hypot(p2.x-p1.x,p2.z-p1.z)*metersPerUnit;
    const widthMeters=minimumRoadWidthOnInterval(feature,segIndex,sourceTStart,sourceTEnd)*roadMetersPerWorldUnit(feature);
-   if(length<RACE_MINIMUM_SPAN_METERS||widthMeters<6||!roadSegmentIsDriveable(feature,segIndex,sourceTStart,sourceTEnd)){rejected('width_or_access');yield;continue;}
+   if(length<RACE_MINIMUM_SPAN_METERS||widthMeters<raceVenueMinimumWidth(venueSource)||!roadSegmentIsDriveable(feature,segIndex,sourceTStart,sourceTEnd)){rejected('width_or_access');yield;continue;}
    if(!sourceFeatureId){rejected('unstable_source');yield;continue;}
    const model=feature.transportSurfaceModel;
    if(feature.surfaceSurveyEvidence){

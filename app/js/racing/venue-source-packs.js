@@ -146,6 +146,7 @@ export function prepareVenueSourceMerge(data,source,descriptor,ground){
   return index<0||ground.contentSha256s?.[index]!==item.contentSha256;
  }))throw Error('venue_ground_not_ready');
  const layout=compileMappedVenueLayout(source),pit=compileMappedVenuePitLayout(source,descriptor,layout);
+ if(layout.stage)throw Error('venue_stage_runtime_unavailable');
  if(layout.venueId!==descriptor.id||!(source.layout.usableWidthMeters>=6&&source.layout.usableWidthMeters<=30))throw Error('venue_source_identity_mismatch');
  maximumPavementWidth(source,layout,descriptor);
  const startLine=reviewedStartLine(descriptor,layout),landscapeRefinement=reviewedLandscapeRefinement(descriptor),terrainEdgePolicy=reviewedTerrainEdgePolicy(descriptor);

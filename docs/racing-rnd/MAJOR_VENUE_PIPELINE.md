@@ -1,5 +1,26 @@
 # Major venue source pipeline
 
+## Open-stage source and path preparation
+
+Schema-two `open-stage-v1` sources retain the original motor-road tags and exact
+ordered way/node endpoints, including reverse legs of bidirectional roads and
+trimmed first/last ways. Native and Overpass intake select only explicitly named
+stage ways, omit mapper accounts and reject missing geometry. The same bounded
+layout compiler checks continuity, direction, repeated intervals and reference
+length. Existing schema-one closed sources retain their exact projections.
+
+The version-two venue header carries the stage intervals and reviewed minimum
+width through canonical district storage and both generated engines.
+`prepareVenueRacePath` requires every qualified interval and correct direction;
+ordinary city admission retains its six-metre floor. This header cannot bypass
+the existing private source annotation or published-support checks.
+
+This completes source/path preparation only. World source adoption and actual
+course creation explicitly reject unfinished stage runtime support. No rally
+event is enabled until the shared surface, vertical-motion, staggered-clock and
+recovery contracts are complete. Controlled contract/browser checks are not a
+geographic pack, real terrain, driving or release acceptance.
+
 ## Daytona source and native ground
 
 The exact five-way tri-oval is retained in `daytona/source.json`, alongside all

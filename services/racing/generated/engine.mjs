@@ -1431,18 +1431,41 @@ var fail = () => {
 var sourceId = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9:_.\/-]{0,179}$/.test(value);
 function normalizeRaceVenueSource(value) {
   if (value === void 0) return void 0;
-  if (!value || value.version !== 1 || typeof value.id !== "string" || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(value.id) || !/^[a-f0-9]{64}$/.test(value.sourceSha256) || !Number.isFinite(value.mappedLengthMeters) || value.mappedLengthMeters < 200 || value.mappedLengthMeters > 3e4 || !Number.isFinite(value.qualificationRadiusWorld) || value.qualificationRadiusWorld < 1200 || value.qualificationRadiusWorld > 6e3 || !Array.isArray(value.sourceFeatureIds) || !value.sourceFeatureIds.length || value.sourceFeatureIds.length > 500 || value.sourceFeatureIds.some((id) => !sourceId(id)) || new Set(value.sourceFeatureIds).size !== value.sourceFeatureIds.length) fail();
+  if (!value || ![1, 2].includes(value.version) || typeof value.id !== "string" || !/^[a-z0-9][a-z0-9-]{0,99}$/.test(value.id) || !/^[a-f0-9]{64}$/.test(value.sourceSha256) || !Number.isFinite(value.mappedLengthMeters) || value.mappedLengthMeters < 200 || value.mappedLengthMeters > 3e4 || !Number.isFinite(value.qualificationRadiusWorld) || value.qualificationRadiusWorld < 1200 || value.qualificationRadiusWorld > 6e3 || !Array.isArray(value.sourceFeatureIds) || !value.sourceFeatureIds.length || value.sourceFeatureIds.length > 500 || value.sourceFeatureIds.some((id) => !sourceId(id)) || new Set(value.sourceFeatureIds).size !== value.sourceFeatureIds.length) fail();
   const pits = value.pitSourceFeatureIds;
   if (pits !== void 0 && (!Array.isArray(pits) || !pits.length || pits.length > 50 || pits.some((id) => !sourceId(id) || value.sourceFeatureIds.includes(id)) || new Set(pits).size !== pits.length)) fail();
+  if (value.version === 1 && value.stage !== void 0 || value.version === 2 && pits !== void 0) fail();
+  const stage = value.version === 2 ? normalizeStage(value.stage, value.sourceFeatureIds) : void 0;
   return Object.freeze({
-    version: 1,
+    version: value.version,
     id: value.id,
     sourceSha256: value.sourceSha256,
     mappedLengthMeters: value.mappedLengthMeters,
     qualificationRadiusWorld: value.qualificationRadiusWorld,
     sourceFeatureIds: Object.freeze([...value.sourceFeatureIds]),
-    ...pits ? { pitSourceFeatureIds: Object.freeze([...pits]) } : {}
+    ...pits ? { pitSourceFeatureIds: Object.freeze([...pits]) } : {},
+    ...stage ? { stage } : {}
   });
+}
+function normalizeStage(value, sourceIds) {
+  if (value?.kind !== "open-stage-v1" || !Number.isFinite(value.minimumWidthMeters) || value.minimumWidthMeters < 3 || value.minimumWidthMeters > 30 || !Number.isSafeInteger(value.startNodeId) || value.startNodeId <= 0 || !Number.isSafeInteger(value.finishNodeId) || value.finishNodeId <= 0 || value.startNodeId === value.finishNodeId || !Array.isArray(value.legs) || !value.legs.length || value.legs.length > 500) fail();
+  const ids = [], used = /* @__PURE__ */ new Set(), legs = [];
+  for (const leg of value.legs) {
+    if (!/^osm:way:[1-9][0-9]*$/.test(leg?.sourceFeatureId) || !sourceIds.includes(leg.sourceFeatureId) || !Number.isInteger(leg.startSegment) || leg.startSegment < 0 || !Number.isInteger(leg.endSegment) || leg.endSegment <= leg.startSegment || leg.endSegment > 3e4 || !["forward", "reverse"].includes(leg.direction)) fail();
+    if (!ids.includes(leg.sourceFeatureId)) ids.push(leg.sourceFeatureId);
+    for (let segment = leg.startSegment; segment < leg.endSegment; segment++) {
+      const key = leg.sourceFeatureId + ":" + segment;
+      if (used.has(key) || used.size >= 3e4) fail();
+      used.add(key);
+    }
+    legs.push(Object.freeze({ sourceFeatureId: leg.sourceFeatureId, startSegment: leg.startSegment, endSegment: leg.endSegment, direction: leg.direction }));
+  }
+  if (JSON.stringify(ids) !== JSON.stringify(sourceIds)) fail();
+  return Object.freeze({ kind: "open-stage-v1", minimumWidthMeters: value.minimumWidthMeters, startNodeId: value.startNodeId, finishNodeId: value.finishNodeId, legs: Object.freeze(legs) });
+}
+var raceVenueMinimumWidth = (venue) => venue?.version === 2 ? venue.stage.minimumWidthMeters : 6;
+function raceVenueContainsInterval(venue, id, segment, start = 0, end = 1) {
+  return !venue?.stage || Number.isInteger(segment) && Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= 1 && start < end && venue.stage.legs.some((leg) => leg.sourceFeatureId === id && segment >= leg.startSegment && segment < leg.endSegment);
 }
 function sameRaceVenueSource(a, b) {
   return JSON.stringify(normalizeRaceVenueSource(a)) === JSON.stringify(normalizeRaceVenueSource(b));
@@ -1452,6 +1475,10 @@ function assertRaceVenueRoads(roads, venue, { partial = false } = {}) {
   const allowed = /* @__PURE__ */ new Set([...venue.sourceFeatureIds, ...venue.pitSourceFeatureIds || []]), found = /* @__PURE__ */ new Set();
   for (const road of roads) {
     if (!allowed.has(road.sourceFeatureId) || !sourceId(road.sourceId) || !road.sourceId.startsWith(road.sourceFeatureId + ":") || [road.a, road.b].some((p) => !p || !Number.isFinite(p.x) || !Number.isFinite(p.z) || Math.hypot(p.x, p.z) > venue.qualificationRadiusWorld + 2e-3)) fail();
+    if (venue.stage) {
+      const parts = road.sourceId.slice(road.sourceFeatureId.length + 1).split(":").map(Number);
+      if (parts.length !== 3 || !raceVenueContainsInterval(venue, road.sourceFeatureId, ...parts)) fail();
+    }
     found.add(road.sourceFeatureId);
   }
   if (!partial && found.size !== allowed.size) fail();
@@ -1634,10 +1661,13 @@ function sliceHeightFields(segment, start, end) {
   const range = segment.heightSampleRange || { start: 0, end: 1 }, span = range.end - range.start;
   return { heightSamples: segment.heightSamples.map(copyHeightSample), heightSampleRange: { start: range.start + span * start, end: range.start + span * end } };
 }
-function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximumGrade = 0.22, venueSource, partialVenue = false } = {}) {
+function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth, maximumGrade = 0.22, venueSource, partialVenue = false } = {}) {
   if (!(metersPerUnit > 0 && metersPerUnit <= 10) || !Array.isArray(roads) || roads.length > 5e4) throw Error("invalid_race_road_source");
   const venue = normalizeRaceVenueSource(venueSource);
   assertRaceVenueRoads(roads, venue, { partial: partialVenue });
+  const widthFloor = raceVenueMinimumWidth(venue);
+  minimumWidth = minimumWidth ?? widthFloor;
+  if (!Number.isFinite(minimumWidth) || minimumWidth < widthFloor) throw Error("invalid_race_minimum_width");
   const nodes = [], edges = [], outgoing = /* @__PURE__ */ new Map(), buckets = /* @__PURE__ */ new Map(), edgeIds = /* @__PURE__ */ new Set();
   function node(point, layer) {
     const gx = Math.round(point.x * 2), gz = Math.round(point.z * 2), key = `${gx}:${gz}:${layer}`;
@@ -1713,6 +1743,7 @@ function buildRaceRoadGraph(roads, { metersPerUnit = 1, minimumWidth = 6, maximu
   return { version: RACE_COURSE_VERSION, metersPerUnit, ...venue ? { venueSource: venue } : {}, nodes, edges, outgoing };
 }
 function createRaceCourse(graph, path, settings = {}) {
+  if (graph.venueSource?.stage) throw Error("race_stage_runtime_unavailable");
   if (!Array.isArray(path) || path.length < 1 || path.length > RACE_MAX_ROUTE_EDGES) throw Error("invalid_race_route");
   const byId = new Map(graph.edges.map((e) => [e.id, e])), edges = path.map((id) => byId.get(id));
   if (edges.some((e) => !e)) throw Error("race_road_missing");
@@ -4456,6 +4487,82 @@ function raceCompetitiveRecordConfiguration(profile, { slot, participants, cours
   return { ...raceRecordConfiguration(profile, { course }), gridRow: Math.floor(slot / 2), gridParticipants: participants, timing: course.discipline === "oval" ? "rolling-green-to-finish" : "grid-to-finish" };
 }
 
+// app/js/racing/venue-courses.js
+function prepareVenueRacePath(district, venue) {
+  if (venue?.status !== "source-prepared" || !Array.isArray(venue.sourceFeatureIds) || !venue.sourceFeatureIds.length) throw Error("race_venue_not_prepared");
+  if (venue.raceAdmission === "pending-timing-line") throw Error("race_venue_timing_line_pending");
+  const graph = buildRaceRoadGraph(district.roads, { metersPerUnit: district.metersPerUnit, venueSource: district.venueSource }), ordered2 = [], edges = new Map(graph.edges.map((e) => [e.id, e]));
+  const stage = graph.venueSource?.stage;
+  if (stage && (!sameRaceVenueSource(venue.venueSource, graph.venueSource) || venue.id !== graph.venueSource.id || venue.sourceSha256 !== graph.venueSource.sourceSha256 || venue.raceDiscipline !== "rally" || venue.mappedLengthMeters !== graph.venueSource.mappedLengthMeters || JSON.stringify(venue.sourceFeatureIds) !== JSON.stringify(graph.venueSource.sourceFeatureIds) || venue.startLine !== void 0 || venue.pitSourceFeatureIds !== void 0)) throw Error("race_venue_stage_identity_invalid");
+  const bySource = /* @__PURE__ */ new Map();
+  for (const road of district.roads) {
+    if (!bySource.has(road.sourceFeatureId)) bySource.set(road.sourceFeatureId, []);
+    const suffix = road.sourceId.slice(road.sourceFeatureId.length + 1).split(":").map(Number);
+    if (suffix.length !== 3 || suffix.some((n) => !Number.isFinite(n)) || !Number.isInteger(suffix[0]) || suffix[0] < 0 || suffix[1] < 0 || suffix[2] > 1 || suffix[1] >= suffix[2]) throw Error("race_venue_source_order_missing");
+    bySource.get(road.sourceFeatureId).push({ road, segment: suffix[0], start: suffix[1], end: suffix[2] });
+  }
+  function orderedRows(ids) {
+    const rows = [];
+    for (const id of ids) {
+      const roads = bySource.get(id);
+      if (!roads?.length) throw Error("race_venue_surface_incomplete");
+      roads.sort((a, b) => a.segment - b.segment || a.start - b.start);
+      for (const row of roads) {
+        const edge = edges.get(row.road.sourceId + ":forward");
+        if (!edge) throw Error("race_venue_direction_unavailable");
+        rows.push({ ...row, edge });
+      }
+    }
+    return rows;
+  }
+  if (stage) {
+    for (const leg of stage.legs) {
+      const rows = [];
+      for (let segment = leg.startSegment; segment < leg.endSegment; segment++) {
+        const interval = (bySource.get(leg.sourceFeatureId) || []).filter((row) => row.segment === segment).sort((a, b) => a.start - b.start);
+        let cursor = 0;
+        if (!interval.length) throw Error("race_venue_surface_incomplete");
+        for (const row of interval) {
+          if (Math.abs(row.start - cursor) > 1e-9) throw Error("race_venue_stage_interval_incomplete");
+          cursor = row.end;
+          rows.push(row);
+        }
+        if (cursor !== 1) throw Error("race_venue_stage_interval_incomplete");
+      }
+      if (leg.direction === "reverse") rows.reverse();
+      for (const row of rows) {
+        const edge = edges.get(row.road.sourceId + ":" + leg.direction);
+        if (!edge) throw Error("race_venue_direction_unavailable");
+        ordered2.push({ ...row, edge });
+      }
+    }
+    if (ordered2.length > RACE_MAX_ROUTE_EDGES) throw Error("invalid_race_route");
+    for (let i = 1; i < ordered2.length; i++) if (ordered2[i - 1].edge.to !== ordered2[i].edge.from) throw Error("disconnected_race_route");
+    if (ordered2.at(-1).edge.to === ordered2[0].edge.from) throw Error("race_venue_stage_not_open");
+    if (Math.abs(ordered2.reduce((sum, row) => sum + row.edge.length, 0) - venue.mappedLengthMeters) / venue.mappedLengthMeters > 0.01) throw Error("race_venue_surface_incomplete");
+  } else ordered2.push(...orderedRows(venue.sourceFeatureIds));
+  const pitPath = venue.pitSourceFeatureIds ? orderedRows(venue.pitSourceFeatureIds).map((row) => row.edge.id) : void 0;
+  let first = 0, startOffsetMeters;
+  if (venue.startLine) {
+    const line = venue.startLine;
+    if (!venue.sourceFeatureIds.includes(line.sourceFeatureId) || !Number.isInteger(line.segment) || line.segment < 0 || !Number.isFinite(line.fraction) || line.fraction <= 0 || line.fraction >= 1) throw Error("race_venue_start_line_invalid");
+    const matches = ordered2.map((row2, index2) => ({ row: row2, index: index2 })).filter(({ row: row2 }) => row2.road.sourceFeatureId === line.sourceFeatureId && row2.segment === line.segment && line.fraction > row2.start && line.fraction < row2.end);
+    if (matches.length !== 1) throw Error("race_venue_start_line_unavailable");
+    const { row, index } = matches[0];
+    first = index;
+    startOffsetMeters = row.edge.length * (line.fraction - row.start) / (row.end - row.start);
+  }
+  const path = [...ordered2.slice(first), ...ordered2.slice(0, first)].map((row) => row.edge.id), label2 = venue.layoutLabel || "GP";
+  return {
+    graph,
+    path,
+    label: label2,
+    ...pitPath ? { pitPath } : {},
+    ...startOffsetMeters !== void 0 ? { startOffsetMeters } : {},
+    diagnostics: { venue: venue.id, sourceWays: venue.sourceFeatureIds.length, qualifiedSpans: path.length }
+  };
+}
+
 // app/js/racing/course-projection.js
 function raceCourseProjection(course, courseId) {
   if (!course.venueSource) return course;
@@ -4764,6 +4871,7 @@ export {
   personalVehicleIdentity,
   export_prepareExplorerCreditAward as prepareExplorerCreditAward,
   prepareRaceDistrictStorage,
+  prepareVenueRacePath,
   raceCompetitiveRecordConfiguration,
   raceCourseKey,
   raceCourseProjection,
