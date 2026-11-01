@@ -2,8 +2,29 @@
 
 Updated October 31, 2026. Launch scope is **Silverstone GP, full Nordschleife
 T13 and Daytona tri-oval**, with the shared real cars and existing racing
-product. The other nine researched layouts are deferred. Nothing in this
-candidate has been deployed to production.
+product. The other nine researched layouts are deferred. This release was
+deployed October 31, 2026 to [World Explorer 3D](https://worldexplorer3d.io/app/).
+The coordinated service, fifteen Functions, indexes, Hosting artifact and six
+reviewed course entries are live.
+
+## Production verification
+
+The custom domain and Firebase Hosting serve the exact frozen build and
+asset-manifest identity below. The production racing authority is healthy and
+uses the frozen service image. All required indexes are ready; six extra
+existing field settings were preserved. Existing server settings and player
+records were retained.
+
+A fresh disposable account passed the normal ReCaptcha Enterprise App Check
+flow without a debug token or environment override, authenticated the production
+WebSocket, read all three reviewed venue catalogues and accessed its own records.
+Missing authentication, invalid attestation and unauthorized moderation were
+rejected. The actual Silverstone world loaded in 36.4 seconds, displayed both
+approved shared GP choices and opened the ground-track creator, with no page
+or WebGL errors. The three HTTP console errors were the intentional 401, 401
+and 403 rejection probes. The test account/profile and owned browser were
+cleaned up. Retained full-lap, pit, damage and creator evidence is not relabelled
+as a repeated production race or physical-device check.
 
 ## Creator and damage extension
 
@@ -164,6 +185,6 @@ geographic support. New damage and room classes have their own acceptance.
 The release packet freezes new matching Functions/service archives, indexes,
 three reviewed catalogue datasets, backend file hashes and explicit Hosting
 configuration. Current-production code and all 84 predecessor ground files
-remain retained by verified hashes. Production, saves and rollback builds are
-unchanged. The earlier three-pack packet remains historical; deploy this
-coordinated creator/contact candidate using the updated rollout instructions.
+remain retained by verified hashes. Existing saves and rollback builds are
+preserved; production now serves the coordinated creator/contact release. The earlier three-pack packet remains historical; use the updated rollout
+instructions for subsequent coordinated updates.

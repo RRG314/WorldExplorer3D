@@ -15,6 +15,13 @@ through the shared road owner without changing the map or native ground.
 See [readiness and evidence limits](RELEASE_READINESS.md). Build and verify the
 matching candidate before rollout.
 
+The October 31 production rollout is complete. The custom domain serves the
+frozen creator/contact build, the dedicated authority is healthy, all fifteen
+Functions and required indexes are ready, and all six curated course entries
+are published. Normal production App Check, authenticated WebSocket access and
+the native shared-route/creator UI passed post-rollout checks. See
+[production verification](RELEASE_READINESS.md).
+
 ## Frozen coordinated inputs
 
 Build from committed, clean source. Preserve the existing production artifact,
@@ -43,7 +50,8 @@ Use the explicit production project `worldexplorer3d-d9b83`. The October 31
 read-only inventory found no deployed racing Functions there; Cloud Run listing
 was permission-denied, so a production racing service was not established by
 that read. Staging's earlier live-service acceptance remains separate.
-These are deployment steps, not evidence that production has been changed.
+The later coordinated rollout completed these steps; this earlier inventory
+remains historical context.
 
 1. Drain active racing before replacing its authority. Build/deploy
    `services/racing/` with its existing Dockerfile and pinned Node version.
@@ -89,8 +97,12 @@ room racing collections. No broader Firestore rules are required. New standard
 contact classes and room-only records coexist with historical courses and times;
 do not overwrite old publications or migrate old results into the new class.
 
-Confirm hosted build/asset identities after deployment. The owner performs
-production deployment separately; local acceptance does not assert production
-App Check, physical-phone, headset or native-store acceptance. Roll back Hosting
+Deploy indexes separately without `--force` to preserve additional production
+field settings. Initial creation of retry-enabled background jobs requires the
+CLI's explicit `--force` acknowledgement; restrict that flag to the named
+Functions deployment, after reviewing their idempotent receipt/cleanup behavior.
+
+Confirm hosted build/asset identities after deployment. Production deployment is now complete and normal production App Check has
+passed. Physical-phone, headset and native-store acceptance remain separate. Roll back Hosting
 to the retained production artifact if delivery fails; preserve current player
 records and immutable history instead of deleting racing data.
