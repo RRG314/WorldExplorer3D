@@ -2,6 +2,26 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## Racing and track creation — deployed 2026-10-31
+
+- Added complete Silverstone GP and pit access, full Nordschleife T13, and
+  Daytona tri-oval with its pit branch; other researched venue packs are deferred.
+- Added the real BMW M3 E46, BMW M3 E92 race car and Porsche 911 Carrera 4S
+  models with existing garage ownership, upgrades and condition.
+- Repaired driving/camera frame interpolation and verified steady held input.
+- Connected racing barrier damage, condition-dependent handling, reconnect
+  and garage handback through the existing vehicle owners.
+- Added one creator workspace for overhead road selection, drive recording
+  and supported roadless tracks, with editable clean layouts and continuous
+  highlights and event barriers.
+- Added current-room track sharing and unranked Journal results, while
+  retaining reviewed public competition, class leaderboards and reward rules.
+- Deployed and verified the coordinated racing service, protected account
+  APIs, required indexes and all three venue catalogues with normal production
+  App Check and authenticated WebSocket access.
+
+[Player guide and release notes](RELEASE_NOTES_RACING.md).
+
 ## [5.6.1] - 2026-10-19
 
 - Local road-detail recovery keeps the selected world and player in place.
