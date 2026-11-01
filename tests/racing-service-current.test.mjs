@@ -6,7 +6,7 @@ import {createRaceConnection} from '../app/js/racing/network-client.js';
 import {createRaceServer} from '../services/racing/transport.mjs';
 import {createNetworkRaceController} from '../app/js/racing/network-controller.js';
 import {advanceRoadRaceFrame} from '../app/js/physics/road-race-delegate.js';
-import {createRaceSession,raceRecordConfiguration,raceCompetitiveRecordConfiguration} from '../services/racing/generated/engine.mjs';
+import {createRaceSession,racePhysicsVersion,raceRecordConfiguration,raceCompetitiveRecordConfiguration} from '../services/racing/generated/engine.mjs';
 import {raceOnlineMetadata} from '../app/js/racing/driver-progress.js';
 import {vrRaceStatus} from '../app/js/vr/race-status.js';
 import {withinDeadline} from '../scripts/verification/owned-browser.mjs';
@@ -112,7 +112,7 @@ test('the actual socket rejects wrong origins/auth and carries an account-scoped
  await new Promise(resolve=>service.server.listen(0,'127.0.0.1',resolve));const endpoint=`ws://127.0.0.1:${service.server.address().port}/race`;
  let connected;const ready=new Promise(resolve=>connected=resolve),errors=[];
  class BrowserSocket extends WebSocket{constructor(url){super(url,{origin:'http://127.0.0.1:4000'});}}
- let owner=true,browserClock=Date.now();const connection=createRaceConnection({uid:'socket-driver',endpoint,now:()=>browserClock,credentials:async()=>({idToken:'controlled-auth',appCheckToken:'controlled-appcheck'}),
+ let owner=true,browserClock=Date.now();const connection=createRaceConnection({uid:'socket-driver',endpoint,physicsVersion:racePhysicsVersion(course),now:()=>browserClock,credentials:async()=>({idToken:'controlled-auth',appCheckToken:'controlled-appcheck'}),
   join:{roomCode:'RACE01',worldSeed:'controlled-world',courseId,vehicleId:'bmw_e34'},isCurrent:()=>owner,WebSocketClass:BrowserSocket,onSnapshot:connected,onError:r=>errors.push(r)});
  try{
   await connection.connect();const state=await withinDeadline(()=>ready,3000,'race socket admission');assert.equal(state.phase,'lobby');assert.equal(connection.connected(),true);assert.deepEqual(errors,[]);
@@ -133,7 +133,7 @@ test('idle sockets revalidate revocation without waiting for another driving com
 });
 test('online frames use the existing road owner, wait for durable completion, and reject replacement worlds before writes',()=>{
  const session=createRaceSession({id:'network',course,creatorUid:'driver',createdAtMs:0});session.add({uid:'driver',profile});session.setReady('driver',true);session.start('driver',0);
- let state={...session.snapshot(),physicsVersion:'earth-road-2026-10-28.2',profiles:{driver:raceRecordConfiguration(profile)}};
+ let state={...session.snapshot(),physicsVersion:racePhysicsVersion(course),profiles:{driver:raceRecordConfiguration(profile,{course})}};
  let controls=0,complete=0,stops=0;const c={worldPublication:{requestId:'one'},car:{x:0,y:1.12,z:10,personalVehicleId:'bmw_e34'},Walk:{state:{mode:'drive'}},activateSurfaceActivity(mode,p){assert.equal(mode,'drive');Object.assign(this.car,{x:p.x,y:p.y+1.12,z:p.z,angle:p.yaw});return true;}};
  let fresh=true;const connection={snapshot:()=>state,connected:()=>true,isFresh:()=>fresh,control:()=>controls++,stop:()=>stops++};
  const run=createNetworkRaceController({context:c,course,connection,uid:'driver',onComplete:()=>complete++});run.start();c.roadRaceController=run;

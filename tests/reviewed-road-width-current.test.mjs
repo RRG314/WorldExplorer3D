@@ -9,7 +9,7 @@ test('all mapped Nordschleife pavement widths survive a narrower reviewed race c
   assert.equal(next.crossSection,before.crossSection);assert.equal(next.crossSection.widthMeters,Number(way.tags.width));widths.add(next.crossSection.widthMeters);assert.deepEqual(before,copy);}
  assert.ok(widths.has(7)&&widths.has(12));
 });
-test('mapped-width preparation probes the complete pavement and preserves private policy without admitting the unfinished venue',()=>{
+test('mapped-width preparation probes the complete pavement and preserves private policy with the accepted venue admission',()=>{
  const descriptor={id:source.venueId,name:'Nordschleife',pavementWidthPolicy:'mapped',groundArtifactId:'fixture',groundContentSha256:'a'.repeat(64),maximumCrossfall:.15};
  const plan=createRacingVenueGroundPlan(descriptor,source),base=createRacingVenueGroundPlan({...descriptor,pavementWidthPolicy:'usable-corridor'},source);
  assert.equal(plan.coverageProbes.length,base.coverageProbes.length);
@@ -20,7 +20,7 @@ test('mapped-width preparation probes the complete pavement and preserves privat
  for(const way of ways)assert.equal(roadSourceSurvey(way)?.pavementWidthPolicy,source.layout.wayIds.includes(way.id)?'mapped':undefined);
  const changed=structuredClone(source);changed.ways.find(w=>w.id===changed.layout.wayIds[0]).tags.width='6';
  assert.throws(()=>createRacingVenueGroundPlan(descriptor,changed),/mapped_pavement_width_invalid/);
- assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).raceAdmission,'pending-timing-line');
+ assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).raceAdmission,'practice');
 });
 test('authored corridor behavior and ordinary roads retain their existing contracts; unknown or wider mapped corridors reject',()=>{
  const original=record({id:1,tags:{highway:'raceway'}});assert.equal(reviewedRoadTransportRecord(original,null),original);

@@ -22,7 +22,7 @@ function run(engine={createRaceSession,createRaceVehicleProfile},{takePit=true,f
  return {state,course,sawPit,sawExit,maximumPitSpeed,maximumPitCheckpoint,midPitState};
 }
 test('a controls-only driver enters the reviewed branch, passes its actual checkpoints, exits and finishes with no boundary contacts',()=>{
- const r=run(),p=r.state.players[0];assert.equal(r.state.phase,'complete');assert.ok(p.progress.finished&&!p.dnf);assert.equal(p.pit.visits,1);assert.ok(r.sawPit&&r.sawExit);assert.ok(r.maximumPitCheckpoint>=17);assert.ok(r.maximumPitSpeed<10.6);assert.equal(p.progress.penaltyMs,0);assert.equal(p.barrierContacts,0);assert.equal(racePhysicsVersion(r.course),RACE_OVAL_PIT_PHYSICS_VERSION);
+ const r=run(),p=r.state.players[0];assert.equal(r.state.phase,'complete');assert.ok(p.progress.finished&&!p.dnf);assert.equal(p.pit.visits,1);assert.ok(r.sawPit&&r.sawExit);assert.ok(r.maximumPitCheckpoint>=17);assert.ok(r.maximumPitSpeed<10.6);assert.equal(p.progress.penaltyMs,0);assert.equal(p.barrierContacts,0);assert.equal(racePhysicsVersion(r.course),RACE_OVAL_PIT_PHYSICS_VERSION+'-contacts1');
 });
 test('a main-track driver passes the shared pit-entry node without being admitted or changing lanes',()=>{
  const r=run(undefined,{takePit:false}),p=r.state.players[0];assert.equal(r.state.phase,'complete');assert.ok(p.progress.finished&&!p.dnf);assert.equal(p.pit.visits,0);assert.equal(p.barrierContacts,0);assert.equal(r.sawPit,false);

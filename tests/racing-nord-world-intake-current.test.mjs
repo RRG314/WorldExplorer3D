@@ -5,7 +5,7 @@ import {RACING_VENUE_SOURCES,racingVenueSourceAt,racingVenueGroundRequirements,l
 import {buildVenueRaceCourses} from '../app/js/racing/venue-courses.js';
 import {raceVenueById} from '../app/js/racing/venue-catalog.js';
 const pack=RACING_VENUE_SOURCES.find(p=>p.id==='nurburgring-nordschleife'),catalog=JSON.parse(fs.readFileSync(new URL('../app/assets/ground/manifest-catalog.json',import.meta.url)));
-test('Nord world inspection keeps the ground group, T13 practice and unfinished catalogue distinct from the ordinary GP location',async()=>{
+test('Nord world inspection keeps the ground group, T13 practice and accepted catalogue distinct from the ordinary GP location',async()=>{
  assert.equal(racingVenueSourceAt(pack.anchor),pack);assert.equal(racingVenueSourceAt({lat:50.3356,lon:6.9475}),null);
  assert.equal(racingVenueGroundRequirements(pack).length,4,'physical source proof remains unchanged');
  const group=racingVenueGroundRequirements(pack,{includeLandscape:true});assert.equal(group.length,8);
@@ -15,6 +15,6 @@ test('Nord world inspection keeps the ground group, T13 practice and unfinished 
   prepared=prepareVenueSourceMerge({},source,pack,{status:'accepted',artifactIds:group.map(g=>g.artifactId),contentSha256s:group.map(g=>g.contentSha256)});
  assert.equal(prepared.metadata.sourceFeatureIds.length,53);assert.equal(prepared.metadata.venueSource.sourceFeatureIds.length,53);
  assert.equal(prepared.metadata.raceAdmission,'practice');assert.equal(raceVenueById(pack.id).status,'researched');
- assert.deepEqual(prepared.metadata.startLine,pack.startLine);assert.equal(prepared.metadata.presentationStatus,'under-construction');
+ assert.deepEqual(prepared.metadata.startLine,pack.startLine);assert.equal(prepared.metadata.presentationStatus,'ready');
  assert.throws(()=>buildVenueRaceCourses({roads:[]},prepared.metadata),/surface_incomplete/);
 });

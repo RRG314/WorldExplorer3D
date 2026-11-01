@@ -28,6 +28,7 @@ function rawFacts(samples=40){
 }
 const courseFrom=facts=>createRaceCourse(buildRaceRoadGraph(facts.roads,{metersPerUnit:facts.metersPerUnit,venueSource:facts.venueSource}),
  facts.roads.map(r=>r.sourceId+':forward'),{...facts,discipline:'circuit',participants:4});
+const factsForSmallCourse=()=>[{sourceId:'small',a:{x:0,y:0,z:0},b:{x:0,y:0,z:250},widthMeters:8,driveable:true,supported:true}];
 const reverse=v=>Array.isArray(v)?v.map(reverse):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).reverse().map(([k,x])=>[k,reverse(x)])):v;
 
 test('long mapped routes reconstruct the same approved geometry and identity; route settings cannot widen an ordinary graph',async()=>{
@@ -78,7 +79,8 @@ test('long join and saved result projections stay small and resolve only to the 
  for(const change of [v=>v.courseId='road-race-'+ 'b'.repeat(32),v=>v.lengthMeters++,v=>v.venueSource.sourceSha256='c'.repeat(64),v=>v.venueSource.sourceFeatureIds.reverse(),v=>v.segments=course.segments]){
   const v=structuredClone(projection);change(v);assert.throws(()=>resolveRaceCourseProjection(v,course,id),/snapshot/);
  }
- const {venueSource,...ordinary}=course;assert.equal(raceCourseProjection(ordinary,id),ordinary,'ordinary joins and stored results retain the existing schema');
+ const {venueSource,...ordinary}=course;assert.equal(raceCourseProjection(ordinary,id).type,'RaceCourseProjection','large ordinary courses also use bounded projections');
+ const small=createRaceCourse(buildRaceRoadGraph(factsForSmallCourse()),['small:forward'],{locationId:'controlled-small',anchor:{lat:50,lon:7}});assert.equal(raceCourseProjection(small,id),small,'small ordinary joins retain their existing schema');
 });
 
 test('browser socket checks the expected long-course key before opening, then supplies reconstructed geometry to the existing callback',async()=>{
@@ -120,7 +122,7 @@ test('explicit source merge shares its immutable extent with each private source
  assert.ok(venue);assert.ok(Object.isFrozen(venue));
  for(const way of result.data.elements.filter(e=>e.type==='way'&&result.metadata.layoutWayIds.includes(e.id)))assert.equal(roadSourceSurvey(way).venueSource,venue);
  assert.equal(JSON.stringify(result.data).includes('mappedLengthMeters'),false);
- assert.throws(()=>prepareVenueSourceMerge({},source,{...descriptor,routeExtent:'unsupported'},ground),/extent_invalid/);
+ assert.throws(()=>prepareVenueSourceMerge({},source,{...descriptor,routeExtent:'unsupported'},ground),/venue_pit_review_unavailable/);
 });
 
 // A transaction adapter and terminal fixture isolate the changed result shape.

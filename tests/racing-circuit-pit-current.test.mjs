@@ -33,7 +33,7 @@ test('an ordinary-pavement circuit starts standing, drives its real pit checkpoi
  const r=run(),p=r.state.players[0];assert.equal(r.state.phase,'complete');assert.ok(p.progress.finished&&!p.dnf);assert.ok(r.sawPit&&r.sawExit);
  assert.equal(p.pit.visits,1);assert.ok(r.maximumGate>=17);assert.equal(p.barrierContacts,0);assert.equal(p.progress.penaltyMs,0);
  assert.equal(r.state.raceControl,undefined);assert.equal(p.trackZone,undefined);assert.equal(p.draftingReduction,undefined);
- assert.equal(p.pit.speedLimitMetersPerSecond,CIRCUIT_PIT_SPEED_METERS_PER_SECOND);assert.equal(racePhysicsVersion(r.course),RACE_CIRCUIT_PIT_PHYSICS_VERSION);
+ assert.equal(p.pit.speedLimitMetersPerSecond,CIRCUIT_PIT_SPEED_METERS_PER_SECOND);assert.equal(racePhysicsVersion(r.course),RACE_CIRCUIT_PIT_PHYSICS_VERSION+'-contacts1');
 });
 test('passing the shared circuit entry on the main course grants no pit visit',()=>{
  const r=run(undefined,{takePit:false}),p=r.state.players[0];assert.equal(r.state.phase,'complete');assert.ok(p.progress.finished&&!p.dnf);
@@ -45,13 +45,13 @@ test('a circuit timing line inside the branch finishes only after the required p
 });
 test('circuit pit replay and class identity agree in the browser and both generated authority engines',async()=>{
  const browser=run(),service=await import('../services/racing/generated/engine.mjs'),functions=createRequire(import.meta.url)('../functions/generated/racing-engine.cjs');
- for(const engine of [service,functions]){assert.deepEqual(run(engine).state,browser.state);assert.equal(engine.racePhysicsVersion(browser.course),RACE_CIRCUIT_PIT_PHYSICS_VERSION);}
+ for(const engine of [service,functions]){assert.deepEqual(run(engine).state,browser.state);assert.equal(engine.racePhysicsVersion(browser.course),RACE_CIRCUIT_PIT_PHYSICS_VERSION+'-contacts1');}
  const f=createCircuitPitFixture(),facts=canonicalRaceDistrict({type:'RaceDistrictFacts',version:1,roads:f.roads,venueSource:f.venueSource,metersPerUnit:1,anchor:f.settings.anchor}),
   fingerprint=await raceDistrictFingerprint(facts),reference=raceCourseReference(f.course,fingerprint),restored=await reconstructPublishedRace(reference,facts),
   approvedBrowser=restoreRaceCourse(reference,facts,buildRaceRoadGraph(facts.roads,{metersPerUnit:1,venueSource:facts.venueSource}),fingerprint);
  // Class identity is built from the same canonical approved millimetre facts,
  // not from the pre-publication floating-point fixture.
- assert.equal(await raceCourseKey(restored),await raceCourseKey(approvedBrowser));assert.equal(racePhysicsVersion(restored),RACE_CIRCUIT_PIT_PHYSICS_VERSION);
+ assert.equal(await raceCourseKey(restored),await raceCourseKey(approvedBrowser));assert.equal(racePhysicsVersion(restored),RACE_CIRCUIT_PIT_PHYSICS_VERSION+'-contacts1');
 });
 test('circuit entry overspeed receives one session-owned penalty, with no oval restriction fields',()=>{
  const r=run(undefined,{paceMetersPerSecond:22}),p=r.state.players[0];assert.equal(r.state.phase,'complete');assert.ok(p.progress.finished&&!p.dnf);assert.equal(p.pit.visits,1);

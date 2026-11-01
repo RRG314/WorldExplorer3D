@@ -106,9 +106,9 @@ test('catalogue, trusted service reconstruction and curated ownership all consum
  const h=database();await publishPreparedRacingDistrict(h.db,prepared,1);
  const graph=buildRaceRoadGraph(prepared.facts.roads),course=createRaceCourse(graph,['storage-00000:forward'],{...prepared.facts,participants:4});
  const reference=raceCourseReference(course,fingerprint),id=await raceCourseKey(course),revision=hash({districtId:prepared.id,reference});
- h.rows.set('racingCourses/'+id,{districtId:prepared.id,ownerUid:'creator',reference,revision,status:'approved',qualification:{revision,physicsVersion:RACE_PHYSICS_VERSION,resultId:'qualification',timeMs:12345}});
+ h.rows.set('racingCourses/'+id,{districtId:prepared.id,ownerUid:'creator',reference,revision,status:'approved',physicsVersion:RACE_PHYSICS_VERSION+'-contacts1',qualification:{revision,physicsVersion:RACE_PHYSICS_VERSION+'-contacts1',resultId:'qualification',timeMs:12345}});
  h.rows.set('users/creator/racingRoutes/'+id,{districtId:prepared.id,status:'approved'});
- h.rows.set('racingResults/qualification',{fingerprint:'b'.repeat(64),receipt:{purpose:'qualification',courseId:id,courseRevision:revision,physicsVersion:RACE_PHYSICS_VERSION,players:[{uid:'creator',finished:true,timeMs:12345,credits:0}]}});
+ h.rows.set('racingResults/qualification',{fingerprint:'b'.repeat(64),receipt:{purpose:'qualification',courseId:id,courseRevision:revision,physicsVersion:RACE_PHYSICS_VERSION+'-contacts1',players:[{uid:'creator',finished:true,timeMs:12345,credits:0}]}});
  const loaded=await readPublishedRaceCourse({id,uid:'viewer',read:async path=>h.rows.get(path)||null});assert.equal(loaded.lengthMeters,250);
  const catalog=await backend.readRacingCatalog({db:h.db,uid:'viewer',locationId:prepared.facts.locationId});assert.equal(catalog.courses[0].id,id);assert.deepEqual(catalog.district.facts,prepared.facts);
  const adoption=await backend.adoptCuratedRacingRoute({db:h.db,admin:h.admin,id,ownerUid:'creator',revision,note:'Controlled chunked course provenance',approve:true});

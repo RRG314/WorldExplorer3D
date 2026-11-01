@@ -12,8 +12,8 @@ const read=file=>fs.readFile(new URL('../'+file,import.meta.url),'utf8'),descrip
 test('pinned Daytona sections require the verified source-load annotation and matching artifact bytes',async()=>{
  const source=await loadRacingVenueSource(descriptor,{fetchImpl}),ground={status:'accepted',artifactIds:[descriptor.groundArtifactId],contentSha256s:[descriptor.groundContentSha256]};
  const merged=prepareVenueSourceMerge({},source,descriptor,ground);assert.equal(merged.metadata.raceAdmission,'practice');
- assert.deepEqual(merged.metadata.startLine,{sourceFeatureId:'osm:way:11371365',segment:0,fraction:.6});assert.equal(merged.metadata.presentationStatus,'under-construction');
- const ways=merged.data.elements.filter(w=>w.type==='way'&&roadSourceSurvey(w));assert.equal(ways.length,5);assert.ok(ways.every(w=>roadSourceSurvey(w).sourcePavementSections&&roadSourceSurvey(w).usableWidthMeters===6));
+ assert.deepEqual(merged.metadata.startLine,{sourceFeatureId:'osm:way:11371365',segment:0,fraction:.6});assert.equal(merged.metadata.presentationStatus,'ready');
+ const ways=merged.data.elements.filter(w=>w.type==='way'&&roadSourceSurvey(w));assert.equal(ways.length,7);assert.ok(ways.every(w=>roadSourceSurvey(w).sourcePavementSections&&roadSourceSurvey(w).usableWidthMeters===6));
  assert.throws(()=>prepareVenueSourceMerge({},JSON.parse(JSON.stringify(source)),descriptor,ground),/source_not_prepared/);
  await assert.rejects(loadRacingVenueSource(descriptor,{fetchImpl:async url=>({ok:true,text:async()=>await read(url.slice(1))+(url===descriptor.reviewedPavementSections.url?' ':'')})}),/integrity_failed/);
 });

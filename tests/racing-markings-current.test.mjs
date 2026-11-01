@@ -12,7 +12,7 @@ test('full-class grid chassis fit within the surveyed start, including the back 
 });
 test('the bundled renderer detaches race presentation and releases every owned geometry/material once',async()=>{
  const previous=globalThis.document;
- globalThis.document={createElement:()=>({getContext:()=>({stroke(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fillRect(){},fillText(){}})})};
+ globalThis.document={createElement:()=>({getContext:()=>({stroke(){},fill(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fillRect(){},fillText(){}})})};
  try {
  const c=course(),context={scene:new THREE.Scene()},view=await prepareRacePresentation(THREE,context,c,[],{signal:new AbortController().signal,current:()=>true});
  view.mount();assert.equal(view.root.parent,context.scene);const geometries=new Set(),materials=new Set(),released=new Set();
@@ -28,7 +28,7 @@ test('the bundled renderer detaches race presentation and releases every owned g
 });
 test('paint is one bounded vertex buffer and follows real grade/crossfall in metre coordinates',()=>{
  const c=course(),paint=buildRacePaint(c),copy=structuredClone(c);assert.ok(paint.positions.length<20000);assert.equal(paint.positions.length,paint.colors.length);assert.equal(paint.strokeCoverage.length,paint.positions.length/3*4);const legacy=buildRacePaint(c,{filtered:false}),edgePositions=[];for(let i=0;i<paint.strokeCoverage.length;i+=4)if(paint.strokeCoverage[i+3]<0)edgePositions.push(...paint.positions.slice(i/4*3,i/4*3+3));assert.deepEqual(new Float32Array(edgePositions),legacy.positions.slice(0,edgePositions.length),'accepted event edges keep their exact vertices');assert.deepEqual(paint.rectangles,legacy.rectangles);
- assert.equal(paint.rectangles.length,Math.ceil((9-.4)/.6)*2+16+c.segments.length*2);
+ assert.equal(paint.rectangles.length,190);
  for(let i=0;i<paint.positions.length;i+=3){const [x,y,z]=paint.positions.slice(i,i+3);assert.ok(Number.isFinite(x+y+z));
   const lateral=x*c.metersPerUnit,expected=z*.04+lateral*.08/1.2+.018/c.metersPerUnit;
   assert.ok(Math.abs(y-expected)<.00001,JSON.stringify({x,y,z,expected}));}

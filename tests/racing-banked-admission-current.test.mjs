@@ -10,7 +10,7 @@ import {buildRaceRoadGraph,createRaceCourse} from '../app/js/racing/course-rules
 import {canonicalRaceDistrict,assertRaceCourseInDistrict,reconstructPublishedRace,readPublishedRaceCourse,raceLocationKey} from '../app/js/racing/publication-rules.js';
 import {prepareRaceDistrictStorage,readRaceDistrictFacts} from '../app/js/racing/district-storage.js';
 import {raceDistrictFingerprint,raceCourseKey,raceCourseReference} from '../app/js/racing/course-library.js';
-import {racePhysicsVersion,RACE_PHYSICS_VERSION,RACE_BANKED_PHYSICS_VERSION,raceRecordConfiguration,raceCompetitiveRecordConfiguration,racePracticeRecordKey} from '../app/js/racing/record-rules.js';
+import {racePhysicsVersion,RACE_PHYSICS_VERSION,RACE_BANKED_PHYSICS_VERSION as LEGACY_BANKED_PHYSICS_VERSION,raceRecordConfiguration,raceCompetitiveRecordConfiguration,racePracticeRecordKey} from '../app/js/racing/record-rules.js';
 import {raceNetworkProfile} from '../app/js/racing/network-controller.js';
 import {createRaceConnection} from '../app/js/racing/network-client.js';
 import {createRaceSession,createRaceVehicleProfile} from '../services/racing/generated/engine.mjs';
@@ -25,6 +25,7 @@ function rawFacts(bank=.2,marked=true){
    ...(marked?{surfaceModel:BANKED_ROAD_MODEL}:{}),widthMeters:8,direction:'forward',structure:'surface',clearanceMeters:0,driveable:true,supported:true,heightSampleSpanMeters:1.2,
    heightSamples:[0,1].map(t=>({t,y:10,leftY:10+bank*1.2,rightY:10-bank*1.2}))}]};
 }
+const RACE_BANKED_PHYSICS_VERSION=LEGACY_BANKED_PHYSICS_VERSION+'-contacts1';
 const courseFrom=facts=>createRaceCourse(buildRaceRoadGraph(facts.roads,{metersPerUnit:facts.metersPerUnit}),['controlled-bank:forward'],facts);
 
 test('only a finalized explicitly banked reviewed surface can qualify published high-bank triangles',async t=>{
@@ -66,7 +67,7 @@ test('banked facts survive canonical storage and reconstruction, and selected so
 });
 
 test('ordinary immutable IDs and record versions remain exact while banked classes and network profiles partition',async()=>{
- const ordinary=rawFacts(.1,false),course=courseFrom(ordinary),banked=courseFrom(rawFacts()),profile=createRaceVehicleProfile('bmw_e34');
+ const ordinary=rawFacts(.1,false),course=courseFrom({...ordinary,eventRules:null}),banked=courseFrom(rawFacts()),profile=createRaceVehicleProfile('bmw_e34');
  assert.equal(await raceDistrictFingerprint(ordinary),'race-district:4bc93b797690967feb93e5ba601715a508f07fa00ccae6e43b147e85b5d337d0');
  assert.equal(await raceCourseKey(course),'road-race-ac49ac0a201471ff4963fe0e59be5018');
  assert.equal(racePhysicsVersion(course),RACE_PHYSICS_VERSION);

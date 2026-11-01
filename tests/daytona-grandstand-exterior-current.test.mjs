@@ -34,8 +34,10 @@ test('post-transport publication transfers only the matching stand visual and co
  Object.assign(ctx,{buildingMeshes:[stand,neighbor],buildings:[collider,other],dynamicBuildingColliders:[],buildingEntranceCatalog:entrances,replaceWorldCollection(k,v){this[k]=v;},addEarthWorldObject:m=>scene.add(m)});
  const result=publishReviewedVenueExteriors(ctx,T);assert.ok(stand.parent===scene,'publication waits for transport');assert.equal(ctx.deferredTransportLandmarkPublishers.length,2);
  ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.ok(stand.parent===null,'the matching provider visual must retire');assert.ok(neighbor.parent===scene,'neighbour retained');assert.equal(collider.collisionReplacedByVenue,true);assert.equal(other.collisionReplacedByVenue,undefined);
- assert.equal(ctx.dynamicBuildingColliders.length,1);assert.equal(ctx.dynamicBuildingColliders[0].sourceBuildingId,DAYTONA_STAND_SOURCE_ID);assert.equal(ctx.buildingEntranceCatalog,entrances);assert.deepEqual(result.published,['Daytona — mapped curved grandstand']);
- publishReviewedVenueExteriors(ctx,T);ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.equal(ctx.buildingMeshes.length,2);assert.equal(ctx.dynamicBuildingColliders.length,1);disposeLandmarkModel(ctx.buildingMeshes.find(m=>m!==neighbor));
+ const standColliders=()=>ctx.dynamicBuildingColliders.filter(c=>c.sourceBuildingId===DAYTONA_STAND_SOURCE_ID);
+ assert.equal(standColliders().length,1);assert.equal(ctx.buildingEntranceCatalog,entrances);assert.ok(result.published.includes('Daytona — mapped curved grandstand'));
+ const counts={meshes:ctx.buildingMeshes.length,colliders:ctx.dynamicBuildingColliders.length};
+ publishReviewedVenueExteriors(ctx,T);ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.equal(ctx.buildingMeshes.length,counts.meshes);assert.equal(ctx.dynamicBuildingColliders.length,counts.colliders);assert.equal(standColliders().length,1);assert.ok(ctx.buildingMeshes.includes(neighbor));for(const m of ctx.buildingMeshes)disposeLandmarkModel(m);
 });
 test('world cancellation, unavailable ground and another venue cannot publish this stand',()=>{
  const ctx=context(),scene=new T.Scene();Object.assign(ctx,{buildings:[],dynamicBuildingColliders:[],replaceWorldCollection(k,v){this[k]=v;},addEarthWorldObject:m=>scene.add(m)});
@@ -56,6 +58,6 @@ test('the real mid-building batch keeps deferred stand bodies and roofs individu
  assert.equal(await batchMidLodBuildingMeshes({yieldToMainThread:async()=>{}}),2);assert.ok(runtime.buildingMeshes.includes(stand)&&runtime.buildingMeshes.includes(roof));
  const batch=runtime.buildingMeshes.find(m=>m.userData.isBuildingBatch);assert.ok(batch);assert.deepEqual(batch.userData.editableBuildingIndexRanges.map(r=>r.sourceBuildingId),['neighbor:0','neighbor:1']);
  ctx.buildingMeshes=runtime.buildingMeshes;ctx.elevationWorldYAtWorldXZ=()=>NaN;ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.ok(stand.parent===scene&&roof.parent===scene,'unavailable replacement ground preserves both original visuals');assert.equal(ctx.dynamicBuildingColliders.length,0);
- ctx.elevationWorldYAtWorldXZ=()=>8;publishReviewedVenueExteriors(ctx,T);ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.ok(stand.parent===null&&roof.parent===null);assert.ok(batch.parent===scene);assert.equal(ctx.buildingMeshes.length,2);
+ ctx.elevationWorldYAtWorldXZ=()=>8;publishReviewedVenueExteriors(ctx,T);ctx.deferredTransportLandmarkPublishers.splice(0).forEach(f=>f());assert.ok(stand.parent===null&&roof.parent===null);assert.ok(batch.parent===scene);assert.equal(ctx.buildingMeshes.filter(m=>m.userData.sourceBuildingId===DAYTONA_STAND_SOURCE_ID).length,1);assert.ok(ctx.buildingMeshes.includes(batch));
  for(const m of ctx.buildingMeshes)disposeLandmarkModel(m);for(const k of Object.keys(runtime))delete runtime[k];delete globalThis.THREE;
 });

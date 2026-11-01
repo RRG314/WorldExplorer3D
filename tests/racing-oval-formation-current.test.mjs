@@ -15,7 +15,7 @@ function session(engine={createRaceSession,createRaceVehicleProfile},id='rolling
 }
 test('oval admission requires the reviewed whole-loop physical bank lane and keeps a distinct record class',()=>{
  const {roads,graph,course,settings}=createOvalFormatFixture();assert.equal(course.discipline,'oval');assert.equal(course.laps,2);
- assert.equal(racePhysicsVersion(course),RACE_OVAL_PHYSICS_VERSION);assert.equal(racePhysicsVersion({...course,discipline:'circuit'}),RACE_PROFILED_PAVEMENT_PHYSICS_VERSION);
+ assert.equal(racePhysicsVersion(course),RACE_OVAL_PHYSICS_VERSION+'-contacts1');assert.equal(racePhysicsVersion({...course,discipline:'circuit'}),RACE_PROFILED_PAVEMENT_PHYSICS_VERSION+'-contacts1');
  assert.equal(raceCompetitiveRecordConfiguration(profile,{course,slot:0,participants:4}).timing,'rolling-green-to-finish');
  const ordinary=buildRaceRoadGraph(roads);assert.throws(()=>createRaceCourse(ordinary,ordinary.edges.map(e=>e.id),settings),/oval_pavement_required/);
  const missing=structuredClone(roads);for(const r of missing)for(const row of r.heightSamples)delete row.racingWidthMeters;const g=buildRaceRoadGraph(missing,{venueSource:graph.venueSource});assert.throws(()=>createRaceCourse(g,g.edges.map(e=>e.id),settings),/oval_pavement_required/);

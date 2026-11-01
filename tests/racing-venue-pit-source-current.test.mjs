@@ -29,7 +29,7 @@ test('pit source requires reviewed ordering, two real main joins and all hash-bo
 
 test('pit adoption carries the same private publication authority into the existing road compiler without granting other raceways that authority',()=>{
  const prepared=prepareVenueSourceMerge({},source,pack,ground),venue=prepared.metadata.venueSource,frame=earthCoordinateFrame(pack.anchor,100000);
- assert.deepEqual(venue.sourceFeatureIds,layout.wayIds.map(id=>`osm:way:${id}`));assert.deepEqual(venue.pitSourceFeatureIds,pit.sourceFeatureIds);assert.equal(prepared.metadata.raceAdmission,'practice');assert.equal(prepared.metadata.presentationStatus,'under-construction');assert.equal(prepared.metadata.mappedLengthMeters,layout.lengthMeters);
+ assert.deepEqual(venue.sourceFeatureIds,layout.wayIds.map(id=>`osm:way:${id}`));assert.deepEqual(venue.pitSourceFeatureIds,pit.sourceFeatureIds);assert.equal(prepared.metadata.raceAdmission,'practice');assert.equal(prepared.metadata.presentationStatus,'ready');assert.equal(prepared.metadata.mappedLengthMeters,layout.lengthMeters);
  for(const id of pit.wayIds){const way=prepared.data.elements.find(e=>e.type==='way'&&e.id===id),survey=roadSourceSurvey(way),native=layout.ways.get(id);
   assert.equal(survey.venueSource,venue);assert.equal(survey.maximumCrossfall,.15);assert.deepEqual(way.tags.name,native.tags.name);assert.equal(roadSourceSurvey(JSON.parse(JSON.stringify(way))),null);
   const profile=roadPavementSectionsInWorld(survey.sourcePavementSections,native.geometry.map(p=>frame.toWorld(p.lat,p.lon)),1.11,{geoToWorld:(lat,lon)=>frame.toWorld(lat,lon)}),record={identity:`osm:way:${id}`,crossSection:{widthMeters:6,placement:{}},provenance:{}},evidence={...survey,pavementSections:profile};

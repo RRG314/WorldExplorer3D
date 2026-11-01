@@ -47,7 +47,7 @@ test('complete source-bound open stages bind conditions, ordered splits, pace no
  assert.deepEqual(raceGridPose(course,0),raceGridPose(course,1),'staggered entrants use the same physical start');
  assert.deepEqual(course.rally.segmentSurfaces,['asphalt-dry','asphalt-dry','gravel-dry','gravel-dry','snow-ice']);
  assert.ok(Object.isFrozen(course.rally));assert.ok(Object.isFrozen(course.rally.splits[0]));
- assert.equal(racePhysicsVersion(course),'earth-rally-2026-10-31.2');
+ assert.equal(racePhysicsVersion(course),'earth-rally-2026-10-31.2-contacts1');
  assert.equal(raceCompetitiveRecordConfiguration(profile,{course,slot:1,participants:2}).timing,'individual-stage-start-to-finish');
  assert.throws(()=>createRaceCourse(graph,path.slice(1),{...course}),/rally_path_incomplete/);
  assert.throws(()=>createRaceCourse(graph,path,{...course,discipline:'sprint'}),/rally_source_required/);

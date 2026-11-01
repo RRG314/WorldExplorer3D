@@ -50,14 +50,17 @@ test('local curated models cover every road-traffic variant and the response fle
   const coveredVariants = [...new Set(assets.flatMap((asset) => asset.vehicleVariantIds || []))].sort();
   assert.deepEqual(coveredVariants, [
     'box_truck', 'city_bus', 'compact', 'delivery_van', 'pickup', 'responder', 'sedan', 'suv', 'taxi', 'van',
-    'delorean', 'cadillac_coupe', 'cadillac_fleetwood', 'golf_ii', 'datsun_280z'
+    'delorean', 'cadillac_coupe', 'cadillac_fleetwood', 'golf_ii', 'datsun_280z',
+    'bmw_m3_e46', 'bmw_m3_e92_race', 'porsche_carrera_4s'
   ].sort());
   assert.equal(modelAssetsForRole('responder-road-vehicle').length, 1);
+  const racingAssets = new Set(['road-bmw-m3-e46', 'road-bmw-m3-e92-race', 'road-porsche-911-carrera-4s']);
   for (const asset of assets) {
     assert.ok(['existing-road-vehicle-envelope', 'existing-responder-vehicle-envelope'].includes(asset.collisionPolicy));
     assert.deepEqual(asset.instancePolicy, { geometry: 'shared', materials: 'clone' });
-    assert.ok(asset.budgets.maxInstances >= 8);
-    assert.match(asset.url, /^\/app\/assets\/models\/vehicles\/(traffic|explorer-fleet)\//);
+    if (racingAssets.has(asset.id)) assert.equal(asset.budgets.maxInstances, 4, asset.id);
+    else assert.ok(asset.budgets.maxInstances >= 8, asset.id);
+    assert.match(asset.url, /^\/app\/assets\/models\/vehicles\/(traffic|explorer-fleet|racing-fleet)\//);
     const file = path.join(root, asset.url.replace(/^\/app\//, 'app/'));
     const { bytes, json } = readGlbAssetMetadata(file);
     assert.ok(bytes.length <= asset.budgets.bytes);

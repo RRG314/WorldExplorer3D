@@ -19,7 +19,7 @@ test('the complete independently sourced Nordschleife keeps T13, all original sp
  assert.ok(layout.points.some((p,i)=>i&&geographicVenueDistance(layout.points[i-1],p)<.5),'retain the real sub-half-metre source span');
  const missing=structuredClone(source);missing.layout.wayIds.shift();assert.throws(()=>compileMappedVenueLayout(missing),/not_closed/);
 });
-test('the graph and saved reference preserve every Nordschleife span while physical long-venue admission remains closed',()=>{
+test('the graph and saved reference preserve every Nordschleife span with its accepted presentation status',()=>{
  // Topology-only fixture, explicitly not a terrain or playable-course survey.
  const layout=compileMappedVenueLayout(source),frame=earthCoordinateFrame({lat:50.359,lon:6.963},100000),roads=[];
  for(const id of layout.wayIds){const way=layout.ways.get(id);for(let i=0;i<way.nodes.length-1;i++)roads.push({sourceId:`osm:way:${id}:${i}`,
@@ -34,7 +34,7 @@ test('the graph and saved reference preserve every Nordschleife span while physi
  assert.throws(()=>normalizeRaceRouteReference({...reference,path:[...reference.path,path[0]]}),/invalid_saved/);
  assert.throws(()=>createRaceCourse(graph,path,{locationId:'topology-only',anchor:{lat:50.359,lon:6.963},discipline:'circuit'}),/race_route_length/);
  assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).raceAdmission,'practice');
- assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).presentationStatus,'under-construction','source topology alone cannot finish venue presentation');
+ assert.equal(RACING_VENUE_SOURCES.find(pack=>pack.id===source.venueId).presentationStatus,'ready','the accepted three-venue release marks this pack ready');
 });
 test('both OSM pit-lane spellings are excluded from a reviewed main-course layout',()=>{
  for(const spelling of ['pitlane','pit_lane']){const changed=structuredClone(source);changed.ways.find(w=>w.id===changed.layout.wayIds[0]).tags.raceway=spelling;

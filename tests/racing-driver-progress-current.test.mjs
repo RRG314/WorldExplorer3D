@@ -12,7 +12,7 @@ test('practice records separate cars, installed builds, condition, grip and surv
  assert.equal(await racePracticeRecordKey(structuredClone(c),createRaceVehicleProfile('bmw_e34')),base);
  const keys=await Promise.all([createRaceVehicleProfile('delorean'),createRaceVehicleProfile('bmw_e34',{levels:{'engine-tune':1}}),
   createRaceVehicleProfile('bmw_e34',{condition:.8}),createRaceVehicleProfile('bmw_e34',{grip:.7})].map(p=>racePracticeRecordKey(c,p)));
- assert.equal(new Set([base,...keys]).size,5);c.segments[0].a.y=4;assert.notEqual(await racePracticeRecordKey(c,p),base);
+ assert.equal(new Set([base,...keys]).size,5);const changed=structuredClone(c);changed.segments[0].a.y=4;assert.notEqual(await racePracticeRecordKey(changed,p),base);assert.equal(c.segments[0].a.y,2);
  assert.match(base,/^race-practice-[a-f0-9]{32}$/);
 });
 test('collector reads preserve both Cadillacs and ordinary/utility choices without granting ownership',()=>{

@@ -16,9 +16,9 @@ function fixture(){
   for(const [kind,path,value]of pending){writes.push({kind,path});if(kind==='delete')rows.delete(path);else rows.set(path,kind==='merge'?{...rows.get(path),...value}:value);}return result;
  }};
  const admin={firestore:{Timestamp:{fromMillis:value=>({toMillis:()=>value})}}};
- rows.set(route,{ownerUid:'creator',status:'approved',revision,reference,districtId,qualification:{resultId:'test-result',revision,physicsVersion:RACE_PHYSICS_VERSION,timeMs:12345}});
+ rows.set(route,{ownerUid:'creator',status:'approved',revision,reference,districtId,physicsVersion:RACE_PHYSICS_VERSION+'-contacts1',qualification:{resultId:'test-result',revision,physicsVersion:RACE_PHYSICS_VERSION+'-contacts1',timeMs:12345}});
  rows.set('racingDistricts/'+districtId,{status:'approved',facts});rows.set('racingLocations/'+locationKey(facts.locationId),{districtId});rows.set(source,{status:'approved'});
- rows.set('racingResults/test-result',{fingerprint:'a'.repeat(64),receipt:{purpose:'qualification',courseId:id,courseRevision:revision,physicsVersion:RACE_PHYSICS_VERSION,players:[{uid:'creator',finished:true,timeMs:12345,credits:0}]}});
+ rows.set('racingResults/test-result',{fingerprint:'a'.repeat(64),receipt:{purpose:'qualification',courseId:id,courseRevision:revision,physicsVersion:RACE_PHYSICS_VERSION+'-contacts1',players:[{uid:'creator',finished:true,timeMs:12345,credits:0}]}});
  const input={db,admin,id,ownerUid:'creator',revision,note:'First-party starter course; reviewed geographic credits.',nowMs:1700000000000};
  return {rows,writes,route,source,db,admin,input,adopt:approve=>adoptCuratedRacingRoute({...input,approve}),read:path=>Promise.resolve(rows.get(path)||null)};
 }

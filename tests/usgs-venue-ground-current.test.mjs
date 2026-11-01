@@ -7,7 +7,7 @@ import {compileGroundArtifact} from '../app/js/terrain/ground-artifact.js';
 import {compileMappedVenueLayout} from '../app/js/racing/venue-layout.js';
 import {geographicToWebMercatorMeters} from '../app/js/terrain/source-contract.js';
 import {sampleDistrictGroundElevationMeters as sample} from '../app/js/world/compiler/district-ground-model.js';
-import {RACING_VENUE_SOURCES,prepareVenueSourceMerge,createRacingVenueGroundPlan} from '../app/js/racing/venue-source-packs.js';
+import {RACING_VENUE_SOURCES,loadRacingVenueSource,prepareVenueSourceMerge,createRacingVenueGroundPlan} from '../app/js/racing/venue-source-packs.js';
 import {roadSourceSurvey} from '../app/js/world/road-source-survey.js';
 import {buildVenueRaceCourses} from '../app/js/racing/venue-courses.js';
 const read=file=>fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
@@ -20,9 +20,9 @@ test('native window decoding retains the original pixel-centre affine, endian va
  const missing=Buffer.from(bytes);missing.writeFloatLE(m.nodata,0);const hole=decodeNativeRasterWindow(m,missing,options);
  assert.throws(()=>sampleNativeRaster(hole,x+1,z-1),/missing_source/);assert.throws(()=>sampleNativeRaster(r,x-.1,z-1),/outside_source/);
 });
-test('the actual compact Daytona ground covers the whole exact oval and retains varying measured banks through the shared compiler',()=>{
- const text=read('app/assets/ground/daytona/ground-artifact.json'),artifact=JSON.parse(text),manifest=JSON.parse(read('app/assets/ground/daytona/ground-manifest.json')),source=JSON.parse(read('app/assets/racing/daytona/source.json')),descriptor=RACING_VENUE_SOURCES.find(s=>s.id===source.venueId),layout=compileMappedVenueLayout(source),compiled=compileGroundArtifact({manifest,artifact});
- assert.equal(crypto.createHash('sha256').update(text).digest('hex'),descriptor.groundContentSha256);assert.equal(manifest.contentSha256,descriptor.groundContentSha256);assert.equal(compiled.status,'accepted');assert.equal(artifact.grid.sampleCount,669685);
+test('the actual compact Daytona ground covers the whole exact oval and retains varying measured banks through the shared compiler',async()=>{
+ const text=read('app/assets/ground/daytona/ground-artifact.json'),artifact=JSON.parse(text),manifest=JSON.parse(read('app/assets/ground/daytona/ground-manifest.json')),descriptor=RACING_VENUE_SOURCES.find(s=>s.id==='daytona-tri-oval'),source=await loadRacingVenueSource(descriptor,{fetchImpl:async url=>({ok:true,text:async()=>read(url.slice(1))})}),layout=compileMappedVenueLayout(source),compiled=compileGroundArtifact({manifest,artifact});
+ assert.equal(crypto.createHash('sha256').update(text).digest('hex'),descriptor.groundContentSha256);assert.equal(manifest.contentSha256,descriptor.groundContentSha256);assert.equal(compiled.status,'accepted');assert.equal(artifact.grid.sampleCount,689533);
  assert.equal(manifest.sourceEvidence.sourceVerticalAccuracyMeters,null);assert.equal(manifest.sourceEvidence.normalizationUncertaintyIncludesSourceAccuracy,false);assert.equal(manifest.sourceEvidence.normalization.accuracyMeters,5.125);assert.ok(manifest.sourceEvidence.quantization.maximumErrorMeters<=.0050001);
  const failure=geographicToWebMercatorMeters(29.19188026901,-81.0660516259155);
  assert.ok(Number.isFinite(sample(compiled.model,failure.eastingMeters,failure.northingMeters)),'the actual first native refinement failure must be inside the delivered ground');
@@ -38,7 +38,7 @@ test('the actual compact Daytona ground covers the whole exact oval and retains 
  }}
  assert.equal(stations,2196);assert.ok(high>200&&low>200,'real banks and flatter sections cannot be replaced by a constant tilt');assert.ok(maximumGrade<.22);
  const neighbor={type:'way',id:999,nodes:[1,2],tags:{building:'yes'}},merged=prepareVenueSourceMerge({elements:[neighbor]},source,descriptor,{status:'accepted',artifactIds:[descriptor.groundArtifactId],contentSha256s:[descriptor.groundContentSha256]});
- assert.equal(merged.data.elements.find(e=>e.id===999),neighbor);assert.equal(merged.metadata.sourceDate,source.source.observedAt);assert.equal(merged.metadata.raceAdmission,'pending-timing-line');assert.equal(merged.metadata.layoutWayIds.length,5);
+ assert.equal(merged.data.elements.find(e=>e.id===999),neighbor);assert.equal(merged.metadata.sourceDate,source.source.observedAt);assert.equal(merged.metadata.raceAdmission,'practice');assert.equal(merged.metadata.layoutWayIds.length,5);
  assert.ok(merged.metadata.sourceFeatureIds.every(id=>{const w=merged.data.elements.find(e=>e.tags?._sourceFeatureId===id);return roadSourceSurvey(w)?.venueSource===merged.metadata.venueSource;}));
- assert.throws(()=>buildVenueRaceCourses({},merged.metadata),/timing_line_pending/);
+ assert.throws(()=>buildVenueRaceCourses({},{...merged.metadata,raceAdmission:'pending-timing-line'}),/timing_line_pending/);
 });

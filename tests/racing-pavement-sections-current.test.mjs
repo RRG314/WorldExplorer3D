@@ -15,7 +15,7 @@ test('profiled pavement retains asymmetric physical bounds, separate racing line
  const district={type:'RaceDistrictFacts',version:1,anchor:{lat:29.185,lon:-81.071},locationLabel:'Controlled',metersPerUnit:1,roads:[road]},canonical=canonicalRaceDistrict(district);assert.equal(canonical.roads[0].pavementModel,PROFILED_ROAD_PAVEMENT_MODEL);assert.equal(canonical.roads[0].heightSamples[0].racingOffsetMeters,1.5);assert.equal(canonical.roads[0].racingWidthMeters,6);
  const legacy={...road};delete legacy.pavementModel;assert.throws(()=>buildRaceRoadGraph([legacy]),/heights|pavement_sections/,'asymmetric geometry cannot enter through an unclassified old road');
  assert.throws(()=>buildRaceRoadGraph([{...road,racingWidthMeters:30}]),/pavement_sections/);assert.throws(()=>buildRaceRoadGraph([{...road,pavementModel:'unreviewed'}]),/surface_model/);
- assert.equal(racePhysicsVersion(course),RACE_PROFILED_PAVEMENT_PHYSICS_VERSION);assert.equal(racePhysicsVersion({surfaceModel:BANKED_ROAD_MODEL}),RACE_BANKED_PHYSICS_VERSION);
+ assert.equal(racePhysicsVersion(course),RACE_PROFILED_PAVEMENT_PHYSICS_VERSION+'-contacts1');assert.equal(racePhysicsVersion({surfaceModel:BANKED_ROAD_MODEL}),RACE_BANKED_PHYSICS_VERSION);
 });
 test('grid and timing remain on the bank while apron projection, closure and driving use the actual physical width',()=>{
  const {course}=fixture();for(let i=0;i<4;i++){const pose=raceGridPose(course,i);assert.ok(pose.x>=.1-1e-12&&pose.x<=2.9+1e-12);assert.ok(Math.abs(pose.y-height(pose.x))<1e-12);}
@@ -68,7 +68,7 @@ test('browser, socket-service and Functions bundles reconstruct the same profile
  assert.deepEqual(await readRaceDistrictFacts(storage.fields),facts);
  const browser={canonicalRaceDistrict,raceCourseKey,raceDistrictFingerprint,reconstructPublishedRace,createRaceVehicleProfile,createRaceSession,racePhysicsVersion},snapshots=[];
  for(const engine of [browser,service,functions]){
-  const normalized=engine.canonicalRaceDistrict(facts),restored=await engine.reconstructPublishedRace(reference,normalized);assert.deepEqual(restored,expected);assert.equal(await engine.raceCourseKey(restored),key);assert.equal(await engine.raceDistrictFingerprint(normalized),fingerprint);assert.equal(engine.racePhysicsVersion(restored),RACE_PROFILED_PAVEMENT_PHYSICS_VERSION);
+  const normalized=engine.canonicalRaceDistrict(facts),restored=await engine.reconstructPublishedRace(reference,normalized);assert.deepEqual(restored,expected);assert.equal(await engine.raceCourseKey(restored),key);assert.equal(await engine.raceDistrictFingerprint(normalized),fingerprint);assert.equal(engine.racePhysicsVersion(restored),RACE_PROFILED_PAVEMENT_PHYSICS_VERSION+'-contacts1');
   const session=engine.createRaceSession({id:'controlled-profiled',course:restored,creatorUid:'driver',createdAtMs:0});session.add({uid:'driver',label:'Driver',profile:engine.createRaceVehicleProfile('bmw_m3_e92_race')});session.setReady('driver',true);session.start('driver',0);
   for(let i=1;i<=180;i++){const at=4000+i*1000/60;session.control('driver',i,{throttle:1,steer:0},at);session.advance(at);}const snapshot=session.snapshot();assert.equal(snapshot.players[0].dnf,false);snapshots.push(snapshot);
  }

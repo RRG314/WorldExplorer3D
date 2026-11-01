@@ -22,6 +22,10 @@ const EXPECTED_PRESET_PACKS = Object.freeze({
   tokyo: 'jp-kanto-urban-nature',
   monaco: 'mc-ligurian-mediterranean',
   nurburgring: 'eu-atlantic-urban-nature',
+  silverstone: 'eu-atlantic-urban-nature',
+  nordschleife: 'eu-atlantic-urban-nature',
+  // Daytona is also outside the reviewed South Florida pack.
+  daytona: null,
   lasvegas: 'us-nv-mojave-desert',
   london: 'eu-atlantic-urban-nature',
   paris: 'eu-atlantic-urban-nature',

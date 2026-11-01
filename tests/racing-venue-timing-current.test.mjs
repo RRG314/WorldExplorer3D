@@ -29,7 +29,7 @@ test('T13 timing rotates the complete loop, clears the four-car grid and survive
  const {graph,events}=buildVenueRaceCourses(district,venue),[course,twoLap]=events;
  assert.equal(course.sourcePath.length,1067);assert.equal(new Set(course.sourcePath).size,1067);
  assert.equal(course.sourcePath[0],'osm:way:41395670:6:0.000000:1.000000:forward');
- assert.match(course.name,/T13 · 1 lap/);assert.doesNotMatch(course.name,/GP/);assert.match(course.description,/in progress/);
+ assert.match(course.name,/T13 · 1 lap/);assert.doesNotMatch(course.name,/GP/);assert.equal(course.description,'');
  assert.equal(twoLap.laps,2);assert.deepEqual(twoLap.sourcePath,course.sourcePath);
  assert.ok(Math.abs(course.lengthMeters-layout.lengthMeters)/layout.lengthMeters<.01);
  assert.deepEqual(course.points[0],course.points.at(-1));
@@ -75,7 +75,7 @@ test('Daytona game timing keeps the complete source loop and leaves its permanen
  }
  const {events:[course]}=buildVenueRaceCourses({locationId:'daytona',locationLabel:pack.name,anchor:pack.anchor,metersPerUnit:1.11,venueSource:venue.venueSource,roads},venue);
  assert.equal(course.sourcePath.length,127);assert.equal(new Set(course.sourcePath).size,127);assert.equal(course.sourcePath[0],'osm:way:11371365:0:0.000000:1.000000:forward');
- assert.match(course.description,/in progress/);assert.ok(Math.abs(course.lengthMeters-layout.lengthMeters)/layout.lengthMeters<.01);
+ assert.equal(course.description,'');assert.ok(Math.abs(course.lengthMeters-layout.lengthMeters)/layout.lengthMeters<.01);
  assert.equal(course.discipline,'oval');assert.equal(course.pitPath.length,12);assert.ok(course.pitLane.course.lengthMeters>500&&course.pitLane.course.lengthMeters<700);
  for(let i=0;i<4;i++)assert.ok(projectRacePosition(course,raceGridPose(course,i)).error<1.401);
  const furniture=buildRaceFurniture(course);assert.equal(furniture.perimeter,'permanent-venue');assert.ok(furniture.chunks.every(c=>!c.positions.length&&!c.fencePositions.length&&!c.posts.length));

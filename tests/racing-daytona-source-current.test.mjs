@@ -20,7 +20,7 @@ test('the retained Daytona tri-oval closes through five exact source ways withou
  const descriptor=RACING_VENUE_SOURCES.find(s=>s.id===source.venueId);
  assert.equal(descriptor.sourceSha256,crypto.createHash('sha256').update(text).digest('hex'));
  assert.equal(descriptor.raceAdmission,'practice');
- assert.equal(descriptor.presentationStatus,'under-construction','accepted private practice does not certify a finished venue pack');
+ assert.equal(descriptor.presentationStatus,'ready','the accepted three-venue release marks this pack ready');
 });
 function nativeFixture(){
  const way=source.ways.find(w=>w.id===11371365),nodes=way.nodes.map((id,i)=>({type:'node',id,...way.geometry[i],uid:123,user:'omitted mapper'}));
