@@ -9,32 +9,42 @@ const {parse}=await import(pathToFileURL(path.resolve(parser)));
 
 // Conservative syntax guard, not a claim to detect arbitrary reflection. Include
 // injected context parameters and local aliases as well as imported context.
+// Function/block bindings keep local canvas contexts from becoming game state.
 export function contextWrites(source) {
  const tree=parse(source,{sourceType:'unambiguous'});
  const roots=new Map([['ctx',''],['appCtx','']]),writes=new Set();
- function member(node){
+ function member(node,bindings=roots){
   if(!node)return null;
-  if(node.type==='Identifier')return roots.has(node.name)?roots.get(node.name):null;
+  if(node.type==='Identifier')return bindings.has(node.name)?bindings.get(node.name):null;
   if(['MemberExpression','OptionalMemberExpression'].includes(node.type)){
-   const base=member(node.object);if(base===null)return null;
+   const base=member(node.object,bindings);if(base===null)return null;
    const key=node.computed?(node.property.value??'*'):node.property.name;
    return base?`${base}.${key}`:key;
   }
   return null;
  }
- function visit(node){
+ function visit(node,bindings=roots,functionScopes=[bindings],declarationKind){
   if(!node||typeof node!=='object')return;
+  if(['FunctionDeclaration','FunctionExpression','ArrowFunctionExpression','ObjectMethod','ClassMethod','ClassPrivateMethod'].includes(node.type)){
+   bindings=new Map(bindings);functionScopes=[bindings];
+   for(const param of node.params||[])if(param.type==='Identifier'){
+    if(['ctx','appCtx'].includes(param.name))bindings.set(param.name,'');else bindings.delete(param.name);
+   }
+  }else if(node.type==='BlockStatement'){bindings=new Map(bindings);functionScopes=[...functionScopes,bindings];}
   if(node.type==='ImportDeclaration'&&node.source.value.includes('shared-context')){
-   for(const spec of node.specifiers)if(spec.imported?.name==='ctx')roots.set(spec.local.name,'');
+   for(const spec of node.specifiers)if(spec.imported?.name==='ctx')bindings.set(spec.local.name,'');
   }
-  if(node.type==='VariableDeclarator'&&node.id.type==='Identifier'){const base=member(node.init);if(base!==null)roots.set(node.id.name,base);}
+  if(node.type==='VariableDeclarator'&&node.id.type==='Identifier'){
+   const base=member(node.init,bindings),bind=map=>base!==null?map.set(node.id.name,base):map.delete(node.id.name);
+   bind(bindings);if(declarationKind==='var')functionScopes.forEach(bind);
+  }
   // Rebinding a local alias (for example releasing a retained actor reference)
   // does not mutate the context object. Keep its conservative alias mapping so
   // any later property writes through that name are still reported.
-  if(node.type==='AssignmentExpression'&&node.left.type!=='Identifier'){const key=member(node.left);if(key)writes.add(key.split('.')[0]);}
-  if(node.type==='UpdateExpression'||node.type==='UnaryExpression'&&node.operator==='delete'){const key=member(node.argument);if(key)writes.add(key.split('.')[0]);}
+  if(node.type==='AssignmentExpression'&&node.left.type!=='Identifier'){const key=member(node.left,bindings);if(key)writes.add(key.split('.')[0]);}
+  if(node.type==='UpdateExpression'||node.type==='UnaryExpression'&&node.operator==='delete'){const key=member(node.argument,bindings);if(key)writes.add(key.split('.')[0]);}
   if(node.type==='CallExpression'&&node.callee?.object?.name==='Object'){
-   const method=node.callee.property?.name,base=member(node.arguments[0]);
+   const method=node.callee.property?.name,base=member(node.arguments[0],bindings);
    if(base!==null&&['assign','defineProperty','defineProperties'].includes(method)){
     if(base)writes.add(base.split('.')[0]);
     else if(method==='defineProperty')writes.add(node.arguments[1]?.value||'*');
@@ -44,7 +54,7 @@ export function contextWrites(source) {
     }
    }
   }
-  for(const [key,value] of Object.entries(node)){if(['loc','start','end','extra','comments','tokens'].includes(key))continue;if(Array.isArray(value))value.forEach(visit);else if(value?.type)visit(value);}
+  for(const [key,value] of Object.entries(node)){if(['loc','start','end','extra','comments','tokens'].includes(key))continue;if(Array.isArray(value))value.forEach(child=>visit(child,bindings,functionScopes,node.type==='VariableDeclaration'?node.kind:undefined));else if(value?.type)visit(value,bindings,functionScopes,node.type==='VariableDeclaration'?node.kind:undefined);}
  }
  visit(tree);return [...writes].sort();
 }

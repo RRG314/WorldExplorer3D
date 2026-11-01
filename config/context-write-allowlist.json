@@ -1836,6 +1836,7 @@
       "car",
       "carMesh",
       "changeVehicleGarage",
+      "checkpointPersonalVehicle",
       "connectedExplorerPlayerState",
       "connectedExplorerWallet",
       "disposeUrbanSandboxRuntime",
