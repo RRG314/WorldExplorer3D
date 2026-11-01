@@ -16,7 +16,12 @@ function setup(d={}){
 }
 test('ordinary road, wet damaged M3 and planetary driving retain the calibrated numeric trajectories without explicit banking admission',()=>{
  const fixture=JSON.parse(fs.readFileSync(new URL('./fixtures/road-plane-legacy-trajectories.json',import.meta.url)));
- for(const row of fixture.cases){const {car,step}=setup(row.config);for(const [index,stage]of row.sequence.entries()){for(let i=0;i<stage.frames;i++)step(stage.actions);for(const [key,value]of Object.entries(row.checkpoints[index]))assert.equal(car[key],value,row.config.id+':'+key);}}
+ // Mac and Linux transcendental functions can differ in the last few bits.
+ // Keep the frozen trajectory with a 64-epsilon relative bound.
+ for(const row of fixture.cases){const {car,step}=setup(row.config);for(const [index,stage]of row.sequence.entries()){for(let i=0;i<stage.frames;i++)step(stage.actions);for(const [key,value]of Object.entries(row.checkpoints[index])){
+  if(typeof value==='number')assert.ok(Number.isFinite(car[key])&&Math.abs(car[key]-value)<=64*Number.EPSILON*Math.max(1,Math.abs(value)),`${row.config.id}:${key}: ${car[key]} vs ${value}`);
+  else assert.equal(car[key],value,row.config.id+':'+key);
+ }}}
 });
 test('banked normal force and friction reserve match the frictionless design speed in both directions',()=>{
  for(const roll of [-.58,.58])for(const sign of [-1,1]){

@@ -66,6 +66,9 @@ jobs:
       - name: Install backend dependencies
         run: npm ci --prefix functions
 
+      - name: Install racing service dependencies
+        run: npm ci --prefix services/racing
+
       - name: Install Firebase release tooling
         run: npm install --global firebase-tools@15.22.0
 
