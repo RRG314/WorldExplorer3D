@@ -43,9 +43,7 @@ test('a long source span compiles only local bands and agrees across a cell boun
 });
 test('actual transport worker transfers the authored physical bands and recompiles them after cell return',{timeout:30000},async t=>{
  const positions=Float32Array.from([-128,128].flatMap(z=>[-128,128].flatMap(x=>[x,0,z]))),terrain={segments:1,meshes:[{position:{x:0,y:0,z:0},positions,indices:Uint16Array.from([0,2,1,1,2,3]),userData:{isFarTerrainClipmap:true}}],far:{grid:{xValues:[-128,128],zValues:[-128,128],worldYs:[0,0,0,0]},portals:[]}};
- const url=new URL('../app/js/terrain/transport-detail-worker.js',import.meta.url).href;
- const code=`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(url)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`;
- const worker=new Worker(code,{eval:true});t.after(()=>worker.terminate());
+ const worker=new Worker(new URL('./fixtures/transport-detail-worker-node.mjs',import.meta.url));t.after(()=>worker.terminate());
  const request=data=>new Promise((resolve,reject)=>{worker.once('message',resolve);worker.once('error',reject);worker.postMessage(data);}).finally(()=>worker.removeAllListeners('error'));
  assert.equal((await request({type:'plan',input:{roads:[road],includeOverview:false}})).type,'planned');
  const response=await request({type:'prepare',input:{terrain}});assert.equal(response.type,'prepared',response.message);
