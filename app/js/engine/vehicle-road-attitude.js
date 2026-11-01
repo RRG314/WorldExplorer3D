@@ -74,8 +74,9 @@ function resolveVehicleRoadContactPose(options = {}) {
   const poseDelta = (pitch, roll, contact) =>
     Math.cos(pitch) * Math.sin(roll) * contact.side * layout.halfTrack -
     Math.sin(pitch) * contact.front * layout.halfWheelbase;
+  const maximumRoll=clamp(finiteNumber(options.maximumRoll,.55),0,Math.atan(.7));
   let pitch = clamp(fallbackPitch, -.55, .55);
-  let roll = clamp(fallbackRoll, -.55, .55);
+  let roll = clamp(fallbackRoll, -maximumRoll, maximumRoll);
   if (!footprint(pitch, roll) || !sampleSurface) return fallback();
   let previousMaximumWheelPenetration = 0;
   for (let index = 0; index < 4; index += 1) {
@@ -94,7 +95,7 @@ function resolveVehicleRoadContactPose(options = {}) {
     const rightSlope = ((rightHeight - leftHeight) / (2 * layout.halfTrack) -
       forwardSlope * Math.sin(pitch) * Math.sin(roll)) / Math.cos(roll);
     const nextPitch = clamp(-Math.atan(forwardSlope), -.55, .55);
-    const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -.55, .55);
+    const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -maximumRoll, maximumRoll);
     if (Math.abs(nextPitch - pitch) + Math.abs(nextRoll - roll) < 1e-7) break;
     pitch = nextPitch;
     roll = nextRoll;
@@ -134,4 +135,21 @@ function resolveVehicleRoadContactPose(options = {}) {
   });
 }
 
-export { directedSurfacePitch, resolveVehicleRoadContactPose };
+// Read the ACTUAL chassis attitude, including flight, rather than the fitted
+// ground attitude. This is a contact measurement, never another pose writer.
+function measureVehicleRoadWheelClearance({x,y,z,yaw,pitch,roll,variant,sampleSurface}){
+  if(![x,y,z,yaw,pitch,roll].every(Number.isFinite)||typeof sampleSurface!=='function')throw Error('invalid_vehicle_wheel_pose');
+  const layout=vehicleWheelContactLayout(variant),forwardX=Math.sin(yaw),forwardZ=Math.cos(yaw),rightX=Math.cos(yaw),rightZ=-Math.sin(yaw);
+  let minimumGap=Infinity,maximumGap=-Infinity,sampledWheelContacts=0;
+  for(const contact of WHEEL_CONTACTS){
+    const localX=contact.side*layout.halfTrack,localZ=contact.front*layout.halfWheelbase,
+      lateral=Math.cos(roll)*localX,longitudinal=Math.sin(pitch)*Math.sin(roll)*localX+Math.cos(pitch)*localZ,
+      px=x+rightX*lateral+forwardX*longitudinal,pz=z+rightZ*lateral+forwardZ*longitudinal,
+      py=y+Math.cos(pitch)*Math.sin(roll)*localX-Math.sin(pitch)*localZ,support=sampleSurface(px,pz,contact);
+    if(support==null||!Number.isFinite(support))continue;
+    const gap=py-support;sampledWheelContacts++;minimumGap=Math.min(minimumGap,gap);maximumGap=Math.max(maximumGap,gap);
+  }
+  return Object.freeze({sampledWheelContacts,minimumGap:sampledWheelContacts?minimumGap:null,
+    maximumWheelPenetration:sampledWheelContacts?Math.max(0,-minimumGap):null,maximumWheelGap:sampledWheelContacts?Math.max(0,maximumGap):null});
+}
+export { directedSurfacePitch, resolveVehicleRoadContactPose, measureVehicleRoadWheelClearance };

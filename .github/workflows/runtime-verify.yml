@@ -38,6 +38,9 @@ jobs:
       - name: Install backend dependencies
         run: npm ci --prefix functions
 
+      - name: Install racing service dependencies
+        run: npm ci --prefix services/racing
+
       - name: Bounded pull-request verification
         run: npm run verify:pr
 
@@ -78,6 +81,9 @@ jobs:
 
       - name: Install backend dependencies
         run: npm ci --prefix functions
+
+      - name: Install racing service dependencies
+        run: npm ci --prefix services/racing
 
       - name: Verify patched Python and pip
         run: |

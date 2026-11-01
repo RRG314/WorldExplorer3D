@@ -1,11 +1,11 @@
 import {createResearchShipMap} from './map-ui.js';
 import {createInvestigationControls} from '../../campaign/coastal-investigation-ui.js';
 import {RCRV_LAYOUT} from './layout.js';
-import {styleMarinePanel,setMarineText} from '../../ocean/interface.js';
+import {mountMarinePanel,setMarineText} from '../../ocean/interface.js';
 import {createCoastalDepartureControls} from '../../campaign/coastal-departure-ui.js';
 export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,retry,researchAct,sharedAct,coastalApi,investigationApi}) {
  const panel=document.createElement('section');panel.id='researchDeckControls';panel.setAttribute('aria-label','Research ship');
- styleMarinePanel(panel,'deck');
+ mountMarinePanel(panel,'deck');
  const map=createResearchShipMap({select,onOpen:mapChanged});
  const title=document.createElement('strong');title.textContent='Research vessel';
  const message=document.createElement('div'),result=document.createElement('div');result.setAttribute('role','status');result.style.marginTop='6px';
@@ -26,7 +26,7 @@ export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,ret
  const investigation=createInvestigationControls({api:investigationApi,prefix:'coastalDeck'});
  const coastal=createCoastalDepartureControls({api:coastalApi,prefix:'coastalDeck'});
  panel.append(header,message,choice,actionButton,enterButton,retryButton,moorButton,coastal.node,investigation.node,researchInfo,researchButton,result,provisions,more);
- for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);
+ for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');
  return {closeMap:()=>map.close(),hide:()=>{panel.hidden=true;map.close()},dispose:()=>{map.dispose();panel.remove()},
  provisions(items,consume){provisions.replaceChildren();provisions.hidden=false;
  const note=document.createElement('p');note.textContent=items.length?'Choose food or water from your Backpack.':'No food or water in your Backpack. Carry route snacks or trail water from an Earth store for your next voyage.';provisions.append(note);

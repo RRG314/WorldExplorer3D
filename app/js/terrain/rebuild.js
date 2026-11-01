@@ -1,6 +1,10 @@
+import {PAVEMENT_NORMAL_CREASE_RADIANS} from './road-crease-normals.js';
+import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import {createRoadRegionLease} from './road-region-lease.js';
+import {hasReviewedPavement} from '../world/compiler/reviewed-deck-profile.js';
 import {createTransportCellFacts,transportFromCellFacts} from '../earth-core/world-cell-facts.js';
 import {worldFactFrame} from '../world/world-cell-adapter.js';
+import {appendRoadEdgeBands} from './transport-detail-compiler.js';
 import {prepareTransportDetail} from './transport-detail-runtime.js';
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {createPortalSurfaceClipper} from './portal-surface-clip.js';
@@ -29,6 +33,8 @@ import { yieldToMainThread, yieldToWorldFrame } from "../world/cooperative-sched
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
 import { createRoadContactIndex, createRoadContactIndexCooperatively } from './road-contact-index.js?v=1';
 import { createSpatialRoadBatches } from './spatial-road-batches.js';
+import {publishedPavementJoins} from './published-pavement-joins.js';
+import {reviewedRoadContinuations} from './reviewed-road-continuations.js';
 
 const ROAD_SURFACE_BIAS = 0.18;
 
@@ -73,9 +79,9 @@ export function appendRoadCenterMarkings(road, points, outputVerts, outputIndice
   const dashLength = 6;
   const patternLength = 12;
   const laneCount = Math.max(1, Number(road?.transportRecord?.crossSection?.lanes) || 1);
-  const corridorOffset = roadPlacementOffsetWorld(road);
   let distanceBeforeSegment = 0;
   for (let index = 0; index < points.length - 1; index += 1) {
+      const corridorOffset = roadPlacementOffsetWorld(road,index,.5);
       const start = points[index];
       const end = points[index + 1];
       const dx = end.x - start.x;
@@ -230,7 +236,7 @@ export function createCompiledRoadSurfaceSampler(feature, fallbackSampler, diagn
       // the cut half of the profile hovering over its own graded ground.
       // Read the published ground in both directions. Bridges and tunnels
       // retain their independent engineered profiles.
-      if (feature?.structureSemantics?.terrainMode === 'at_grade' && feature.transportSurfaceModel?.engineeredApproach !== true && typeof fallbackSampler === 'function') {
+      if (feature?.structureSemantics?.terrainMode === 'at_grade' && feature.transportSurfaceModel?.engineeredApproach !== true && !hasReviewedPavement(feature) && typeof fallbackSampler === 'function') {
         const renderedTerrainY = fallbackSampler(x, z);
         if (Number.isFinite(renderedTerrainY)) {
           if (diagnostics && renderedTerrainY > compiledY) diagnostics.renderedTerrainClamps = Number(diagnostics.renderedTerrainClamps || 0) + 1;
@@ -450,6 +456,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     await yieldToMainThread();
   }
   assertCurrent();
+  const roadContinuations=reviewedRoadContinuations(baseRoads,appCtx.worldLoadRuntimeState?.venuePack?.venueSource);
   if(typeof Worker==='function') {
     const seen=new Set(),planRoads=[];
     for(const road of baseRoads){
@@ -457,10 +464,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const shared=road.transportSurfacePresentation?.status==='compiled'?road.transportSurfacePresentation:null;
       if(shared){if(seen.has(shared.id))continue;seen.add(shared.id);}
       const renderRoad=shared||road;
-      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(renderRoad)&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
     }
     const terrainReady=new Promise(resolve=>releaseTerrain=resolve);
-    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady});
+    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady,roadContinuations});
     // The final publication awaits this same promise. Handle early rejection
     // while terrain is still compiling, so cancellation never leaks a worker.
     preparingDetail.catch(()=>{});
@@ -518,6 +525,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   const roadBatchBuilder = createSpatialRoadBatches();
   const roadMainBatches = roadBatchBuilder.batches;
+  const pavementJoins=[];
   // Accessories keep their exact geometry, but no longer force every marking
   // and bridge skirt in the region through the GPU from every street view.
   const roadSkirtBuilder = createSpatialRoadBatches();
@@ -553,6 +561,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   const sharedRoadMaterials = typeof getSharedRoadMaterials === "function" ? getSharedRoadMaterials() : {};
   const roadMat = sharedRoadMaterials.roadMat;
+  const roadMaterialForBatch=batch=>{if(!batch.material)return roadMat;if(batch.material==='edge-band')return getSharedRoadMaterials({includeEdgeBands:true}).edgeBandMat;throw Error('invalid_road_batch_material');};
   const skirtMat = sharedRoadMaterials.skirtMat;
   const markMat = sharedRoadMaterials.markMat;
   const atGradeRoads=[];
@@ -587,7 +596,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       // junctions with fan polygons, exposing circles and triangle boundaries.
       const pts = basePts;
       if (!Array.isArray(pts) || pts.length < 2) continue;
-      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true) {
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(renderRoad)) {
         // Regional road indices refer to every carriageway, but only roads
         // with center paint need these dense temporary marking samples after
         // construction. Retaining them for unmarked residential/service roads
@@ -632,6 +641,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       leftEdge.push(...ribbonEdges.leftEdge);
       rightEdge.push(...ribbonEdges.rightEdge);
       appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
+      pavementJoins.push(...publishedPavementJoins(renderRoad,verts,indices,baseRoads));
       recordAtGradeRoadTerrainConformance(
         roadTerrainAudit,
         renderRoad,
@@ -674,35 +684,38 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   assertCurrent();
   await measureAsync('buildCarriagewayRegions',async()=>{
+    roadSurfaceIntegrity.reviewedSourceContinuations=[...roadContinuations.values()].reduce((count,joins)=>count+joins.length,0);
+    roadSurfaceIntegrity.reviewedPavementJoins=pavementJoins.length;
+    roadSurfaceIntegrity.reviewedPavementJoinVertices=pavementJoins.reduce((count,join)=>count+join.positions.length/3,0);
     if(typeof Worker==='function') {
-      releaseTerrain();
+      releaseTerrain(pavementJoins);
       detail=await preparingDetail;
       assertCurrent();
       for(const region of detail.initial.regions){
         initialRegionKeys.add(region.key);
-        for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade');
+        for(const batch of region.batches)appendRoadMainGeometry(batch.positions,batch.indices,'at_grade',{material:batch.material,colors:batch.colors,baseY:batch.baseY,normalCreaseAngleRadians:batch.normalCreaseAngleRadians});
         roadSurfaceIntegrity.carriagewayRegions+=region.keys.length;
       }
       detail.initial=null;
       roadBatchBuilder.finish();
       return;
     }
-    const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,current:isCurrent,yieldWork:yieldToMainThread});
+    const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,pavementJoins,current:isCurrent,yieldWork:yieldToMainThread});
     try {
       trace('indexCarriageways:start',{roads:atGradeRoads.length});
-      const tiles=prepareCarriagewayTiles(atGradeRoads.map(entry=>entry.road));
+      const tiles=prepareCarriagewayTiles(atGradeRoads.map(({road})=>{const edgeBandRecipe=reviewedRoadEdgeRecipe(road),endpointContinuations=roadContinuations.get(road);return edgeBandRecipe||endpointContinuations?{...road,...(edgeBandRecipe?{edgeBandRecipe}:{}),...(endpointContinuations?{endpointContinuations}:{})}:road;}));
       trace('indexCarriageways:end',{tiles:tiles.length});
       let sliceStartedAt=now();
       for(const [tileIndex,tile] of tiles.entries()) {
         assertCurrent();
         if(tileIndex%128===0)trace('meshCarriageway:progress',{completed:tileIndex,total:tiles.length,key:tile.key});
-        const mesh=meshCarriagewayTile(tile,uncutRoadTop,partition);
+        const mesh=meshCarriagewayTile(tile,uncutRoadTop,partition,{edgeFaces:tile.edgeFaces});
         if(mesh.indices.length) {
           const cut=clipGroundSurface(mesh.positions,mesh.indices);
-          appendRoadMainGeometry(cut.positions,cut.indices,'at_grade');
-          roadSurfaceIntegrity.carriagewayRegions++;
-
+          appendRoadMainGeometry(cut.positions,cut.indices,'at_grade',tile.segments.some(s=>s.road.transportRecord?.crossSection?.pavementSections)?{normalCreaseAngleRadians:PAVEMENT_NORMAL_CREASE_RADIANS}:{});
         }
+        appendRoadEdgeBands(roadBatchBuilder,mesh.edgeBands,clipGroundSurface);
+        if(mesh.indices.length||mesh.edgeBands?.indices.length)roadSurfaceIntegrity.carriagewayRegions++;
         if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
       }
     } finally {partition.dispose();}
@@ -741,7 +754,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         targetList: stagedRoadMeshes,
         verts: batch.verts,
         indices: batch.indices,
-        material: roadMat,
+        colors:batch.colors||null,baseY:batch.baseY||null,normalCreaseAngleRadians:batch.normalCreaseAngleRadians,
+        material: roadMaterialForBatch(batch),
         renderOrder: 2,
         frustumCulled: true,
         userData: {
@@ -749,7 +763,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           surfaceRanges: batch.ranges,
           roadBatchIndex: batchIndex,
           roadSpatialKey: batch.spatialKey,
-          sharedRoadMaterial: true,
+          sharedRoadMaterial: true,...(batch.material?{roadSurfaceMaterial:batch.material}:{}),
           worldLoadSequence: appCtx._worldLoadSequence || 0
         }
       });
@@ -818,7 +832,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
                 const road=baseRoads[branch.roadIdx];
                 return {...branch,name:road?.name,sourceFeatureId:road?.sourceFeatureId,
                   mode:road?.structureSemantics?.terrainMode,sharedSurface:road?.transportSurfacePresentation?.id,
-                  sourceWidth:road?.width,placementOffset:roadPlacementOffsetWorld(road)};
+                  sourceWidth:road?.width,placementOffset:roadPlacementOffsetWorld(road,branch.segIndex??branch.segIdx??0,branch.t??.5)};
               })});
           }
         }
@@ -914,8 +928,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const schedule={current:publicationCurrent,yieldWork:yieldToWorldFrame,budgetMs:2};
       try {
         for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
-          verts:batch.positions,indices:batch.indices,material:roadMat,renderOrder:2,frustumCulled:true,
-          userData:{isRoadBatch:true,terrainMode:'at_grade',surfaceRanges:[{start:0,count:batch.indices.length,terrainMode:'at_grade'}],roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
+          verts:batch.positions,indices:batch.indices,colors:batch.colors||null,baseY:batch.baseY||null,normalCreaseAngleRadians:batch.normalCreaseAngleRadians,material:roadMaterialForBatch(batch),renderOrder:2,frustumCulled:true,
+          userData:{isRoadBatch:true,...(batch.material?{roadSurfaceMaterial:batch.material}:{}),terrainMode:'at_grade',surfaceRanges:[{start:0,count:batch.indices.length,terrainMode:'at_grade'}],roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
         contact=await createRoadContactIndexCooperatively(meshes,16,schedule);
         // Clip dashes to this region's exact road tops. Neighboring regions own
         // the other pieces; no marking changes physical collision coverage.

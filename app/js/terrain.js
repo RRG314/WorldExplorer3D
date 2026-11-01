@@ -6,6 +6,7 @@ import {
   updateStructureVisualVisibility
 } from "./terrain/structure-visuals.js?v=59";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=15";
+import {refineReviewedDetailedTerrain} from './terrain/reviewed-detailed-refinement.js';
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=22";
@@ -66,9 +67,9 @@ import {
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=17";
-import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
+import { createLocationTerrainApi } from "./terrain/location-world.js?v=5";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=74";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=75";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterTerrainBedY } from "./terrain/water-terrain-mask.js?v=1";
 import {engineeredWaterfrontFor} from './world/engineered-waterfront.js';
@@ -107,11 +108,13 @@ const getAcceptedGroundRuntimeSnapshot = () =>
 const prepareAcceptedGroundForLocation = (options) =>
   acceptedGroundRuntime.prepare(options);
 const prepareAcceptedGroundFromCatalog = async (options = {}) => {
-  acceptedGroundCatalogState = await loadAcceptedGroundCatalog({
+  const catalog = await loadAcceptedGroundCatalog({
     url: options.catalogUrl,
     fetchImpl: options.fetchImpl,
     signal: options.signal
   });
+  if(options.signal?.aborted)throw options.signal.reason instanceof Error?options.signal.reason:new DOMException('Ground catalog load aborted','AbortError');
+  acceptedGroundCatalogState = catalog;
   if (acceptedGroundCatalogState.status !== 'accepted') {
     return acceptedGroundRuntime.clear(
       acceptedGroundCatalogState.reason || 'ground-catalog-rejected'
@@ -122,6 +125,7 @@ const prepareAcceptedGroundFromCatalog = async (options = {}) => {
     longitude: options.longitude,
     manifests: acceptedGroundCatalogState.manifests,
     coverageProbes: options.coverageProbes,
+    requiredArtifacts: options.requiredArtifacts,
     signal: options.signal
   });
 };
@@ -322,10 +326,16 @@ async function applyTransportTerrainCorridors(options = {}) {
     await options.yieldBetweenTiles?.();
   }
   if(options.isCurrent?.()===false)return null;
+  const reviewedDetailedRefinement=await refineReviewedDetailedTerrain(appCtx,terrainTileDeps,{current:options.isCurrent,yieldWork:options.yieldBetweenTiles});
+  if(options.isCurrent?.()===false)return null;
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
   refreshFarTerrainBoundaryHeights();
+  const reviewedCorridorRefinement=await refreshReviewedVenueTerrain({current:options.isCurrent,yieldWork:options.yieldBetweenTiles});
+  if(options.isCurrent?.()===false)return null;
   clearTerrainHeightCache();
   const stats = Object.freeze({
+    reviewedDetailedRefinement,
+    reviewedCorridorRefinement,
     authority: 'compiled_transport_surface',
     heightSamplingAuthority: 'rendered-triangle-barycentric',
     frontageQueries:appCtx.streetFrontageGrading?.stats?.(),
@@ -396,6 +406,7 @@ const {
   refreshFarTerrainSurfaceColors,
   refreshFarWaterDetailCoverage,
   refreshFarTerrainBoundaryHeights,
+  refreshReviewedVenueTerrain,
   resetFarTerrainClipmap,
   sampleFarTerrainWorldYAt,
   getFarTerrainSurfaceSnapshot,

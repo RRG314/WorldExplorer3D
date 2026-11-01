@@ -1,13 +1,13 @@
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 // Retain each exact Float32 vertex once. Remove only triangles that collapse
 // completely at render precision; thin valid faces and vertical curbs remain.
-function* indexPavementPositionSteps(input) {
+function* indexPavementPositionSteps(input,{includeSourceVertexIndices=false}={}) {
   const source=input instanceof Float32Array?input:new Float32Array(input);
   if(source.length%9!==0)throw new Error('Invalid pavement triangle array');
   // Open addressing keeps the exact Float32 vertex key in numeric buffers.
   // Large string keys and growable JS arrays caused collection pauses when a
   // completed pavement tile replaced them with the final GPU buffers.
-  const positions=new Float32Array(source.length),indices=new Uint32Array(source.length/3);
+  const positions=new Float32Array(source.length),indices=new Uint32Array(source.length/3),sourceVertexIndices=includeSourceVertexIndices?new Uint32Array(source.length/3):null;
   const bits=new Uint32Array(source.buffer,source.byteOffset,source.length);
   let tableSize=1;
   while(tableSize<Math.max(1,source.length/3*2))tableSize*=2;
@@ -28,7 +28,7 @@ function* indexPavementPositionSteps(input) {
       for(;;){
         index=table[slot]-1;
         if(index<0){
-          index=vertexCount++;table[slot]=index+1;
+          index=vertexCount++;table[slot]=index+1;if(sourceVertexIndices)sourceVertexIndices[index]=i/3;
           positions[index*3]=x;positions[index*3+1]=y;positions[index*3+2]=z;
           break;
         }
@@ -39,14 +39,14 @@ function* indexPavementPositionSteps(input) {
     }
   }
   const Index=vertexCount<=65536?Uint16Array:Uint32Array;
-  return {positions:positions.slice(0,vertexCount*3),indices:new Index(indices.subarray(0,indexCount)),collapsedTriangles};
+  return {positions:positions.slice(0,vertexCount*3),indices:new Index(indices.subarray(0,indexCount)),collapsedTriangles,...(sourceVertexIndices?{sourceVertexIndices:sourceVertexIndices.slice(0,vertexCount)}:{})};
 }
 
-export function indexPavementPositions(input){
- const steps=indexPavementPositionSteps(input);let result;
+export function indexPavementPositions(input,options={}){
+ const steps=indexPavementPositionSteps(input,options);let result;
  do{result=steps.next();}while(!result.done);
  return result.value;
 }
 export function indexPavementPositionsCooperatively(input,options={}){
- return drainCooperatively(indexPavementPositionSteps(input),options);
+ return drainCooperatively(indexPavementPositionSteps(input,options),options);
 }

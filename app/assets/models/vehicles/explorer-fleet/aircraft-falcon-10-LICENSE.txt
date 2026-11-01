@@ -1,0 +1,11 @@
+Model Information:
+* title:	Falcon10
+* source:	https://sketchfab.com/3d-models/falcon10-0d5a676f75da403b8419154b102d55a7
+* author:	manilov.ap (https://sketchfab.com/manilov.ap)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Falcon10" (https://sketchfab.com/3d-models/falcon10-0d5a676f75da403b8419154b102d55a7) by manilov.ap (https://sketchfab.com/manilov.ap) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

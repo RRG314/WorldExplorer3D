@@ -8,6 +8,7 @@ const EXCLUDED_PARTS = new Set(['roof', 'canopy', 'balcony']);
 const MINIMUM_BODY_HEIGHT_METERS = 2.4;
 
 export function canContainWalkableInterior(building) {
+  if (building?.exteriorOnly===true || building?.buildingSemantics?.exteriorOnly===true) return false;
   if (!building || building.isInteriorCollider || building.collisionDisabled || building.collisionKind === 'barrier') return false;
   if (EXCLUDED_TYPES.has(String(building.buildingType || '').trim().toLowerCase())) return false;
   if (EXCLUDED_PARTS.has(String(building.buildingPartKind || '').trim().toLowerCase())) return false;

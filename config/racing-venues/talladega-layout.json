@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "venueId": "talladega-tri-oval",
+  "readiness": "source-only",
+  "source": {
+    "provider": "OpenStreetMap native API",
+    "format": "osm-api-map-json-v1",
+    "endpoint": "https://api.openstreetmap.org/api/0.6/map.json?bbox=-86.0767738,33.5509478,-86.0556547,33.5814798",
+    "coverage": {
+      "south": 33.5509478,
+      "west": -86.0767738,
+      "north": 33.5814798,
+      "east": -86.0556547
+    },
+    "observedAt": "2026-10-31T02:18:04.000Z",
+    "responseSha256": "e9a296fb68b4dd3e9bae52a58c667daf2c972e0d6eb79e64e549395a403d26fa"
+  },
+  "layout": {
+    "closed": true,
+    "wayIds": [
+      8835825,
+      426163860,
+      426163859,
+      532106116
+    ],
+    "referenceLengthMeters": 4280.97024,
+    "usableWidthMeters": 6,
+    "name": "Talladega · Tri-oval",
+    "referenceUrl": "https://www.talladegasuperspeedway.com/track-facts/",
+    "widthEvidence": "Six-metre conservative eligibility corridor only. Physical pavement width, banking, ground and complete venue admission remain pending review."
+  },
+  "preparedSourceSha256": "800f7c133a4152ca613bfe8069fdc8600ed324124e30ad0a561ce3d25acfb56e"
+}

@@ -1,3 +1,4 @@
+import {prepareStreetEdgeClearances} from './street-edge-clearance.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {roadWidthAtSegment} from '../road-cross-section-profile.js?v=1';
 import {roadTurnFootprint} from '../../terrain/road-surface-geometry.js?v=2';
@@ -8,7 +9,7 @@ const boundsOf = points => ({minX:Math.min(...points.map(p=>p.x)),maxX:Math.max(
 // Both road rendering and pavement subtraction consume these same width and
 // placement samples. Cell boundaries never replace source width constraints.
 export function* streetRoadSegments(road) {
-  const offset=roadPlacementOffsetWorld(road);
+  const pavement=road.transportRecord?.crossSection?.pavementSections;
   const section=road.resolvedCrossSection;
   const widths=section?.segmentWidthsMeters;
   const sampledWidths=widths instanceof Float32Array || Array.isArray(widths);
@@ -19,7 +20,7 @@ export function* streetRoadSegments(road) {
   // Source points already describe the road curve. A straight, constant-width
   // source segment is one exact quad; uniform 32-unit cuts add no shape or
   // terrain information (the terrain partition supplies those creases later).
-  const needsWidthSampling=varyingWidths || hasProfiles;
+  const needsWidthSampling=varyingWidths || hasProfiles || !!pavement;
   for(let index=0;index<(road.pts?.length || 0)-1;index++) {
     const a=road.pts[index],b=road.pts[index+1],length=Math.hypot(b.x-a.x,b.z-a.z);
     if(length<.01)continue;
@@ -29,11 +30,13 @@ export function* streetRoadSegments(road) {
     for(const profile of road.resolvedCrossSection?.segmentProfiles?.[index] || []) {
       breaks.add(Math.max(0,Math.min(1,profile.startT)));breaks.add(Math.max(0,Math.min(1,profile.endT)));
     }
+    if(pavement){const from=pavement.nodeDistances[index],to=pavement.nodeDistances[index+1];for(const sample of pavement.samples)if(sample.distance>from&&sample.distance<to)breaks.add((sample.distance-from)/(to-from));}
     const ts=[...breaks].filter(Number.isFinite).sort((a,b)=>a-b);
     const at=t=>({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t});
     for(let j=1;j<ts.length;j++) {
       const t0=ts[j-1],t1=ts[j],start=at(t0),end=at(t1);
-      yield {road,offset,index,t0,t1,a:start,b:end,wa:roadWidthAtSegment(road,index,t0),wb:roadWidthAtSegment(road,index,t1),bounds:boundsOf([start,end])};
+      const offset=roadPlacementOffsetWorld(road,index,t0),nextOffset=roadPlacementOffsetWorld(road,index,t1);
+      yield {road,offset,...(pavement?{nextOffset}:{}),index,t0,t1,a:start,b:end,wa:roadWidthAtSegment(road,index,t0),wb:roadWidthAtSegment(road,index,t1),bounds:boundsOf([start,end])};
     }
   }
 }
@@ -43,14 +46,16 @@ export function carriagewaySegmentPolygon(s) {
   if(length<1e-6)return null;
   const nx=(s.b.z-s.a.z)/length,nz=-(s.b.x-s.a.x)/length,offset=s.offset || 0;
   const leftA=Math.max(.3,s.wa/2-offset),rightA=Math.max(.3,s.wa/2+offset);
-  const leftB=Math.max(.3,s.wb/2-offset),rightB=Math.max(.3,s.wb/2+offset);
+  const nextOffset=s.nextOffset??offset;
+  const leftB=Math.max(.3,s.wb/2-nextOffset),rightB=Math.max(.3,s.wb/2+nextOffset);
   const ring=[[s.a.x+nx*leftA,s.a.z+nz*leftA],[s.a.x-nx*rightA,s.a.z-nz*rightA],
     [s.b.x-nx*rightB,s.b.z-nz*rightB],[s.b.x+nx*leftB,s.b.z+nz*leftB]];
   return [ring.concat([ring[0]])];
 }
 
 export function carriagewayJoinPolygons(join) {
-  return roadTurnFootprint({...join,leftDistance:Math.max(.3,join.halfWidth+join.offset),rightDistance:Math.max(.3,join.halfWidth-join.offset)});
+  return roadTurnFootprint({...join,leftDistance:Math.max(.3,join.halfWidth+join.offset),rightDistance:Math.max(.3,join.halfWidth-join.offset),
+    ...(Number.isFinite(join.nextHalfWidth)?{nextLeftDistance:Math.max(.3,join.nextHalfWidth+(join.nextOffset||0)),nextRightDistance:Math.max(.3,join.nextHalfWidth-(join.nextOffset||0))}:{})});
 }
 
 export function unionCarriageway(tile, {clipToBounds = true} = {}) {
@@ -67,6 +72,7 @@ export function unionCarriageway(tile, {clipToBounds = true} = {}) {
 // Ground roads have a single horizontal owner. Elevated and underground roads
 // retain independent structure surfaces and never enter this planar union.
 export function prepareCarriagewayTiles(roads, chunkSize = 128) {
+  const stagedRoads=roads.some(road=>road.edgeBandRecipe)?roads.map(road=>road.edgeBandRecipe?{...road}:road):roads;
   const tiles=new Map(),joinOwners=new Map();
   const insert=(kind,item,polygon)=> {
     const b=boundsOf(polygon.flat().map(([x,z])=>({x,z})));
@@ -86,15 +92,20 @@ export function prepareCarriagewayTiles(roads, chunkSize = 128) {
         tiles.get(key)[kind].push(item);
       }
   };
-  for(const road of roads) {
+  for(const road of stagedRoads) {
     if(road.structureSemantics?.terrainMode!=='at_grade')continue;
     for(const segment of streetRoadSegments(road)) {
       const polygon=carriagewaySegmentPolygon(segment);if(polygon)insert('segments',segment,polygon);
     }
     for(let i=1;i<(road.pts?.length || 0)-1;i++) {
-      const join={road,previous:road.pts[i-1],point:road.pts[i],next:road.pts[i+1],halfWidth:roadWidthAtSegment(road,i,0)/2,offset:roadPlacementOffsetWorld(road)};
+      const join={road,previous:road.pts[i-1],point:road.pts[i],next:road.pts[i+1],halfWidth:roadWidthAtSegment(road,i,0)/2,offset:roadPlacementOffsetWorld(road,i,0)};
+      for(const polygon of carriagewayJoinPolygons(join))insert('joins',join,polygon);
+    }
+    for(const continuation of road.endpointContinuations||[]){
+      const join={...continuation,road};
       for(const polygon of carriagewayJoinPolygons(join))insert('joins',join,polygon);
     }
   }
+  if(stagedRoads!==roads)prepareStreetEdgeClearances([...tiles.values()],carriagewaySegmentPolygon,carriagewayJoinPolygons);
   return [...tiles.values()].sort((a,b)=>a.bounds.minX-b.bounds.minX || a.bounds.minZ-b.bounds.minZ);
 }

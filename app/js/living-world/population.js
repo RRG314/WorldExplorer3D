@@ -1,4 +1,7 @@
+import {raceClosureContains} from '../racing/closed-course.js';
+import {createVehicleSpacing, vehicleFollowingGap} from './vehicle-spacing.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
+import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import { nearbyPedestrianSnapshots } from './nearby-pedestrians.js';
 import { nearbyVehicleSnapshots } from './nearby-vehicles.js';
 import {setPopulationHostVisible} from './presentation-attachment.js';
@@ -150,11 +153,11 @@ function spawnCandidate(graph, random, kind, reference) {
   const progress = (.06 + random() * .88) * edge.length;
   const pathOffset = kind === 'pedestrian' ? pedestrianPathOffset(edge, random) : 0;
   const point = edgePoint(edge, progress, pathOffset);
-  return { edgeIndex, progress, pathOffset, x: point.x, z: point.z, corridorKey: physicalEdgeKey(edge) };
+  return { edgeIndex, progress, pathOffset, x: point.x, y: Number(edge.p1.y||0)+(Number(edge.p2.y||0)-Number(edge.p1.y||0))*progress/Math.max(.01,edge.length), z: point.z, corridorKey: physicalEdgeKey(edge) };
 }
 
 function spawnCandidateScore(candidate, placements, graph, kind) {
-  if (kind !== 'pedestrian') return 0;
+  if (kind === 'vehicle') return placements.reduce((penalty,other)=>Math.max(penalty,Math.abs((candidate.y||0)-(other.y||0))<3?Math.max(0,12-Math.hypot(candidate.x-other.x,candidate.z-other.z)):0),0);
   const sameCorridor = placements.filter((entry) => entry.corridorKey === candidate.corridorKey).length;
   const nearest = placements.reduce((distance, entry) => (
     Math.min(distance, Math.hypot(candidate.x - entry.x, candidate.z - entry.z))
@@ -171,7 +174,7 @@ function spawnCandidateScore(candidate, placements, graph, kind) {
 function planAgentSpawns(count, graph, random, kind, reference = null) {
   if (!graph?.edges?.length) return [];
   const placements = [];
-  const attempts = kind === 'pedestrian' ? Math.min(28, Math.max(12, graph.edges.length * 2)) : 1;
+  const attempts = kind === 'pedestrian' ? Math.min(28, Math.max(12, graph.edges.length * 2)) : 24;
   for (let index = 0; index < count; index += 1) {
     let best = null;
     let bestScore = Infinity;
@@ -184,7 +187,7 @@ function planAgentSpawns(count, graph, random, kind, reference = null) {
       }
       if (kind === 'pedestrian' && score < .01) break;
     }
-    if (best && (kind !== 'pedestrian' || placements.every(other => Math.hypot(best.x - other.x, best.z - other.z) >= 1.1))) placements.push(best);
+    if (best && (kind !== 'vehicle' || bestScore < .011) && (kind !== 'pedestrian' || placements.every(other => Math.hypot(best.x - other.x, best.z - other.z) >= 1.1))) placements.push(best);
   }
   return placements;
 }
@@ -369,10 +372,12 @@ export function yieldToOpposingPedestrian(agent, agents, graph) {
 }
 
 function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {}) {
-  const spacing = kind === 'pedestrian' ? createPedestrianSpacing(agents, agent => agentPose(agent, graph)) : null;
+  const spacing = kind === 'pedestrian' ? createPedestrianSpacing(agents, agent => agentPose(agent, graph))
+    : createVehicleSpacing(agents, agent => agentPose(agent, graph), behavior.obstacles);
   const occupancy = new Map();
   if (kind === 'vehicle') {
     agents.forEach((agent) => {
+      if(agent.promoted&&!agent.detailPromoted)return;
       const list = occupancy.get(agent.edgeIndex) || [];
       list.push(agent);
       occupancy.set(agent.edgeIndex, list);
@@ -400,6 +405,16 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       }
       continue;
     }
+    const priorMotion = kind === 'vehicle' ? {edgeIndex:agent.edgeIndex,progress:agent.progress,
+      bridge:agent.bridge?{...agent.bridge}:null,motionTime:agent.motionTime} : null;
+    const publishMotion = () => {
+      let pose=agentPose(agent,graph);
+      if(priorMotion && !spacing.allowsPose(agent,pose)) {
+        Object.assign(agent,priorMotion);agent.currentSpeed=0;agent.waiting=true;agent.waitReason='turn_clearance';
+        pose=agentPose(agent,graph);
+      }
+      spacing.update(agent,pose);
+    };
     if (agent.bridge) {
       let bridgeSpeed = agent.speed * .72;
       if (spacing) {
@@ -415,7 +430,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         agent.progress = overflow;
         agent.bridge = null;
       }
-      spacing?.update(agent, agentPose(agent, graph));
+      publishMotion();
       continue;
     }
     const edge = graph.edges[agent.edgeIndex];
@@ -432,10 +447,10 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       const sameEdge = occupancy.get(agent.edgeIndex) || [];
       const rank = sameEdge.indexOf(agent);
       const leader = rank > 0 ? sameEdge[rank - 1] : null;
-      const followingGap = 3.2 + Math.max(0, Number(agent.currentSpeed ?? speed)) * .82;
+      const followingGap = vehicleFollowingGap(agent, leader, Number(agent.currentSpeed ?? speed));
       if (leader && leader.progress - agent.progress < followingGap) {
-        const availableGap = Math.max(0, leader.progress - agent.progress - 2.8);
-        speed *= Math.max(0, Math.min(1, availableGap / Math.max(1, followingGap - 2.8)));
+        const availableGap = Math.max(0, leader.progress - agent.progress - (agent.variant.length + leader.variant.length)*.5 - 1.1);
+        speed *= Math.max(0, Math.min(1, availableGap / Math.max(1, followingGap - (agent.variant.length + leader.variant.length)*.5 - 1.1)));
         agent.waitReason = 'traffic_queue';
       } else {
         agent.waitReason = '';
@@ -468,6 +483,9 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         agent.waitReason = `signal_${signal.aspect}`;
       }
       speed *= Math.max(.12, Number(behavior.speedScale) || 1);
+      const run=Math.max(.01,Math.hypot(edge.p2.x-edge.p1.x,edge.p2.z-edge.p1.z));
+      const clear=spacing.limit(agent,(edge.p2.x-edge.p1.x)/run*speed*dt,(edge.p2.z-edge.p1.z)/run*speed*dt);
+      speed*=clear; if(clear<1)agent.waitReason='vehicle_clearance';
     } else {
       if (agent.reactionRemaining > 0) {
         agent.reactionRemaining = Math.max(0, agent.reactionRemaining - dt * stride);
@@ -538,7 +556,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       transitionEdge = nextEdge;
       if (!nextEdge || agent.progress < nextEdge.length) break;
     }
-    spacing?.update(agent, agentPose(agent, graph));
+    publishMotion();
   }
 }
 
@@ -567,6 +585,7 @@ export function createLivingWorldPopulation(options = {}) {
   const group = new THREE.Group();
   group.name = 'Living World Population';
   let disposed = false;
+  let raceClosure=null;
   const pedestrianHosts = pedestrians.map((agent, index) => {
     const host = new THREE.Group();
     const assetId = NEARBY_NPC_ASSET_IDS[index % NEARBY_NPC_ASSET_IDS.length];
@@ -705,7 +724,7 @@ export function createLivingWorldPopulation(options = {}) {
       const host = agent.visualHost;
       if (!pose || !host) return;
       const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
-      if (agent.promoted) {
+      if (agent.promoted || raceClosureContains(raceClosure,pose)) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
@@ -737,7 +756,7 @@ export function createLivingWorldPopulation(options = {}) {
       const host = agent.visualHost;
       if (!pathPose || !host) { agent.presentationPose = null; return; }
       const distance = reference ? Math.hypot(pathPose.x - reference.x, pathPose.z - reference.z) : 0;
-      if (agent.promoted) {
+      if (agent.promoted || raceClosureContains(raceClosure,pathPose,6)) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
@@ -758,6 +777,14 @@ export function createLivingWorldPopulation(options = {}) {
       agent.renderedGroundY = Number(pose.y || 0);
       agent.wheelContact = vehicleContactSnapshot(pose);
       const scale = Math.max(.001, agent.visibility);
+      const dx = pose.x - host.position.x, dz = pose.z - host.position.z;
+      const signedDistance = dx * Math.sin(pose.yaw) + dz * Math.cos(pose.yaw);
+      const turn = Math.atan2(Math.sin(pose.yaw - host.rotation.y), Math.cos(pose.yaw - host.rotation.y));
+      if (Math.hypot(dx, dz) < 8) updateVehicleWheels(
+        host.userData.curatedTrafficVehicleAttachment?.visual?.userData?.wheels,
+        signedDistance,
+        Math.abs(signedDistance) > .01 ? Math.atan(turn * agent.variant.length * .58 / signedDistance) : 0
+      );
       host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS * scale, pose.z);
       host.rotation.order = 'YXZ';
       host.rotation.set(Number(pose.pitch || 0), pose.yaw, Number(pose.roll || 0));
@@ -768,11 +795,19 @@ export function createLivingWorldPopulation(options = {}) {
   };
 
   const refreshVehiclePresentation = () => updateCuratedVehicleHosts(POPULATION_STEP_SECONDS);
+  // These existing hosts own their model leases, including while detached for
+  // bone-update savings. Initial presentation must include their loaded visuals,
+  // rather than compiling new variants when an agent first becomes visible.
   updateCuratedPedestrianHosts(.1);
   refreshVehiclePresentation();
 
   return Object.freeze({
     group,
+    setRaceClosure(course) {raceClosure=course||null;updateCuratedPedestrianHosts(.1);refreshVehiclePresentation();},
+    residentPresentationRoots() {
+      return disposed ? [] : [...pedestrianHosts, ...vehicleHosts].filter(host =>
+        host.userData.curatedCharacterAttachment || host.userData.curatedTrafficVehicleAttachment);
+    },
     diagnostics: Object.freeze({
       tier,
       pedestrians: pedestrians.length,
@@ -964,6 +999,7 @@ export function createLivingWorldPopulation(options = {}) {
           reference,
           tick,
           sampleVehicleSurface,
+          obstacles: options.getVehicleObstacles?.() || [],
           speedScale: demand.vehicleSpeedScale,
           signalDirective: (edgeIndex, progress, speed) => trafficControls.directive(edgeIndex, progress, speed, elapsedSeconds)
         });

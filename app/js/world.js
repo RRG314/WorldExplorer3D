@@ -57,7 +57,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=45";
+} from "./world/load-support.js?v=46";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=51";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=229";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=230";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,

@@ -642,6 +642,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   appCtx.enforceEnvironmentSceneOwnership?.();
   try {
     appCtx.showLoad?.('',{phase:'prepareWorldPresentation'});
+    appCtx.refreshAstronomicalSky?.(true);
     const firstRender=appCtx.prepareFirstWorldRender?.();
     if(runtimeState)runtimeState.firstRender=firstRender || null;
   } catch(error) {
@@ -651,7 +652,6 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   appCtx.hideLoad?.();
   void appCtx.refreshNearbyCapturePresentation?.();
   scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
-    appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);
   }, { timeout: 1200, once: false, isCurrent: () =>
     appCtx.worldPublication === publication && appCtx.initialEarthWorldReady === true &&

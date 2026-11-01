@@ -16,6 +16,10 @@ test('far terrain seam refresh uses published geometry after construction arrays
  const bounds={minX:0,maxX:20,minZ:0,maxZ:20};
  const built=await planner.buildFarFieldGeometry({outer:{minX:-20,maxX:40,minZ:-20,maxZ:40},inner:bounds,detailedCoverage:[bounds]},new Map(),0,{contextZoom:0,waterAreas:[]});
  assert.ok(built.geometry.attributes.position.array.length>0);assert.ok(built.coverage.boundaryAdditionalVertices>0);
+ for(const triangles of built.surfaceGrid.boundaryTriangles.values())for(const triangle of triangles)for(const p of triangle){
+  assert.ok(Number.isInteger(p.vertexIndex)&&p.vertexIndex>=0&&p.vertexIndex<built.geometry.attributes.position.count);
+  assert.equal(built.geometry.attributes.position.getX(p.vertexIndex),p.x,'field readers share the actual published vertex identity');
+ }
  const before=sampleFarFieldGridWorldY(-1,10,built.surfaceGrid);
  for(let i=0;i<near.geometry.attributes.position.count;i++)near.geometry.attributes.position.setY(i,near.geometry.attributes.position.getY(i)+5);
  assert.ok(built.refreshBoundaryHeights([near])>0);

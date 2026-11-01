@@ -2,7 +2,7 @@ import { currentMappedGroundIndex, mappedAreaContains } from '../terrain/mapped-
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=21";
-import { vegetationIdentitySeed, semanticForestWeightAt, nearbyVegetationCells } from './vegetation-spatial.js';
+import { vegetationIdentitySeed, semanticForestWeightAt, nearbyVegetationCells,terrainVegetationBounds } from './vegetation-spatial.js';
 import {renderVegetationModels} from './vegetation-models.js';
 import {terrainHeightWithPortalCuts} from '../terrain/structure-terrain-portals.js?v=2';
 
@@ -215,19 +215,24 @@ function* vegetationPlacementSteps() {
   const occupied = new Set();
   const actor=appCtx.activeTransportActor?.();
   const focus={x:Number(actor?.position?.x)||0,z:Number(actor?.position?.z)||0};
+  const farSurface=appCtx.getFarTerrainSurfaceSnapshot?.()?.grid;
+  const forestAt=(mesh,x,z)=>semanticForestWeightAt(mesh,x,z,farSurface);
   const treeNodes = Array.isArray(appCtx.osmTreeNodes) ? appCtx.osmTreeNodes : [];
   const treeRows = Array.isArray(appCtx.osmTreeRows) ? appCtx.osmTreeRows : [];
   const worldDensityScale = vegetationWorldDensityScale();
   const budgetScale = 1;
   const tropicalCanopy = isTropicalCanopyLocation();
   const performanceTier = appCtx.getDynamicBudgetState?.().tier === 'performance';
+  const reviewedWoodland=!!appCtx.worldLoadRuntimeState?.venuePack?.landscapeRefinement&&!tropicalCanopy&&
+    (appCtx.terrainGroup?.children||[]).some(mesh=>[-80,0,80].some(dx=>[-80,0,80].some(dz=>forestAt(mesh,focus.x+dx,focus.z+dz)>.7)));
   const maxTrees = Math.max(120, Math.floor(
-    (tropicalCanopy ? MAX_TROPICAL_TREE_INSTANCES * (performanceTier ? 0.5 : 1) : MAX_GENERATED_TREE_INSTANCES) *
+    (tropicalCanopy ? MAX_TROPICAL_TREE_INSTANCES * (performanceTier ? 0.5 : 1) : reviewedWoodland ? 2200 : MAX_GENERATED_TREE_INSTANCES) *
     budgetScale *
     worldDensityScale
   ));
+  let placementLimit=maxTrees;
   const pushPlacement = (placement) => {
-    if (!placement || placements.length >= maxTrees) return false;
+    if (!placement || placements.length >= placementLimit) return false;
     if (!Number.isFinite(placement.x) || !Number.isFinite(placement.z)) return false;
     if (!['node','tree_row'].includes(placement.source) && Math.hypot(placement.x-focus.x,placement.z-focus.z)>1800) return false;
     // Explicit trees/rows and authored planters have their own evidence. An
@@ -252,7 +257,7 @@ function* vegetationPlacementSteps() {
     pushPlacement({x:p.x,z:p.z,scale:.85,rotation:p.yaw,leafType:'broadleaved',landuseType:'garden',source:'authored-harbor-district'});
   }
 
-  for (let i = 0; i < treeNodes.length && placements.length < maxTrees; i++) {
+  for (let i = 0; i < treeNodes.length && placements.length < placementLimit; i++) {
     yield;
     const node = treeNodes[i];
     if (!node || !Number.isFinite(node.lat) || !Number.isFinite(node.lon)) continue;
@@ -272,7 +277,7 @@ function* vegetationPlacementSteps() {
     });
   }
 
-  for (let i = 0; i < treeRows.length && placements.length < maxTrees; i++) {
+  for (let i = 0; i < treeRows.length && placements.length < placementLimit; i++) {
     yield;
     const way = treeRows[i];
     const rawPts = way?.nodes?.map((id) => appCtx._worldLoadNodes?.[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon)) || [];
@@ -281,7 +286,7 @@ function* vegetationPlacementSteps() {
     const totalLength = polylineLength(pts);
     const rowCount = Math.min(32, Math.max(2, Math.floor(totalLength / TREE_ROW_SPACING)));
     const rowSeed = vegetationSeed((appCtx.worldSeed ^ Number(way.id || i + 1)) >>> 0);
-    for (let p = 0; p < rowCount && placements.length < maxTrees; p++) {
+    for (let p = 0; p < rowCount && placements.length < placementLimit; p++) {
       yield;
       const spacingNoise = 0.65 + appCtx.rand01FromInt(rowSeed ^ p ^ 0x9e3779b9) * 0.7;
       const point = samplePolylinePointAtDistance(pts, p * TREE_ROW_SPACING * spacingNoise);
@@ -301,11 +306,15 @@ function* vegetationPlacementSteps() {
     }
   }
 
+  // Long reviewed venues can spend the whole cap on farther mapped polygons.
+  // Keep explicit trees/rows first, then leave part of the SAME capacity for
+  // the accepted foreground canopy field. Ordinary placement stays unchanged.
+  if(reviewedWoodland)placementLimit=Math.max(placements.length,Math.floor(maxTrees*.45));
   const prioritizedLanduses = [...(appCtx.landuses || [])].sort((a,b) => {
     const distance=lu=>lu?.bounds ? Math.hypot(Math.max(lu.bounds.minX-focus.x,0,focus.x-lu.bounds.maxX),Math.max(lu.bounds.minZ-focus.z,0,focus.z-lu.bounds.maxZ)) : Infinity;
     return distance(a)-distance(b) || String(a?.sourceFeatureId||'').localeCompare(String(b?.sourceFeatureId||''));
   });
-  for (let i = 0; i < prioritizedLanduses.length && placements.length < maxTrees; i++) {
+  for (let i = 0; i < prioritizedLanduses.length && placements.length < placementLimit; i++) {
     yield;
     const lu = prioritizedLanduses[i];
     if (!lu || !VEGETATION_ELIGIBLE_TYPES.has(lu.type) || !Array.isArray(lu.pts) || lu.pts.length < 3) continue;
@@ -341,7 +350,7 @@ function* vegetationPlacementSteps() {
     const spacing = cfg.spacing / Math.sqrt(Math.max(0.42,densityScale));
     for (const cell of nearbyVegetationCells({minX,maxX,minZ,maxZ},spacing,desired*8,focus)) {
       yield;
-      if (placements.length >= maxTrees || placements.length-polygonStartCount >= desired) break;
+      if (placements.length >= placementLimit || placements.length-polygonStartCount >= desired) break;
       const seed = vegetationSeed(polySeed ^ vegetationIdentitySeed(`${cell.cx}:${cell.cz}`));
       const cluster = (vegetationIdentitySeed(`${Math.floor(cell.cx/5)}:${Math.floor(cell.cz/5)}:${polySeed}`) % 1000) / 1000;
       if (lu.type !== 'orchard' && appCtx.rand01FromInt(seed ^ 0x94d049bb) > 0.45 + cluster * 0.5) continue;
@@ -385,13 +394,13 @@ function* vegetationPlacementSteps() {
   const terrainMeshes = tropicalCanopy ? [] : (appCtx.terrainGroup?.children || []).filter(
     (mesh) => mesh?.userData?.worldCoverResult?.vegetationSamples?.length
   ).sort((a,b)=>Math.hypot(a.position.x-focus.x,a.position.z-focus.z)-Math.hypot(b.position.x-focus.x,b.position.z-focus.z));
-  for (let tileIndex = 0; tileIndex < terrainMeshes.length && placements.length < maxTrees; tileIndex++) {
+  for (let tileIndex = 0; tileIndex < terrainMeshes.length && placements.length < placementLimit; tileIndex++) {
     yield;
     const mesh = terrainMeshes[tileIndex];
     const bounds = mesh.userData?.terrainTile?.bounds;
     const samples = mesh.userData.worldCoverResult.vegetationSamples;
     if (!bounds || !Array.isArray(samples)) continue;
-    for (let sampleIndex = 0; sampleIndex < samples.length && placements.length < maxTrees; sampleIndex++) {
+    for (let sampleIndex = 0; sampleIndex < samples.length && placements.length < placementLimit; sampleIndex++) {
       yield;
       const sample = samples[sampleIndex];
       const lat = bounds.latN - (bounds.latN - bounds.latS) * Number(sample.v || 0);
@@ -422,30 +431,33 @@ function* vegetationPlacementSteps() {
   // weight. Use that accepted surface product when optional raster vegetation
   // samples are unavailable, so a provider outage cannot turn a mapped jungle
   // into an empty green sheet or trigger a duplicate land-cover request.
+  placementLimit=maxTrees;
   const semanticMeshes = (appCtx.terrainGroup?.children || []).filter((mesh) => {
     const positions = mesh?.geometry?.attributes?.position;
     const mixA = mesh?.geometry?.attributes?.terrainSurfaceMixA;
     return positions && mixA && positions.count === mixA.count;
-  }).sort((a,b)=>Math.hypot(a.position.x-focus.x,a.position.z-focus.z)-Math.hypot(b.position.x-focus.x,b.position.z-focus.z));
+  }).sort((a,b)=>{
+    const distance=mesh=>{const bounds=terrainVegetationBounds(mesh,farSurface);return bounds?Math.hypot(Math.max(bounds.minX-focus.x,0,focus.x-bounds.maxX),Math.max(bounds.minZ-focus.z,0,focus.z-bounds.maxZ)):Infinity;};
+    return distance(a)-distance(b);
+  });
   const hasWorldCoverPlacements = placements.some((placement) => placement.source === 'worldcover');
-  if (!hasWorldCoverPlacements || tropicalCanopy) {
-    for (let meshIndex = 0; meshIndex < semanticMeshes.length && placements.length < maxTrees; meshIndex += 1) {
+  if (!hasWorldCoverPlacements || tropicalCanopy || reviewedWoodland) {
+    for (let meshIndex = 0; meshIndex < semanticMeshes.length && placements.length < placementLimit; meshIndex += 1) {
       yield;
       const mesh = semanticMeshes[meshIndex];
-      const perMeshBudget = Math.min(tropicalCanopy ? 1600 : 400,maxTrees-placements.length);
-      const params=mesh.geometry.parameters;
-      if(!params?.width || !params?.height) continue;
-      const area={minX:Math.max(focus.x-900,mesh.position.x-params.width/2),maxX:Math.min(focus.x+900,mesh.position.x+params.width/2),minZ:Math.max(focus.z-900,mesh.position.z-params.height/2),maxZ:Math.min(focus.z+900,mesh.position.z+params.height/2)};
+      const perMeshBudget = Math.min(tropicalCanopy || reviewedWoodland ? 1600 : 400,maxTrees-placements.length);
+      const bounds=terrainVegetationBounds(mesh,farSurface);if(!bounds)continue;
+      const area={minX:Math.max(focus.x-900,bounds.minX),maxX:Math.min(focus.x+900,bounds.maxX),minZ:Math.max(focus.z-900,bounds.minZ),maxZ:Math.min(focus.z+900,bounds.maxZ)};
       if(area.minX>=area.maxX || area.minZ>=area.maxZ) continue;
-      const spacing=tropicalCanopy ? 12 : 18;
+      const spacing=tropicalCanopy || reviewedWoodland ? 12 : 18;
       let accepted = 0;
       for (const {cx,cz} of nearbyVegetationCells(area,spacing,perMeshBudget*5,focus)) {
         yield;
-        if(accepted>=perMeshBudget || placements.length>=maxTrees) break;
+        if(accepted>=perMeshBudget || placements.length>=placementLimit) break;
         const seed = vegetationIdentitySeed(`${cx}:${cz}:forest`);
         const x=(cx+0.15+appCtx.rand01FromInt(seed^0x7f4a7c15)*.7)*spacing;
         const z=(cz+0.15+appCtx.rand01FromInt(seed^0x165667b1)*.7)*spacing;
-        const forestWeight=semanticForestWeightAt(mesh,x,z);
+        const forestWeight=forestAt(mesh,x,z);
         if(forestWeight < (tropicalCanopy ? .6 : .7)) continue;
         const cluster=appCtx.rand01FromInt(vegetationIdentitySeed(`${Math.floor(cx/5)}:${Math.floor(cz/5)}`));
         if(appCtx.rand01FromInt(seed^0x27d4eb2f)>.6+.35*cluster) continue;
@@ -517,7 +529,7 @@ function* vegetationPlacementSteps() {
     const x=tree.x+Math.cos(seed)*1.3, z=tree.z+Math.sin(seed)*1.3;
     if (isVegetationPlacementBlocked(x,z)) continue;
     const mapped=mappedLanduseAt(x,z);
-    const supported=mapped ? mapped.mode === 'forest' : (appCtx.terrainGroup?.children||[]).some(mesh=>semanticForestWeightAt(mesh,x,z)>.7);
+    const supported=mapped ? mapped.mode === 'forest' : (appCtx.terrainGroup?.children||[]).some(mesh=>forestAt(mesh,x,z)>.7);
     if (supported) groundcover.push({x,z,scale:0.7+(seed%40)/100,rotation:seed%628/100,landuseType:'forest_groundcover',source:'supported-forest-understory'});
   }
   // Herbaceous wetland cover is not a forest. Close clumps use the same

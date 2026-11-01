@@ -5,6 +5,7 @@ import {activePresentationOwner} from './renderer-owners.js';
 import { updateStreetPavementFocus, updateStreetOverviewFrame, prepareStreetOverviewMaterials } from '../world/street-pavement-runtime.js';
 import { suspendStreetPreparationForInterior } from '../world/street-interior-suspension.js';
 import { prepareResidentPresentation } from './resident-presentation-preparation.js';
+import {updateControlInputFrame} from '../controls/input-frame.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
   let hudTimer = 0;
@@ -33,8 +34,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'engine',
       phase: 'input',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
-      update() {
-        appCtx.updateControlInput?.();
+      update(frame) {
+        updateControlInputFrame(appCtx, frame);
       }
     },
     {
@@ -111,7 +112,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'camera',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
-        appCtx.updateCamera(frame.dt);
+        if(!appCtx.vrPresentation?.active||appCtx.vrPresentation.updateCamera(frame)===false)appCtx.updateCamera(frame.dt);
         appCtx.updatePlanetarySky?.();
       }
     },
@@ -194,22 +195,29 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     return prepareResidentPresentation(appCtx, globalThis.THREE, {
       root: root || appCtx.scene,
       visibleRoots,
+      residentRoots: root && root !== appCtx.scene ? [] : appCtx.livingWorldRuntime?.residentPresentationRoots?.() || [],
       target: shouldUseComposer() ? appCtx.composer.readBuffer : null
     });
   };
   const draw = () => {
+    const gl = appCtx.renderer.getContext?.();
+    if (gl?.isContextLost?.()) return false;
     graphicsEvidence?.begin();
     const restoreWaterPresentation=beginSwimmingRender(appCtx);
     try {
-      if (shouldUseComposer()) appCtx.composer.render();
+      let presented=true;
+      if (appCtx.vrPresentation?.active) presented=appCtx.vrPresentation.render()!==false;
+      else if (shouldUseComposer()) appCtx.composer.render();
       else appCtx.renderer.render(appCtx.scene, appCtx.camera);
       appCtx.recordPerfRendererInfo?.(appCtx.renderer);
+      return presented && !gl?.isContextLost?.();
     } finally {restoreWaterPresentation?.();graphicsEvidence?.end();}
   };
   // The completed world must have produced its first frame before the loading
   // cover is dismissed. Use the real render path, including postprocessing.
   appCtx.prepareFirstWorldRender = () => {
     if (!appCtx.gameStarted || appCtx.worldLoading) throw new Error('World is not ready for its first render');
+    if (appCtx.renderer.getContext?.()?.isContextLost?.()) throw new Error('The 3D view is temporarily unavailable. Wait for your browser to restore it, then retry this location.');
     const started=performance.now();
     appCtx.updateCamera?.(0);
     prepareStreetOverviewMaterials(appCtx);
@@ -233,7 +241,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
       }
     }
     const residentPreparation = appCtx.prepareResidentPresentation(appCtx.scene, [appCtx.carMesh, appCtx.Walk?.state?.characterMesh]);
-    draw();
+    if (!draw()) throw new Error('The 3D view became unavailable before the world could be shown. Retry this location.');
     return {durationMs:performance.now()-started,programs:appCtx.renderer?.info?.programs?.length || 0,residentPreparation};
   };
   return {
@@ -248,9 +256,10 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // partial city batches competes with compilation and uploads them early.
     // Manual pause retains the last frame beneath its dimmed dialog. Network
     // listeners and lease heartbeats remain alive without redrawing the city.
-    enabled: (frame) => frame?.manualRender !== false && activePresentationOwner(appCtx)==='main' && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
-    update() {
-      draw();
+    enabled: (frame) => frame?.manualRender !== false && activePresentationOwner(appCtx)==='main' && !appCtx.worldLoading && !appCtx.titleLaunchPending && (!appCtx.hasPauseReason?.('manual_pause')||appCtx.vrPresentation?.active===true),
+    update(frame) {
+      const presented=draw();
+      if(presented&&frame?.flags)frame.flags.mainWorldPresented=appCtx.worldPublication;
     }
   };
 }

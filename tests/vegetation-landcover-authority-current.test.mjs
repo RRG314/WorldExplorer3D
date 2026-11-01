@@ -109,3 +109,17 @@ test('portal excavation excludes vegetation at the cut floor while preserving co
  setup([],{osmTreeNodes:nodes,baseTerrainHeightAt:()=>40,terrainMeshHeightAt:()=>40,structureTerrainPortalDescriptors:[mask]});
  assert.ok(collectWorldVegetationPlacements().some(p=>p.x===100),'intact ground above the aperture still supports trees');
 });
+
+test('a reviewed wooded venue uses bounded denser supported foreground canopy',()=>{
+ const landuses=[feature('forest',-300,-300,600),...Array.from({length:7},(_,i)=>feature('forest',400+(i%3)*350,-300+Math.floor(i/3)*350,300)),feature('grass',120,100,60)],
+  values=new Float32Array([-200,0,-200,400,0,-200,-200,0,400,400,0,400]),mesh={position:{x:0,z:0},geometry:{parameters:{width:600,height:600,widthSegments:1,heightSegments:1},attributes:{position:{array:values,itemSize:3,count:4,getX:i=>values[i*3],getZ:i=>values[i*3+2]},terrainSurfaceMixA:{count:4,getZ:()=>1}}}};
+ setup(landuses,{terrainGroup:{children:[mesh]},worldLoadRuntimeState:{venuePack:{landscapeRefinement:{radiusMeters:350}}}});
+ const points=collectWorldVegetationPlacements(),canopy=points.filter(p=>p.source==='terrain_semantic_forest');
+ assert.ok(canopy.length>=200,'farther polygon trees must not exhaust all foreground canopy capacity');
+ assert.ok(points.filter(p=>p.landuseType!=='forest_groundcover').length<=2200,'reviewed woodland retains its explicit bounded cap');
+ assert.ok(canopy.length>=500,'reviewed woodland fills the supported foreground instead of a sparse distant polygon allocation');
+ assert.ok(canopy.every(p=>Math.hypot(p.x-100,p.z-100)<500));
+ assert.ok(canopy.every(p=>!mappedAreaContains(landuses.at(-1),p.x,p.z)),'measured clearing remains open');
+ setup(landuses,{terrainGroup:{children:[mesh]}});
+ assert.equal(collectWorldVegetationPlacements().some(p=>p.source==='terrain_semantic_forest'),false,'ordinary mapped placement policy is unchanged');
+});

@@ -3,6 +3,8 @@ import { homeAchievementEvent } from '../campaign/home-achievements.js';
 import {supportRecorder} from '../runtime/support-receipt.js';
 import { normalizeCameraFavorites } from '../live-earth/public-camera-directory.js';
 import { validateJournalBackup } from './backup-validation.js?v=1';
+import {createPortalTrailPersistence,portalTrailProfileRows} from './portal-trail-persistence.js';
+import {portalTrailPrefix} from '../portal/trail-model.js';
 import { summarizeReceiptState } from './save-status.js?v=1';
 import { awardCompanionXp, normalizeCompanionProgression } from './companions.js?v=7';
 import { pendingDiscoveryReceipt } from './receipt-outbox.js?v=1';
@@ -161,6 +163,15 @@ function validateReceipt(item, receipt) {
     || !['trusted-server', 'server-receipt'].includes(receipt.authority)) throw Object.assign(new TypeError('Receipt does not match the local discovery.'), {status:422});
 }
 
+function eventPrefixPage(prefix, {after = '', limit = 64} = {}) {
+  if (typeof prefix !== 'string' || !prefix || prefix.length > 220 || /[\u0000-\u001f\uffff]/.test(prefix)
+      || typeof after !== 'string' || after.length > 260 || (after && !after.startsWith(prefix))) {
+    throw new TypeError('Expected a stable event prefix and matching cursor');
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 64) throw new TypeError('Expected a page of 1 to 64 events');
+  return {after, limit};
+}
+
 function requestPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -265,6 +276,40 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   const open = () => openDiscoveryDatabase(options.indexedDB);
   let characterMigrationReady = false;
   let characterMigrationPromise = null;
+  const portalTrail = createPortalTrailPersistence({
+    async read(key) {
+      const db=await open();
+      try{const tx=db.transaction(['profiles'],'readonly');const row=await requestPromise(tx.objectStore('profiles').get(key));await transactionPromise(tx);return row;}
+      finally{db.close();}
+    },
+    async update(key,reduce) {
+      const db=await open();let tx;
+      try{
+        tx=db.transaction(['profiles'],'readwrite');const store=tx.objectStore('profiles');
+        const next=reduce(await requestPromise(store.get(key)));store.put(next);await transactionPromise(tx);return clone(next);
+      }catch(error){try{tx?.abort();}catch{}supportRecorder.record({operation:'journal-save',error});throw error;}
+      finally{db.close();}
+    },
+    async page(ownerScope,after,limit) {
+      const db=await open();
+      try{
+        const tx=db.transaction(['profiles'],'readonly'),store=tx.objectStore('profiles');
+        const prefix=portalTrailPrefix(ownerScope),rangeType=options.IDBKeyRange||globalThis.IDBKeyRange;
+        const range=rangeType?.bound(after?`${prefix}${after}`:prefix,`${prefix}\uffff`,!!after,false);
+        const rows=await new Promise((resolve,reject)=>{
+          const rows=[],request=store.openCursor(range);
+          request.onerror=()=>reject(request.error||new Error('Trail could not be read.'));
+          request.onsuccess=()=>{
+            const cursor=request.result;
+            if(!cursor||rows.length>=limit){resolve(rows);return;}
+            if(String(cursor.key).startsWith(prefix)&&cursor.value.ownerScope===ownerScope&&(!after||cursor.value.destinationId>after))rows.push(cursor.value);
+            if(rows.length>=limit){resolve(rows);return;}cursor.continue();
+          };
+        });
+        await transactionPromise(tx);return rows;
+      }finally{db.close();}
+    }
+  });
 
   async function ensureCharacterMigration(db) {
     if (characterMigrationReady) return true;
@@ -629,6 +674,31 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }finally{db.close();}
   }
 
+  // Use the existing event primary key, avoiding an upgrade or a scan of
+  // unrelated Journal history. Consumers may cancel between bounded pages.
+  async function listEventsByIdPrefix(prefix, page = {}) {
+    const {after, limit} = eventPrefixPage(prefix, page);
+    const rangeType = options.IDBKeyRange || globalThis.IDBKeyRange;
+    if (!rangeType?.bound) throw new Error('IndexedDB key ranges are unavailable.');
+    const db = await open();
+    try {
+      const transaction = db.transaction(['events'], 'readonly');
+      const range = rangeType.bound(after || prefix, prefix + '\uffff', !!after, false);
+      const rows = await new Promise((resolve, reject) => {
+        const rows = [], request = transaction.objectStore('events').openCursor(range);
+        request.onerror = () => reject(request.error || new Error('Journal events could not be read.'));
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor || rows.length >= limit) { resolve(rows); return; }
+          rows.push(cursor.value);
+          if (rows.length >= limit) resolve(rows); else cursor.continue();
+        };
+      });
+      await transactionPromise(transaction);
+      return {events: rows.map(clone), nextCursor: rows.length === limit ? rows.at(-1).eventId : null};
+    } finally { db.close(); }
+  }
+
   async function listEvents(limit = 500) {
     const db = await open();
     try {
@@ -864,7 +934,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const tx = db.transaction(names, 'readonly');
       const rows = await Promise.all(names.map(name => requestPromise(tx.objectStore(name).getAll())));
       await transactionPromise(tx);
-      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
+      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), portalTrail:portalTrailProfileRows(rows[0]), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
     } finally { db.close(); }
   }
 
@@ -928,6 +998,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
           };
       profiles.put(importedProfile);
       for(const album of data.albums)profiles.put(clone(album));
+      for(const row of data.portalTrail??portalTrailProfileRows(previous.profiles))profiles.put(clone(row));
       const items = Array.isArray(data.items) ? data.items : [];
       const companions = Array.isArray(data.companions) ? data.companions : [];
       items.forEach((item) => {
@@ -958,6 +1029,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   return Object.freeze({
     type: 'IndexedDbDiscoveryProfileStore',
+    ...portalTrail,
     setReceiptOwnerProvider(provider, catalogVersion) { options.getReceiptOwnerUid = provider; options.catalogVersion = catalogVersion; },
     getReceiptSyncStatus, listPendingReceipts, completePendingReceipt, deferPendingReceipt,
     applyTrustedReceipt,
@@ -969,6 +1041,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     listCompanions,
     listEvents,
     getEventsById,
+    listEventsByIdPrefix,
     listFieldGuide,
     listItems,
     loadRuntimeBootstrap,
@@ -1014,6 +1087,13 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
   const guide = new Map((seed.fieldGuide || []).map((entry) => [entry.catalogId, clone(entry)]));
   const companions = new Map((seed.companions || []).map((entry) => [entry.instanceId, clone(entry)]));
   const events = new Map((seed.events || []).map((entry) => [entry.eventId, clone(entry)]));
+  const portalRows=new Map((seed.portalTrail||[]).map(row=>[row.id,clone(row)]));
+  const portalTrail=createPortalTrailPersistence({
+    async read(key){return clone(portalRows.get(key));},
+    async update(key,reduce){const next=reduce(clone(portalRows.get(key)));portalRows.set(key,clone(next));return clone(next);},
+    async page(ownerScope,after,limit){return [...portalRows.values()].filter(row=>row.ownerScope===ownerScope&&(!after||row.destinationId>after))
+      .sort((a,b)=>a.destinationId<b.destinationId?-1:a.destinationId>b.destinationId?1:0).slice(0,limit).map(clone);}
+  });
 
   async function recordDiscovery(record, policy = {}) {
     if (!record?.claimId || !record?.catalogId) throw new TypeError('Discovery recording requires stable claim and catalog IDs.');
@@ -1100,6 +1180,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    ...portalTrail,
     async recordHomeAchievement(kind,home) {
       if(profile.homeAchievements?.[kind])return clone(profile.homeAchievements[kind]);
       const event=createExplorerStoryEvent(homeAchievementEvent(kind,home,profile));
@@ -1160,6 +1241,12 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async listItems(limit = 200) { return [...items.values()].sort((a,b)=>compareJournalRows('items',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async listFieldGuide(limit = 500) { return [...guide.values()].sort((a,b)=>compareJournalRows('fieldGuide',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async getEventsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable event IDs');return ids.map(id=>events.get(id)).filter(Boolean).map(clone);},
+    async listEventsByIdPrefix(prefix, page = {}) {
+      const {after, limit} = eventPrefixPage(prefix, page);
+      const rows = [...events.keys()].filter(id => id.startsWith(prefix) && (!after || id > after))
+        .sort().slice(0, limit).map(id => clone(events.get(id)));
+      return {events: rows, nextCursor: rows.length === limit ? rows.at(-1).eventId : null};
+    },
     async listEvents(limit = 500) { return [...events.values()].sort((a,b)=>compareJournalRows('events',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async loadRuntimeBootstrap() {
       return {
@@ -1227,6 +1314,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
         schemaVersion: DISCOVERY_DB_VERSION,
         profile: clone(profile),
         albums: photoAlbum.photos.length?[clone(photoAlbum)]:[],
+        portalTrail:[...portalRows.values()].map(clone),
         items: [...items.values()].map(clone),
         fieldGuide: [...guide.values()].map(clone),
         companions: [...companions.values()].map(clone),
@@ -1237,14 +1325,14 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       if (!beforeImport) return false;
       photoAlbum=clone(beforeImport.photoAlbum);
       profile = clone(beforeImport.profile); legacyProfileBackup = clone(beforeImport.legacyProfileBackup);
-      for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox})) {
+      for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox,portalRows})) {
         map.clear(); for (const [id,row] of beforeImport[name]) map.set(id,clone(row));
       }
       beforeImport = null; return true;
     },
     async importData(data = {}) {
       data = validateJournalBackup(data);
-      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox]});
+      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows]});
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
       for (const [id,row] of outbox) {
@@ -1264,6 +1352,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
           });
       profile = normalizeProfile({ ...data.profile, characterState: importedCharacter });
       photoAlbum=clone(data.albums.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
+      if(data.portalTrail){portalRows.clear();for(const row of data.portalTrail)portalRows.set(row.id,clone(row));}
       items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();
       (data.items || []).filter((item) => item?.instanceId && item?.catalogId).forEach((item) => items.set(item.instanceId, clone(item)));
       for (const item of items.values()) if (item.claimId) claims.set(item.claimId,{claimId:item.claimId,item:clone(item),event:null});

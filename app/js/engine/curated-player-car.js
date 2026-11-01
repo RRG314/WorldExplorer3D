@@ -100,6 +100,7 @@ function prepareE34Model(THREE, source, record) {
   normalized.updateMatrix();
   oriented.add(normalized);
   oriented.position.y = -1.1;
+  oriented.userData.vehicleRootHeightMeters = 1.1;
   oriented.updateMatrix();
   oriented.updateMatrixWorld(true);
   oriented.userData.defaultPlayerVehicleVisual = true;
@@ -160,4 +161,4 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
   return loadPromise;
 }
 
-export { attachCuratedPlayerCar };
+export { attachCuratedPlayerCar, prepareE34Model };

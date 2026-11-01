@@ -144,11 +144,10 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
   }
   for (const road of roads) {
     if (!groundFeature(road) || !Array.isArray(road.pts)) continue;
-    const offset = roadPlacementOffsetWorld(road);
     for (let i=1;i<road.pts.length-1;i++) {
       const point=road.pts[i];
       if (coverageBounds && !intersects(box([point]),coverageBounds,20)) continue;
-      const halfWidth=roadWidthAtSegment(road,i,0)/2;
+      const halfWidth=roadWidthAtSegment(road,i,0)/2,offset=roadPlacementOffsetWorld(road,i,0);
       insert('joins',{road,sidewalkMasks:sidewalkOwnership.masks.get(road),sidewalkMaskProduct:sidewalkMaskProducts.get(road),section:frontagePolicy.section(road,i),previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
     }
     for (const segment of streetRoadSegments(road)) {
@@ -157,7 +156,7 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
       segment.sidewalkMasks=sidewalkOwnership.masks.get(road);
       segment.sidewalkMaskProduct=sidewalkMaskProducts.get(road);
       segments.push(segment);
-      insert('segments',segment,segment.bounds,Math.max(segment.wa,segment.wb)/2+Math.abs(offset)+32/metersPerWorldUnit);
+      insert('segments',segment,segment.bounds,Math.max(segment.wa,segment.wb)/2+Math.max(Math.abs(segment.offset),Math.abs(segment.nextOffset??segment.offset))+32/metersPerWorldUnit);
     }
   }
   for (const feature of linearFeatures) {
@@ -282,8 +281,8 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     }
   }
   for (const original of tile.segments) {
-    const offset=original.offset || 0;
-    const road=quad(original.a,original.b,Math.max(.3,original.wa/2-offset),Math.max(.3,original.wa/2+offset),Math.max(.3,original.wb/2-offset),Math.max(.3,original.wb/2+offset));
+    const offset=original.offset || 0,nextOffset=original.nextOffset??offset;
+    const road=quad(original.a,original.b,Math.max(.3,original.wa/2-offset),Math.max(.3,original.wa/2+offset),Math.max(.3,original.wb/2-nextOffset),Math.max(.3,original.wb/2+nextOffset));
     if(!road) continue;
     const length=Math.hypot(original.b.x-original.a.x,original.b.z-original.a.z);
     const nx=(original.b.z-original.a.z)/length,nz=-(original.b.x-original.a.x)/length;
@@ -293,11 +292,11 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     for(const [side,sign] of [['left',1],['right',-1]]) {
       if(section[side].presence!=='present') continue;
       const width=section[side].widthMeters/metersPerWorldUnit;
-      const edgeStart=streetSideEdge(original.road,original.wa/2,sign),edgeEnd=streetSideEdge(original.road,original.wb/2,sign);
+      const edgeStart=streetSideEdge(original.road,original.wa/2,sign,original.index,original.t0),edgeEnd=streetSideEdge(original.road,original.wb/2,sign,original.index,original.t1);
       const pieces=splitFrontageIntervals(original,tile.edges,{nx:nx*sign,nz:nz*sign,minimumA:edgeStart+width,minimumB:edgeEnd+width,maximumA:edgeStart+FRONTAGE_RULES.ordinaryReach/metersPerWorldUnit,maximumB:edgeEnd+FRONTAGE_RULES.ordinaryReach/metersPerWorldUnit});
       const outerPoints=[];
       for(const s of pieces) {
-        const edgeA=streetSideEdge(s.road,s.wa/2,sign),edgeB=streetSideEdge(s.road,s.wb/2,sign);
+        const edgeA=streetSideEdge(s.road,s.wa/2,sign,s.index,s.t0),edgeB=streetSideEdge(s.road,s.wb/2,sign,s.index,s.t1);
         let outerA=edgeA+width,outerB=edgeB+width;
         const midpoint={x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2};
         const max=(s.frontageMaximumA+s.frontageMaximumB)/2;
@@ -370,7 +369,8 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
 }
 
 // Regular cells keep slope interpolation local. Shared world-grid vertices produce matching tile seams.
-export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [], includeCurbs = true, includeTriangles = true } = {}) {
+export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [], includeCurbs = true, includeTriangles = true, preclipped = false } = {}) {
+  if(preclipped&&(cellSize<tile.bounds.maxX-tile.bounds.minX||cellSize<tile.bounds.maxZ-tile.bounds.minZ||ramps.length))throw Error('invalid_preclipped_pavement');
   const vertices = [], curbVertices = [], triangles = [], b = tile.bounds;
   const polygonBounds = polygons.map(poly => {
     const ring = poly[0];
@@ -398,7 +398,7 @@ export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, c
     const candidates=polygonBounds.filter(p=>p.minX<=x+size && p.maxX>=x && p.minZ<=z+size && p.maxZ>=z).map(p=>p.poly);
     if(!candidates.length)continue;
     const square = polygon([[x, z], [x + size, z], [x + size, z + size], [x, z + size]]);
-    for (const poly of clip.intersection(candidates, square)) {
+    for (const poly of (preclipped?candidates:clip.intersection(candidates, square))) {
       const points = [], holes = [];
       for (let ri = 0; ri < poly.length; ri++) { if (ri) holes.push(points.length); points.push(...poly[ri].slice(0, -1)); }
       const indices = earcut(points.flat(), holes, 2);

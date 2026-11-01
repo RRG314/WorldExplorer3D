@@ -51,6 +51,8 @@ export function splitFrontageIntervals(segment, edges, {nx,nz,minimumA,minimumB=
   const sorted=[...cuts].sort((a,b)=>a-b),at=t=>({x:segment.a.x+dx*t,z:segment.a.z+dz*t});
   return sorted.slice(1).map((end,i)=>{const start=sorted[i];return {...segment,a:at(start),b:at(end),
     wa:segment.wa+(segment.wb-segment.wa)*start,wb:segment.wa+(segment.wb-segment.wa)*end,
+    ...(Number.isFinite(segment.t0)&&Number.isFinite(segment.t1)?{t0:segment.t0+(segment.t1-segment.t0)*start,t1:segment.t0+(segment.t1-segment.t0)*end}:{}),
+    ...(Number.isFinite(segment.nextOffset)?{offset:segment.offset+(segment.nextOffset-segment.offset)*start,nextOffset:segment.offset+(segment.nextOffset-segment.offset)*end}:{}),
     frontageMinimumA:minimumA+minimumDelta*start,frontageMinimumB:minimumA+minimumDelta*end,
     frontageMaximumA:maximumA+maximumDelta*start,frontageMaximumB:maximumA+maximumDelta*end};});
 }

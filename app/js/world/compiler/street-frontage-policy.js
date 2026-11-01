@@ -7,8 +7,8 @@ export const FRONTAGE_RULES = Object.freeze({ minimumFacade: 3, urbanReach: 20, 
 export const isGroundStreet = feature => !feature.isStructureConnector &&
   ['at_grade', undefined].includes(feature.structureSemantics?.terrainMode) &&
   !feature.structureSemantics?.gradeSeparated && !feature.structureSemantics?.rampCandidate;
-export function streetSideEdge(road, halfWidth, sign) {
-  const offset = roadPlacementOffsetWorld(road);
+export function streetSideEdge(road, halfWidth, sign,segmentIndex,segmentT=.5) {
+  const offset = roadPlacementOffsetWorld(road,segmentIndex,segmentT);
   return Math.max(.3, halfWidth - sign * offset);
 }
 export function streetScale(value = 1.11) {

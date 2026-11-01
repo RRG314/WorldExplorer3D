@@ -1,6 +1,10 @@
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
+import {vehicleWheelRig} from '../transport/vehicle-wheel-motion.js';
+import {prepareE34Model} from '../engine/curated-player-car.js?v=7';
+import {syncVehicleGroundPivot as syncCuratedVehicleGroundPivot} from '../engine/vehicle-ground-pivot.js';
+import {createVehicleInstruments} from '../transport/vehicle-instruments.js';
 
 const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   compact: 'traffic-compact-hatchback-v1',
@@ -11,22 +15,18 @@ const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   delivery_van: 'traffic-city-van-v1',
   taxi: 'traffic-city-taxi-v1',
   box_truck: 'traffic-service-truck-v1',
-  city_bus: 'traffic-city-bus-v1'
+  city_bus: 'traffic-city-bus-v1',
+  delorean: 'road-delorean-dmc12',
+  cadillac_coupe: 'road-cadillac-coupe-deville',
+  cadillac_fleetwood: 'road-cadillac-fleetwood-brougham',
+  golf_ii: 'road-volkswagen-golf-ii',
+  datsun_280z: 'road-datsun-280z',
+  bmw_m3_e46: 'road-bmw-m3-e46',
+  bmw_m3_e92_race: 'road-bmw-m3-e92-race',
+  porsche_carrera_4s: 'road-porsche-911-carrera-4s',
 });
 
 const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';
-
-function syncCuratedVehicleGroundPivot(host) {
-  const visual = host?.userData?.curatedTrafficVehicleAttachment?.visual;
-  if (!visual) return;
-  const pitch = Number(host.rotation?.x || 0);
-  const roll = Number(host.rotation?.z || 0);
-  const height = VEHICLE_ROOT_TO_GROUND_METERS;
-  // The host is positioned above the ground vertically. Inverse-rotate that
-  // offset so its mesh still rotates about the sampled ground-contact center.
-  visual.position.set(-height * Math.sin(roll) * Math.cos(pitch),
-    -height * Math.cos(roll) * Math.cos(pitch), height * Math.sin(pitch));
-}
 
 function prepareTrafficVisual(THREE, instance, options = {}) {
   const { record, root: source } = instance;
@@ -66,7 +66,7 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     materials.forEach((material) => {
       const name = String(material?.name || '');
-      if (paintNames.has(name)) {
+      if (paintNames.has(name) && options.preserveSourcePaint !== true) {
         material.color?.setHex?.(Number(options.color || 0x52697a));
         material.roughness = .5;
         material.metalness = .28;
@@ -77,7 +77,8 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
       } else if (/Headlights/i.test(name)) {
         material.emissive?.setHex?.(0xffd784);
         material.emissiveIntensity = .5;
-      } else if (/TailLights/i.test(name)) {
+      } else if (/TailLights|BrakeLight/i.test(name)) {
+        material.color?.setHex?.(0xa52c27);
         material.emissive?.setHex?.(0x7c1118);
         material.emissiveIntensity = .62;
       }
@@ -85,6 +86,7 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
     });
   });
   visual.userData.curatedTrafficAssetId = record.id;
+  visual.userData.wheels = vehicleWheelRig(source);
   visual.userData.collisionPolicy = record.collisionPolicy;
   visual.userData.performanceProfile = Object.freeze({
     style: 'licensed-curated-world-traffic',
@@ -97,9 +99,13 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
 }
 
 function disposeCuratedTrafficVehicle(host) {
+  if(!host?.userData)return false;
+  host.userData.curatedTrafficVehicleLoadGeneration=(host.userData.curatedTrafficVehicleLoadGeneration||0)+1;
+  host.userData.curatedTrafficVehicleLoadStarted=false;
   const attachment = host?.userData?.curatedTrafficVehicleAttachment;
   if (!attachment) return false;
   const assetId = attachment.instance.record.id;
+  attachment.visual.userData.instruments?.dispose();
   detachSceneObject(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedTrafficVehicleAttachment;
@@ -114,15 +120,21 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     ? CURATED_RESPONDER_ASSET_ID
     : CURATED_TRAFFIC_ASSET_BY_VARIANT[String(options.variantId || '')]);
   if (!assetId) return false;
+  const generation=(host.userData.curatedTrafficVehicleLoadGeneration||0)+1;
+  host.userData.curatedTrafficVehicleLoadGeneration=generation;
+  host.userData.disposeCuratedTrafficVehicle=()=>disposeCuratedTrafficVehicle(host);
   host.userData.curatedTrafficVehicleLoadStarted = true;
+  let instance;
   try {
-    const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
-    if (options.isCurrent && !options.isCurrent()) {
+    instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
+    if (host.userData.curatedTrafficVehicleLoadGeneration!==generation || options.isCurrent && !options.isCurrent()) {
       instance.dispose();
-      host.userData.curatedTrafficVehicleLoadStarted = false;
+      if(host.userData.curatedTrafficVehicleLoadGeneration===generation)host.userData.curatedTrafficVehicleLoadStarted = false;
       return false;
     }
-    const visual = prepareTrafficVisual(THREE, instance, options);
+    const visual = instance.record.id==='vehicle-bmw-525i-e34'
+      ?prepareE34Model(THREE,instance.root,instance.record):prepareTrafficVisual(THREE, instance, options);
+    visual.userData.instruments = createVehicleInstruments(THREE, visual);
     host.add(visual);
     host.userData.curatedTrafficAssetId = instance.record.id;
     host.userData.curatedTrafficVehicleLoadFailed = false;
@@ -131,8 +143,11 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     syncCuratedVehicleGroundPivot(host);
     return true;
   } catch (error) {
-    host.userData.curatedTrafficVehicleLoadStarted = false;
-    host.userData.curatedTrafficVehicleLoadFailed = error?.name !== 'AbortError';
+    if(host.userData.curatedTrafficVehicleLoadGeneration===generation){
+      disposeCuratedTrafficVehicle(host);
+      host.userData.curatedTrafficVehicleLoadFailed = error?.name !== 'AbortError';
+    }
+    instance?.dispose();
     if (error?.name !== 'AbortError') console.warn('Curated traffic vehicle unavailable; vehicle remains hidden.', error);
     return false;
   }

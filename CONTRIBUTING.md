@@ -110,6 +110,14 @@ dependency locks in Git. Their workflows build in owned emulators/simulators.
 Release signing material and temporary live-test identities stay outside Git;
 they must never enter screenshots, uploaded logs or build artifacts.
 
+`scripts/verification/web-startup-current.mjs` checks a failed essential file,
+explicit reload and slow startup in one selected browser engine. Run it through
+`scripts/verification/attested-source-check.mjs` with authorized staging access.
+`WE3D_STARTUP_WORLD=1` adds one city entry; `WE3D_STARTUP_PHASE=world-only` reuses
+accepted startup checks when only a world journey needs investigation. Optional
+allocation profiling and regional settling are diagnostics, not phone performance
+acceptance. Keep their output private and reuse applicable successful results.
+
 ## 8. OSM-Facing Quality Bar
 
 For map/data path changes:
@@ -117,3 +125,11 @@ For map/data path changes:
 - keep OSM attribution visible and accurate
 - avoid exaggerated performance or coverage claims
 - document known tradeoffs/limitations explicitly
+
+For an admitted mobile context change, reuse accepted startup cases with
+`WE3D_STARTUP_WORLD=1 WE3D_STARTUP_PHASE=world-only WE3D_STARTUP_SETTLE=1
+WE3D_STARTUP_LOAD_PLAN=1` and the same attested wrapper. This runs one real
+Baltimore load, input, complete regional publication, nearby location replacement
+and owned world release. It checks the shared mobile context boundary; it does
+not qualify physical-phone performance. Do not combine this release flag with
+the independent graphics-loss journey, which needs an active world.

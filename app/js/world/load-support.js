@@ -60,7 +60,9 @@ export async function finalizeLoadedWorld(options = {}) {
   }
 
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishLocationTerrain === 'function') {
-    runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
+    runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain({
+      regionalContextRadiusMeters: options.loadProfile?.regionalContextRadiusMeters
+    }));
     await yieldToMainThread();
     // Every world needs the published near surface before transport snapshots
     // or player spawn, including retries after an interrupted terrain source.
@@ -149,6 +151,14 @@ export async function finalizeLoadedWorld(options = {}) {
     appCtx.streetPavementError = String(error?.message || error);
     if(error?.name==='AbortError')throw error;
     throw new SurfacePublicationError('pavement',error);
+  }
+  // A reviewed long venue can have an early navigation graph before its
+  // finalized transport connections exist. Adopt that existing model now;
+  // retaining the early cache disconnects otherwise supported bridge ends.
+  const runtime=appCtx.worldLoadRuntimeState;
+  if(runtime?.sequence===appCtx._worldLoadSequence&&runtime.venuePack?.status==='source-prepared'&&runtime.venuePack.venueSource){
+    if(typeof appCtx.invalidateTraversalNetworks!=='function')throw new SurfacePublicationError('reviewed-venue-traversal',new Error('Traversal invalidation owner is unavailable'));
+    appCtx.invalidateTraversalNetworks('reviewed-venue-source-ready');
   }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   await yieldToMainThread();

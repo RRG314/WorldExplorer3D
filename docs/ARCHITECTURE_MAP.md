@@ -4,9 +4,9 @@
 
 Updated September 10, 2026 · Source baseline `53452516` · Version 5.2.0.
 
-September 15 performance audit supplement: [current ownership and scheduling](audits/2026-09-15-performance/architecture-and-ownership.md), [verified release/test findings and remaining measurements](audits/2026-09-15-performance/README.md). The dated findings below are historical unless reverified in that report.
+September 15 performance audit supplement: current ownership and scheduling (private operator record), verified release/test findings and remaining measurements (private operator record). The dated findings below are historical unless reverified in that report.
 
-This map records the September 10 responsibilities and data flow. It replaces accumulated dated rollout notes; earlier detail remains in Git and specialist documents. An architecture boundary describes where responsibility belongs, not proof that every path enforces it correctly. See [system inventory](SYSTEM_INVENTORY.md), [source reference](SYSTEM_INVENTORY_REFERENCE.md) and [confirmed audit findings](audits/2026-09-10/README.md).
+This map records the September 10 responsibilities and data flow. It replaces accumulated dated rollout notes; earlier detail remains in Git and specialist documents. An architecture boundary describes where responsibility belongs, not proof that every path enforces it correctly. See [system inventory](SYSTEM_INVENTORY.md), [source reference](SYSTEM_INVENTORY_REFERENCE.md) and confirmed audit findings (private operator record).
 
 ## Application overview
 
@@ -48,6 +48,12 @@ localStorage and IndexedDB hold device-local preferences, progress or drafts acc
 Destination choice → provider requests → normalized evidence → world compilation → published geometry/semantics → rendering, movement and interaction. Terrain, transport, buildings and POIs must agree on coordinates and stable identity. Changing cities must dispose the previous world and clear location-specific support data before publishing the next one.
 
 Owners include `world/`, `terrain/`, `earth-core/`, `geospatial/`, `structure-semantics/` and `poi/`. Geospatial provider failures and generated fallbacks must retain honest provenance. Earth uses bounded locations rather than continuous planetary streaming.
+
+The Living Portal's development foundation is the read-only
+`earth-core/portal-destination-policy.js`. It separates scoped destination/device
+qualification from current publication readiness and reuses `isEarthWorldUsable`.
+It owns no world, actor, timer, Journal or rewards. Catalog and widget consumers
+are not yet connected. See the cross-device design (private operator record).
 
 ### Building exterior presentation flow
 
@@ -120,9 +126,11 @@ Canonical source → environment-selected hosting artifact → manifest/content 
 
 The backend targets Node 22; hosting uses esbuild and static assets. Node contract tests, browser tests and Firebase emulators serve different roles. Browser CDN dependencies need an inventory in addition to npm advisory checks. CI dependency setup and the production-default CLI shortcut require repair.
 
-No build, browser, emulator or deployment was run for this documentation update. Choose proportionate verification using CONTRIBUTING.md; saved candidates are bounded by local tooling safeguards.
+No build, browser, emulator or deployment was run for this documentation update.
+Choose proportionate verification using `CONTRIBUTING.md`; saved candidates are
+bounded by the local tooling safeguard.
 
-Cloud alerting, backups, restore tests and physical-device performance remain operational verification items, not inferred guarantees. Use [the repair plan](audits/2026-09-10/repair-plan.md) for completion criteria and [the evidence ledger](audits/2026-09-10/tests-and-evidence.md) for actual results.
+Cloud alerting, backups, restore tests and physical-device performance remain operational verification items, not inferred guarantees. Use the repair plan (private operator record) for completion criteria and the evidence ledger (private operator record) for actual results.
 
 ### RDT restoration (16 September 2026)
 

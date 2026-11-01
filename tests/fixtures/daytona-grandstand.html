@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#afc1ca;color:#172a2d;font:15px system-ui}canvas{display:block}p{margin:8px}</style>
+<p>Mapped Daytona grandstand. Right cycles trackside, rear and overview.</p>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script type="module">
+import {earthCoordinateFrame} from '/app/js/earth-core/coordinate-frame.js';
+import {DAYTONA_STAND_FOOTPRINT} from '/app/js/world/daytona-grandstand-survey.js';
+import {createDaytonaGrandstandExterior} from '/app/js/world/daytona-grandstand-exterior.js';
+const frame=earthCoordinateFrame({lat:29.185,lon:-81.071},100000),ctx={worldLoadRuntimeState:{venuePack:{id:'daytona-tri-oval'}},buildingMeshes:[],METERS_PER_WORLD_UNIT:1.11,geoToWorld:(lat,lon)=>frame.toWorld(lat,lon),elevationWorldYAtWorldXZ:()=>8},model=createDaytonaGrandstandExterior(THREE,ctx);
+if(!model)throw Error('Mapped grandstand failed to compile');
+const scene=new THREE.Scene();scene.background=new THREE.Color('#afc1ca');scene.add(new THREE.HemisphereLight(0xeaf2f6,0x6c6b59,.8));const sun=new THREE.DirectionalLight(0xfff8e8,.95);sun.position.set(200,500,300);scene.add(sun);scene.add(model.root);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(2600,2600),new THREE.MeshStandardMaterial({color:0x71815c,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.set(model.root.position.x,7.98,model.root.position.z);scene.add(ground);
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:true});renderer.setSize(1200,700);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);const camera=new THREE.PerspectiveCamera(48,12/7,.2,4000),front=ctx.geoToWorld(DAYTONA_STAND_FOOTPRINT[200].lat,DAYTONA_STAND_FOOTPRINT[200].lon),back=ctx.geoToWorld(DAYTONA_STAND_FOOTPRINT[80].lat,DAYTONA_STAND_FOOTPRINT[80].lon),dx=front.x-back.x,dz=front.z-back.z,n=Math.hypot(dx,dz),center=model.root.position;
+let view=0;function draw(){
+ if(view===0){camera.position.set(center.x+690,440,center.z+440);camera.lookAt(center.x,20,center.z);}
+ if(view===1){camera.position.set(front.x+dx/n*90,18,front.z+dz/n*90);camera.lookAt(front.x,26,front.z);}
+ if(view===2){camera.position.set(back.x-dx/n*160,38,back.z-dz/n*160);camera.lookAt(back.x,22,back.z);}
+ renderer.render(scene,camera);
+}
+addEventListener('keydown',e=>{if(e.code==='ArrowRight'){view=(view+1)%3;draw();}});window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({view,architecture:model.root.userData.architecture,activeDetail:model.root.children[0].levels.findIndex(l=>l.object.visible),triangles:renderer.info.render.triangles,drawCalls:renderer.info.render.calls,glError:renderer.getContext().getError()});draw();
+</script>

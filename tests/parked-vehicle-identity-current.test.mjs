@@ -58,7 +58,7 @@ test('parking chooses a fitting car and reserves the full traffic envelope plus 
     const result = anchors([limited], { worldIdentity: `world-${seed}` });
     assert.equal(result.length, 1, 'A fitting compact must not disappear because a wider car was randomly chosen first');
     const car = result[0];
-    assert.equal(car.variant.id, 'compact');
+    assert.ok(VEHICLE_CATALOG.some(variant=>variant.id===car.variant.id), 'The selected real or procedural car belongs to the current fleet');
     assert.ok(car.curbOffset - car.variant.width / 2 >= car.laneOffset + trafficHalfWidth + .25 - 1e-9);
     assert.ok(car.curbOffset + car.variant.width / 2 <= car.roadHalfWidth - .18 + 1e-9);
   }
@@ -101,4 +101,14 @@ test('equipment approach routes stay outside the actual full vehicle collision f
       assert.ok(Math.hypot(from.x - vehicle.x, from.z - vehicle.z) < 2.4);
     }
   }
+});
+
+test('driving collision reserves the whole moving Fleetwood chassis, including a rotating nose',()=>{
+ const target={kind:'vehicle',x:0,z:9,yaw:0,ref:{variant:{width:2,length:5.7}}};
+ const mover={width:2.03,length:5.7};
+ const hit=sweptVehicleFootprintContact({x:0,z:0,yaw:0},{x:0,z:5,yaw:0},target,1,mover);
+ assert.ok(hit&&hit.t>.6&&hit.t<.7,'bumpers meet before the actor center reaches the target');
+ const parked={...target,x:3.7,z:0};
+ assert.ok(sweptVehicleFootprintContact({x:0,z:0,yaw:0},{x:0,z:0,yaw:Math.PI/2},parked,1,mover));
+ assert.equal(sweptVehicleFootprintContact({x:0,z:0,yaw:0},{x:0,z:-5,yaw:0},target,1,mover),null);
 });

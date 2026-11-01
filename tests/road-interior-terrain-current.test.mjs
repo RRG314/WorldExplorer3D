@@ -17,7 +17,7 @@ test('walking samples the rendered road under the actor, not its projected cente
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js';
 function surfaceMesh(y, flags={}) {
   const positions=new Float32Array([-4,y-1,-4, 4,y+1,-4, -4,y-1,4]);
-  return {userData:flags,geometry:{getAttribute:()=>({array:positions}),getIndex:()=>({array:new Uint16Array([0,1,2])})}};
+  return {userData:flags,geometry:{getAttribute:name=>name==='position'?{array:positions}:undefined,getIndex:()=>({array:new Uint16Array([0,1,2])})}};
 }
 test('road contact index preserves cross slope, negative cells, and separate levels',()=>{
   const index=createRoadContactIndex([surfaceMesh(10),surfaceMesh(20),surfaceMesh(50,{isRoadMarking:true})]);
@@ -80,7 +80,7 @@ test('ground-level surface queries cannot select a bridge when the ground road e
   const indices=new Uint16Array([0,1,2,0,2,3,4,5,6,4,6,7]);
   const index=createRoadContactIndex([{userData:{surfaceRanges:[
     {start:0,count:6,terrainMode:'at_grade'}, {start:6,count:6,terrainMode:'elevated'}
-  ]},geometry:{getAttribute:()=>({array:positions}),getIndex:()=>({array:indices})}}]);
+  ]},geometry:{getAttribute:name=>name==='position'?{array:positions}:undefined,getIndex:()=>({array:indices})}}]);
   assert.ok(Math.abs(index.sampleAt(-1,2,0,'at_grade')-.18)<1e-7);
   assert.equal(index.sampleAt(1,2,0,'at_grade'),null);
   assert.equal(index.sampleAt(1,2,0),12,'bridge contact remains available to its own traversal');

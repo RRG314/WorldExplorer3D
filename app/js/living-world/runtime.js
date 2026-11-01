@@ -24,6 +24,11 @@ function publicationIsActive(appCtx, publication) {
   });
 }
 
+export function residentPopulationRoots(appCtx, state = appCtx?.livingWorldRuntime) {
+  return state && !state.disposed && appCtx.getEnv?.() === 'EARTH' && publicationIsActive(appCtx, state.publication)
+    ? state.population.residentPresentationRoots() : [];
+}
+
 function pedestrianPointBlocked(appCtx, x, z) {
   if (Array.isArray(appCtx.waterAreas)) {
     for (const area of appCtx.waterAreas) {
@@ -205,6 +210,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
       const projected=new THREE.Vector3(point.x,Number(point.y||0)+1,point.z).project(camera);
       return projected.z < -1 || projected.z > 1 || Math.abs(projected.x)>1.3 || Math.abs(projected.y)>1.3;
     },
+    getVehicleObstacles: () => appCtx.urbanSandboxRuntime?.trafficObstacles?.() || [],
     getTimePhase: () => appCtx.timeOfDay,
     getTrafficFlow: () => appCtx.currentTrafficFlowProfile || null,
     trafficControls: appCtx.trafficControlPlacements,
@@ -283,6 +289,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     disposed: false,
     reason: null
   };
+  state.residentPresentationRoots = () => residentPopulationRoots(appCtx, state);
   state.handleWorldSelection = (target) => {
     if (state.disposed) return false;
     const activeActor = appCtx.activeTransportActor?.();

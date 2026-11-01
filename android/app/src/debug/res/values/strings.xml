@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">World Explorer 3D · Dev</string>
+    <string name="asset_statements" translatable="false">[{\"relation\":[\"delegate_permission/common.handle_all_urls\"],\"target\":{\"namespace\":\"web\",\"site\":\"https://we3d-staging-20260712.web.app\"}}]</string>
+</resources>

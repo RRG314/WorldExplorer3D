@@ -1,0 +1,10 @@
+*
+!package.json
+!package-lock.json
+!generated/
+!generated/engine.mjs
+!authority.mjs
+!firestore-store.mjs
+!transport.mjs
+!server.mjs
+!Dockerfile

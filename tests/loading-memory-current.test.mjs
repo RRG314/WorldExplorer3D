@@ -131,7 +131,7 @@ test('persistent urban actions use the active world and safely stop at Main Menu
  const source=await readFile(new URL('../app/js/urban-sandbox/runtime.js',import.meta.url),'utf8');
  const code=source.slice(source.lastIndexOf('Object.assign(appCtx, {'),source.lastIndexOf('export {'));
  const appCtx={},calls=[];
- const context=vm.createContext({appCtx,activeRuntime:null,beginEnter:(s,v)=>calls.push(['enter',s.id,v.id]),beginExit:s=>calls.push(['exit',s.id]),toggleEquipment:(s,f)=>calls.push(['toggle',s.id,f]),equipSlot:(s,k)=>calls.push(['slot',s.id,k]),useEquipped:s=>calls.push(['use',s.id]),interactionCandidate:()=>null,performResponderLoot(){},performNpcTake(){},disposeRuntime(){},startUrbanSandboxRuntime(){},snapshot:s=>s?.id||null});
+ const context=vm.createContext({appCtx,activeRuntime:null,releaseUrbanVehicleForTravel:()=>true,activePersonalVehicleRuntime:()=>null,beginEnter:(s,v)=>calls.push(['enter',s.id,v.id]),beginExit:s=>calls.push(['exit',s.id]),toggleEquipment:(s,f)=>calls.push(['toggle',s.id,f]),equipSlot:(s,k)=>calls.push(['slot',s.id,k]),useEquipped:s=>calls.push(['use',s.id]),interactionCandidate:()=>null,performResponderLoot(){},performNpcTake(){},disposeRuntime(){},startUrbanSandboxRuntime(){},snapshot:s=>s?.id||null});
  vm.runInContext(code,context);
  assert.equal(appCtx.handleUrbanEquipmentUse(),false);assert.equal(appCtx.exitUrbanVehicleForSupport(),false);
  context.activeRuntime={id:'first',vehicles:[{id:'car1'}]};appCtx.enterUrbanVehicleByIdForSupport('car1');appCtx.handleUrbanEquipmentUse();

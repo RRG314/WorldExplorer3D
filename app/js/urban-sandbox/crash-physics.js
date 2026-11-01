@@ -25,6 +25,12 @@ function classifyCrash(energyJoules, closingMps) {
   return 'severe';
 }
 
+// Game-tuned crush response: parking contacts do not remove a large fraction
+// of health. Collision impulses still use mass, speed and the contact normal.
+export function roadCollisionDamageForce(deltaV) {
+  return 160*Math.min(.88,Math.pow(Math.max(0,Number(deltaV||0)-2.5)/25,1.65));
+}
+
 function resolveCrashImpact(options = {}) {
   const moverMassKg = Math.max(40, finite(options.moverMassKg, 1520));
   const targetMassKg = Math.max(40, finite(options.targetMassKg, 1520));
@@ -86,10 +92,10 @@ function resolveCrashImpact(options = {}) {
     targetVelocity: Object.freeze(targetAfter),
     moverYawImpulse: Math.max(-.72, Math.min(.72, -glancing * closingMps * .045)),
     targetYawImpulse: Math.max(-1.4, Math.min(1.4, glancing * closingMps * .085)),
-    moverDamageForce: severity === 'contact' ? 0 : Math.min(105, energyRoot * .18),
+    moverDamageForce: severity === 'contact' ? 0 : roadCollisionDamageForce(Math.hypot(moverAfter.x-moverVelocity.x,moverAfter.z-moverVelocity.z)),
     targetDamageForce: severity === 'contact'
       ? 0
-      : Math.min(150, energyRoot * (targetKind.includes('npc') ? 1.08 : .34)),
+      : (targetKind.includes('npc') ? Math.min(150,energyRoot*1.08) : roadCollisionDamageForce(Math.hypot(targetAfter.x-targetVelocity.x,targetAfter.z-targetVelocity.z))),
     knockdownSeconds: targetKind.includes('npc') && severity !== 'contact'
       ? Math.min(8, 1.4 + closingMps * .28)
       : 0

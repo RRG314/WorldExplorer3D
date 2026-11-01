@@ -400,7 +400,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     (!options.isWithinDetailedBuildingDomain || options.detailedBuildingFrame) &&
     (!options.roadCoverageFrame || options.detailedBuildingFrame);
   const buildingWorker = useWorker ? await createRegionalBuildingWorker({
-    bounds, excludedBounds, tileCount: tiles.length, detailedFrame: options.detailedBuildingFrame,
+    bounds, excludedBounds, tileCount: tiles.length, detailedFrame: options.detailedBuildingFrame, venuePack:options.venuePack,
     unitsPerMeter: options.roadCoverageFrame?.unitsPerMeter || 1, maxInstances: options.maxInstances,
     roadFrame: options.roadCoverageFrame ? { bounds: options.roadCoverageFrame.bounds,
       unitsPerMeter: options.roadCoverageFrame.unitsPerMeter, maxTextureSize: options.roadCoverageFrame.maxTextureSize,

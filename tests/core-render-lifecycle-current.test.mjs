@@ -3,6 +3,58 @@ import assert from 'node:assert/strict';
 import { createRuntimeKernel } from '../app/js/runtime/kernel.js';
 import { createCoreFrameSystems, createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
 
+test('a lost graphics context cannot publish current-world presentation evidence',()=>{
+ for(const owner of ['direct','composer','vr']) {
+  let lost=true,draws=0;
+  const publication=Object.freeze({requestId:'context-recovery:'+owner});
+  const draw=()=>{draws++;};
+  const app={gameStarted:true,worldPublication:publication,renderer:{getContext:()=>({isContextLost:()=>lost}),render:draw},composer:{render:draw}};
+  if(owner==='vr')app.vrPresentation={active:true,render:draw};
+  const render=createCoreRenderSystem(app,()=>owner==='composer');
+  const hidden={flags:{}};render.update(hidden);
+  assert.equal(hidden.flags.mainWorldPresented,undefined,owner);assert.equal(draws,0,owner);
+  lost=false;const restored={flags:{}};render.update(restored);
+  assert.equal(restored.flags.mainWorldPresented,publication,owner);assert.equal(draws,1,owner);
+  // Loss can occur during the renderer/composer call as well.
+  app.renderer.render=app.composer.render=()=>{lost=true;};
+  if(app.vrPresentation)app.vrPresentation.render=()=>{lost=true;};
+  const interrupted={flags:{}};render.update(interrupted);
+  assert.equal(interrupted.flags.mainWorldPresented,undefined,owner);
+ }
+});
+
+test('first-world readiness rejects a lost context before compiling resident resources',()=>{
+ let compiled=0,drawn=0;
+ const app={gameStarted:true,worldLoading:false,renderer:{getContext:()=>({isContextLost:()=>true}),getRenderTarget:()=>null,setRenderTarget(){},compile:()=>compiled++,render:()=>drawn++}};
+ createCoreRenderSystem(app,()=>false);
+ assert.throws(()=>app.prepareFirstWorldRender(),/3D view.*unavailable/);
+ assert.equal(compiled,0);assert.equal(drawn,0);
+});
+
+test('only a successful current-world draw exposes presentation evidence to later frame systems',()=>{
+  const publication=Object.freeze({requestId:'presented:one'}),app={gameStarted:true,worldPublication:publication,renderer:{render(){}}};
+  const render=createCoreRenderSystem(app,()=>false),frame=()=>({flags:{}});
+  let f=frame();render.update(f);assert.equal(f.flags.mainWorldPresented,publication);
+  app.renderer.render=()=>{throw Error('lost context');};f=frame();assert.throws(()=>render.update(f));assert.equal(f.flags.mainWorldPresented,undefined);
+  app.vrPresentation={active:true,render:()=>false};f=frame();render.update(f);assert.equal(f.flags.mainWorldPresented,undefined);
+  app.vrPresentation.render=()=>true;f=frame();render.update(f);assert.equal(f.flags.mainWorldPresented,publication);
+});
+
+test('VR retains head presentation during pause and delegates the camera without advancing a second renderer',()=>{
+  let flatCamera=0,vrCamera=0,flatDraw=0,vrDraw=0;
+  const app={gameStarted:true,hasPauseReason:()=>true,updateCamera:()=>flatCamera++,renderer:{render:()=>flatDraw++},
+    vrPresentation:{active:true,updateCamera:()=>{vrCamera++;return true;},render:()=>vrDraw++}};
+  const camera=createCoreFrameSystems(app).find(row=>row.id==='core.camera');camera.update({dt:0,timestamp:0});
+  const render=createCoreRenderSystem(app,()=>false);assert.equal(render.enabled({}),true);render.update();
+  assert.equal(vrCamera,1);assert.equal(flatCamera,0);assert.equal(vrDraw,1);assert.equal(flatDraw,0);
+  app.vrPresentation.active=false;camera.update({dt:0,timestamp:10});assert.equal(flatCamera,1);assert.equal(render.enabled({}),false);
+});
+test('VR tracking can use the current readiness gate to stop the same frame before simulation',()=>{
+  let simulated=0;const app={gameStarted:true,vrPresentation:{beforeInput:frame=>frame.flags.simulationBlocked=true}};
+  const kernel=createRuntimeKernel();kernel.registerSystem(createCoreFrameSystems(app).find(row=>row.id==='core.input'));
+  kernel.registerSystem({id:'controlled-motion',phase:'simulation',update:frame=>simulated+=frame.dt});kernel.runFrame(0);kernel.runFrame(20);assert.equal(simulated,0);kernel.dispose();
+});
+
 test('ship presentation does not run retained Earth map, detail or activity work and resumes afterward',()=>{
  const calls=[];
  const app={gameStarted:true,activeShipInterior:true,updateHUD:()=>calls.push('hud'),drawMinimap:()=>calls.push('map'),updateStreetFurnitureVisibility:()=>calls.push('lod'),updateActivityCreator:()=>calls.push('activity')};

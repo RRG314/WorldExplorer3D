@@ -1,0 +1,79 @@
+name: Apple Portal native acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_only:
+        description: Run changed native app views; reuse accepted widget checks
+        type: boolean
+        default: false
+      widget_only:
+        description: Run widget layouts and Home Screen journey; reuse accepted app checks
+        type: boolean
+        default: false
+      native_live:
+        description: Exercise native SDK ownership with the owned temporary staging identity
+        type: boolean
+        default: false
+  push:
+    branches: [steven/living-portal-vr]
+    paths: ['apple/**', 'scripts/verification/apple-portal.sh', '.github/workflows/apple-portal.yml']
+
+permissions:
+  contents: read
+concurrency:
+  group: apple-portal-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native:
+    # The push trigger registers this feature-branch workflow. Native acceptance
+    # itself is dispatched deliberately so each committed change is tested once.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify the pinned project generator
+        run: |
+          node scripts/build-native-roam-theme.mjs --check
+          curl --fail --location --silent --show-error https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip -o "$RUNNER_TEMP/xcodegen.zip"
+          printf '%s  %s\n' '4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806' "$RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
+          "$RUNNER_TEMP/xcodegen/xcodegen/bin/xcodegen" generate --spec apple/project.yml
+      - name: Restore pinned SDK compilation
+        id: apple_sdk_cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: apple-sdk-${{ runner.os }}-${{ runner.arch }}-xcode26.6-v1-${{ hashFiles('apple/Package.resolved', 'apple/project.yml') }}
+          path: |
+            ${{ runner.temp }}/we3d-apple-packages
+            ${{ runner.temp }}/we3d-apple-derived/Build
+            ${{ runner.temp }}/we3d-apple-derived/ModuleCache.noindex
+            ${{ runner.temp }}/we3d-apple-derived/SDKStatCaches.noindex
+      - name: Build and exercise the native app in one owned simulator
+        id: native
+        env:
+          WE3D_PORTAL_APPLE_ACCEPTANCE: ${{ inputs.native_live && secrets.WE3D_PORTAL_APPLE_ACCEPTANCE || '' }}
+          WE3D_PORTAL_APPLE_WIDGET_ONLY: ${{ inputs.widget_only }}
+          WE3D_PORTAL_APPLE_APP_ONLY: ${{ inputs.app_only }}
+        run: bash scripts/verification/apple-portal.sh
+      - name: Retain compiled SDKs after a completed build
+        if: always() && steps.native.outputs.sdk_built == 'true' && steps.apple_sdk_cache.outputs.cache-hit != 'true' && !inputs.native_live
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.apple_sdk_cache.outputs.cache-primary-key }}
+          path: |
+            ${{ runner.temp }}/we3d-apple-packages
+            ${{ runner.temp }}/we3d-apple-derived/Build
+            ${{ runner.temp }}/we3d-apple-derived/ModuleCache.noindex
+            ${{ runner.temp }}/we3d-apple-derived/SDKStatCaches.noindex
+      - name: Retain bounded diagnostics, pins and native screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apple-portal-evidence
+          path: apple-portal-evidence/
+          retention-days: 30
+          if-no-files-found: warn

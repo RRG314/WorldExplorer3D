@@ -124,6 +124,8 @@ export function isVehicleBuildingCollisionBlocking(
 
 function queryVehicleBuildingCollision(appCtx, checkBuildingCollision, x, z, carFeetY) {
   const angle = Number(appCtx.car?.angle) || 0;
+  const dimensions=appCtx.car?.handlingProfile;
+  const profile=dimensions?.assetId?{radius:dimensions.width*.5,centerlineHalfLength:Math.max(0,(dimensions.length-dimensions.width)*.5)}:VEHICLE_COLLISION_PROFILE;
   const forwardX = Math.sin(angle);
   const forwardZ = Math.cos(angle);
   const nearestRoad = typeof appCtx.findNearestRoad === 'function'
@@ -134,19 +136,19 @@ function queryVehicleBuildingCollision(appCtx, checkBuildingCollision, x, z, car
       })
     : null;
   for (const longitudinalOffset of [
-    VEHICLE_COLLISION_PROFILE.centerlineHalfLength,
+    profile.centerlineHalfLength,
     0,
-    -VEHICLE_COLLISION_PROFILE.centerlineHalfLength
+    -profile.centerlineHalfLength
   ]) {
     const probeX = x + forwardX * longitudinalOffset;
     const probeZ = z + forwardZ * longitudinalOffset;
     const buildingCheck = checkBuildingCollision(
       probeX,
       probeZ,
-      VEHICLE_COLLISION_PROFILE.radius,
+      profile.radius,
       {
         actorBaseY: carFeetY,
-        actorHeight: 1.9,
+        actorHeight: dimensions?.height || 1.9,
         acceptCollision: (collision) =>
           isVehicleBuildingCollisionBlocking(collision, nearestRoad)
       }

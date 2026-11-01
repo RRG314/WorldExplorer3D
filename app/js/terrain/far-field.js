@@ -419,7 +419,7 @@ function createFarFieldTerrainApi(deps = {}) {
       if (!Number.isFinite(groundMeters)) { rejectedBuildings.missingGround++; continue; }
       const areaWorld = Number(building.areaMeters) * unitsPerMeter * unitsPerMeter;
       const massing = packedDescriptors ? (building.validMassing ? building.massing : null)
-        : resolveFarBuildingMassing(building, null, areaWorld, unitsPerMeter);
+        : resolveFarBuildingMassing(building, null, areaWorld, unitsPerMeter, {venuePack:appCtx.worldLoadRuntimeState?.venuePack});
       if (!massing) { rejectedBuildings.implausibleMassing++; continue; }
       const baseY = groundMeters * unitsPerMeter * yExaggeration + 0.25;
       const footprint = farBuildingRenderFootprint(building, appCtx.geoToWorld, unitsPerMeter);
@@ -521,6 +521,7 @@ function createFarFieldTerrainApi(deps = {}) {
         {
           signal,
           concurrency: spec.travelRefresh ? 4 : 8,
+          venuePack: appCtx.worldLoadRuntimeState?.venuePack ? {id:appCtx.worldLoadRuntimeState.venuePack.id,sourceSha256:appCtx.worldLoadRuntimeState.venuePack.sourceSha256} : null,
           detailedBuildingFrame: { origin: {lat: appCtx.LOC.lat, lon: appCtx.LOC.lon}, scale: appCtx.SCALE,
             radius: Number(appCtx.worldLoadRuntimeState?.buildingVisibleRadiusWorld) },
           roadCoverageFrame: { bounds: spec.contextOuter, geoToWorld: appCtx.geoToWorld,
@@ -685,7 +686,8 @@ function createFarFieldTerrainApi(deps = {}) {
       spec,
       worldCoverResult: worldCoverContext,
       surfaceGrid: built.surfaceGrid,
-      refreshBoundaryHeights:built.refreshBoundaryHeights
+      refreshBoundaryHeights:built.refreshBoundaryHeights,
+      refineReviewedCorridors:built.refineReviewedCorridors
     };
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
     applyMappedSurfaceTintOwnership(mesh);
@@ -859,6 +861,7 @@ function createFarFieldTerrainApi(deps = {}) {
       status: 'ready',
       anchor: spec.anchor,
       contextHalfExtentWorld: spec.contextHalfExtentWorld,
+      regionalContextRadiusMeters: spec.regionalContextRadiusMeters,
       dependencyDurationsMs,
       contextBatchMetrics:mappedContext.contextBatchMetrics,
       waterBatchMetrics:mappedContext.waterBatchMetrics,
@@ -997,6 +1000,17 @@ function createFarFieldTerrainApi(deps = {}) {
       terrainHeightWithPortalCuts(farFieldMesh.userData.structureTerrainPortalDescriptors, x, z, height);
   }
 
+  async function refreshReviewedVenueTerrain(options={}) {
+    if(!farFieldMesh||!farFieldSurfaceState)return null;
+    const mesh=farFieldMesh,state=farFieldSurfaceState;
+    const current=()=>farFieldMesh===mesh&&farFieldSurfaceState===state&&options.current?.()!==false;
+    const result=await state.refineReviewedCorridors?.(mesh,{...options,current});
+    // The far material can precede venue-source adoption. Refresh its owned
+    // uniforms after the admitted corridor so near and far cells agree.
+    if(current()&&appCtx.worldLoadRuntimeState?.venuePack?.venueSource)applyTerrainSemanticMaterialBlend(mesh,Number(mesh.userData.terrainTextureRepeats)||12);
+    return result;
+  }
+
   function refreshFarTerrainBoundaryHeights() {
     if(!farFieldMesh || !farFieldSurfaceState)return 0;
     return farFieldSurfaceState.refreshBoundaryHeights?.(appCtx.terrainGroup?.children)||0;
@@ -1016,9 +1030,15 @@ function createFarFieldTerrainApi(deps = {}) {
     const centerX = Number(options.centerX);
     const centerY = Number(options.centerY);
     const ring = Math.max(1, Number(options.ring) || 1);
-    if (!options.anchor) locationTerrainRequest = { z, centerX, centerY, ring };
+    // Capture the admitted world's policy once. Optional moving scenery must
+    // keep this plan even if device quality or a later world's state changes.
+    const regionalContextRadiusMeters = Math.max(1000, Math.min(
+      FAR_CONTEXT_HALF_EXTENT_METERS,
+      Number(options.regionalContextRadiusMeters) || FAR_CONTEXT_HALF_EXTENT_METERS
+    ));
+    if (!options.anchor) locationTerrainRequest = Object.freeze({ z, centerX, centerY, ring, regionalContextRadiusMeters });
     const anchor = { x: Number(options.anchor?.x) || 0, z: Number(options.anchor?.z) || 0 };
-    const key = `${z}/${centerX}/${centerY}/r${ring}/a${anchor.x}:${anchor.z}`;
+    const key = `${z}/${centerX}/${centerY}/r${ring}/c${regionalContextRadiusMeters}/a${anchor.x}:${anchor.z}`;
     if (key === activeKey) return pendingBuildPromise;
     const retiringBuildPromise = pendingBuildPromise;
     activeKey = key;
@@ -1048,7 +1068,7 @@ function createFarFieldTerrainApi(deps = {}) {
     };
     let contextHalfExtent = Math.min(
       outerHalfExtent,
-      FAR_CONTEXT_HALF_EXTENT_METERS * Number(appCtx.WORLD_UNITS_PER_METER || 1)
+      regionalContextRadiusMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1)
     );
     const windowAt = radius => ({ minX: anchor.x - radius, maxX: anchor.x + radius,
       minZ: anchor.z - radius, maxZ: anchor.z + radius });
@@ -1079,6 +1099,7 @@ function createFarFieldTerrainApi(deps = {}) {
         anchor,
         travelRefresh: !!options.anchor,
         contextHalfExtentWorld: contextHalfExtent,
+        regionalContextRadiusMeters,
         inner,
         detailedCoverage: [],
         detailedCoverageRequest: { z, centerX, centerY, ring },
@@ -1136,6 +1157,7 @@ function createFarFieldTerrainApi(deps = {}) {
     refreshFarWaterDetailCoverage,
     refreshFarTerrainSurfaceColors,
     refreshFarTerrainBoundaryHeights,
+    refreshReviewedVenueTerrain,
     resetFarTerrainClipmap,
     sampleFarTerrainWorldYAt,
     getFarTerrainSurfaceSnapshot: () => farFieldSurfaceState ? {grid:farFieldSurfaceState.surfaceGrid,portals:farFieldMesh?.userData?.structureTerrainPortalDescriptors || []} : null,

@@ -1,4 +1,5 @@
 import {resolveControlState} from './transport/control-state.js';
+import {renderHudCondition} from './hud/condition-view.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from './ui/dom-state.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=8";
@@ -17,6 +18,7 @@ import { applyDrivingCabinCamera, setCabinNearClip } from './hud/driving-cabin-c
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=9";
 import { beginCameraFollowFrame, cameraFollowHistory, smoothMovingCameraTarget } from "./hud/moving-camera-target.js";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
+import {isPlanetarySurfaceActive} from './planetary/traversal-capabilities.js?v=1';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -177,18 +179,7 @@ function setStreetAndLocation(roadLabel, locationLabel) {
 }
 
 function updateConditionBar(condition = 1, label = 'Explorer') {
-  const bar = document.getElementById('conditionBar');
-  const fill = document.getElementById('conditionFill');
-  if (!bar || !fill) return;
-  const value = clampValue(Number(condition), 0, 1);
-  const percent = Math.round(value * 100);
-  const state = value <= .25 ? 'critical' : value <= .6 ? 'injured' : 'healthy';
-  const width = `${percent}%`;
-  if (fill.style.width !== width) fill.style.width = width;
-  setDomAttribute(fill, 'data-state', state);
-  setDomAttribute(bar, 'aria-label', `${label} health`);
-  setDomAttribute(bar, 'aria-valuenow', percent);
-  setDomAttribute(bar, 'title', `${label} health · ${percent}%`);
+  renderHudCondition(document, condition, `${label} health`);
 }
 
 function explorerCondition() {
@@ -804,7 +795,8 @@ function updateHUD() {
   setDomText(document.getElementById('limit'), limit);
   const planetarySurfaceLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
   setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Exploring', locName);
-  updateConditionBar(appCtx.car.condition ?? 1, appCtx.car.durabilityPolicy === 'exploration_unlimited' ? 'BMW' : 'Vehicle');
+  updateConditionBar(appCtx.car.condition ?? 1, isPlanetarySurfaceActive(appCtx)
+    ? 'Rover' : appCtx.car.durabilityPolicy === 'exploration_unlimited' ? 'BMW' : 'Vehicle');
   setDomClass(document.getElementById('indBrake'), 'on', appCtx.keys.Space);
   setDomClass(document.getElementById('indBoost'), 'on', appCtx.car.boost);
   const isDrifting = appCtx.car.isDrifting === true && Math.abs(appCtx.car.driftAngle) > 0.08;

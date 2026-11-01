@@ -35,9 +35,9 @@ export function transportRegionBounds(key) {
 // intersecting the detail window, rather than allocating an entry pair for
 // every distant pending region on every frame. queueOrder preserves the old
 // Map insertion-order tie break, including regions requeued after eviction.
-export function nearestPendingTransportRegion(regions, focus) {
+export function nearestPendingTransportRegion(regions, focus, radius = TRANSPORT_DETAIL_RADIUS) {
   if (!Number.isFinite(focus?.x) || !Number.isFinite(focus?.z)) return null;
-  const radius = TRANSPORT_DETAIL_RADIUS;
+  if (!Number.isFinite(radius) || radius <= 0 || radius > 4096) return null;
   let selected = null, best = Infinity, first = Infinity;
   const minX = Math.floor((focus.x - radius) / TRANSPORT_REGION_SIZE);
   const maxX = Math.ceil((focus.x + radius) / TRANSPORT_REGION_SIZE) - 1;

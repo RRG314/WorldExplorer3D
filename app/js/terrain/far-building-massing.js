@@ -1,3 +1,4 @@
+import {daytonaGeographicFallbackHeight} from '../world/daytona-building-massing.js';
 import { regionalFacadeStyle } from './regional-building-appearance.js';
 import { resolveMappedRoof } from '../world/mapped-roof-geometry.js?v=6';
 import { selectBuildingExteriorProfile } from '../world/building-exterior-catalog.js?v=1';
@@ -40,7 +41,8 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
   const footprintArea = areaWorld / (unitsPerMeter * unitsPerMeter);
   const seed = buildingSeedFromIdentity(building?.identity);
   const random = (seed >>> 0) / 4294967295;
-  const fallbackHeight = inferFallbackBuildingHeightMeters(
+  const venueFallback = tags['building:part'] ? null : daytonaGeographicFallbackHeight(options.venuePack,building?.ring,kind,footprintArea);
+  const fallbackHeight = venueFallback ?? inferFallbackBuildingHeightMeters(
     kind,
     footprintArea,
     footprintWidth,
@@ -54,6 +56,7 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
     footprintWidth,
     footprintDepth
   });
+  if(venueFallback!==null&&semantics.heightSource==='fallback')semantics.heightSource='reviewed_venue_context_estimate';
   const heightMeters = semantics.heightMeters;
   const intentionalVerticalStructure = /tower|spire|chimney|silo|lighthouse|mast|minaret/.test(kind);
   if (isImplausibleTallBuildingFootprint({

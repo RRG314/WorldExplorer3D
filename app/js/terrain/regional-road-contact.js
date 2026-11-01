@@ -30,6 +30,21 @@ export function createRegionalRoadContact(base) {
       }
       return best;
     },
+    sampleProfileAt(x,z,referenceY=NaN,mode=null){
+      let best=null;
+      for(const index of selected(x-1e-5,x+1e-5,z-1e-5,z+1e-5)){
+        const candidate=index.sampleProfileAt(x,z,referenceY,mode);
+        if(candidate&&(!best||(Number.isFinite(referenceY)?Math.abs(candidate.y-referenceY)<Math.abs(best.y-referenceY):candidate.y>best.y)))best=candidate;
+      }
+      return best;
+    },
+    nearestProfileAt(x,z,distance,mode=null){
+      if(!Number.isFinite(distance)||distance<0)throw new RangeError('Invalid surface distance bound');
+      let best=null;for(const index of selected(x-distance,x+distance,z-distance,z+distance)){
+        const candidate=index.nearestProfileAt(x,z,distance,mode);if(candidate&&(!best||candidate.distance<best.distance))best=candidate;
+      }
+      return best;
+    },
     nearestSurfaceAt(x,z,distance,mode=null){
       if(!Number.isFinite(distance)||distance<0)throw new RangeError('Invalid surface distance bound');
       let best=null;
@@ -38,6 +53,12 @@ export function createRegionalRoadContact(base) {
         if(candidate&&(!best||candidate.distance<best.distance))best=candidate;
       }
       return best;
+    },
+    crossSectionOffsets(x,z,nx,nz,halfWidth,mode=null){
+      const offsets=[];
+      for(const index of selected(x-Math.abs(nx)*halfWidth,x+Math.abs(nx)*halfWidth,z-Math.abs(nz)*halfWidth,z+Math.abs(nz)*halfWidth))
+        offsets.push(...index.crossSectionOffsets(x,z,nx,nz,halfWidth,mode));
+      return offsets.sort((a,b)=>a-b).filter((n,i,a)=>!i||n-a[i-1]>1e-6);
     },
     projectPolygon,projectTriangle:projectPolygon,
     dispose(){base.dispose();for(const index of regions.values())index.dispose();regions.clear();}

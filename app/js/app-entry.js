@@ -8,14 +8,14 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=84';
+import './runtime-diagnostics.js?v=85';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=7';
-import './controls/action-input.js?v=14';
-import './controls/keyboard-binding-ui.js?v=2';
+import './controls/action-input.js?v=15';
+import './controls/keyboard-binding-ui.js?v=3';
 import './interaction/context-router.js?v=5';
 import './transport/actor-contract.js?v=6';
 import './world/collection-registry.js?v=1';
@@ -25,14 +25,14 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=105';
+import { init, tryEnablePostProcessing } from './engine.js?v=108';
 import './physics.js?v=129';
 import './walking.js?v=98';
 import './travel-mode.js?v=29';
 import { initBoatMode } from './boat-mode.js?v=58';
 import './sky.js?v=89';
 import './weather.js?v=12';
-import './runtime/on-demand-modes.js?v=52';
+import './runtime/on-demand-modes.js?v=54';
 import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=193';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=11';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=2';
@@ -47,12 +47,12 @@ import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=11';
 import './game.js?v=71';
 import './input.js?v=79';
-import './hud.js?v=105';
+import './hud.js?v=106';
 import './map.js?v=61';
-import { renderLoop } from './main.js?v=78';
+import { renderLoop } from './main.js?v=81';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=174';
-import { initAccessibility } from './ui/accessibility.js?v=2';
+import { setupUI } from './ui.js?v=180';
+import { initAccessibility } from './ui/accessibility.js?v=4';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -131,7 +131,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=86');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=88');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;
@@ -144,6 +144,10 @@ function registerPlatformServices() {
             mod.initArPlatform?.(appCtx);
             return mod;
         }
+    });
+    platformServices.register({
+        id:'virtual-reality',category:'presentation',
+        load:async()=>{const mod=await import('./vr/platform.js');return mod.createVrPlatform(appCtx);}
     });
 }
 
@@ -358,7 +362,9 @@ function registerLazySubsystemEntrypoints() {
     appCtx.scheduleActivityDiscoveryWarmup = scheduleActivityDiscoveryWarmup;
     appCtx.ensurePlatformService = ensurePlatformService;
     appCtx.openArExperience = async (request = {}) => {
+        if(appCtx.getVrSnapshot?.().active){appCtx.showToast?.('Exit VR before opening AR.');return false;}
         const mod = await ensurePlatformService('augmented-reality');
+        if(appCtx.getVrSnapshot?.().active){appCtx.showToast?.('Exit VR before opening AR.');return false;}
         const platform = mod.initArPlatform?.(appCtx);
         return platform?.open?.(request) ?? false;
     };
@@ -370,6 +376,13 @@ function registerLazySubsystemEntrypoints() {
     appCtx.getArPlatformSnapshot = () => platformServices.peek('augmented-reality')?.getArPlatformSnapshot?.() || {
         type: 'ArPlatformSnapshot', phase: 'idle', active: false
     };
+    appCtx.openVrSettings=async()=>{
+        const revision=appCtx.screenLayout?.snapshot?.().revision;
+        const platform=await ensurePlatformService('virtual-reality');
+        if(appCtx.screenLayout?.snapshot?.().revision!==revision)return false;
+        return platform.openSettings();
+    };
+    appCtx.getVrSnapshot=()=>platformServices.peek('virtual-reality')?.snapshot()||{active:false,kind:null};
     appCtx.getPlatformServicesSnapshot = () => platformServices.snapshot();
     appCtx.getAccountUserId = () => {
         const user = platformServices.peek('account')?.getUser?.();

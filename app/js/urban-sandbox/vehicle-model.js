@@ -1,3 +1,4 @@
+import {sweptChassisContact} from '../engine/vehicle-footprint.js';
 import { PARKED_VEHICLE_CATALOG, VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
 
@@ -22,10 +23,14 @@ function hashText(value = '') {
 function stableVehicleDefinition(worldIdentity, anchorKey, slot = 0, catalog = URBAN_VEHICLE_CATALOG) {
   if (!catalog.length) return null;
   const seed = hashText(`${worldIdentity}:${anchorKey}:${slot}`);
-  const variant = catalog[seed % catalog.length];
+  // New fleet choices get distinct identities. Existing generic parked-car
+  // identities must never silently become a different model with old upgrades.
+  const licensed=catalog.filter(entry=>entry.assetId),legacy=catalog.filter(entry=>!entry.assetId);
+  const choices=licensed.length&&(!legacy.length||(seed>>>16)%3!==0)?licensed:legacy;
+  const variant = choices[seed % choices.length];
   const palette = [variant.color, 0x2f3d4a, 0x9b9a8d, 0x6f3e39, 0x426255, 0x6b587b];
   return Object.freeze({
-    id: `urban-vehicle:${hashText(`${worldIdentity}:${anchorKey}:${slot}:vehicle`).toString(16)}`,
+    id: `urban-vehicle:${hashText(`${worldIdentity}:${anchorKey}:${slot}:vehicle${variant.assetId?`:${variant.assetId}`:''}`).toString(16)}`,
     variant,
     color: palette[(seed >>> 5) % palette.length],
     condition: 1,
@@ -174,10 +179,14 @@ export {
 // Sweep the actor against the vehicle's full oriented footprint. Expanding
 // the box by the actor radius is conservative at corners and prevents both
 // tunnelling and walking through the front/rear overhangs of long vehicles.
-export function sweptVehicleFootprintContact(from, to, target, actorRadius = .3) {
+export function sweptVehicleFootprintContact(from, to, target, actorRadius = .3, actorProfile = null) {
   const variant = target?.ref?.variant;
   if (!['vehicle', 'ambient_vehicle'].includes(target?.kind) ||
       !(Number(variant?.width) > 0 && Number(variant?.length) > 0)) return undefined;
+  if(actorProfile) {
+    const t=sweptChassisContact(from,to,actorProfile,{...target,y:from.y},variant,.03);
+    return t<1?{target,t,distance:0,footprint:'swept-chassis'}:null;
+  }
   const yaw = Number(target.yaw || 0), c = Math.cos(yaw), s = Math.sin(yaw);
   const local = point => ({ x: (point.x - target.x) * c - (point.z - target.z) * s,
     z: (point.x - target.x) * s + (point.z - target.z) * c });

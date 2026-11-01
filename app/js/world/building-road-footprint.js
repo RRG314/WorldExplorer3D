@@ -35,10 +35,10 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
   const markRoadCorridorCell = (x, z, radius) =>
     roadCorridorCells.addSquare(Math.floor(x / roadCorridorCellSize), Math.floor(z / roadCorridorCellSize), Math.max(0, radius | 0));
   const registerRoadCenterlineSegment = (p0, p1, radius, road, segIndex, indexRadius = radius) => {
-    const offset=roadPlacementOffsetWorld(road),dx=p1.x-p0.x,dz=p1.z-p0.z,length=Math.hypot(dx,dz);
-    if(offset&&length>0){
-      const shiftX=-dz/length*offset,shiftZ=dx/length*offset;
-      p0={x:p0.x+shiftX,z:p0.z+shiftZ};p1={x:p1.x+shiftX,z:p1.z+shiftZ};
+    const dx=p1.x-p0.x,dz=p1.z-p0.z,length=Math.hypot(dx,dz),a=road.pts[segIndex],b=road.pts[segIndex+1],sx=b.x-a.x,sz=b.z-a.z,den=sx*sx+sz*sz,
+      at=p=>Math.max(0,Math.min(1,((p.x-a.x)*sx+(p.z-a.z)*sz)/den)),offset=roadPlacementOffsetWorld(road,segIndex,at(p0)),nextOffset=roadPlacementOffsetWorld(road,segIndex,at(p1));
+    if((offset||nextOffset)&&length>0){
+      p0={x:p0.x-dz/length*offset,z:p0.z+dx/length*offset};p1={x:p1.x-dz/length*nextOffset,z:p1.z+dx/length*nextOffset};
     }
     const segmentIndex = roadCenterlineSegments.length;
     roadCenterlineSegments.push({ p0, p1, radius, road, segIndex });

@@ -1,3 +1,27 @@
+import {hasReviewedDeck,hasReviewedPavement} from './reviewed-deck-profile.js';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_GRADE} from '../../physics/road-plane-dynamics.js';
+import {sampleTransportSurfaceAtDistance} from './transport-surface-model.js?v=25';
+
+function reviewedNodeOwners(entries){
+ const decks=entries.filter(entry=>hasReviewedDeck(entry.feature));
+ return decks.length?decks:entries.filter(entry=>hasReviewedPavement(entry.feature));
+}
+function reviewedNodeConflict(entries,target){
+ return entries.some(entry=>Math.abs(entry.surfaceY-target)>(hasReviewedDeck(entry.feature) ? .002 :
+   entry.feature.transportSurfaceModel.surveyedSurface.pavementProfile.maximumAdjustmentMeters/(Number(entry.feature.metersPerWorldUnit)||1)));
+}
+
+function reviewedDeckCrossfall(group,feature,side){
+ const entry=group.sides.find(row=>hasReviewedDeck(row.feature));
+ if(!entry||hasReviewedDeck(feature))return {};
+ const model=entry.feature.transportSurfaceModel,distance=finite(entry.side.distanceAlong),half=model.width/2;
+ const slope=(sampleTransportSurfaceAtDistance(model,distance,half)-sampleTransportSurfaceAtDistance(model,distance,-half))/(2*half);
+ let upper=1;while(upper<model.distances.length-1&&model.distances[upper]<distance)upper++;
+ const grade=(model.centerHeights[upper]-model.centerHeights[upper-1])/(model.distances[upper]-model.distances[upper-1]);
+ const tangent=(road,s)=>{const i=Math.max(0,Math.min(road.pts.length-2,finite(s.segmentIndex))),a=road.pts[i],b=road.pts[i+1],length=Math.hypot(b.x-a.x,b.z-a.z);if(!(length>1e-8))throw Error('reviewed_deck_invalid_junction_tangent');return {x:(b.x-a.x)/length,z:(b.z-a.z)/length};};
+ const a=tangent(entry.feature,entry.side),b=tangent(feature,side);
+ return {reviewedDeckCrossfall:slope*(a.x*b.x+a.z*b.z)+grade*(a.z*b.x-a.x*b.z),reviewedDeckSourceId:model.sourceFeatureId};
+}
 function finite(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -29,6 +53,7 @@ function ownerScore(side, feature) {
 
 function maximumGradeFor(feature) {
   if (feature?.structureSemantics?.terrainMode === 'subgrade') return 0.135;
+  if (feature?.surfaceSurveyEvidence?.surfaceModel === BANKED_ROAD_MODEL) return BANKED_ROAD_MAXIMUM_GRADE;
   const type = String(
     feature?.transportRecord?.sourceTags?.highway ||
     feature?.transportRecord?.rawTags?.highway ||
@@ -243,6 +268,7 @@ export function auditTransportJunctionContinuity(
       { feature: rightFeature, side: connection.right }
     ].some(({ feature, side }) =>
       feature?.structureSemantics?.terrainMode !== 'at_grade' ||
+      feature?.transportSurfaceModel?.surveyedSurface?.surfaceModel === BANKED_ROAD_MODEL ||
       hasEngineeredGraphConstraintAt(feature, side)
     );
     if (!complete || !structureConnection) continue;
@@ -361,6 +387,7 @@ export function buildTransportContinuityRepairAnchors(
   const membershipsByFeature = new Map();
   const targetByGroup = new Map();
   const ownerByGroup = new Map();
+  const reviewedNodeTargets = new Map();
   let seedNodeCount = 0;
   const surfaceFor = ({ side, feature }) => Number(sampleSurfaceY(
     feature,
@@ -387,9 +414,14 @@ export function buildTransportContinuityRepairAnchors(
     const terrainFittedAtGrade = atGrade.filter(({ feature, side }) =>
       !hasEngineeredGraphConstraintAt(feature, side));
     const interior = sampled.filter(({ side }) => side?.endpoint === 'interior');
+    const reviewed=reviewedNodeOwners(sampled);
     let target = NaN;
     let owner = null;
-    if (atGrade.length > 0 && (elevated.length > 0 || subgrade.length > 0)) {
+    if(reviewed.length){
+      owner=reviewed[0];target=owner.surfaceY;
+      if(reviewedNodeConflict(reviewed,target))throw Error('reviewed_deck_node_conflict');
+      reviewedNodeTargets.set(group.id,target);
+    } else if (atGrade.length > 0 && (elevated.length > 0 || subgrade.length > 0)) {
       // Exact mapped surface roads own the physical portal/abutment elevation.
       // A provisional at-grade profile may already have been grade-smoothed
       // below the accepted terrain at a steep endpoint. That buried profile is
@@ -623,6 +655,10 @@ export function buildTransportContinuityRepairAnchors(
     return first;
   };
   const raiseNode = (id, height, owner) => {
+    if(reviewedNodeTargets.has(id)){
+      if(height>reviewedNodeTargets.get(id)+.002)throw Error('reviewed_deck_approach_infeasible');
+      return;
+    }
     if (!Number.isFinite(height) || height <= (targetByGroup.get(id) ?? -Infinity) + 1e-6) return;
     targetByGroup.set(id,height);
     if (owner) ownerByGroup.set(id,owner);
@@ -723,6 +759,7 @@ export function buildTransportContinuityRepairAnchors(
       target=Math.max(...samples);
     }
     const lowered=target>ceiling+1e-6;
+    if(lowered&&reviewedNodeTargets.has(groupId))throw Error('reviewed_deck_obstruction_conflict');
     if (lowered) {
       targetByGroup.set(groupId,ceiling);
       ownerByGroup.set(groupId,owner);
@@ -748,6 +785,7 @@ export function buildTransportContinuityRepairAnchors(
       if (!Number.isFinite(terrainY)) continue;
       const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
       const targetDelta = Math.abs(targetSurfaceY - currentSurfaceY);
+      const crossfall=reviewedDeckCrossfall(group,feature,side);
       const constrainedMembershipCount = (membershipsByFeature.get(feature) || [])
         .filter((membership) => Number.isFinite(targetByGroup.get(membership.group.id)))
         .length;
@@ -770,8 +808,8 @@ export function buildTransportContinuityRepairAnchors(
       const requiredForGradeFeasibility = activeFeatures.has(feature) &&
         (constrainedMembershipCount > 1 && (targetDelta > 1e-5 || conflictingPublishedTarget) || !hasPublishedNode);
       const reconcilingAtGrade = terrainMode === 'at_grade' &&
-        (targetDelta > toleranceMeters || requiredForGradeFeasibility) &&
-        (targetSurfaceY >= terrainY + surfaceBias - 0.02 || foundationAffectedGroups.has(group.id));
+        (targetDelta > toleranceMeters || requiredForGradeFeasibility || Number.isFinite(crossfall.reviewedDeckCrossfall)) &&
+        (targetSurfaceY >= terrainY + surfaceBias - 0.02 || foundationAffectedGroups.has(group.id) || reviewedNodeTargets.has(group.id));
       const reconcilingStructure = terrainMode !== 'at_grade' &&
         (targetDelta > toleranceMeters || requiredForGradeFeasibility);
       if (!reconcilingAtGrade && !reconcilingStructure) continue;
@@ -781,6 +819,7 @@ export function buildTransportContinuityRepairAnchors(
         distance: Math.max(0, finite(side.distanceAlong)),
         targetOffset: targetSurfaceY - terrainY - surfaceBias,
         targetSurfaceY,
+        ...crossfall,
         span: Math.max(24, Math.min(featureLength(feature), gradeRun + 24)),
         endpoint: side.endpoint === 'start' || side.endpoint === 'end' ? side.endpoint : null,
         graphEndpoint: side.endpoint === 'start' || side.endpoint === 'end' ? side.endpoint : null,
@@ -955,7 +994,11 @@ export function buildExactTransportNodeFinalizationAnchors(
     // through-route, then the highest completed deck (or deepest tunnel).
     // For an all-surface continuation, the existing engineered approach owns
     // the node and is carried into the next terrain-fitted road.
-    const owner = structuralInterior.length > 0
+    const reviewed=reviewedNodeOwners(entries);
+    if(reviewed.length>1&&reviewedNodeConflict(reviewed,reviewed[0].surfaceY))throw Error('reviewed_deck_node_conflict');
+    const owner = reviewed.length>0
+      ? reviewed[0]
+      : structuralInterior.length > 0
       ? [...structuralInterior].sort((left, right) =>
           ownerScore(right.side, right.feature) - ownerScore(left.side, left.feature))[0]
       : elevated.length > 0
@@ -1001,7 +1044,7 @@ export function buildExactTransportNodeFinalizationAnchors(
         : 0.08;
       // A completed through surface may replace a stale higher approach, but
       // an at-grade ribbon is never lowered into accepted terrain.
-      return Number.isFinite(terrainY) && targetSurfaceY >= terrainY + surfaceBias - 0.02;
+      return Number.isFinite(terrainY) && (targetSurfaceY >= terrainY + surfaceBias - 0.02 || reviewed.length>0);
     });
     if (adjusted.length === 0) continue;
     nodeCount += 1;
@@ -1018,6 +1061,7 @@ export function buildExactTransportNodeFinalizationAnchors(
         distance: Math.max(0, finite(entry.side.distanceAlong)),
         targetOffset: targetSurfaceY - terrainY - surfaceBias,
         targetSurfaceY,
+        ...reviewedDeckCrossfall({sides:entries},entry.feature,entry.side),
         span: Math.max(24, Math.min(featureLength(entry.feature), gradeRun + 24)),
         endpoint: ['start', 'end'].includes(String(entry.side?.endpoint || ''))
           ? entry.side.endpoint

@@ -1,4 +1,9 @@
+import {raceClosureContains} from '../racing/closed-course.js';
+import {createPersonalVehicleRuntime} from '../transport/personal-vehicle-runtime.js';
+import {vehicleDriverCamera} from '../transport/vehicle-camera-mount.js';
+import {personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 import {consumePlayerProvision} from '../player/provisions.js';
+import {updateVehicleWheels} from '../transport/vehicle-wheel-motion.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {urbanTargetOverlapsHeight} from './vertical-contact.js';
 import { bindPlayerConditionAuthority } from './player-condition-binding.js';
@@ -11,7 +16,7 @@ import { VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '.
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=24';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=25';
 import {urbanGroundPlayerPosition} from './player-position.js';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=10';
 import {
@@ -39,7 +44,7 @@ import { createConnectedExplorerWallet } from '../economy/connected-wallet-autho
 import { ensurePlayerConditionAuthority } from '../player/condition-model.js?v=1';
 import { createConnectedPlayerState } from '../player/connected-player-state.js?v=1';
 import { ensureVehicleUpgradeStore, parseUpgradeServiceId, stableVehicleIdentity } from '../transport/vehicle-upgrades.js?v=1';
-import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
+import { getCurrentUser, observeAuth } from '../../../js/auth-ui.js?v=56';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
@@ -134,6 +139,13 @@ function vehiclePose(vehicle) {
 }
 
 function syncVehiclePose(vehicle, pose) {
+  if (!vehicle.attachedToPlayer && Number.isFinite(vehicle.x) && Number.isFinite(vehicle.z)) {
+    const dx=Number(pose.x)-vehicle.x,dz=Number(pose.z)-vehicle.z;
+    const distance=dx*Math.sin(Number(pose.yaw)||0)+dz*Math.cos(Number(pose.yaw)||0);
+    const turn=Math.atan2(Math.sin(Number(pose.yaw)-Number(vehicle.yaw)),Math.cos(Number(pose.yaw)-Number(vehicle.yaw)));
+    // Reconciliation/recovery jumps reposition the car; they are not wheel travel.
+    if(Math.hypot(dx,dz)<8)updateVehicleWheels(vehicle.visual?.wheels,distance*(Number(appCtx.METERS_PER_WORLD_UNIT)||1),Math.abs(distance)>.01?Math.atan(turn*Number(vehicle.variant?.length||4.4)*.58/distance):0);
+  }
   vehicle.x = Number(pose.x || 0);
   vehicle.y = Number(pose.y || 0);
   vehicle.z = Number(pose.z || 0);
@@ -218,7 +230,7 @@ function urbanCollisionTargets(state, reference, radius = 5) {
     ...(state.population?.nearbyPedestrians?.(reference, radius) || [])
       .filter((npc) => !promotedNpcIds.has(npc.id))
       .map((npc) => ({ kind: 'ambient_npc', ref: npc, radius: .42, ...npc })),
-    ...state.vehicles.filter((vehicle) => !vehicle.attachedToPlayer && Number(vehicle.condition ?? 1) > .05).map((vehicle) => ({
+    ...state.vehicles.filter((vehicle) => !vehicle.attachedToPlayer).map((vehicle) => ({
       kind: 'vehicle', ref: vehicle, radius: Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5), ...vehiclePose(vehicle)
     })),
     ...(state.population?.nearbyVehicles?.(reference, radius) || [])
@@ -557,8 +569,9 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
   if (!activeWorldMatches(state)) return Object.freeze({ x: Number(to.x) || 0, z: Number(to.z) || 0, collision: false });
   const mode = options.mode === 'drive' ? 'drive' : 'walk';
   const actorRadius = mode === 'drive' ? Math.max(.78, Number(options.radius) || .9) : Math.max(.2, Number(options.radius) || .3);
-  const source = { x: Number(from.x) || 0, z: Number(from.z) || 0 };
-  const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0 };
+  const source = { x: Number(from.x) || 0, z: Number(from.z) || 0, yaw:Number(options.fromYaw??appCtx.car?.angle??0) };
+  const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0, yaw:Number(options.yaw??appCtx.car?.angle??0) };
+  const actorProfile=mode==='drive'?appCtx.car?.handlingProfile:null;
   const travelDistance = Math.hypot(destination.x - source.x, destination.z - source.z);
   const actorBaseY=Number.isFinite(options.actorBaseY)?options.actorBaseY:mode==='drive'?appCtx.car?.y-1.2:appCtx.Walk?.state?.walker?.y;
   const actorHeight=Number.isFinite(options.actorHeight)?options.actorHeight:1.8;
@@ -569,7 +582,7 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
     const dz = end.z - start.z;
     const lengthSquared = dx * dx + dz * dz;
     return targets.map((target) => {
-      const footprint = sweptVehicleFootprintContact(start, end, target, actorRadius);
+      const footprint = sweptVehicleFootprintContact(start, end, target, actorRadius, actorProfile);
       if (footprint !== undefined) return footprint;
       const targetX = Number(target.x || 0);
       const targetZ = Number(target.z || 0);
@@ -650,9 +663,15 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
     }
   }
 
+  const responseApplied = direct.responseSuppressed === true || direct.crashResponse?.applied === true && direct.crashResponse?.severity !== 'contact';
+  if(mode==='drive' && direct.footprint) {
+    const t=Math.max(0,direct.t-.001);
+    return Object.freeze({x:source.x+(destination.x-source.x)*t,z:source.z+(destination.z-source.z)*t,
+      yaw:source.yaw+Math.atan2(Math.sin(destination.yaw-source.yaw),Math.cos(destination.yaw-source.yaw))*t,
+      collision:true,responseApplied,targetKind:direct.target.kind});
+  }
   const slideX = blockerAlong(source, { x: destination.x, z: source.z });
   const slideZ = blockerAlong(source, { x: source.x, z: destination.z });
-  const responseApplied = direct.responseSuppressed === true || direct.crashResponse?.applied === true && direct.crashResponse?.severity !== 'contact';
   if (!slideX) return Object.freeze({ x: destination.x, z: source.z, collision: true, responseApplied, targetKind: direct.target.kind });
   if (!slideZ) return Object.freeze({ x: source.x, z: destination.z, collision: true, responseApplied, targetKind: direct.target.kind });
   return Object.freeze({ x: source.x, z: source.z, collision: true, responseApplied, targetKind: direct.target.kind });
@@ -1290,16 +1309,17 @@ function releaseDetailedTrafficVehicle(state, vehicle) {
 
 function attachCuratedTrafficDetail(state, vehicle) {
   if (!vehicle?.visual?.root || vehicle.serviceType === 'responder' || vehicle.playerClaimed) return false;
-  const assetId = CURATED_TRAFFIC_ASSET_BY_VARIANT[String(vehicle.variant?.id || '')];
+  const assetId = vehicle.assetId || CURATED_TRAFFIC_ASSET_BY_VARIANT[String(vehicle.variant?.id || '')];
   if (!assetId) return false;
   const root = vehicle.visual.root;
-  root.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(root);
   void attachCuratedTrafficVehicle(THREE, root, {
     assetId,
     variantId: vehicle.variant.id,
     color: vehicle.color,
     dimensionsMeters: vehicle.variant,
     isCurrent: () => activeWorldMatches(state) && state.vehicles.includes(vehicle)
+  }).then(attached => {
+    if (attached && activeWorldMatches(state) && vehicle.attachedToPlayer && root.parent === appCtx.carMesh) appCtx.wheelMeshes = vehicle.visual.wheels;
   });
   return true;
 }
@@ -1323,6 +1343,23 @@ function retireDisabledRoadVehicle(state, vehicle) {
   vehicle.visual?.dispose?.();
   state.vehicles.splice(index, 1);
   return true;
+}
+
+function updateRaceClosurePresentation(state) {
+  const roots=state.raceHiddenRoots ||= new Map();
+  for(const actor of [...state.npcs,...state.vehicles]) {
+    const root=actor.visual?.root;if(!root||actor.attachedToPlayer)continue;
+    const pose=actor.variant?vehiclePose(actor):npcPose(actor);
+    if(raceClosureContains(state.raceClosure,pose,actor.variant?6:4)) {
+      if(!roots.has(root))roots.set(root,root.visible);root.visible=false;
+    } else if(roots.has(root)) {root.visible=roots.get(root);roots.delete(root);}
+  }
+  if(!state.raceClosure) {for(const [root,visible]of roots)root.visible=visible;roots.clear();}
+}
+function setUrbanRaceClosure(course) {
+  const state=activeRuntime;if(!activeWorldMatches(state))return ()=>{};
+  state.raceClosure=course;updateRaceClosurePresentation(state);
+  return ()=>{if(state.raceClosure===course){state.raceClosure=null;updateRaceClosurePresentation(state);}};
 }
 
 function updateEntityLifecycle(state) {
@@ -1667,6 +1704,8 @@ function resetPlayerVehicleVisual(state) {
   appCtx.wheelMeshes = state.defaultWheelMeshes;
   if (appCtx.carMesh?.userData) {
     delete appCtx.carMesh.userData.activeUrbanVehicleId;
+    delete appCtx.carMesh.userData.driverCameraMount;
+    delete appCtx.carMesh.userData.mountedVehicleVisualHost;
     appCtx.carMesh.userData.vehicleStyle = state.defaultVehicleStyle;
   }
   appCtx.car.vehicleVariantId = 'sedan';
@@ -1677,6 +1716,7 @@ function resetPlayerVehicleVisual(state) {
   appCtx.car.resistance = state.defaultCarResistance;
   appCtx.car.transportCatalogId = 'sedan';
   appCtx.car.vehicleIdentity = 'player-default:sedan';
+  appCtx.car.personalVehicleId = 'bmw_e34';
 }
 
 function stopServiceSiren(state) {
@@ -1749,6 +1789,7 @@ function toggleActiveServiceEquipment(state) {
 }
 
 function updateServiceEquipment(state, dt) {
+  state.personalVehicles?.update(dt);
   state.serviceLightElapsed += Math.max(0, Number(dt) || 0);
   const keyDown = appCtx.keys?.KeyH === true;
   if (keyDown && !state.serviceEquipmentKeyHeld) toggleActiveServiceEquipment(state);
@@ -1775,6 +1816,8 @@ function mountVehicleForDriving(state, vehicle) {
   vehicle.visual.root.rotation.set(0, 0, 0);
   syncCuratedVehicleGroundPivot(vehicle.visual.root);
   appCtx.carMesh.add(vehicle.visual.root);
+  appCtx.carMesh.userData.mountedVehicleVisualHost = vehicle.visual.root;
+  appCtx.carMesh.userData.driverCameraMount=vehicleDriverCamera(vehicle.variant);
   vehicle.attachedToPlayer = true;
   vehicle.occupied = true;
   vehicle.driver = 'player';
@@ -1788,7 +1831,8 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.car.durabilityPolicy = vehicle.durabilityPolicy || vehicle.variant?.durabilityPolicy || 'standard';
   appCtx.car.resistance = Number(vehicle.resistance || vehicle.variant?.resistance || 160);
   appCtx.car.transportCatalogId = vehicle.variant.id;
-  appCtx.car.vehicleIdentity = vehicle.id;
+  appCtx.car.vehicleIdentity = vehicle.vehicleIdentity || vehicle.id;
+  appCtx.car.personalVehicleId = vehicle.personalVehicleId || '';
   appCtx.car.x = pose.x;
   appCtx.car.y = pose.y;
   appCtx.car.z = pose.z;
@@ -1808,6 +1852,7 @@ function mountVehicleForDriving(state, vehicle) {
 }
 
 function parkActiveVehicle(state, vehicle) {
+  void state.personalVehicles?.checkpoint(true);
   const pose = vehiclePose(vehicle);
   appCtx.carMesh.remove(vehicle.visual.root);
   state.group.add(vehicle.visual.root);
@@ -2772,6 +2817,7 @@ function disposeRuntime(state, reason = 'disposed') {
   if (!state || state.disposed) return false;
   state.roomAuthorityRuntime?.dispose?.();
   state.disposed = true;
+  state.personalVehicles?.dispose();
   stopServiceSiren(state);
   try { void state.serviceAudioContext?.close?.(); } catch (_) {}
   closeStore(state);
@@ -2801,6 +2847,7 @@ function disposeRuntime(state, reason = 'disposed') {
   const caughtButton = document.getElementById('caughtBtn');
   if (caughtButton) caughtButton.textContent = 'Try Again';
   state.unsubscribeBackpack?.();
+  state.stopPlayerAuth?.();
   state.stopWalletSubscription?.();
   appCtx.screenLayout?.setPanelLayer?.('backpack', false);
   state.prompt?.root?.classList.remove('show');
@@ -2850,6 +2897,43 @@ function disposeRuntime(state, reason = 'disposed') {
   if (activeRuntime === state) activeRuntime = null;
   if (appCtx.urbanSandboxRuntime === state) appCtx.urbanSandboxRuntime = null;
   return true;
+}
+
+function connectUrbanPlayerServices(equipment,backpackStore) {
+  const currentUser = getCurrentUser();
+  if (appCtx.connectedExplorerWallet && appCtx.connectedExplorerWallet.uid !== currentUser?.uid) {
+    appCtx.connectedExplorerWallet.dispose?.();
+    appCtx.connectedExplorerWallet = null;
+  }
+  const connectedWallet = appCtx.connectedExplorerWallet || createConnectedExplorerWallet({
+    onError: handleWalletReconnect
+  });
+  if (connectedWallet) appCtx.connectedExplorerWallet = connectedWallet;
+  const stopWalletSubscription = connectedWallet?.subscribe?.(() => {
+    if (!appCtx.urbanSandboxRuntime) return;
+    renderEquipment(appCtx.urbanSandboxRuntime);
+    if (appCtx.urbanSandboxRuntime.storeOpen) renderStore(appCtx.urbanSandboxRuntime);
+  }) || null;
+  const commerce = connectedWallet
+    ? createLocalCommerceModel({ inventory: equipment, backpackStore, transactionAuthority: connectedWallet })
+    : (appCtx.worldEconomy?.accountUid===''?appCtx.worldEconomy:null) || createLocalCommerceModel({ inventory: equipment, backpackStore });
+  appCtx.worldEconomy = commerce;
+  appCtx.localConvenienceStoreCommerce = commerce;
+  const playerConditionAuthority = ensurePlayerConditionAuthority(appCtx);
+  const vehicleUpgradeStore = ensureVehicleUpgradeStore(appCtx,{ownerUid:currentUser?.uid||''});
+  if (appCtx.connectedExplorerPlayerState && appCtx.connectedExplorerPlayerState.uid !== currentUser?.uid) {
+    appCtx.connectedExplorerPlayerState.dispose?.();
+    appCtx.connectedExplorerPlayerState = null;
+  }
+  if (!appCtx.connectedExplorerPlayerState && currentUser?.uid) {
+    appCtx.connectedExplorerPlayerState = createConnectedPlayerState({
+      conditionAuthority: playerConditionAuthority,
+      vehicleUpgradeStore,
+      onError: handlePlayerStateReconnect,
+      onChange: refreshActiveEquipment
+    });
+  }
+  return {commerce,playerConditionAuthority,vehicleUpgradeStore,stopWalletSubscription};
 }
 
 function startUrbanSandboxRuntime(options = {}) {
@@ -2933,39 +3017,7 @@ function startUrbanSandboxRuntime(options = {}) {
     buildings: appCtx.buildings,
     entranceByBuilding: appCtx.buildingEntranceByBuilding
   });
-  const currentUser = getCurrentUser();
-  if (appCtx.connectedExplorerWallet && appCtx.connectedExplorerWallet.uid !== currentUser?.uid) {
-    appCtx.connectedExplorerWallet.dispose?.();
-    appCtx.connectedExplorerWallet = null;
-  }
-  const connectedWallet = appCtx.connectedExplorerWallet || createConnectedExplorerWallet({
-    onError: handleWalletReconnect
-  });
-  if (connectedWallet) appCtx.connectedExplorerWallet = connectedWallet;
-  const stopWalletSubscription = connectedWallet?.subscribe?.(() => {
-    if (!appCtx.urbanSandboxRuntime) return;
-    renderEquipment(appCtx.urbanSandboxRuntime);
-    if (appCtx.urbanSandboxRuntime.storeOpen) renderStore(appCtx.urbanSandboxRuntime);
-  }) || null;
-  const commerce = connectedWallet
-    ? createLocalCommerceModel({ inventory: equipment, backpackStore, transactionAuthority: connectedWallet })
-    : appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment, backpackStore });
-  appCtx.worldEconomy = commerce;
-  appCtx.localConvenienceStoreCommerce = commerce;
-  const playerConditionAuthority = ensurePlayerConditionAuthority(appCtx);
-  const vehicleUpgradeStore = ensureVehicleUpgradeStore(appCtx);
-  if (appCtx.connectedExplorerPlayerState && appCtx.connectedExplorerPlayerState.uid !== currentUser?.uid) {
-    appCtx.connectedExplorerPlayerState.dispose?.();
-    appCtx.connectedExplorerPlayerState = null;
-  }
-  if (!appCtx.connectedExplorerPlayerState && currentUser?.uid) {
-    appCtx.connectedExplorerPlayerState = createConnectedPlayerState({
-      conditionAuthority: playerConditionAuthority,
-      vehicleUpgradeStore,
-      onError: handlePlayerStateReconnect,
-      onChange: refreshActiveEquipment
-    });
-  }
+  const {commerce,playerConditionAuthority,vehicleUpgradeStore,stopWalletSubscription}=connectUrbanPlayerServices(equipment,backpackStore);
   const storeUi = {
     root: document.getElementById('urbanStore'),
     name: document.getElementById('urbanStoreName'),
@@ -3353,6 +3405,7 @@ function startUrbanSandboxRuntime(options = {}) {
         }
       });
       updateEntityLifecycle(state);
+      updateRaceClosurePresentation(state);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {
         state.npcPromotionElapsed = 0;
@@ -3371,9 +3424,62 @@ function startUrbanSandboxRuntime(options = {}) {
     }
   });
   activeRuntime = state;
+  state.personalVehicles=createPersonalVehicleRuntime({context:appCtx,state,isCurrent:()=>activeWorldMatches(state),
+    async prepare(definition,record,spawn,controls){
+      const variant=VEHICLE_CATALOG.find(v=>v.id===definition.variantId);
+      const vehicle={id:`personal:${getCurrentUser()?.uid||'device'}:${definition.id}`,personalVehicleId:definition.id,assetId:definition.assetId,
+        vehicleIdentity:personalVehicleIdentity(definition.id),variant,color:variant.color,condition:record.condition,
+        durabilityPolicy:variant.durabilityPolicy,resistance:variant.resistance,driverSide:state.driveOnLeft?1:-1,
+        x:spawn.x,y:spawn.carY,z:spawn.z,yaw:spawn.angle,attachedToPlayer:false,occupied:false,source:'personal-garage'};
+      vehicle.visual=createUrbanVehicleVisual(THREE,vehicle,state.serviceLighting);
+      let ready;
+      try{ready=await attachCuratedTrafficVehicle(THREE,vehicle.visual.root,{variantId:variant.id,color:vehicle.color,
+        dimensionsMeters:variant,signal:controls.signal,isCurrent:controls.isCurrent});}
+      catch(error){vehicle.visual.dispose();throw error;}
+      const expected=definition.assetId||CURATED_TRAFFIC_ASSET_BY_VARIANT[variant.id];
+      if(!ready||vehicle.visual.root.userData.curatedTrafficAssetId!==expected){vehicle.visual.dispose();return null;}
+      return vehicle;
+    },
+    applyPublishedPose:syncVehiclePose,
+    mount(vehicle){state.vehicles.push(vehicle);mountVehicleForDriving(state,vehicle);},
+    releaseCurrent(){
+      void state.personalVehicles.checkpoint(true);
+      state.roomAuthorityRuntime.releaseDefaultDriverLease();
+      const previous=state.activeVehicle;if(!previous)return;
+      state.roomAuthorityRuntime.releasePreparedVehicle(previous);
+      if(previous.serviceEquipmentActive)setActiveServiceEquipment(state,false);
+      parkActiveVehicle(state,previous);
+      if(previous.personalVehicleId){previous.visual.dispose();state.vehicles.splice(state.vehicles.indexOf(previous),1);}
+    },
+    restoreDefault(spawn,record){
+      resetPlayerVehicleVisual(state);
+      state.defaultCarCondition=record.condition;appCtx.car.condition=record.condition;
+      appCtx.carMesh.visible=true;
+    },
+    dispose(vehicle){vehicle.visual.dispose();}
+  });
+  state.trafficObstacles = () => {
+    const obstacles=state.vehicles.filter(v=>!v.ambientTraffic&&!v.attachedToPlayer).map(v=>({...vehiclePose(v),variant:v.variant}));
+    if(appCtx.Walk?.state?.mode!=='walk'&&!appCtx.droneMode&&!appCtx.planeMode?.active&&!appCtx.boatMode?.active)
+      obstacles.push({x:appCtx.car.x,y:appCtx.car.y-VEHICLE_ROOT_TO_GROUND_METERS,z:appCtx.car.z,yaw:appCtx.car.angle,
+        variant:state.activeVehicle?.variant||VEHICLE_CATALOG.find(v=>v.id===appCtx.car.vehicleVariantId)||VEHICLE_CATALOG[1]});
+    return obstacles;
+  };
+  let playerOwnerUid=String(getCurrentUser()?.uid||'');
+  state.stopPlayerAuth=observeAuth(user=>{
+    const nextUid=String(user?.uid||'');
+    if(!activeWorldMatches(state)||nextUid===playerOwnerUid)return;
+    state.personalVehicles.cancelSelection();
+    if(state.activeVehicle?.personalVehicleId||state.defaultRoomVehicle)releaseUrbanVehicleForTravel('drive');
+    state.stopWalletSubscription?.();
+    Object.assign(state,connectUrbanPlayerServices(equipment,backpackStore));
+    playerOwnerUid=nextUid;state.personalVehicles.rebindOwner(nextUid);
+    renderEquipment(state);
+  });
   appCtx.urbanSandboxRuntime = state;
   state.vehicles.forEach((vehicle) => attachCuratedTrafficDetail(state, vehicle));
   appCtx.resolveUrbanActorCollision = resolveUrbanActorCollision;
+  appCtx.setUrbanRaceClosure = setUrbanRaceClosure;
   state.handleMechanicInteraction = () => openNearbyMechanic(state);
   appCtx.handleMechanicInteraction = state.handleMechanicInteraction;
   state.prepareAirborneParachute = (options = {}) => {
@@ -3442,6 +3548,20 @@ function startUrbanSandboxRuntime(options = {}) {
 
 // These callbacks outlive a location. Keep them out of its closure scope and
 // resolve the current runtime at invocation instead of capturing an old world.
+function releaseUrbanVehicleForTravel(targetMode) {
+  const state=activeRuntime;
+  if(!state)return true;
+  if(state.transition)return false;
+  state.roomAuthorityRuntime.releaseDefaultDriverLease();
+  if(!state.activeVehicle)return true;
+  const vehicle=state.activeVehicle;
+  state.roomAuthorityRuntime.releasePreparedVehicle(vehicle);
+  if(vehicle.serviceEquipmentActive)setActiveServiceEquipment(state,false);
+  parkActiveVehicle(state,vehicle);
+  if(vehicle.personalVehicleId){vehicle.visual.dispose();state.vehicles.splice(state.vehicles.indexOf(vehicle),1);}
+  return true;
+}
+function activePersonalVehicleRuntime(){return activeRuntime?.personalVehicles;}
 function handleWalletReconnect() {
   if (activeRuntime) setStatus(activeRuntime, 'Explorer Wallet is reconnecting.', 2200);
 }
@@ -3453,6 +3573,14 @@ function handlePlayerStateReconnect(error) {
 function refreshActiveEquipment() { if (activeRuntime) renderEquipment(activeRuntime); }
 
 Object.assign(appCtx, {
+  releaseUrbanVehicleForTravel,
+  canReleaseUrbanVehicle:()=>!activeRuntime?.transition,
+  cancelPersonalVehicleSelection:()=>activePersonalVehicleRuntime()?.cancelSelection(),
+  getVehicleGarage:()=>activePersonalVehicleRuntime()?.snapshot(),
+  checkpointPersonalVehicle:()=>activePersonalVehicleRuntime()?.checkpoint(true),
+  getVehicleGarageHomes:()=>activePersonalVehicleRuntime()?.homes()||[],
+  changeVehicleGarage:command=>activePersonalVehicleRuntime()?.change(command),
+  selectPersonalVehicle:(id,options)=>options?.intent==='ensure-room-lease'?activePersonalVehicleRuntime()?.ensureRoomVehicleLease(id):activePersonalVehicleRuntime()?.selectAndDrive(id),
   enterUrbanVehicleByIdForSupport: vehicleId => activeRuntime ? beginEnter(activeRuntime, activeRuntime.vehicles.find(vehicle => vehicle.id === vehicleId)) : false,
   exitUrbanVehicleForSupport: () => activeRuntime ? beginExit(activeRuntime) : false,
   toggleUrbanEquipment: force => activeRuntime ? toggleEquipment(activeRuntime, force) : false,

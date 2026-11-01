@@ -1,0 +1,33 @@
+{
+  "asset": "asphalt_track",
+  "creator": "Dimitrios Savva",
+  "provider": "Poly Haven",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "sourceUrl": "https://polyhaven.com/a/asphalt_track",
+  "tileMeters": 2,
+  "resolution": 1024,
+  "files": [
+    {
+      "file": "asphalt_track_diffuse.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_track/asphalt_track_diff_1k.jpg",
+      "bytes": 858925,
+      "sha256": "05c4e79cd99160075969d37bfc6ef72be262153a410bb45510b2c23f7303894c",
+      "providerMd5": "92e0682878c39430e521cce235ac1f75"
+    },
+    {
+      "file": "asphalt_track_normal.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_track/asphalt_track_nor_gl_1k.jpg",
+      "bytes": 832851,
+      "sha256": "18caf02427a7cd9cd577ceae5aa9daa7bb3ffba60598e2df8aaf75d1925a8a94",
+      "providerMd5": "d61d8e22e24ea0e44873b9c9c97d4e0c"
+    },
+    {
+      "file": "asphalt_track_roughness.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_track/asphalt_track_rough_1k.jpg",
+      "bytes": 459197,
+      "sha256": "0646d0cfbe6bf9ea4a8a9e43aec826e7ec32a10b8aff61bf5a4ec02b1bc3c363",
+      "providerMd5": "c57f7b3a42ebfaf58e44c0ccc83326c3"
+    }
+  ]
+}

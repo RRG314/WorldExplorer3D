@@ -67,7 +67,7 @@ export function createRegionalBuildingCompiler(options) {
     let majorCount = 0;
     for (let i = 0; i < descriptors.length; i++) {
       const b = descriptors[i], units = Number(options.unitsPerMeter) || 1;
-      writeBuildingDescriptor(data, i, b, resolveFarBuildingMassing(b, null, b.areaMeters * units * units, units));
+      writeBuildingDescriptor(data, i, b, resolveFarBuildingMassing(b, null, b.areaMeters * units * units, units, {venuePack:options.venuePack}));
       if (i < exactCandidates) exact.set(i, { ring: b.ring, identity: b.identity,
         centerLat: b.centerLat, centerLon: b.centerLon, priority: b.priority });
       if (b.priority >= 1000000) {

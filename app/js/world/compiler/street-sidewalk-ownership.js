@@ -38,7 +38,7 @@ export function createStreetSidewalkOwnership(roads,features,frontages,scale) {
         const t=(start+end)/2,x=a.x+dx*t,z=a.z+dz*t;
         const normal={x:uz,z:-ux},signed=(x-s.a.x)*normal.x+(z-s.a.z)*normal.z,sign=Math.sign(signed);
         const roadT=Math.max(0,Math.min(1,(along+span*t)/rl));
-        const edge=streetSideEdge(s.road,(s.wa+(s.wb-s.wa)*roadT)/2,sign);
+        const edge=streetSideEdge(s.road,(s.wa+(s.wb-s.wa)*roadT)/2,sign,s.index,s.t0+(s.t1-s.t0)*roadT);
         const gap=Math.abs(signed)-edge-feature.width/2;
         if(!sign||gap<-.5/scale||gap>8/scale)continue;
         const facade=frontageHit({x,z},normal.x*sign,normal.z*sign,frontages.query({x,z},undefined,7/scale),feature.width/2,7/scale);

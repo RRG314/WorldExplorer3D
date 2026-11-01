@@ -44,7 +44,7 @@ test('roads, bridges and tunnels keep exact published profiles across scratch re
       structureSemantics:{terrainMode:mode,isTunnel:mode==='subgrade'},
       structureTransitionAnchors:[]};
     const ground=(x,z)=>12+x*.025+Math.sin(x*.035+i)*.2+z*.012;
-    const expected=reference(feature,ground);let nested=false;
+    const expected={...reference(feature,ground),surveyedSurface:null};let nested=false;
     const actual=compile(feature,(x,z)=>{
       if(!nested){nested=true;compile({id:'inner',pts:[{x:0,z:0},{x:20,z:0}],structureSemantics:{terrainMode:'at_grade'}},()=>37);}
       return ground(x,z);
@@ -62,7 +62,7 @@ test('compilation publication pages preserve every road across retries, yields a
       structureSemantics:{terrainMode:['at_grade','elevated','subgrade'][i%3]},structureTransitionAnchors:[]};
     const ground=(x,z)=>13+x*.01+z*.02;
     const actual=compile(feature,ground,{publicationStorage});
-    assert.deepEqual(actual,reference(feature,ground));
+    assert.deepEqual(actual,{...reference(feature,ground),surveyedSurface:null});
     published.push({actual,copy:structuredClone(actual)});buffers.add(actual.distances.buffer);
     assert.throws(()=>compile(feature,()=>{throw Error('aborted');},{publicationStorage}),/aborted/);
     if(i%10===0)await Promise.resolve();

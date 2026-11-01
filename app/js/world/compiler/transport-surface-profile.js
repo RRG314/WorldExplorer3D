@@ -582,23 +582,37 @@ function smoothSignedCutFillProfile(
   distances,
   maximumGrade,
   fitRadius,
-  allocate = copyNumericArray
+  allocate = copyNumericArray,
+  {preserveLinearTrend = false} = {}
 ) {
   const radius = Math.max(4, finiteNumber(fitRadius, DEFAULT_VERTICAL_FIT_RADIUS));
   const heights = allocate(Float64Array, terrainEnvelope.length);
   for (let index = 0; index < terrainEnvelope.length; index += 1) {
     let weightedSum = 0;
     let weightTotal = 0;
+    let weightedDistance = 0, weightedDistanceSquared = 0, weightedDistanceHeight = 0;
     for (let candidate = 0; candidate < terrainEnvelope.length; candidate += 1) {
       const delta = Math.abs(distances[candidate] - distances[index]);
       if (delta > radius) continue;
       const weight = 1 - delta / radius;
       weightedSum += terrainEnvelope[candidate] * weight;
       weightTotal += weight;
+      if(preserveLinearTrend){
+        const x=distances[candidate]-distances[index];
+        weightedDistance+=weight*x;weightedDistanceSquared+=weight*x*x;
+        weightedDistanceHeight+=weight*x*terrainEnvelope[candidate];
+      }
     }
-    const target = weightTotal > 0
+    let target = weightTotal > 0
       ? weightedSum / weightTotal
       : terrainEnvelope[index];
+    if(preserveLinearTrend){
+      // A one-sided weighted mean invents ramps at every source-way endpoint,
+      // even on a perfectly straight grade. Fit the local intercept instead;
+      // the same absolute cut/fill and grade solver still owns the result.
+      const determinant=weightTotal*weightedDistanceSquared-weightedDistance**2;
+      if(determinant>1e-9)target=(weightedSum*weightedDistanceSquared-weightedDistance*weightedDistanceHeight)/determinant;
+    }
     heights[index] = clamp(target, lowerBounds[index], upperBounds[index]);
   }
 

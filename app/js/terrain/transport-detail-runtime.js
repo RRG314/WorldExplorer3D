@@ -1,3 +1,4 @@
+import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import { leaseRoadOverview } from './road-overview-owner.js';
 import {captureTransportTerrain} from './transport-terrain-snapshot.js';
 import {createPavementTerrainMask} from '../world/pavement-terrain-mask.js';
@@ -5,20 +6,27 @@ import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail,actorRequestsRoadDetail,
   transportRegionBounds,transportRegionInWindow,transportRegionDistanceSquared,nearestPendingTransportRegion,
   TRANSPORT_DETAIL_RADIUS,TRANSPORT_RETENTION_RADIUS,MAX_MOVING_TRANSPORT_REGIONS} from './transport-detail-plan.js';
 
-export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null}) {
+export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null,roadContinuations=new Map()}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
   let worker=null,recoveryInput=null,retryAt=0,retryAttempts=0;
   let pending=null,disposed=false,active=null,publish=null,complete=null,retire=null,mask=null,notice=null,noticeText=null,retryButton=null,lastSync=0;
   const remaining=new Map(),resident=new Map(),latestFocus={x:focus.x,z:focus.z};
-  let requestsDetail=true;
+  let requestsDetail=true,initialPinnedRegions=0;
+  // Buildings and the starting terrain already belong to this fixed district.
+  // Finish its queued roads using the same worker, then retain them for the visit.
+  const districtRadius=Math.min(4096,Math.max(0,Number(appCtx.worldLoadRuntimeState?.buildingVisibleRadiusWorld)||0));
+  const districtOrigin={x:0,z:0};
+  const inDistrict=bounds=>districtRadius>0&&transportRegionInWindow(bounds,districtOrigin,districtRadius);
   let queueOrder=0;
   const stats={status:'preparing',sourceRoads:roads.length,completedRegions:0,pendingRegions:0,
     pinnedRegions:0,residentMovingRegions:0,maxMovingRegions:MAX_MOVING_TRANSPORT_REGIONS,
     activeJobs:0,evictedRegions:0,cancelledRegions:0,
     blocked:false,blockedAtMs:null,blockedTotalMs:0,blockedCount:0,error:null,recoveryAttempts:0,recoveries:0};
   const refreshCounts=()=>{
-    stats.residentMovingRegions=resident.size;
-    stats.completedRegions=stats.pinnedRegions+resident.size;
+    stats.pinnedRegions=initialPinnedRegions;
+    stats.residentMovingRegions=0;
+    for(const bounds of resident.values())if(inDistrict(bounds))stats.pinnedRegions++;else stats.residentMovingRegions++;
+    stats.completedRegions=initialPinnedRegions+resident.size;
     stats.pendingRegions=remaining.size;
   };
   function evict(key){
@@ -69,7 +77,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
     if(appCtx._cancelTransportPreparation===dispose)appCtx._cancelTransportPreparation=null;pending?.reject(new DOMException('Transport detail cancelled','AbortError'));
     for(const key of resident.keys())retire?.(key);
     resident.clear();mask?.dispose();mask=null;notice?.remove();notice=noticeText=retryButton=null;remaining.clear();publish=complete=retire=null;
-    stats.status='disposed';stats.pendingRegions=0;stats.residentMovingRegions=0;stats.activeJobs=0;stats.blocked=false;
+    initialPinnedRegions=0;stats.status='disposed';stats.pendingRegions=0;stats.pinnedRegions=0;stats.completedRegions=0;stats.residentMovingRegions=0;stats.activeJobs=0;stats.blocked=false;
   }
   function updateNotice(blocked){
     if(blocked&&!stats.blocked){stats.blockedAtMs=performance.now();stats.blockedCount++;}
@@ -93,14 +101,17 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   appCtx._cancelTransportPreparation=dispose;
   try {
     const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,
-      pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
+      endpointContinuations:roadContinuations.get(road),
+      edgeBandRecipe:reviewedRoadEdgeRecipe(road),pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
       structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
     }));
     const includeOverview=appCtx.farTerrainClipmapState?.regionalRoadCoverage?.status!=='ready';
     stats.overviewOwner=includeOverview?'selected-transport-fallback':'regional-source-coverage';
     const planInput={roads:sourceRoads,focus,includeOverview,maxTextureSize:Math.min(4096,appCtx.renderer.capabilities.maxTextureSize)};
+    let pavementJoins=[];
     if(terrainReady){
-      await Promise.all([request({type:'plan',input:planInput}),terrainReady]);
+      const [,joins]=await Promise.all([request({type:'plan',input:planInput}),terrainReady]);
+      pavementJoins=joins||[];
       if(disposed||!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
     }
     const heightProbes=[];
@@ -111,8 +122,8 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       heightProbes.push({x:point.x,z:point.z,y});
     }
     const terrain=captureTransportTerrain(appCtx);
-    recoveryInput={...planInput,terrain,heightProbes,includeOverview:false,deferInitial:true};
-    const initial=await request({type:'prepare',input:{...(terrainReady?{}:planInput),terrain,heightProbes}});
+    recoveryInput={...planInput,terrain,pavementJoins,heightProbes,includeOverview:false,deferInitial:true};
+    const initial=await request({type:'prepare',input:{...(terrainReady?{}:planInput),terrain,pavementJoins,heightProbes}});
 
     if(!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
     if(includeOverview){
@@ -127,7 +138,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
     mask?.syncMaterials();
     // Texture data are bulk-uploaded once. The overview stays available after
     // contact/render eviction; it never needs to be rebuilt during travel.
-    stats.heightParity=initial.heightParity;stats.pinnedRegions=initial.regions.length;refreshCounts();stats.status='near-ready';
+    stats.heightParity=initial.heightParity;initialPinnedRegions=initial.regions.length;refreshCounts();stats.status='near-ready';
     initial.masks=null;
     const controller={stats,initial,dispose,
       retry,
@@ -137,13 +148,17 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
         if(!actorNeedsRoadDetail(point,terrainY)){updateNotice(false);return true;}
         return controller.readyAt(point);
       },
+      hasReadyCoverageAt(point,margin=384){
+        if(disposed||!Number.isFinite(point?.x)||!Number.isFinite(point?.z)||!Number.isFinite(margin)||margin<0||margin>TRANSPORT_RETENTION_RADIUS||Math.abs(point.x)>Number.MAX_SAFE_INTEGER/2||Math.abs(point.z)>Number.MAX_SAFE_INTEGER/2)return false;
+        for(let ix=Math.floor((point.x-margin)/TRANSPORT_REGION_SIZE);ix<=Math.floor((point.x+margin)/TRANSPORT_REGION_SIZE);ix++)
+          for(let iz=Math.floor((point.z-margin)/TRANSPORT_REGION_SIZE);iz<=Math.floor((point.z+margin)/TRANSPORT_REGION_SIZE);iz++)
+            if(remaining.has(`${ix}:${iz}`))return false;
+        return true;
+      },
       readyAt(point,margin=384){
         if(disposed)return true;
         const x=Number(point?.x)||0,z=Number(point?.z)||0;
-        for(let ix=Math.floor((x-margin)/TRANSPORT_REGION_SIZE);ix<=Math.floor((x+margin)/TRANSPORT_REGION_SIZE);ix++)
-          for(let iz=Math.floor((z-margin)/TRANSPORT_REGION_SIZE);iz<=Math.floor((z+margin)/TRANSPORT_REGION_SIZE);iz++)
-            if(remaining.has(`${ix}:${iz}`)){updateNotice(true);return false;}
-        updateNotice(false);return true;
+        const ready=controller.hasReadyCoverageAt({x,z},margin);updateNotice(!ready);return ready;
       },
       step(point={x:0,z:0},terrainY=NaN){
         latestFocus.x=Number(point.x)||0;latestFocus.z=Number(point.z)||0;
@@ -153,18 +168,21 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
         const now=performance.now();if(now-lastSync>500){mask?.syncMaterials();lastSync=now;}
         // Retire only outside the overlap. Resident and staged work have
         // independent bounds: one packet can be in flight, never an open queue.
-        for(const [key,bounds] of resident)if(!transportRegionInWindow(bounds,latestFocus,TRANSPORT_RETENTION_RADIUS))evict(key);
+        for(const [key,bounds] of resident)if(!inDistrict(bounds)&&!transportRegionInWindow(bounds,latestFocus,TRANSPORT_RETENTION_RADIUS))evict(key);
         if(active)return;
         if(stats.error){if(requestsDetail&&performance.now()>=retryAt)recover();return;}
         if(!requestsDetail){stats.status='dormant';return;}
-        const key=nearestPendingTransportRegion(remaining,latestFocus);
+        const key=nearestPendingTransportRegion(remaining,latestFocus)??
+          (districtRadius>0?nearestPendingTransportRegion(remaining,districtOrigin,districtRadius):null);
         if(key===null){
           if(!remaining.size&&stats.status!=='complete')complete?.();
           stats.status=remaining.size?'window-ready':'complete';return;
         }
-        if(resident.size>=MAX_MOVING_TRANSPORT_REGIONS){
+        const bounds=remaining.get(key),fixed=inDistrict(bounds);
+        if(!fixed&&stats.residentMovingRegions>=MAX_MOVING_TRANSPORT_REGIONS){
           let victim=null,farthest=-1;
           for(const [candidate,bounds] of resident){
+            if(inDistrict(bounds))continue;
             if(transportRegionInWindow(bounds,latestFocus,TRANSPORT_DETAIL_RADIUS))continue;
             const distance=transportRegionDistanceSquared(bounds,latestFocus);
             if(distance>farthest){farthest=distance;victim=candidate;}
@@ -172,9 +190,8 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
           if(victim===null)throw new Error('Transport detail window exceeds its residency budget');
           evict(victim);
         }
-        const bounds=remaining.get(key);
-        const publicationCurrent=()=>!disposed&&isCurrent()&&requestsDetail&&
-          transportRegionInWindow(bounds,latestFocus,TRANSPORT_DETAIL_RADIUS);
+        const publicationCurrent=()=>!disposed&&isCurrent()&&
+          (fixed||requestsDetail&&transportRegionInWindow(bounds,latestFocus,TRANSPORT_DETAIL_RADIUS));
         mask?.finishBulkUpload();
         stats.status='refining';stats.activeJobs=1;
         active=(async()=>{

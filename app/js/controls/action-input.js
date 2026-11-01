@@ -7,6 +7,7 @@ import {
 } from './mobile-touch-authority.js?v=6';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { createVehicleTiltInput } from './vehicle-tilt-input.js?v=1';
+import {mergeXrActions} from '../vr/xr-input.js';
 import {
   keyMatchesKeyboardAction,
   keyboardActionPressed,
@@ -71,7 +72,7 @@ function normalizeMode(mode) {
 function connectedGamepad() {
   const pads = typeof navigator !== 'undefined' && navigator.getGamepads?.();
   if (!pads) return null;
-  return Array.from(pads).find((pad) => pad?.connected) || null;
+  return Array.from(pads).find((pad) => pad?.connected&&pad.mapping!=='xr-standard') || null;
 }
 
 function buttonValue(gamepad, index) {
@@ -232,6 +233,7 @@ function mergeMobileTouch(actions) {
 function readControlActions(mode = 'drive') {
   const normalizedMode = normalizeMode(mode);
   const hardware = mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad());
+  mergeXrActions(hardware,appCtx.vrPresentation?.readActions?.(normalizedMode,hardware));
   const hardwareTurn = Math.abs(hardware.turn) > 0;
   const hardwareMove = Math.abs(hardware.move) > 0;
   const hardwareDriveSpeed = hardwareMove || hardware.throttle > 0 || hardware.reverse > 0 || hardware.brake > 0;
@@ -355,7 +357,7 @@ function updateControlInput() {
     inputState.previousButtons = [];
     return false;
   }
-  if (appCtx.hasPauseReason?.('reality_capture')) {
+  if (appCtx.hasPauseReason?.('reality_capture') || appCtx.hasPauseReason?.('controls_settings')) {
     inputState.previousButtons = gamepad.buttons.map(button => button.value > 0.55);
     return false;
   }
@@ -379,6 +381,8 @@ function clearControlInputState(reason = 'runtime') {
   new Set([...HELD_CONTROL_CODES, ...configuredCodes]).forEach((code) => {
     keys[code] = false;
   });
+  // Dedicated flight UI retains its normalized keyboard channel separately.
+  for (const code of Object.keys(appCtx.spaceFlight?.keys || {})) appCtx.spaceFlight.keys[code] = false;
   inputState.gamepad = null;
   inputState.previousButtons = [];
   inputState.lastPlaneTurnTapAt.ArrowLeft = -Infinity;

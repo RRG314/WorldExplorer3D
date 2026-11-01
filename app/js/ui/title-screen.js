@@ -1,4 +1,5 @@
 import { requestGuidedJourney, consumeGuidedJourney, readReturnPlace } from '../tutorial/entry-journey.js';
+import {createPortalGameEntry} from '../portal/game-entry.js';
 import { createLaunchMeasurement } from '../platform/launch-telemetry.js';
 import {validateOceanVoyage} from '../ocean/voyage-store.js';
 import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
@@ -10,9 +11,9 @@ import { commitEnvironment } from '../session-coordinator.js?v=2';
 import { createGlobeSelector } from "./globe-selector.js?v=94";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
+import { markFirstPlayReady } from '../runtime/workload-policy.js?v=1';
 import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
-import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=8';
 import {
   clampDetectedCoords,
   geolocationErrorMessage,
@@ -45,7 +46,19 @@ function initTitleScreenUi({
     space: spaceLaunchToggle,
     ocean: oceanLaunchToggle
   };
-  const sharedExperienceParams = readSharedExperienceParams();
+  const portalEntry=createPortalGameEntry(appCtx,{recordVisit:async(ownerScope,claim)=>{
+    const {createIndexedDbDiscoveryProfileStore}=await import('../discovery/profile-store.js?v=5');
+    const store=appCtx.discoveryProfileStore||createIndexedDbDiscoveryProfileStore();
+    await store.recordPortalGameVisit(ownerScope,claim);
+    const uid=ownerScope.startsWith('account:')?ownerScope.slice(8):null;
+    if(!uid||appCtx.getAccountUserId?.()!==uid||navigator.onLine===false)return;
+    const [{createPortalTrailController},{postProtectedFunction}]=await Promise.all([
+      import('../portal/trail-controller.js'),import('../../../js/function-api.js?v=3')]);
+    const sync=createPortalTrailController({store,request:postProtectedFunction});
+    try{await sync.changeOwner(uid);}finally{sync.dispose();}
+  }});
+  const sharedExperienceParams = portalEntry.intent?null:readSharedExperienceParams();
+  window.addEventListener('pagehide',event=>{if(!event.persisted)portalEntry.dispose();});
   let pendingOceanSelection = null;
   let pendingOceanResume = null;
   let titleLaunchMode = 'earth';
@@ -527,8 +540,22 @@ function initTitleScreenUi({
     if (raw) applyLastLocationSelection(JSON.parse(raw));
   } catch {}
 
+  if(portalEntry.intent){
+    const {place,decision}=portalEntry.intent;
+    if(decision.eligible){
+      const origin=place.destination.origin,preset=appCtx.LOCS?.[place.preset];
+      applyLastLocationSelection(preset?.lat===origin.lat&&preset?.lon===origin.lon
+        ?{selLoc:place.preset,launchMode:'earth'}
+        :{selLoc:'custom',customLoc:{...origin,name:place.title},launchMode:'earth'});
+      selectCurrentLocationMode();
+    }
+    const status=shareExperienceStatus||perfSettingsStatus;
+    if(status)status.textContent=decision.eligible?`${place.title} · Start Explore to enter this Portal.`:
+      'This Portal world is not ready for this device. Your saved place is kept; you can choose another location.';
+  }
+
   if (sharedExperienceParams) {
-    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock', 'livegps']);
+    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock', 'livegps', 'racing']);
     if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
       appCtx.gameMode = sharedExperienceParams.gameMode;
       const targetMode = document.querySelector(`.mode[data-mode="${sharedExperienceParams.gameMode}"]`);
@@ -582,11 +609,13 @@ function initTitleScreenUi({
   document.getElementById('locationSearch')?.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') appCtx.searchLocation();
   });
-  document.querySelectorAll('.mode').forEach((element) => element.addEventListener('click', () => {
-    document.querySelectorAll('.mode').forEach((node) => node.classList.remove('sel'));
-    element.classList.add('sel');
-    appCtx.gameMode = element.dataset.mode;
-  }));
+  function selectTitleGameMode(mode) {
+    const elements=[...document.querySelectorAll('.mode')],target=elements.find(element=>element.dataset.mode===mode);
+    if(!target)return false;
+    for(const element of elements)element.classList.toggle('sel',element===target);
+    appCtx.gameMode=mode;return true;
+  }
+  document.querySelectorAll('.mode').forEach(element=>element.addEventListener('click',()=>selectTitleGameMode(element.dataset.mode)));
 
   let activeLaunchMode = 'earth';
   let launchMeasurement = null;
@@ -614,6 +643,7 @@ function initTitleScreenUi({
     if (externalBypassCustomGate) appCtx.pendingCustomLaunchBypass = false;
     if (globeSelector?.isOpen?.()) globeSelector.close();
 
+    const portalTicket=portalEntry.begin(requestedLaunchMode);
     activeLaunchMode = requestedLaunchMode;
     launchMeasurement = createLaunchMeasurement(requestedLaunchMode);
     const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ? appCtx.consumePendingFlowerChallengeStart() : false;
@@ -644,10 +674,6 @@ function initTitleScreenUi({
     document.getElementById('floatMenuContainer')?.classList.add('show');
     document.getElementById('mainMenuBtn')?.classList.add('show');
     document.getElementById('worldQuickControls')?.classList.add('show');
-    document.getElementById('controlsTab')?.classList.add('show');
-    const accessibilitySettings = document.getElementById('accessibilitySettings');
-    const mobileControlSettings = document.getElementById('mobileControlSettings');
-    if (accessibilitySettings && mobileControlSettings?.parentElement) mobileControlSettings.after(accessibilitySettings);
     document.getElementById('coords')?.classList.add('show');
     document.getElementById('historicBtn')?.classList.add('show');
     document.getElementById('memoryFlowerFloatBtn')?.classList.add('show');
@@ -714,6 +740,10 @@ function initTitleScreenUi({
 
     await ensureEarthWorldRuntime();
     appCtx.ensureEnginePbrTextures?.();
+    // Start the local catalog while location data/geometry is loading. Starting
+    // it only after control release introduces its geometry and shader variants
+    // into the first playable seconds. The existing sky owner caches this load.
+    void appCtx.ensureStarCatalogLoaded?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
     const earthLoadResult = await appCtx.loadRoads();
@@ -724,9 +754,6 @@ function initTitleScreenUi({
       globeSelector.open();
       return false;
     }
-    scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
-      timeout: 1800
-    });
     const startedOnWater = appCtx.boatMode?.active === true;
     if (!startedOnWater) resetTitleEarthTravelMode('title_earth_ready');
     if (!startedOnWater && appCtx.Walk) {
@@ -752,6 +779,7 @@ function initTitleScreenUi({
     updateControlsModeUI?.();
     applySharedRuntimeState?.();
     if (typeof appCtx.startMode === 'function') appCtx.startMode();
+    if(portalTicket&&!portalEntry.arm(portalTicket,earthLoadResult))appCtx.showToast?.('The location is open, but its Portal arrival could not be verified. No visit was recorded.');
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
       launchMode: requestedLaunchMode
@@ -793,6 +821,7 @@ function initTitleScreenUi({
         return result;
       })
       .catch((error) => {
+        portalEntry.cancel();
         launchMeasurement?.finish('failed');
         consumeGuidedJourney();
         console.error('[title] World launch failed:',error);
@@ -879,6 +908,7 @@ function initTitleScreenUi({
   }
 
   return {
+    selectGameMode: selectTitleGameMode,
     getTitleLaunchMode: () => titleLaunchMode,
     setTitleLaunchMode: (mode) => setLaunchMode(mode),
     getGlobeSelector: () => globeSelector,

@@ -15,6 +15,7 @@ const DRIVEABLE_HIGHWAY_TYPES = new Set([
   'residential',
   'unclassified',
   'living_street',
+  'raceway',
   'service'
 ]);
 

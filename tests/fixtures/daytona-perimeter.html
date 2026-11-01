@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{margin:0;background:#b5cbd4;color:#172a2d;font:15px system-ui}canvas{display:block}p{margin:8px}</style><p id="mode">Controlled bank and apron · Right changes the view.</p>
+<script src="/app/vendor/three/build/three.min.js"></script><script type="module">
+import {createDaytonaPerimeterExterior} from '/app/js/world/daytona-perimeter-exterior.js';
+import {createRoadContactIndex} from '/app/js/terrain/road-contact-index.js';
+const T=THREE,scene=new T.Scene();scene.background=new T.Color('#b5cbd4');scene.fog=new T.Fog('#b5cbd4',180,850);scene.add(new T.HemisphereLight(0xe7eff5,0x6c6e52,.7));const sun=new T.DirectionalLight(0xfff5df,1);sun.position.set(-50,100,20);scene.add(sun);
+// Controlled presentation surface, not geographic or native-height acceptance.
+const roads=[],positions=[],uvs=[],height=l=>10+(l>=-6?l*Math.tan(31*Math.PI/180):-6*Math.tan(31*Math.PI/180)+(l+6)*.025);
+for(let i=0;i<5;i++){
+ const sourceFeatureId='fixture:'+i,a={x:0,z:i*80},b={x:0,z:(i+1)*80};roads.push({sourceFeatureId,pts:[a,b],transportSurfaceModel:{reviewedSurfacePhase:'accepted'},transportRecord:{crossSection:{pavementSections:{coordinateSpace:'world',nodeDistances:[0,80],nodeFrames:[{x:-1,z:0},{x:-1,z:0}],samples:[0,80].map(distance=>({distance,positive:4,negative:15,bankNegative:6}))}}}});
+ for(const [lo,hi]of [[-15,-6],[-6,0],[0,4]])for(const [l,z]of [[lo,a.z],[hi,a.z],[hi,b.z],[lo,a.z],[hi,b.z],[lo,b.z]]){positions.push(-l,height(l),z);uvs.push(l/3,z/3);}
+}
+const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));geometry.computeVertexNormals();
+const texture=await new T.TextureLoader().loadAsync('/app/assets/textures/earth/asphalt_track_diffuse.jpg');texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.encoding=T.sRGBEncoding;texture.anisotropy=8;
+const road=new T.Mesh(geometry,new T.MeshStandardMaterial({map:texture,color:0xffffff,roughness:1,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));road.renderOrder=2;road.userData.terrainMode='at_grade';scene.add(road);
+const index=createRoadContactIndex([road]),ctx={METERS_PER_WORLD_UNIT:1,worldLoadRuntimeState:{venuePack:{id:'daytona-tri-oval',sourceFeatureIds:roads.map(r=>r.sourceFeatureId)}},buildingMeshes:[],roads,roadContactIndex:index},exterior=createDaytonaPerimeterExterior(T,ctx);scene.add(exterior.root);
+const grass=new T.Mesh(new T.PlaneGeometry(1800,1800),new T.MeshStandardMaterial({color:0x69784d,roughness:1}));grass.rotation.x=-Math.PI/2;grass.position.y=4;scene.add(grass);
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1200,700);renderer.outputEncoding=T.sRGBEncoding;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;document.body.append(renderer.domElement);
+const camera=new T.PerspectiveCamera(55,12/7,.1,2000);let view=0;
+function draw(){const views=[[[4,12,30],[-2,12,130]],[[-14,16,75],[-3,14,135]],[[20,9,65],[0,11,140]]];camera.position.set(...views[view][0]);camera.lookAt(...views[view][1]);renderer.render(scene,camera);document.getElementById('mode').textContent=['Controlled bank · double yellow boundary and white outer wall','Controlled outer wall · curved steel catch fence','Controlled apron · open access below the bank'][view];}
+addEventListener('keydown',e=>{if(e.code==='ArrowRight'){view=(view+1)%3;draw();}});window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({scope:'Controlled decoration projection; native venue verified separately',view,presentation:exterior.root.userData.presentation,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,glError:renderer.getContext().getError()});draw();
+</script>

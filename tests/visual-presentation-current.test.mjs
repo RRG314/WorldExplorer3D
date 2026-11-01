@@ -73,6 +73,7 @@ test('slope redistribution conserves cover and is stable across tile refreshes',
       assert.ok(first.reduce((a,b)=>a+b,0) <= 258, `non-normalized cover ${first}`);
       assert.equal(first[0],Math.round(weights[0]*255));
       assert.equal(first[1],Math.round(weights[1]*255));
+      assert.equal(first[2],Math.round(weights[2]*255));
       assert.equal(first[5],Math.round(weights[5]*255));
       for(let i=0;i<10;i++)applyTerrainReliefMaterialMix(mesh);
       assert.deepEqual([...attributes.mixA.array,...attributes.mixB.array],first,'refresh changes appearance');

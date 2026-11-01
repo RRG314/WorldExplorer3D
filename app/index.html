@@ -6,8 +6,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="World Explorer 3D">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1a1a2e">
+<meta name="theme-color" content="#101818">
 <title>World Explorer 3D</title>
 <script>
 if (location.protocol === 'file:') document.documentElement.classList.add('unsupported-file-launch');
@@ -21,30 +22,40 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 </style>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icons/app-192-v1.png">
+<link rel="stylesheet" href="vr.css?v=2">
 <script defer src="install-support.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=130">
+<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=3">
+<link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
+<link rel="stylesheet" href="styles/title-shell.css?v=98">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=142">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
-<link rel="stylesheet" href="styles/universe.css?v=9">
+<link rel="stylesheet" href="styles/universe.css?v=10">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
-<link rel="stylesheet" href="styles/interface-v4.css?v=33">
-<link rel="stylesheet" href="styles/start-hub.css?v=21">
-<link rel="stylesheet" href="styles/discovery.css?v=19">
-<link rel="stylesheet" href="styles/tutorial.css?v=15">
+<link rel="stylesheet" href="styles/interface-v4.css?v=40">
+<link rel="stylesheet" href="styles/start-hub.css?v=24">
+<link rel="stylesheet" href="styles/navigation.css?v=3">
+<link rel="stylesheet" href="styles/discovery.css?v=21">
+<link rel="stylesheet" href="styles/backpack.css?v=1">
+<link rel="stylesheet" href="styles/tutorial.css?v=17">
 <link rel="stylesheet" href="styles/ar.css?v=1">
-<link rel="stylesheet" href="styles/mobile-controls.css?v=4">
-<link rel="stylesheet" href="styles/map-explorer.css?v=4">
-<link rel="stylesheet" href="styles/accessibility.css?v=3">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=8">
+<link rel="stylesheet" href="styles/hud.css?v=7">
+<link rel="stylesheet" href="styles/multiplayer.css?v=1">
+<link rel="stylesheet" href="styles/settings.css?v=2">
+<link rel="stylesheet" href="styles/control-guides.css?v=2">
+<link rel="stylesheet" href="styles/map-explorer.css?v=5">
+<link rel="stylesheet" href="styles/accessibility.css?v=5">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
 </head>
 <body>
 <!-- Initial loading and recovery are available before any game module. -->
 <div id="loading" class="show" data-state="starting" role="dialog" aria-modal="true" aria-busy="true" aria-labelledby="loadTitle" tabindex="-1">
-  <section class="loadingCard">
+  <section class="loadingCard wx-panel">
     <div class="loadingOverview">
       <div class="loadingBrand">WORLD EXPLORER 3D</div>
       <h1 id="loadTitle">Starting World Explorer</h1>
@@ -52,7 +63,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
       <div class="loadingStatus"><span id="loadText" role="status" aria-live="polite">Opening the game</span><span id="loadPercent" aria-hidden="true"></span></div>
       <progress id="loadProgress" max="100" aria-label="World loading progress" aria-describedby="loadText loadProgressNote"></progress>
       <p id="loadProgressNote">Progress follows loading steps. Some steps take longer than others.</p>
-      <a id="loadRetry" href="" hidden>Reload and try again</a>
+      <a id="loadRetry" href="" hidden class="wx-button wx-button--quiet">Reload and try again</a>
     </div>
     <noscript><p>JavaScript is required to start World Explorer. Enable it for this site, then reload.</p></noscript>
     <div id="loadTip" class="loadingTip" role="group" aria-label="Things to try in World Explorer">
@@ -61,9 +72,9 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
       <p id="loadTipText">Explore on foot, take a flight or set out on the water.</p>
       <div class="loadingTipControls">
         <span id="loadTipCount" aria-label="Tip number"></span>
-        <button id="loadTipPause" type="button" aria-pressed="false">Pause tips</button>
-        <button id="loadTipPrevious" type="button" aria-label="Previous tip">←</button>
-        <button id="loadTipNext" type="button" aria-label="Next tip">→</button>
+        <button id="loadTipPause" type="button" aria-pressed="false" class="wx-button wx-button--quiet">Pause tips</button>
+        <button id="loadTipPrevious" type="button" aria-label="Previous tip" class="wx-button wx-button--quiet">←</button>
+        <button id="loadTipNext" type="button" aria-label="Next tip" class="wx-button wx-button--quiet">→</button>
       </div>
     </div>
   </section>
@@ -249,6 +260,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
 <div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="racing"><div class="mode-icon">🏁</div><div><div class="mode-name">Road Racing</div><div class="mode-desc">Race rivals on qualified real roads. Choose a city, keep your cars, or create your own route.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Drive through the gold destination ring before time runs out. Pause stops the timer.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Drive through every pink road marker, in any order. Free Roam ends the run.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
@@ -260,70 +272,74 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 <div class="tab-content" id="tab-multiplayer">
 <div class="mp-card">
-<div class="mp-title">🌐 Explore Together</div>
+<header class="mp-heading"><div><span class="mp-eyebrow">SHARED EXPLORATION</span><h2 class="mp-title">Explore together</h2></div><button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button></header>
 <div id="mpPlanState" class="mp-plan-state">Join Weekly City as a guest, or sign in to create a room.</div>
-<p class="mp-status">Each room shares one location. World detail loads as you explore; choosing another location leaves the room.</p>
-<div class="mp-subtitle">Public Rooms</div>
+<div id="mpTitleStatus" class="mp-status" role="status" aria-live="polite"></div>
+<p class="mp-status">Each room shares one selected location. Detailed roads and activities belong to that loaded area; choosing another location leaves the room.</p>
+<section class="mp-section mp-weekly" aria-label="Weekly city"><h3 class="mp-subtitle">Weekly city</h3>
 <div class="mp-row">
-<input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="Filter by city (optional)">
+<button id="mpFeaturedWeeklyBtn" class="mp-btn primary mpSmallBtn" type="button">Join Weekly City</button>
+</div>
+<div id="mpFeaturedWeeklyMeta" class="mp-status">Weekly city room rotates each week.</div>
+</section>
+<section class="mp-section" aria-label="Public rooms"><h3 class="mp-subtitle">Find a public room</h3>
+<div class="mp-row">
+<label class="mp-field" for="mpBrowseCityInput"><span>City filter (optional)</span><input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="Filter by city (optional)"></label>
 <button id="mpBrowseBtn" class="mp-btn secondary" type="button">Browse</button>
 </div>
-<div id="mpBrowseStatus" class="mp-status">Browse room metadata only (no live presence stream).</div>
+<div id="mpBrowseStatus" class="mp-status" role="status" aria-live="polite">Browse shared destinations. Player counts are shown after joining.</div>
 <ul id="mpBrowseList" class="mp-room-list">
 <li class="mpRoomEmpty">Loading public rooms…</li>
 </ul>
 
-<div class="mp-subtitle">Join With A Room Code</div>
+</section>
+<section class="mp-section" aria-label="Join by invitation"><h3 class="mp-subtitle">Have an invite?</h3>
 <div class="mp-row">
-<input id="mpTitleCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
+<label class="mp-field" for="mpTitleCodeInput"><span>Room code</span><input id="mpTitleCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
 <button id="mpTitleJoinBtn" class="mp-btn primary" type="button">Join Room</button>
 </div>
 <div class="mp-status">Private rooms use an invite code. Public rooms appear above, with an optional city filter.</div>
 
-<details id="mpCreateRoomDetails"><summary class="mp-subtitle">Create a room at this location</summary>
+</section>
+<details id="mpCreateRoomDetails"><summary>Create your own room</summary>
+<p class="mp-status">Uses your selected location. Sign in, choose who can find it, then invite other explorers.</p>
 <div class="mp-row">
-<select id="mpTitleVisibilitySelect" class="mp-select" aria-label="Room visibility">
+<label class="mp-field" for="mpTitleVisibilitySelect"><span>Who can find your room</span><select id="mpTitleVisibilitySelect" class="mp-select">
 <option value="private" selected>Private Room</option>
 <option value="public">Public Room</option>
-</select>
-<input id="mpTitleRoomNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
-<input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="City label for public discovery (optional for private rooms)">
+</select></label>
+<label class="mp-field" for="mpTitleRoomNameInput"><span>Room name (optional)</span><input id="mpTitleRoomNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)"></label>
+<label class="mp-field" for="mpTitleLocationTagInput"><span>City label (required for public rooms)</span><input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="City label for public discovery (optional for private rooms)"></label>
 </div>
 <div class="mp-row">
 <button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
-<button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Open Active Room</button>
+</div>
+
+</details>
+
+<section class="mp-section" aria-label="Current room"><h3 class="mp-subtitle">Current room</h3><div class="mp-row"><button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Open Active Room</button>
 <button id="mpTitleInviteBtn" class="mp-btn secondary" type="button">Copy Invite</button>
 <button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
-</div>
-<div class="mp-row">
-<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button>
-</div>
-</details>
-<div id="mpTitleStatus" class="mp-status"></div>
-
-<div class="mp-subtitle">My Rooms</div>
+</div></section>
+<section class="mp-section" aria-label="My rooms"><h3 class="mp-subtitle">My rooms</h3>
 <div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create or join appear here so you can return any time. You can delete rooms you own.</div>
 <ul id="mpOwnedRoomsList" class="mp-room-list">
 <li class="mpRoomEmpty">Sign in to load your rooms.</li>
 </ul>
 
-<div class="mp-subtitle">Featured City</div>
-<div class="mp-row">
-<button id="mpFeaturedWeeklyBtn" class="mp-btn primary mpSmallBtn" type="button">Join Weekly City</button>
-<button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Curated Rooms</button>
-</div>
-<div id="mpFeaturedWeeklyMeta" class="mp-status">Weekly city room rotates each week.</div>
-<ul id="mpFeaturedList" class="mp-room-list">
+</section>
+<details class="mp-secondary-tools"><summary>More featured destinations</summary><button id="mpFeaturedRefreshBtn" class="mp-btn secondary" type="button">Refresh featured rooms</button><ul id="mpFeaturedList" class="mp-room-list">
 <li class="mpRoomEmpty">Admin-curated public rooms will appear here.</li>
 </ul>
 
+</details>
 <details class="mp-secondary-tools">
 <summary>Friends, invites, recent players, and leaderboard</summary>
 <div class="mp-subtitle">Friends</div>
 <div id="mpFriendsStatus" class="mp-status">Add friends by UID or from Recent Players to invite them fast.</div>
 <div class="mp-row">
-<input id="mpFriendUidInput" class="mp-input" type="text" maxlength="128" placeholder="Friend UID">
-<input id="mpFriendNameInput" class="mp-input" type="text" maxlength="48" placeholder="Display name (optional)">
+<label class="mp-field" for="mpFriendUidInput"><span>Friend Explorer UID</span><input id="mpFriendUidInput" class="mp-input" type="text" maxlength="128" placeholder="Friend UID"></label>
+<label class="mp-field" for="mpFriendNameInput"><span>Friend name (optional)</span><input id="mpFriendNameInput" class="mp-input" type="text" maxlength="48" placeholder="Display name (optional)"></label>
 <button id="mpAddFriendBtn" class="mp-btn secondary" type="button">Add Friend</button>
 </div>
 <ul id="mpFriendsList" class="mp-room-list">
@@ -351,170 +367,153 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </details>
 </div>
 </div>
-<div class="tab-content" id="tab-settings">
-<section class="support-receipt-card" aria-labelledby="supportReceiptTitle">
-<h3 id="supportReceiptTitle">Help with a problem</h3>
-<p>Copy a report of the game version and recent errors to share with support. Coordinates, account details and personal media are excluded.</p>
-<button id="copySupportReceiptBtn" type="button">Copy support report</button>
-<p id="supportReceiptStatus" role="status" aria-live="polite"></p>
-<textarea id="supportReceiptPreview" readonly hidden aria-label="Support report for copying" spellcheck="false"></textarea>
-</section>
-<div style="padding:8px 0">
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-Graphics
-</div>
-<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Render Quality</label>
-<select id="renderQualitySelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:10px">
+<div class="tab-content settings-page" id="tab-settings">
+<p class="settings-intro">Adjust this device’s view and exploration preferences. Accessibility options are also available in Quick Start.</p>
+<section class="settings-section" aria-labelledby="graphicsSettingsTitle">
+<h3 id="graphicsSettingsTitle">Graphics</h3>
+<label class="settings-field" for="renderQualitySelect"><span>Render quality</span>
+<select id="renderQualitySelect" class="wx-field">
 <option value="low">Low (mobile/performance)</option>
 <option value="med">Medium (balanced)</option>
 <option value="high">High (best visuals)</option>
-</select>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
-<input type="checkbox" id="highQualityToggle" style="width:16px;height:16px;cursor:pointer">
-High Quality Boost (stronger shadows + car paint)
-</label>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
-<input type="checkbox" id="ssaoToggle" style="width:16px;height:16px;cursor:pointer">
-High-only SSAO contact shadows
-</label>
-<div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
-Graphics changes apply to the current session.
-</div>
-</div>
-</div>
-<section aria-labelledby="worldExplorationSettingsTitle" style="margin-bottom:24px">
-<h3 id="worldExplorationSettingsTitle" style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin:0 0 12px">World exploration</h3>
-<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px;color:#334155;font-size:12px">
-<p style="margin:0 0 12px"><strong>Explore a selected location (default).</strong> Pick a place on the globe or use your location. Roads, buildings and activities load for that area. Personal rooms and the weekly community room share their selected place.</p>
-<label style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer">
-<input type="checkbox" id="regionalSceneryToggle" aria-describedby="regionalSceneryHelp" style="width:16px;height:16px;cursor:pointer">
+</select></label>
+<label class="settings-check"><input type="checkbox" id="highQualityToggle"><span>High Quality Boost (stronger shadows + car paint)</span></label>
+<label class="settings-check"><input type="checkbox" id="ssaoToggle"><span>High-only SSAO contact shadows</span></label>
+<p id="perfSettingsStatus" class="settings-status" role="status" aria-live="polite">Graphics changes apply to the current session.</p>
+</section>
+<section class="settings-section" aria-labelledby="worldExplorationSettingsTitle">
+<h3 id="worldExplorationSettingsTitle">World exploration</h3>
+<div class="settings-stack">
+<p><strong>Explore a selected location (default).</strong> Pick a place on the globe or use your location. Roads, buildings and activities load for that area. Personal rooms and the weekly community room share their selected place.</p>
+<label class="settings-check">
+<input type="checkbox" id="regionalSceneryToggle" aria-describedby="regionalSceneryHelp">
 Extend Earth scenery (experimental)
 </label>
-<p id="regionalSceneryHelp" style="font-size:11px;margin:0 0 12px">Optional: load terrain and mapped buildings beyond the selected location as you travel. Detailed driving, entrances and activities remain in the loaded area. This is not a continuous worldwide driving mode and uses more data.</p>
-<label style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer">
-<input type="checkbox" id="oceanContinuousToggle" aria-describedby="oceanContinuousHelp" style="width:16px;height:16px;cursor:pointer">
+<p id="regionalSceneryHelp">Optional: load terrain and mapped buildings beyond the selected location as you travel. Detailed driving, entrances and activities remain in the loaded area. This is not a continuous worldwide driving mode and uses more data.</p>
+<label class="settings-check">
+<input type="checkbox" id="oceanContinuousToggle" aria-describedby="oceanContinuousHelp">
 Continue ocean exploration beyond the dive site
 </label>
-<p id="oceanContinuousHelp" style="font-size:11px;margin:0">Optional: new open-ocean voyages load nearby seabed as you travel, using more data. Off by default. Saved voyages and guided study sites keep their original setting. Your explicit preferences are remembered on this device.</p>
-<p id="worldExplorationStatus" role="status" aria-live="polite" style="font-size:11px;margin:8px 0 0"></p>
+<p id="oceanContinuousHelp">Optional: new open-ocean voyages load nearby seabed as you travel, using more data. Off by default. Saved voyages and guided study sites keep their original setting. Your explicit preferences are remembered on this device.</p>
+<p id="worldExplorationStatus" role="status" aria-live="polite"></p>
 </div>
 </section>
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-Optional Property Data
+
+<details class="settings-section settings-optional">
+<summary>Optional property data</summary>
+<h3 id="propertyDataSettingsTitle">Connect your provider account</h3>
+<p>These services are optional reference records. The mapped world and game homes work without them.</p>
+<p>Private provider keys last for this visit. Re-enter them after reloading or closing the page.</p>
+<div hidden><input type="password" id="estatedKeyInput" autocomplete="off" aria-label="Legacy property provider key"></div>
+<div class="settings-key-grid">
+<div class="settings-stack"><label class="settings-field" for="attomKeyInput"><span>ATTOM API key</span><input type="password" id="attomKeyInput" class="wx-field" autocomplete="off" spellcheck="false" placeholder="Your ATTOM key"></label>
+<a href="https://api.developer.attomdata.com/docs" target="_blank" rel="noopener noreferrer">ATTOM documentation</a></div>
+<div class="settings-stack"><label class="settings-field" for="rentcastKeyInput"><span>RentCast API key</span><input type="password" id="rentcastKeyInput" class="wx-field" autocomplete="off" spellcheck="false" placeholder="Your RentCast key"></label>
+<a href="https://developers.rentcast.io/reference/search-queries" target="_blank" rel="noopener noreferrer">RentCast documentation</a></div>
 </div>
-<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px">
-<div hidden><input type="password" id="estatedKeyInput" autocomplete="off"></div>
-<div style="margin-bottom:16px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">ATTOM API Key</label>
-<input type="password" id="attomKeyInput" autocomplete="off" placeholder="Enter your ATTOM API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
-<div style="font-size:10px;color:#64748b;margin-bottom:8px">
-Property records from your ATTOM account. <a href="https://api.developer.attomdata.com/docs" target="_blank" rel="noopener noreferrer" style="color:#667eea">ATTOM documentation</a>
-</div>
-</div>
-<div style="margin-bottom:12px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RentCast API Key</label>
-<input type="password" id="rentcastKeyInput" autocomplete="off" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
-<div style="font-size:10px;color:#64748b;margin-bottom:8px">
-Sale and rental listings from your RentCast account. <a href="https://developers.rentcast.io/reference/search-queries" target="_blank" rel="noopener noreferrer" style="color:#667eea">RentCast documentation</a>
-</div>
-</div>
-<button id="saveApiKey" style="background:#667eea;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%">
-Use Keys for This Visit
-</button>
-</div>
-</div>
-<div>
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-How Connected Data Is Used
-</div>
-<div style="background:#f0f4ff;border:2px solid #c7d2fe;border-radius:12px;padding:16px;font-size:12px;color:#475569;line-height:1.6">
-<p style="margin:0 0 8px 0">Connected records appear under <strong>Home &amp; Property → Property Data</strong> as optional reference information.</p>
-<p style="margin:0 0 8px 0">Provider terms, coverage, and request limits depend on your own account. Private provider keys last for this visit. Re-enter them after reloading or closing the page.</p>
-<p style="margin:0">Outside data never creates game buildings, changes in-game home prices, or grants ownership.</p>
-</div>
-</div>
-</div>
+<button id="saveApiKey" class="wx-button wx-button--primary" type="button">Use Keys for This Visit</button>
+<p id="providerKeysStatus" class="settings-status" role="status" aria-live="polite"></p>
+<p>Connected records appear under <strong>Home &amp; Property → Property Data</strong>. Provider terms, coverage and request limits depend on your account.</p>
+<p>Outside data never creates game buildings, changes in-game home prices or grants ownership.</p>
+</details>
+<section class="settings-section support-receipt-card" aria-labelledby="supportReceiptTitle">
+<h3 id="supportReceiptTitle">Help with a problem</h3>
+<p>Copy a report of the game version and recent errors to share with support. Coordinates, account details and personal media are excluded.</p>
+<button id="copySupportReceiptBtn" class="wx-button" type="button">Copy support report</button>
+<p id="supportReceiptStatus" class="settings-status" role="status" aria-live="polite"></p>
+<textarea id="supportReceiptPreview" class="wx-field" readonly hidden aria-label="Support report for copying" spellcheck="false"></textarea>
+</section>
 </div>
 <div class="tab-content" id="tab-controls">
 <div class="ctrl-grid">
-<div class="ctrl-section">Driving</div>
-<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Accelerate / Brake &amp; Reverse</span></div>
-<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Steer</span></div>
+<section class="control-guide-section"><h3 class="ctrl-section">Driving</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_forward move_backward">W / S</span><span class="ctrl-action">Accelerate / Brake &amp; Reverse</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_left move_right">A / D</span><span class="ctrl-action">Steer</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate drive controls</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Drag</span><span class="ctrl-action">Look Around</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
-<div class="ctrl-section">Walking Mode</div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Move / Strafe</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="primary_action">Space</span><span class="ctrl-action">Handbrake</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="boost_action">Ctrl</span><span class="ctrl-action">Boost</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Walking Mode</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_forward move_left move_backward move_right">WASD</span><span class="ctrl-action">Move / Strafe</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate move / turn</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="primary_action">Space</span><span class="ctrl-action">Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="modifier_action">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Drag World</span><span class="ctrl-action">Look Around (left or right mouse)</span></div>
-<div class="ctrl-section">World Interaction</div>
-<div class="ctrl-row"><span class="ctrl-key">E / Action</span><span class="ctrl-action">Use the visible nearby door, vehicle, person, or object</span></div>
-<div class="ctrl-row"><span class="ctrl-key">I</span><span class="ctrl-action">Open / close carried equipment</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">World Interaction</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="interact" data-keyboard-suffix=" / Action">E / Action</span><span class="ctrl-action">Use the visible nearby door, vehicle, person, or object</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="inventory">I</span><span class="ctrl-action">Open / close carried equipment</span></div>
 <div class="ctrl-row"><span class="ctrl-key">1–6</span><span class="ctrl-action">Quick-equip a carried item</span></div>
-<div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Use equipped item</span></div>
-<div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-action">Take an available nearby item</span></div>
-<div class="ctrl-section">Drone Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="use_item">V</span><span class="ctrl-action">Use equipped item</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="take_item">T</span><span class="ctrl-action">Take an available nearby item</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Drone Controls</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_forward move_left move_backward move_right">WASD</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate flight controls</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="primary_action">Space</span><span class="ctrl-action">Move Up</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="modifier_action" data-keyboard-suffix=" / Ctrl">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Mouse</span><span class="ctrl-action">Look Around</span></div>
-<div class="ctrl-section">Personal Plane</div>
-<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Bank / Ground Steer</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Personal Plane</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_forward move_backward">W / S</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_left move_right">A / D</span><span class="ctrl-action">Bank / Ground Steer</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate flight controls</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Double-tap ← / →</span><span class="ctrl-action">Barrel Roll while airborne</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="primary_action modifier_action">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Full Throttle</span><span class="ctrl-action">About 150 MPH; boarded aircraft differ</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Drag</span><span class="ctrl-action">Look Around</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Wheel Brake (Ground)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
-<div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Personal Plane</span></div>
-<div class="ctrl-section">Camera & View</div>
-<div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Q</span><span class="ctrl-action">Look Back while driving</span></div>
-<div class="ctrl-section">Mode Switching</div>
-<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Character → BMW → Plane → Drone</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="boost_action">Ctrl</span><span class="ctrl-action">Wheel Brake (Ground)</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="camera">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="plane">P</span><span class="ctrl-action">Enter / Exit Personal Plane</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Camera & View</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="camera">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="look_back">Q</span><span class="ctrl-action">Look Back while driving</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Mode Switching</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="traversal_mode">F</span><span class="ctrl-action">Cycle Character → BMW → Plane → Drone</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Travel Menu</span><span class="ctrl-action">Choose Character / Car / Plane / Drone</span></div>
-<div class="ctrl-row"><span class="ctrl-key">P / G</span><span class="ctrl-action">Personal plane / boat shortcuts</span></div>
-<div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
-<div class="ctrl-section">Navigation & Map</div>
-<div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-action">Toggle Map</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="plane boat">P / G</span><span class="ctrl-action">Personal plane / boat shortcuts</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="build">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Navigation & Map</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="map">M</span><span class="ctrl-action">Toggle Map</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click on Map</span><span class="ctrl-action">Teleport to Location</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Left Click on Map</span><span class="ctrl-action">View Property/POI Info</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift + N</span><span class="ctrl-action">Next City (Teleport)</span></div>
-<div class="ctrl-section">Space Exploration</div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Space Exploration</h3>
 <div class="ctrl-row"><span class="ctrl-key">Click on Moon</span><span class="ctrl-action">Travel to Moon</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click on Stars</span><span class="ctrl-action">View Constellation Info</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click Apollo 11 Flag</span><span class="ctrl-action">View Mission Info (on Moon)</span></div>
-<div class="ctrl-section">Space Flight Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">A/D or ←/→</span><span class="ctrl-action">Yaw Left/Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">W/S or ↑/↓</span><span class="ctrl-action">Pitch Up/Down</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Primary / Space</span><span class="ctrl-action">Thrust / Boost</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Modifier / Shift</span><span class="ctrl-action">Brake / Decelerate</span></div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Space Flight Controls</h3>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_left move_right" data-keyboard-suffix=" or ←/→">A/D or ←/→</span><span class="ctrl-action">Yaw Left/Right</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="move_forward move_backward" data-keyboard-suffix=" or ↑/↓">W/S or ↑/↓</span><span class="ctrl-action">Pitch Up/Down</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="primary_action" data-keyboard-prefix="Primary / ">Primary / Space</span><span class="ctrl-action">Thrust / Boost</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="modifier_action" data-keyboard-prefix="Modifier / ">Modifier / Shift</span><span class="ctrl-action">Brake / Decelerate</span></div>
 <div class="ctrl-row"><span class="ctrl-key">LAND ON ... Button</span><span class="ctrl-action">Land when in range</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click Planets/Asteroids/Galaxies</span><span class="ctrl-action">Inspect deep-space object info</span></div>
-<div class="ctrl-section">Gamepad</div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Gamepad</h3>
 <div class="ctrl-row"><span class="ctrl-key">Left Stick</span><span class="ctrl-action">Move / steer / flight control</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Stick</span><span class="ctrl-action">Look around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">A / X</span><span class="ctrl-action">Primary movement action / context action</span></div>
 <div class="ctrl-row"><span class="ctrl-key">D-pad Up / LB</span><span class="ctrl-action">Backpack / change camera</span></div>
 <div class="ctrl-row"><span class="ctrl-key">View / Menu</span><span class="ctrl-action">Map / pause</span></div>
-<div class="ctrl-section">Phone &amp; Tablet</div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Phone &amp; Tablet</h3>
 <div class="ctrl-row"><span class="ctrl-key">Left Pad</span><span class="ctrl-action">Move; can swap sides in Mobile Controls</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Pad</span><span class="ctrl-action">Analog camera; sensitivity and recenter are adjustable</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Action Buttons</span><span class="ctrl-action">Change for walking, driving, flight, water, and Space</span></div>
-<div class="ctrl-section">Other</div>
+</section>
+<section class="control-guide-section"><h3 class="ctrl-section">Other</h3>
 <div class="ctrl-row"><span class="ctrl-key">Connect Menu</span><span class="ctrl-action">Rooms, share tools, and memory markers</span></div>
-<div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-action">Record/Stop Track</span></div>
+<div class="ctrl-row"><span class="ctrl-key" data-keyboard-actions="track">R</span><span class="ctrl-action">Record/Stop Track</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Esc</span><span class="ctrl-action">Pause</span></div>
+</section>
 </div>
 </div>
 <div class="start-section"><button class="startBtn" id="startBtn" type="button" disabled aria-busy="true">EXPLORE</button></div>
@@ -523,6 +522,7 @@ How Connected Data Is Used
 <div class="flowerChallengeHeader">
 <div class="flowerChallengeTitle">Rankings</div>
 <div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
+<button id="leaderboardCloseBtn" type="button" class="rankings-close" aria-label="Close Rankings">×</button>
 </div>
 <div class="flowerChallengeBody">
 <div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest Flower Sprint finishes. Player-reported results.</div>
@@ -535,7 +535,9 @@ How Connected Data Is Used
 <button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">◎ Community</button>
 <button id="leaderboardTabProperty" class="flowerLeaderboardTab" type="button">⌂ Property</button>
 <button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
+<button id="leaderboardTabRacing" class="flowerLeaderboardTab" type="button">⚑ Racing</button>
 </div>
+<div id="racingRecordFilters" class="racing-record-filters" hidden><label>Results<select id="racingRecordSource"><option value="practice">My practice</option><option value="online">Online races</option></select></label><label>Course<select id="racingRecordCourse"></select></label><label>Car setup<select id="racingRecordSetup"></select></label></div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
 <button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Start Flower Sprint</button>
@@ -792,8 +794,8 @@ How Connected Data Is Used
 <button id="liveEarthReplayBtn" class="live-earth-local-btn primary" type="button">Replay Shake</button>
 </div>
 </div>
-<div id="hud"><div class="hud-box" id="hudBox">
-<button id="hudToggleBtn" type="button" aria-label="Collapse HUD" aria-expanded="true">-</button>
+<div id="hud" role="region" aria-label="Travel status"><div class="hud-box" id="hudBox">
+<button id="hudToggleBtn" type="button" aria-label="Collapse HUD" aria-expanded="true" aria-controls="hudHeader hudDetails hudClockDisplay">−</button>
 <div id="hudHeader">
 <div id="hudSpeedBlock">
 <div id="speed">0</div>
@@ -807,15 +809,68 @@ How Connected Data Is Used
 </div>
 <div id="hudClockDisplay"></div>
 <div id="hudDetails">
+<span id="conditionLabel">Explorer health · 100%</span>
 <div id="conditionBar" role="progressbar" aria-label="Explorer health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" title="Explorer health · 100%"><div id="conditionFill" data-state="healthy"></div></div>
 <div id="street">Loading...</div>
 <div id="locationLine"></div>
 <div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span></div>
 </div>
-</div></div>
+</div>
+<div id="hudMap" aria-label="Local map and coordinates">
+<div class="hudMapVisual">
+<canvas id="minimap" width="150" height="150"></canvas>
+<div id="minimapZoomControls" aria-label="Minimap zoom controls">
+  <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
+  <div id="minimapZoomLevel" aria-live="polite">Z 15</div>
+  <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
+</div>
+</div>
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a><a id="terrainImageryCredit" hidden href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer" title="Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community">© Esri</a></div>
-<div id="interiorPrompt" aria-live="polite"></div>
+</div>
+<div id="hudUtilities">
 <div id="boatPrompt" aria-live="polite"></div>
+<section id="liveGpsHud" aria-label="Live GPS status">
+  <div class="liveGpsHudTop"><strong aria-label="Live GPS">GPS</strong><button id="liveGpsStopBtn" type="button">Stop</button><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
+  <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
+  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span><span id="liveGpsFieldDistance">Walk 0 m</span></div>
+  <div class="liveGpsActions">
+    <button id="liveGpsFieldBtn" type="button">Field Today</button>
+    <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
+    <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
+    <button id="liveGpsLowPowerBtn" type="button">Low Power</button>
+
+  </div>
+</section>
+<aside id="deFlockHud" aria-live="polite">
+  <div class="deFlockHudHead"><strong>📷 DEFLOCK HUNT</strong><button id="deFlockHelpOpen" type="button" aria-label="DeFlock information">i</button></div>
+  <div id="deFlockCounts">Loading mapped cameras…</div>
+  <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
+</aside>
+<aside id="urbanCivicStatus" role="status" aria-live="polite" aria-hidden="true">
+  <div id="urbanCivicStatusMeter" aria-label="Civic attention level">○○○</div>
+  <div class="urbanCivicStatusCopy">
+    <div id="urbanCivicStatusTitle">Incident witnessed</div>
+    <div id="urbanCivicStatusDetail">Local civic response</div>
+  </div>
+</aside>
+<div class="hudUtilityActions">
+<div id="worldQuickControls" aria-label="Quick world controls">
+<button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
+<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>
+<span id="quickTimeOfDayState">Live</span>
+</button>
+<button id="quickWeatherMode" class="worldQuickControl" type="button" aria-label="Change weather" title="Change weather">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.2h10.3a3.6 3.6 0 0 0 .4-7.2 5.8 5.8 0 0 0-11-1.1 4.2 4.2 0 0 0 .3 8.3Z"></path></svg>
+<span id="quickWeatherModeState">Live</span>
+</button>
+</div>
+<div class="floatMenu contextualMenuControl" id="controlsMenu">
+<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-controls="controlsTab" aria-expanded="false" title="Current controls"><span class="btnIcon">⚙️</span><span class="btnText">Controls</span></button>
+</div>
+</div>
+</div>
+</div>
+<div id="interiorPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
 <button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
 <aside id="currentJourneyCard" role="status" aria-label="Current journey" aria-live="polite" aria-atomic="true" hidden>
@@ -824,9 +879,9 @@ How Connected Data Is Used
   <button id="currentJourneyAction" type="button">Open</button>
   <button id="currentJourneyDismiss" type="button" aria-label="Dismiss this notice" title="Dismiss">×</button>
 </aside>
-<aside id="discoveryPanel" aria-label="Explorer" aria-hidden="true">
+<aside id="discoveryPanel" role="dialog" aria-modal="true" aria-labelledby="discoveryPanelTitle" aria-hidden="true" tabindex="-1">
   <header class="discoveryHead">
-    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">WORLD EXPLORER</span><strong id="discoveryPanelTitle">Today</strong></div></div>
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">WORLD EXPLORER</span><h2 id="discoveryPanelTitle">Today</h2></div></div>
     <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
@@ -883,6 +938,7 @@ How Connected Data Is Used
       </section>
       <section class="discoveryPane" data-discovery-pane="journal">
         <div class="discoverySectionHead"><span>JOURNAL</span><small>YOUR STORY</small></div>
+        <div class="discoveryModeNote"><b>EXPLORATION TRAIL</b><span>Keep places you saved, learned about and visited. <a href="../portal/" target="_blank" rel="noopener">Open the Living Portal ↗</a></span></div>
         <div class="discoveryModeNote"><b>MEMORIES</b><span>Fieldwork, games, making, travel, rooms, and companions appear here in time order.</span></div>
         <div class="discoveryJournalFilters"><select id="discoveryJournalCategory" aria-label="Filter Journal by Explorer path"><option value="all">All paths</option><option value="field">Fieldwork</option><option value="activity">Games</option><option value="creation">Making</option><option value="travel">Travel</option><option value="community">Community</option><option value="companion">Companions</option></select><select id="discoveryJournalRegion" aria-label="Filter Journal by region"><option value="all">All regions</option></select></div><div id="discoveryJournalList" class="discoveryList"></div>
         <details class="discoveryJournalPlaces"><summary>Visited places</summary><p>Places are part of your story, not a separate collection.</p><div id="discoveryCollectionList" class="discoveryList"></div></details>
@@ -987,11 +1043,7 @@ How Connected Data Is Used
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
 </div>
-<aside id="deFlockHud" aria-live="polite">
-  <div class="deFlockHudHead"><strong>📷 DEFLOCK HUNT</strong><button id="deFlockHelpOpen" type="button" aria-label="DeFlock information">i</button></div>
-  <div id="deFlockCounts">Loading mapped cameras…</div>
-  <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
-</aside>
+
 <div id="deFlockPrompt" role="status"></div>
 <div id="urbanVehiclePrompt" role="status" aria-live="polite" aria-hidden="true">
   <div class="urbanVehiclePromptCopy">
@@ -1006,15 +1058,15 @@ How Connected Data Is Used
   <button id="urbanVehiclePromptTakeButton" type="button" hidden>Take</button>
 </div>
 <aside id="urbanEquipment" aria-hidden="true" aria-label="Character Backpack">
-  <div class="urbanEquipmentHead"><span>Backpack</span><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
+  <div class="urbanEquipmentHead"><h2 id="urbanEquipmentTitle">Backpack</h2><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
   <nav class="sandboxPathActions" aria-label="Explorer records"><button data-pack-record="journal" type="button">Journal</button><button data-pack-record="guide" type="button">Field Guide</button><button data-pack-record="profile" type="button">Skills & companions</button></nav>
   <section class="urbanBackpackWallet" aria-label="Explorer wallet"><span>Explorer wallet</span><strong id="urbanBackpackWallet">$0</strong></section>
   <p class="sandboxWalletNote">Credits buy in-game goods and property. Exploring and basic building are free.</p>
-  <div class="urbanBackpackLabel">Quick access</div>
-  <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
-  <div class="urbanBackpackLabel">Pack contents</div>
+  <h3 id="urbanQuickAccessHeading" class="urbanBackpackLabel">Quick access</h3>
+  <div id="urbanEquipmentSlots" class="urbanEquipmentSlots" role="group" aria-labelledby="urbanQuickAccessHeading"></div>
+  <h3 id="urbanContentsHeading" class="urbanBackpackLabel">Carried items</h3>
   <nav id="urbanBackpackFilters" class="urbanBackpackFilters" aria-label="Backpack categories"><button class="active" data-backpack-filter="all" type="button">All</button><button data-backpack-filter="field-tool" type="button">Tools</button><button data-backpack-filter="specimen" type="button">Finds</button><button data-backpack-filter="gear" type="button">Gear</button></nav>
-  <div id="urbanBackpackContents" class="urbanBackpackContents"></div>
+  <div id="urbanBackpackContents" class="urbanBackpackContents" role="group" aria-labelledby="urbanContentsHeading"></div>
   <div id="urbanBackpackDetail" class="urbanBackpackDetail" aria-live="polite"><span>Select an item to see its story and available actions.</span></div>
   <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
   <details class="urbanConditionDetails"><summary>Character condition <span id="urbanPlayerConditionText">100%</span></summary><div id="urbanPlayerCondition" class="urbanPlayerCondition" role="status" aria-label="Character health"><i aria-hidden="true"><b id="urbanPlayerConditionFill"></b></i></div></details>
@@ -1032,13 +1084,7 @@ How Connected Data Is Used
 <button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.8C8 3.7 9.7 2 11.8 2h.4C14.3 2 16 3.7 16 5.8V7M6.5 8h11A2.5 2.5 0 0 1 20 10.5v8A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-8A2.5 2.5 0 0 1 6.5 8ZM4 13h16M8 16h8"/></svg><span>PACK</span></button>
 <div id="urbanWeaponReticle" aria-hidden="true"><i></i><b></b><span></span><em></em></div>
 <div id="urbanCrashFeedback" aria-hidden="true"></div>
-<aside id="urbanCivicStatus" role="status" aria-live="polite" aria-hidden="true">
-  <div id="urbanCivicStatusMeter" aria-label="Civic attention level">○○○</div>
-  <div class="urbanCivicStatusCopy">
-    <div id="urbanCivicStatusTitle">Incident witnessed</div>
-    <div id="urbanCivicStatusDetail">Local civic response</div>
-  </div>
-</aside>
+
 <aside id="deFlockHelp" role="dialog" aria-modal="false" aria-labelledby="deFlockHelpTitle">
   <div class="deFlockHelpHead"><strong id="deFlockHelpTitle">About DeFlock Hunt</strong><button id="deFlockHelpClose" type="button" aria-label="Close DeFlock information">×</button></div>
   <p>Camera locations are publicly mapped community data from OpenStreetMap. Coverage can be incomplete or outdated.</p>
@@ -1062,24 +1108,8 @@ How Connected Data Is Used
     </div>
   </div>
 </div>
-<section id="liveGpsHud" aria-label="Live GPS status">
-  <div class="liveGpsHudTop"><strong>📍 LIVE GPS</strong><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
-  <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
-  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span><span id="liveGpsFieldDistance">Walk 0 m</span></div>
-  <div class="liveGpsActions">
-    <button id="liveGpsFieldBtn" type="button">Field Today</button>
-    <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
-    <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
-    <button id="liveGpsLowPowerBtn" type="button">Low Power</button>
-    <button id="liveGpsStopBtn" type="button">Stop</button>
-  </div>
-</section>
-<canvas id="minimap" width="150" height="150"></canvas>
-<div id="minimapZoomControls" aria-label="Minimap zoom controls">
-  <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
-  <div id="minimapZoomLevel" aria-live="polite">Z 15</div>
-  <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
-</div>
+
+
 <div id="largeMap">
 <header id="mapExplorerHeader">
   <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
@@ -1334,11 +1364,12 @@ How Connected Data Is Used
 <div id="poiCategory" style="font-size:11px;text-align:center;opacity:0.8;margin-bottom:8px">Education</div>
 <div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid rgba(0,255,200,0.3)">50m ahead</div>
 </div>
-<div class="floatMenuContainer" id="floatMenuContainer">
+<nav class="floatMenuContainer" id="floatMenuContainer" aria-label="Game destinations">
+<button id="returnToWorldBtn" class="gameFocusReturn" type="button">Return to world controls · Escape</button>
 <!-- Stable player goals. Detailed controls stay inside their owning panels. -->
 <div class="floatMenu" id="exploreMenu">
-<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
-<div class="floatItems" data-menu-title="EXPLORE">
+<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" aria-controls="exploreChoices" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
+<div class="floatItems" id="exploreChoices" role="group" aria-label="Explore" data-menu-title="EXPLORE"><h2 class="floatMenuTitle">Explore</h2>
 <div class="floatItemSection" role="separator">FIELDWORK</div>
 <div class="floatItem" id="fWorldDiscovery">⌖ Today &amp; Nearby</div>
 <div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
@@ -1353,14 +1384,18 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="travelMenu">
-<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Open Travel" aria-expanded="false" data-mobile-label="Travel"><span class="btnIcon">◈</span><span class="btnText">Travel</span></button>
-<div class="floatItems" data-menu-title="TRAVEL">
+<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Open Travel" aria-expanded="false" aria-controls="travelChoices" data-mobile-label="Travel"><span class="btnIcon">◈</span><span class="btnText">Travel</span></button>
+<div class="floatItems" id="travelChoices" role="group" aria-label="Travel" data-menu-title="TRAVEL"><h2 class="floatMenuTitle">Travel</h2>
 <div class="floatItemSection" role="separator">MAP</div>
 <div class="floatItem" id="fWorldMap">🗺️ World Map &amp; Search</div>
 <div class="floatItemSection" role="separator">MOVE</div>
 <div class="floatItem" id="fWalk">🚶 Walk</div>
+<label class="travel-aircraft-choice" for="travelVehicleSelect">Personal vehicle<select id="travelVehicleSelect"><option value="bmw_e34">BMW 525i E34</option></select></label>
+<div class="floatItem" id="fGarage">My garage</div>
+<div class="floatItem" id="fRacing">Road racing</div>
 <div class="floatItem" id="fDriving">🚗 Drive</div>
 <div class="floatItem" id="fDrone">🚁 Fly Drone</div>
+<label class="travel-aircraft-choice" for="travelAircraftSelect">Aircraft to fly <select id="travelAircraftSelect"><option value="personal-prop">Explorer aerobatic jet</option><option value="expedition-prop">Cessna 172 · touring</option><option value="business-jet">Falcon 10 · business jet</option></select></label>
 <div class="floatItem" id="fPlane">✈️ Fly Plane</div>
 <div class="floatItem" id="fBoat" style="display:none">🚤 Pilot Boat</div>
 <div class="floatItemSection" role="separator">WORLDS</div>
@@ -1377,8 +1412,8 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="backpackMenu">
-<button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
-<div class="floatItems" data-menu-title="BACKPACK">
+<button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" aria-controls="backpackChoices" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
+<div class="floatItems" id="backpackChoices" role="group" aria-label="Backpack" data-menu-title="BACKPACK"><h2 class="floatMenuTitle">Backpack</h2>
 <div class="floatItem" id="fBackpack">🎒 Items &amp; Quick Slots</div>
 <div class="floatItem" id="fExplorerJournal">≡ Journal</div>
 <div class="floatItem" id="fExplorerGuide">▤ Field Guide</div>
@@ -1387,8 +1422,8 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="communityMenu">
-<button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
-<div class="floatItems" data-menu-title="COMMUNITY">
+<button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" aria-controls="communityChoices" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
+<div class="floatItems" id="communityChoices" role="group" aria-label="Community" data-menu-title="COMMUNITY"><h2 class="floatMenuTitle">Community</h2>
 <div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
 <div class="floatItem" id="fCommunityBoard">◎ Rankings</div>
 <div class="floatItem" id="fMemoryFlower">🌸 Leave a Memory Marker</div>
@@ -1408,16 +1443,13 @@ How Connected Data Is Used
 </div>
 
 <div class="floatMenu" id="realEstateMenu">
-<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Build &amp; Home" aria-expanded="false" data-mobile-label="Build &amp; Home"><span class="btnIcon">⌂</span><span class="btnText">Build &amp; Home</span></button>
-<div class="floatItems" data-menu-title="BUILD &amp; HOME">
+<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Build &amp; Home" aria-expanded="false" aria-controls="realEstateChoices" data-mobile-label="Build &amp; Home"><span class="btnIcon">⌂</span><span class="btnText">Build &amp; Home</span></button>
+<div class="floatItems" id="realEstateChoices" role="group" aria-label="Build &amp; Home" data-menu-title="BUILD &amp; HOME"><h2 class="floatMenuTitle">Build &amp; Home</h2>
 <div class="floatItem" id="fQuickBuild">🧱 Build with Blocks</div>
 <div class="floatItem" id="fRealEstate">⌂ Homes &amp; Property</div>
 </div>
 </div>
 
-<div class="floatMenu contextualMenuControl" id="controlsMenu">
-<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open current controls" aria-expanded="false" title="Current controls"><span class="btnIcon">⚙️</span><span class="btnText">Controls</span></button>
-</div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
 
 <!-- Map display settings live with the map; weather and time live in the top quick controls. -->
@@ -1433,7 +1465,7 @@ How Connected Data Is Used
 <div class="floatItem" id="fClouds">☁️ Clouds</div>
 <div class="floatItem" id="fConstellations">✨ Constellations</div>
 </div>
-</div>
+</nav>
 
 <div id="memoryComposer">
 <div class="memoryComposerTitle">Memory Marker</div>
@@ -1534,16 +1566,6 @@ How Connected Data Is Used
 </div>
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
-<div id="worldQuickControls" aria-label="Quick world controls">
-<button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
-<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>
-<span id="quickTimeOfDayState">Live</span>
-</button>
-<button id="quickWeatherMode" class="worldQuickControl" type="button" aria-label="Change weather" title="Change weather">
-<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.2h10.3a3.6 3.6 0 0 0 .4-7.2 5.8 5.8 0 0 0-11-1.1 4.2 4.2 0 0 0 .3 8.3Z"></path></svg>
-<span id="quickWeatherModeState">Live</span>
-</button>
-</div>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
 <div id="flowerActionMenu" aria-label="Flower Actions">
 <button id="flowerActionMemoryBtn" class="flowerActionOption" type="button">🌸 Place Memory Flower</button>
@@ -1609,127 +1631,153 @@ How Connected Data Is Used
   </div>
   <div id="blockBuilderStatus" role="status" aria-live="polite"></div>
 </aside>
-<div id="controlsTab" aria-hidden="true"><div id="ctrlHeader" aria-expanded="false" aria-controls="ctrlContent">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden" aria-hidden="true">
-<section id="mobileControlSettings" aria-label="Mobile control settings">
-<div class="mobileControlSettingsHead"><strong>Mobile Controls</strong><button id="mobileControlsReset" type="button">Reset</button></div>
-<label><span>Layout</span><select id="mobileControlsHandedness"><option value="standard">Standard · move left</option><option value="southpaw">Southpaw · move right</option></select></label>
-<label><span>Move sensitivity</span><input id="mobileMoveSensitivity" type="range" min="45" max="150" step="5" value="100"><output id="mobileMoveSensitivityValue">100%</output></label>
-<label><span>Camera sensitivity</span><input id="mobileLookSensitivity" type="range" min="35" max="150" step="5" value="80"><output id="mobileLookSensitivityValue">80%</output></label>
-<label class="mobileControlToggle"><input id="mobileCameraRecenter" type="checkbox" checked><span>Return camera behind player</span></label>
-<p id="mobileControlSettingsStatus">Cars: steer with your left thumb and use the pedals on the right. Brake / reverse slows first, then reverses. Flight: use the flight pad and separate speed buttons.</p>
-<div class="mobileTiltActions"><button id="mobileTiltEnable" type="button" aria-pressed="false">Enable tilt</button><button id="mobileTiltRecenter" type="button" disabled>Recenter tilt</button></div>
-<label><span>Tilt sensitivity</span><input id="mobileTiltSensitivity" type="range" min="50" max="150" step="5" value="100"><output id="mobileTiltSensitivityValue">100%</output></label>
-<label class="mobileControlToggle"><input id="mobileTiltSpeed" type="checkbox"><span>Car speed by tilt: tip forward to accelerate, back to brake</span></label>
-<p id="mobileTiltStatus" role="status" aria-live="polite">Tilt is off. Touch controls always work.</p>
-<p class="mobileTiltHelp">Cars: tilt to steer. Planes: tilt to bank and pitch. Spacecraft: tilt to turn and pitch. Flight speed uses the throttle buttons. Hold the phone comfortably when enabling or recentering. Motion stays on your device.</p>
+<dialog id="controlsTab" aria-labelledby="controlsPanelTitle" aria-hidden="true">
+<header class="controls-panel-header"><div><p class="controls-panel-eyebrow">HOW TO PLAY</p><h2 id="controlsPanelTitle">Controls</h2></div><button id="ctrlHeader" class="wx-button" type="button" aria-label="Close controls" autofocus>Close</button></header>
+<div id="ctrlContent" class="hidden" aria-hidden="true">
+<p class="controls-panel-intro">Local gameplay pauses here. Online rooms continue.</p>
+<div id="controlsSharedSettings">
+<section id="mobileControlSettings" aria-label="Mobile control settings" hidden>
+<div class="mobileControlSettingsHead"><h3>Touch &amp; motion</h3><button id="mobileControlsReset" class="wx-button" type="button">Reset</button></div>
 <div id="mobileControlModeSummary" aria-live="polite">
 <strong id="mobileControlModeName">Walking</strong>
 <div><span><b>LEFT</b><i id="mobileControlLeftSummary">Move</i></span><span><b>RIGHT</b><i id="mobileControlRightSummary">Look</i></span><span><b>ACTIONS</b><i id="mobileControlActionSummary">Jump · Run</i></span></div>
 </div>
+<details><summary>Touch layout &amp; sensitivity</summary>
+<label><span>Layout</span><select id="mobileControlsHandedness" class="wx-field"><option value="standard">Standard · move left</option><option value="southpaw">Southpaw · move right</option></select></label>
+<label><span>Move sensitivity</span><input id="mobileMoveSensitivity" type="range" min="45" max="150" step="5" value="100"><output id="mobileMoveSensitivityValue">100%</output></label>
+<label><span>Camera sensitivity</span><input id="mobileLookSensitivity" type="range" min="35" max="150" step="5" value="80"><output id="mobileLookSensitivityValue">80%</output></label>
+<label class="mobileControlToggle"><input id="mobileCameraRecenter" type="checkbox" checked><span>Return camera behind player</span></label>
+<p id="mobileControlSettingsStatus">Cars: steer with your left thumb and use the pedals on the right. Brake / reverse slows first, then reverses. Flight: use the flight pad and separate speed buttons.</p>
+</details>
+<details><summary>Optional phone tilt</summary>
+<div class="mobileTiltActions"><button id="mobileTiltEnable" class="wx-button wx-button--primary" type="button" aria-pressed="false">Enable tilt</button><button id="mobileTiltRecenter" class="wx-button" type="button" disabled>Recenter tilt</button></div>
+<label><span>Tilt sensitivity</span><input id="mobileTiltSensitivity" type="range" min="50" max="150" step="5" value="100"><output id="mobileTiltSensitivityValue">100%</output></label>
+<label class="mobileControlToggle"><input id="mobileTiltSpeed" type="checkbox"><span>Car speed by tilt: tip forward to accelerate, back to brake</span></label>
+<p id="mobileTiltStatus" role="status" aria-live="polite">Tilt is off. Touch controls always work.</p>
+<p class="mobileTiltHelp">Cars: tilt to steer. Planes: tilt to bank and pitch. Spacecraft: tilt to turn and pitch. Flight speed uses the throttle buttons. Hold the phone comfortably when enabling or recentering. Motion stays on your device.</p>
+</details>
 </section>
 <section id="accessibilitySettings" aria-label="Accessibility settings">
-<div class="accessibilitySettingsHead"><strong>Accessibility</strong><button id="accessibilityReset" type="button">Reset</button></div>
+<div class="accessibilitySettingsHead"><strong>Accessibility</strong><button id="accessibilityReset" class="wx-button" type="button">Reset</button></div>
 <p class="accessibilitySettingsIntro">Readable controls, calmer effects, and guidance that stays long enough for you.</p>
-<label><span>Text size</span><select id="accessibilityTextScale"><option value="100">Standard · 100%</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option><option value="160">Very large · 160%</option><option value="200">Maximum · 200%</option></select></label>
-<label><span>Nearby notice time</span><select id="accessibilityNoticeDuration"><option value="standard">Standard · 7 seconds</option><option value="long">Longer · 15 seconds</option><option value="persistent">Until dismissed</option></select></label>
-<label><span>Aim reticle</span><select id="accessibilityReticleSize"><option value="standard">Standard</option><option value="large">Large</option></select></label>
+<label><span>Text size</span><select id="accessibilityTextScale" class="wx-field"><option value="100">Standard · 100%</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option><option value="160">Very large · 160%</option><option value="200">Maximum · 200%</option></select></label>
+<label><span>Nearby notice time</span><select id="accessibilityNoticeDuration" class="wx-field"><option value="standard">Standard · 7 seconds</option><option value="long">Longer · 15 seconds</option><option value="persistent">Until dismissed</option></select></label>
+<label><span>Aim reticle</span><select id="accessibilityReticleSize" class="wx-field"><option value="standard">Standard</option><option value="large">Large</option></select></label>
 <label><input id="accessibilityReducedMotion" type="checkbox"><span>Reduce interface motion</span></label>
 <label><input id="accessibilityReducedEffects" type="checkbox"><span>Reduce flashes and screen pulses</span></label>
 <label><input id="accessibilityHighContrast" type="checkbox"><span>Increase interface contrast</span></label>
 <label><input id="accessibilityActionDetails" type="checkbox"><span>Keep full nearby-action descriptions</span></label>
 <p id="accessibilitySettingsStatus" role="status" aria-live="polite">100% text · system motion · standard contrast</p>
 </section>
-<div id="drivingControls">
-<b>🚗 Driving Mode · default layout:</b><br>
-• W/S - Accelerate / brake and reverse<br>
-• A/D - Steer left / right; arrow keys are an alternate<br>
-• Right-click + drag - Look around; chase view recenters automatically<br>
-• Space - Handbrake<br>
-• Ctrl - Boost<br>
-• E - Context action: enter / exit a nearby vehicle or use an object<br>
-• C - Camera view<br>
-• Q - Look behind while held<br>
-• F - Cycle character / BMW / plane / drone<br>
-• H - Open a mapped mechanic only when you are close enough<br>
-• Travel menu - Choose a travel mode directly<br>
-• M - Toggle map<br>
-• Shift+N - Next city<br>
-• B - Open / close Build with Blocks<br>
+<details class="controls-keyboard-guide" open><summary>Keyboard &amp; mouse · current mode</summary>
+<div class="control-mode-guide" id="drivingControls">
+<h3>🚗 Driving Mode controls</h3>
+<ul>
+<li><kbd data-keyboard-actions="move_forward move_backward">W/S</kbd> - Accelerate / brake and reverse</li>
+<li><kbd data-keyboard-actions="move_left move_right">A/D</kbd> - Steer left / right; arrow keys are an alternate</li>
+<li>Right-click + drag - Look around; chase view recenters automatically</li>
+<li><kbd data-keyboard-actions="primary_action">Space</kbd> - Handbrake</li>
+<li><kbd data-keyboard-actions="boost_action">Ctrl</kbd> - Boost</li>
+<li><kbd data-keyboard-actions="interact">E</kbd> - Context action: enter / exit a nearby vehicle or use an object</li>
+<li><kbd data-keyboard-actions="camera">C</kbd> - Camera view</li>
+<li><kbd data-keyboard-actions="look_back">Q</kbd> - Look behind while held</li>
+<li><kbd data-keyboard-actions="traversal_mode">F</kbd> - Cycle character / BMW / plane / drone</li>
+<li><kbd data-keyboard-actions="facility_action">H</kbd> - Open a mapped mechanic only when you are close enough</li>
+<li>Travel menu - Choose a travel mode directly</li>
+<li><kbd data-keyboard-actions="map">M</kbd> - Toggle map</li>
+<li>Shift+N - Next city</li>
+<li><kbd data-keyboard-actions="build">B</kbd> - Open / close Build with Blocks</li>
+</ul>
 </div>
-<div id="boatControls" style="display:none">
-<b>🚤 Boat Mode · default layout:</b><br>
-• W/S - Throttle / Reverse; A/D - Steer<br>
-• Arrow keys - Alternate boat controls<br>
-• Right-click + drag - Look around<br>
-• Space - Brake / Hold position<br>
-• G - Enter / exit boat travel<br>
-• C - Camera view<br>
-• Fishing button - Open fishing while the boat is stopped<br>
-• E - Cast / set hook; hold Space to reel; hold Q to give line<br>
-• J/K/L - Rod left / center / right during a fight<br>
-• Use the bottom Wave Intensity slider for calm, moderate, or rough water
+<div class="control-mode-guide" id="boatControls" style="display:none">
+<h3>🚤 Boat Mode controls</h3>
+<ul>
+<li><kbd data-keyboard-actions="move_forward move_backward">W/S</kbd> - Throttle / Reverse; <kbd data-keyboard-actions="move_left move_right">A/D</kbd> - Steer</li>
+<li>Arrow keys - Alternate boat controls</li>
+<li>Right-click + drag - Look around</li>
+<li><kbd data-keyboard-actions="primary_action">Space</kbd> - Brake / Hold position</li>
+<li><kbd data-keyboard-actions="boat">G</kbd> - Enter / exit boat travel</li>
+<li><kbd data-keyboard-actions="camera">C</kbd> - Camera view</li>
+<li>Fishing button - Open fishing while the boat is stopped</li>
+<li>E - Cast / set hook; hold Space to reel; hold Q to give line</li>
+<li>J/K/L - Rod left / center / right during a fight</li>
+<li>Use the bottom Wave Intensity slider for calm, moderate, or rough water</li>
+</ul>
 </div>
-<div id="walkingControls" style="display:none">
-<b>🚶 Walking Mode · default layout:</b><br>
-• WASD - Move forward / back and strafe<br>
-• Arrow Up/Down - Alternate forward / back; Arrow Left/Right - turn<br>
-• E - Context action at a visible door, vehicle, person, or object<br>
-• I - Open / close carried equipment; 1–6 quick-equip<br>
-• V - Use equipped item; T - take an available nearby item<br>
-• Space - Jump<br>
-• Space at a wall - Climb / wall jump<br>
-• Shift - Run (2x speed)<br>
-• Drag on the world with either mouse button - Look around<br>
-• C - Camera view<br>
-• F - Cycle character / BMW / plane / drone<br>
-• H - Open a mapped mechanic only when you are close enough<br>
-• Travel menu - Choose a travel mode directly<br>
-• B - Open / close Build with Blocks<br>
+<div class="control-mode-guide" id="walkingControls" style="display:none">
+<h3>🚶 Walking Mode controls</h3>
+<ul>
+<li><kbd data-keyboard-actions="move_forward move_left move_backward move_right">WASD</kbd> - Move forward / back and strafe</li>
+<li>Arrow Up/Down - Alternate forward / back; Arrow Left/Right - turn</li>
+<li><kbd data-keyboard-actions="interact">E</kbd> - Context action at a visible door, vehicle, person, or object</li>
+<li><kbd data-keyboard-actions="inventory">I</kbd> - Open / close carried equipment; 1–6 quick-equip</li>
+<li><kbd data-keyboard-actions="use_item">V</kbd> - Use equipped item; <kbd data-keyboard-actions="take_item">T</kbd> - take an available nearby item</li>
+<li><kbd data-keyboard-actions="primary_action">Space</kbd> - Jump</li>
+<li><kbd data-keyboard-actions="primary_action" data-keyboard-suffix=" at a wall">Space at a wall</kbd> - Climb / wall jump</li>
+<li><kbd data-keyboard-actions="modifier_action">Shift</kbd> - Run (2x speed)</li>
+<li>Drag on the world with either mouse button - Look around</li>
+<li><kbd data-keyboard-actions="camera">C</kbd> - Camera view</li>
+<li><kbd data-keyboard-actions="traversal_mode">F</kbd> - Cycle character / BMW / plane / drone</li>
+<li><kbd data-keyboard-actions="facility_action">H</kbd> - Open a mapped mechanic only when you are close enough</li>
+<li>Travel menu - Choose a travel mode directly</li>
+<li><kbd data-keyboard-actions="build">B</kbd> - Open / close Build with Blocks</li>
+</ul>
 </div>
-<div id="droneControls" style="display:none">
-<b>🚁 Drone Mode · default layout:</b><br>
-• W/S - Fly forward / back; A/D - turn<br>
-• Arrow keys - Alternate flight controls<br>
-• Right-click + drag - Look around independently<br>
-• Space - Fly up<br>
-• Shift/Ctrl - Fly down<br>
-• Travel menu - Choose another travel mode<br>
-• B - Open / close Build with Blocks<br>
+<div class="control-mode-guide" id="droneControls" style="display:none">
+<h3>🚁 Drone Mode controls</h3>
+<ul>
+<li><kbd data-keyboard-actions="move_forward move_backward">W/S</kbd> - Fly forward / back; <kbd data-keyboard-actions="move_left move_right">A/D</kbd> - turn</li>
+<li>Arrow keys - Alternate flight controls</li>
+<li>Right-click + drag - Look around independently</li>
+<li><kbd data-keyboard-actions="primary_action">Space</kbd> - Fly up</li>
+<li><kbd data-keyboard-actions="modifier_action" data-keyboard-suffix=" / Ctrl">Shift/Ctrl</kbd> - Fly down</li>
+<li>Travel menu - Choose another travel mode</li>
+<li><kbd data-keyboard-actions="build">B</kbd> - Open / close Build with Blocks</li>
+</ul>
 </div>
-<div id="planeControls" style="display:none">
-<b>✈️ Personal Plane · default layout:</b><br>
-• W/S - Nose down / pull up (inverted)<br>
-• A/D - Bank or ground steer; arrow keys are an alternate<br>
-• Double-tap Arrow Left/Right - Deliberate barrel roll while airborne<br>
-• Space/Shift - Increase / reduce throttle<br>
-• Full throttle - About 150 MPH; boarded aircraft differ<br>
-• Hold pitch for loops; ordinary left/right banks into a coordinated turn<br>
-• Ctrl - Wheel brake on the ground<br>
-• Right-click + drag - Look around<br>
-• C - Chase / cockpit / overhead camera<br>
-• P - Enter / exit your personal plane<br>
+<div class="control-mode-guide" id="planeControls" style="display:none">
+<h3>✈️ Personal Plane controls</h3>
+<ul>
+<li><kbd data-keyboard-actions="move_forward move_backward">W/S</kbd> - Nose down / pull up (inverted)</li>
+<li><kbd data-keyboard-actions="move_left move_right">A/D</kbd> - Bank or ground steer; arrow keys are an alternate</li>
+<li>Double-tap Arrow Left/Right - Deliberate barrel roll while airborne</li>
+<li><kbd data-keyboard-actions="primary_action modifier_action">Space/Shift</kbd> - Increase / reduce throttle</li>
+<li>Full throttle - About 150 MPH; boarded aircraft differ</li>
+<li>Hold pitch for loops; ordinary left/right banks into a coordinated turn</li>
+<li><kbd data-keyboard-actions="boost_action">Ctrl</kbd> - Wheel brake on the ground</li>
+<li>Right-click + drag - Look around</li>
+<li><kbd data-keyboard-actions="camera">C</kbd> - Chase / cockpit / overhead camera</li>
+<li><kbd data-keyboard-actions="plane">P</kbd> - Enter / exit your personal plane</li>
+</ul>
 </div>
-<div id="rocketControls" style="display:none">
-<b>🚀 Rocket Mode · default layout:</b><br>
-• WASD or Arrow Keys - Steer rocket (yaw/pitch)<br>
-• Space - Thrust / Boost<br>
-• Shift - Brake / Decelerate<br>
-• Configured Use Item key (default V) or left-click - Fire Pathfinder cannons during an interception<br>
-• Gamepad X or the mobile FIRE action - Fire Pathfinder cannons<br>
-• LAND ON ... Button - Land when in range
+<div class="control-mode-guide" id="rocketControls" style="display:none">
+<h3>🚀 Rocket Mode controls</h3>
+<ul>
+<li><kbd data-keyboard-actions="move_forward move_left move_backward move_right">WASD</kbd> or Arrow Keys - Steer rocket (yaw/pitch)</li>
+<li><kbd data-keyboard-actions="primary_action">Space</kbd> - Thrust / Boost</li>
+<li><kbd data-keyboard-actions="modifier_action">Shift</kbd> - Brake / Decelerate</li>
+<li><kbd data-keyboard-actions="use_item">V</kbd> or left-click - Fire Pathfinder cannons during an interception</li>
+<li>Gamepad X or the mobile FIRE action - Fire Pathfinder cannons</li>
+<li>LAND ON ... Button - Land when in range</li>
+</ul>
 </div>
-<div id="oceanControls" style="display:none">
-<b>🌊 Submarine Mode · default layout:</b><br>
-• W/S - Forward / Reverse thrust<br>
-• A/D - Turn left / right; arrow keys are an alternate<br>
-• Space - Ascend<br>
-• Shift/Ctrl - Descend<br>
-• Choose Explore outside submarine to swim or dive; scuba equips when needed<br>
-• Recover to parent vessel brings you and your submarine back aboard<br>
-• Continuous ocean travel streams eligible geographic water; study sites use authored seabeds<br>
-• The seabed map shows gameplay contours; modeled geographic depths are labeled separately
+<div class="control-mode-guide" id="oceanControls" style="display:none">
+<h3>🌊 Submarine Mode controls</h3>
+<ul>
+<li><kbd data-keyboard-actions="move_forward move_backward">W/S</kbd> - Forward / Reverse thrust</li>
+<li><kbd data-keyboard-actions="move_left move_right">A/D</kbd> - Turn left / right; arrow keys are an alternate</li>
+<li><kbd data-keyboard-actions="primary_action">Space</kbd> - Ascend</li>
+<li><kbd data-keyboard-actions="modifier_action" data-keyboard-suffix=" / Ctrl">Shift/Ctrl</kbd> - Descend</li>
+<li>Choose Explore outside submarine to swim or dive; scuba equips when needed</li>
+<li>Recover to parent vessel brings you and your submarine back aboard</li>
+<li>Continuous ocean travel streams eligible geographic water; study sites use authored seabeds</li>
+<li>The seabed map shows gameplay contours; modeled geographic depths are labeled separately</li>
+</ul>
 </div>
-</div></div>
+</details>
+</div>
+<footer class="controls-panel-footer"><button id="vrSettingsBtn" class="wx-button" type="button">Virtual reality · viewer setup</button></footer>
+</div></dialog>
 <div id="mobileTouchControls" aria-label="Mobile navigation controls">
 <div id="mobileMovePad" class="mobilePad" aria-label="Movement pad">
 <button id="mobileMoveUp" class="mobileNavBtn up" type="button" aria-label="Move up">▲</button>
@@ -1738,7 +1786,7 @@ How Connected Data Is Used
 <button id="mobileMoveDown" class="mobileNavBtn down" type="button" aria-label="Move down">▼</button>
 <div id="mobileMoveLabel" class="mobilePadLabel">Move</div>
 </div>
-<div id="mobileDrivePedals" aria-label="Driving pedals" hidden><button id="mobileDriveAccelerate" type="button">Accelerate</button><button id="mobileDriveBrakeReverse" type="button">Brake /<br>reverse</button></div>
+<div id="mobileDrivePedals" aria-label="Driving pedals" hidden><button id="mobileDriveAccelerate" type="button" aria-label="Accelerate vehicle">Go</button><button id="mobileDriveBrakeReverse" type="button">Brake /<br>reverse</button></div>
 <button id="mobileTiltQuickRecenter" class="hidden" type="button" aria-label="Recenter phone tilt">Recenter tilt</button>
 <div id="mobileActionStack" aria-label="Mode actions">
 <button id="mobileActionPrimary" class="mobileActionBtn" type="button">Action 1</button>
@@ -1755,7 +1803,7 @@ How Connected Data Is Used
 </div>
 
 <!-- Real Estate System -->
-<script type="module" data-startup-critical src="js/app-shell-fragments.js?v=91"></script>
+<script type="module" data-startup-critical src="js/app-shell-fragments.js?v=93"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" data-startup-critical src="js/bootstrap.js?v=612"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=624"></script>
 </body></html>

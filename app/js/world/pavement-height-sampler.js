@@ -10,12 +10,12 @@ function* pavementBaseSamplerSteps({segments=[],ground,roadContactIndex,profileC
   const prepared=[];
   for(const segment of segments){
     const scale=roadMetersPerWorldUnit(segment.road);
-    const key=JSON.stringify([segment.a.x,segment.a.z,segment.b.x,segment.b.z,segment.wa,segment.wb,Number(segment.offset)||0,scale,segment.road?.surfaceBias??.18]);
+    const key=JSON.stringify([segment.a.x,segment.a.z,segment.b.x,segment.b.z,segment.wa,segment.wb,Number(segment.offset)||0,...(segment.nextOffset!==undefined?[segment.nextOffset]:[]),scale,segment.road?.surfaceBias??.18]);
     if(profileCache.has(key)){prepared.push(profileCache.get(key));yield;continue;}
     const dx=segment.b.x-segment.a.x,dz=segment.b.z-segment.a.z,length=Math.hypot(dx,dz)||1;
     const offset=Number(segment.offset)||0;
-    const shift=p=>({x:p.x-dz/length*offset,z:p.z+dx/length*offset});
-    const a=shift(segment.a),b=shift(segment.b);
+    const shift=(p,o)=>({x:p.x-dz/length*o,z:p.z+dx/length*o});
+    const a=shift(segment.a,offset),b=shift(segment.b,segment.nextOffset??offset);
     const clearance=p=>{
       const base=ground(p.x,p.z),height=roadContactIndex?.sampleAt(p.x,p.z,base,'at_grade');
       const bias=Number.isFinite(segment.road?.surfaceBias)?segment.road.surfaceBias:.18;
@@ -25,7 +25,7 @@ function* pavementBaseSamplerSteps({segments=[],ground,roadContactIndex,profileC
     const left=new Float64Array(steps+1),right=new Float64Array(steps+1);
     for(let i=0;i<=steps;i++){
       if(i%16===0)yield;
-      const t=i/steps,x=a.x+dx*t,z=a.z+dz*t,halfWidth=(segment.wa+(segment.wb-segment.wa)*t)/2;
+      const t=i/steps,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,halfWidth=(segment.wa+(segment.wb-segment.wa)*t)/2;
       left[i]=clearance({x:x-dz/length*halfWidth,z:z+dx/length*halfWidth});
       right[i]=clearance({x:x+dz/length*halfWidth,z:z-dx/length*halfWidth});
     }

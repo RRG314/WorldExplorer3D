@@ -5,6 +5,8 @@ import {
   TRANSPORT_DURABILITY_POLICIES,
   defineTransportCatalogEntry
 } from '../transport/catalog-contract.js?v=1';
+import {EXPLORER_FLEET_ASSETS} from '../assets/explorer-fleet-assets.js';
+import {RACING_FLEET_ASSETS} from '../assets/racing-fleet-assets.js';
 
 const VEHICLE_ROOT_TO_GROUND_METERS = 1.12;
 
@@ -33,11 +35,31 @@ const ROAD_VEHICLE_METADATA = Object.freeze({
 });
 
 const ROAD_FLEET_REFERENCE = 'docs/reference-art/road-fleet-and-damage-2026-08-29.png';
-const VEHICLE_CATALOG = Object.freeze(ROAD_VEHICLE_DEFINITIONS.map((definition) => {
+const LICENSED_ROAD_PROFILES = Object.freeze([
+  {id:'delorean',assetId:'road-delorean-dmc12',bodyStyle:'sedan',handlingLabel:'Rear-engine touring',massKg:1230,seatCount:2,weight:12,color:0xa6a9ad,topSpeedMph:109,accelerationScale:.92,steeringScale:1.04,gripScale:1.02,brakeScale:1.04,turningRadius:5.4},
+  {id:'cadillac_coupe',assetId:'road-cadillac-coupe-deville',bodyStyle:'sedan',handlingLabel:'Long-wheelbase cruiser',massKg:2240,seatCount:6,weight:16,color:0x7cafa0,topSpeedMph:105,accelerationScale:.8,steeringScale:.76,gripScale:.96,brakeScale:.91,turningRadius:6.6},
+  {id:'cadillac_fleetwood',assetId:'road-cadillac-fleetwood-brougham',bodyStyle:'sedan',handlingLabel:'Luxury touring sedan',massKg:1930,seatCount:6,weight:20,color:0x6b2635,topSpeedMph:105,accelerationScale:.83,steeringScale:.8,gripScale:1.02,brakeScale:.96,turningRadius:6.4},
+  {id:'golf_ii',assetId:'road-volkswagen-golf-ii',bodyStyle:'compact',handlingLabel:'Light city hatchback',massKg:1010,seatCount:5,weight:40,color:0xb7662e,topSpeedMph:110,accelerationScale:1.04,steeringScale:1.12,gripScale:1.04,brakeScale:1.05,turningRadius:4.8},
+  {id:'datsun_280z',assetId:'road-datsun-280z',bodyStyle:'sedan',handlingLabel:'Sport coupe',massKg:1300,seatCount:2,weight:20,color:0xe5bd49,topSpeedMph:120,accelerationScale:1.16,steeringScale:1.1,gripScale:1.07,brakeScale:1.09,turningRadius:5.1},
+  {id:'bmw_m3_e46',assetId:'road-bmw-m3-e46',bodyStyle:'sedan',category:'Performance coupe',handlingLabel:'M3 sports coupe',massKg:1495,seatCount:4,weight:0,color:0x225690,topSpeedMph:120,accelerationScale:1.38,steeringScale:1.12,gripScale:1.14,brakeScale:1.22,turningRadius:5.2,parkedEligible:false},
+  {id:'bmw_m3_e92_race',assetId:'road-bmw-m3-e92-race',bodyStyle:'sedan',category:'GT racing coupe',handlingLabel:'M3 racing chassis',massKg:1150,seatCount:1,weight:0,color:0xc9d3dc,topSpeedMph:120,accelerationScale:1.8,steeringScale:1.18,gripScale:1.42,brakeScale:1.48,turningRadius:5.1,parkedEligible:false},
+  {id:'porsche_carrera_4s',assetId:'road-porsche-911-carrera-4s',bodyStyle:'sedan',category:'Performance coupe',handlingLabel:'Carrera sports coupe',massKg:1500,seatCount:4,weight:0,color:0x275773,topSpeedMph:120,accelerationScale:1.48,steeringScale:1.15,gripScale:1.25,brakeScale:1.28,turningRadius:5.2,parkedEligible:false}
+].map(profile=>{
+  const asset=[...EXPLORER_FLEET_ASSETS,...RACING_FLEET_ASSETS].find(entry=>entry.id===profile.assetId);
+  return Object.freeze({...profile,...asset.dimensionsMeters,label:asset.label,wheelContacts:asset.wheelLayout,
+    wheelBase:Math.max(...asset.wheelLayout.map(w=>w.position[2]))-Math.min(...asset.wheelLayout.map(w=>w.position[2])),
+    halfTrack:(Math.max(...asset.wheelLayout.map(w=>w.position[0]))-Math.min(...asset.wheelLayout.map(w=>w.position[0])))*.5,
+    wheelRadius:asset.wheelLayout[0].radius,cabinScale:.5,speedFactor:1,acceleration:2.5,parkedEligible:profile.parkedEligible!==false,
+    driverEyeGroundMeters:asset.driverEyeGroundMeters,
+    rights:{kind:'licensed-model',brand:asset.license==='CC0-1.0'?'unbranded':asset.label,attribution:asset.attribution}});
+}));
+
+const VEHICLE_CATALOG = Object.freeze([...ROAD_VEHICLE_DEFINITIONS,...LICENSED_ROAD_PROFILES].map((definition) => {
   const metadata = ROAD_VEHICLE_METADATA[definition.id] || ROAD_VEHICLE_METADATA.sedan;
   return defineTransportCatalogEntry({
     ...definition,
     ...metadata,
+    ...(definition.assetId?{massKg:definition.massKg,seatCount:definition.seatCount}:{}),
     domain: 'road',
     playable: true,
     enterable: true,
@@ -70,13 +92,17 @@ function vehicleHandlingProfile(variantOrId = 'sedan', options = {}) {
   return Object.freeze({
     id: responder ? `response-${variant.id}` : variant.id,
     label: responder ? 'Response-tuned' : String(variant.handlingLabel || 'Balanced'),
+    assetId: String(variant.assetId || ''),
+    width: Number(variant.width||1.8), height: Number(variant.height||1.5), length: Number(variant.length||4.45),
+    wheelRadius:Number(variant.wheelRadius)||.35,
+    halfTrack: Number(variant.halfTrack || Number(variant.width || 1.8)*.43),
     topSpeedMph: responder ? 120 : Math.max(40, Math.min(120, Number(variant.topSpeedMph) || 120)),
     accelerationScale: Math.max(.35, Number(variant.accelerationScale) || 1) * (responder ? 1.18 : 1),
     steeringScale: Math.max(.35, Number(variant.steeringScale) || 1) * (responder ? 1.1 : 1),
     gripScale: Math.max(.55, Number(variant.gripScale) || 1) * (responder ? 1.06 : 1),
     brakeScale: Math.max(.45, Number(variant.brakeScale) || 1) * (responder ? 1.08 : 1),
     massKg: vehicleMassKg(variant) + (responder ? 140 : 0),
-    wheelBase: Math.max(1.9, Math.min(4.8, Number(variant.length || 4.45) * .58)),
+    wheelBase: Math.max(1.9, Math.min(4.8, Number(variant.wheelBase || Number(variant.length || 4.45) * .58))),
     turningRadius: Math.max(3.8, Number(variant.turningRadius) || 5.2)
   });
 }
@@ -120,6 +146,7 @@ function vehicleWheelContactLayout(variant = {}) {
   const width = Math.max(0.8, Number(variant.width) || 1.8);
   const length = Math.max(1.8, Number(variant.length) || 4.4);
   const style = String(variant.bodyStyle || variant.id || 'sedan');
+  if (variant.wheelBase && variant.halfTrack) return Object.freeze({halfTrack:variant.halfTrack,halfWheelbase:variant.wheelBase*.5,wheelRadius:variant.wheelRadius});
   const axleFactor = style === 'bus' ? 0.37 : style === 'box-truck' ? 0.35 : style === 'compact' ? 0.3 : 0.32;
   return Object.freeze({
     halfTrack: width * 0.43,

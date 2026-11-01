@@ -120,12 +120,15 @@ test('regional readiness changes only after the publication callback commits and
  const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});
  let finish;const publication=new Promise(resolve=>finish=resolve);let called=false;
  detail.attach(async()=>{called=true;await publication;});
+ assert.equal(detail.hasReadyCoverageAt({x:2500,z:300},0),false);assert.equal(detail.stats.blocked,false,'Previewing readiness must not open a gameplay notice');
  assert.equal(detail.readyAt({x:2500,z:300},0),false);
  detail.step({x:2500,z:300});await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(called,true);assert.equal(detail.readyAt({x:2500,z:300},0),false);
  finish();await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(detail.readyAt({x:2500,z:300},0),true);
+ assert.equal(detail.hasReadyCoverageAt({x:2500,z:300},0),true);
  detail.dispose();assert.equal(worker.terminated,true);assert.equal(detail.stats.status,'disposed');
+ assert.equal(detail.hasReadyCoverageAt({x:2500,z:300},0),false,'A retired controller cannot qualify another ride');
  detail.step({x:2500,z:300});assert.equal(detail.stats.status,'disposed');
  // Reset while asynchronous main-thread publication is still outstanding.
  const cancelled=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});
@@ -370,4 +373,31 @@ test('compiler-only restoration rebuilds evicted regions with identical geometry
   assert.equal(triangles(restored.compile(key).batches),triangles(original.compile(key).batches));
  }
  original.dispose();restored.dispose();
+});
+
+test('fixed selected district finishes queued roads at rest and retains them across travel',async t=>{
+ const previous=globalThis.Worker;let worker;
+ const regions=['2:0','-3:0','6:0'].map(key=>({key,bounds:transportRegionBounds(key)}));
+ globalThis.Worker=class {
+  constructor(){worker=this;this.terminated=false;}
+  postMessage(message){queueMicrotask(()=>this.onmessage?.({data:message.type==='prepare'?
+   {type:'prepared',keys:[],masks:new Uint8Array(),regions:[],pending:regions}:
+   {type:'region',key:message.key,keys:[],batches:[]}}));}
+  terminate(){this.terminated=true;}
+ };
+ t.after(()=>globalThis.Worker=previous);
+ const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
+ const ctx={worldLoadRuntimeState:{buildingVisibleRadiusWorld:2700},farTerrainClipmapState:{regionalRoadCoverage:{status:'ready'}},terrainGroup:{children:[]},renderer:{capabilities:{maxTextureSize:4096}},terrainMeshHeightAt:()=>0};
+ const detail=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});t.after(()=>detail.dispose());
+ const live=new Set();detail.attach(packet=>{assert.ok(!live.has(packet.key));live.add(packet.key);},()=>{},key=>assert.equal(live.delete(key),true));
+ const step=async x=>{detail.step({x,z:0,source:'drive'},0);await new Promise(resolve=>setImmediate(resolve));assert.ok(detail.stats.activeJobs<=1);};
+ await step(0);await step(0);
+ assert.deepEqual([...live].sort(),['-3:0','2:0']);
+ assert.equal(detail.stats.pinnedRegions,2);assert.equal(detail.stats.residentMovingRegions,0);
+ assert.equal(detail.hasReadyCoverageAt({x:2500,z:100},0),true);
+ await step(6500);assert.ok(live.has('6:0'));assert.equal(detail.stats.residentMovingRegions,1);
+ await step(-10000);
+ assert.deepEqual([...live].sort(),['-3:0','2:0'],'selected-district geometry and contacts survive distant travel');
+ assert.equal(detail.stats.evictedRegions,1);assert.equal(detail.stats.pendingRegions,1);
+ detail.dispose();assert.equal(live.size,0);assert.equal(worker.terminated,true);assert.equal(detail.stats.completedRegions,0);
 });

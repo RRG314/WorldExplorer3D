@@ -5,6 +5,27 @@ import {createMarineClock,createMarineLink} from '../app/js/ocean/shared-marine-
 import {openSharedMarine} from '../app/js/ocean/shared-marine-runtime.js';
 const {mutateMarineExpedition}=createRequire(import.meta.url)('../functions/marine-expedition-authority.js');
 const settle=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
+function installDocument(t) {
+ const elements=[];
+ const element=()=>{
+  const classes=new Set(),attributes=new Map();
+  const e={dataset:{},style:{},children:[],parentNode:null,
+   classList:{add(...names){names.forEach(name=>classes.add(name));},contains:name=>classes.has(name)},
+   append(...nodes){nodes.forEach(node=>this.insertBefore(node,null));},
+   insertBefore(node,before){node.remove();const index=before===null?this.children.length:this.children.indexOf(before);assert.ok(index>=0);this.children.splice(index,0,node);node.parentNode=this;return node;},
+   setAttribute(name,value){attributes.set(name,String(value));},
+   removeAttribute(name){attributes.delete(name);if(name==='style')this.style={};},
+   querySelector(selector){return this.children.find(node=>selector.startsWith('.')?node.classList.contains(selector.slice(1)):false)||null;},
+   replaceChildren(...nodes){[...this.children].forEach(node=>node.remove());this.append(...nodes);},
+   remove(){if(this.parentNode){const siblings=this.parentNode.children;siblings.splice(siblings.indexOf(this),1);this.parentNode=null;}},blur(){}};
+  elements.push(e);return e;
+ };
+ const previous=globalThis.document;
+ const document={createElement:element,head:element(),body:element(),getElementById:id=>elements.find(e=>e.id===id)||null};
+ globalThis.document=document;
+ t.after(()=>{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;});
+ return {elements,document};
+}
 test('lease ownership uses monotonic server time, independent of ±60 second local clock corrections',t=>{
  let now=20;const clock=createMarineClock(()=>now);assert.equal(clock.leaseNow(),Infinity);
  now=220;clock.observe(1000000,20);assert.equal(clock.leaseNow(),1000200);
@@ -13,9 +34,7 @@ test('lease ownership uses monotonic server time, independent of ±60 second loc
 });
 test('delayed actual client movement cannot build a FIFO; recovery reconciles before resuming',async t=>{
  let now=1000000,state,timer,subscription,release,sequence=0,delay=true;
- const elements=[],events=[];
- const element=()=>{const e={dataset:{},style:{},children:[],append(...v){this.children.push(...v);},setAttribute(){},replaceChildren(...v){this.children=v;},remove(){},blur(){}};elements.push(e);return e;};
- const previousDocument=globalThis.document;globalThis.document={createElement:element,head:element(),body:element()};t.after(()=>{if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;});
+ const {elements,document}=installDocument(t),events=[];
  t.mock.method(globalThis,'setInterval',fn=>{timer=fn;return 1;});t.mock.method(globalThis,'clearInterval',()=>{});
  function mutate(uid,type,extra={}){return state=mutateMarineExpedition(state,{roomCode:'TEST',uid,activeUids:['captain','pilot'],nowMs:now,newId:'test-voyage',command:{type,requestId:`test-command-${++sequence}`,revision:state?.controlRevision||0,deployment:state?.deployment||0,...extra}});}
  mutate('captain','create');mutate('pilot','join');mutate('pilot','claim',{seat:'pilot'});mutate('captain','deploy');
@@ -25,6 +44,7 @@ test('delayed actual client movement cannot build a FIFO; recovery reconciles be
   state=mutateMarineExpedition(state,{roomCode:'TEST',uid:'pilot',activeUids:['captain','pilot'],nowMs:now,command});events.push(command);subscription(state);return{state,serverNowMs:now};
  }};
  const api=await openSharedMarine(ctx,{transport,now:()=>now});elements.find(e=>e.id==='sharedMarineJoin').onclick();await settle();assert.equal(api.canPilot,true);
+ const panel=elements.find(e=>e.id==='sharedMarineControls');assert.equal(panel.parentNode,document.body);assert.equal(panel.classList.contains('session-hud-panel'),true);
  now+=2500;ctx.oceanMode.submarine.position.z+=35;timer();await settle();
  now+=1000;assert.equal(api.canPilot,false,'stop predicting after a slow acknowledgment');
  for(let i=0;i<3;i++){now+=500;timer();await settle();assert.equal(api.snapshot().connection.pending,1);}
@@ -32,6 +52,7 @@ test('delayed actual client movement cannot build a FIFO; recovery reconciles be
  assert.equal(ctx.oceanMode.submarine.position.z,state.submarine.pose.z);
  now+=2500;ctx.oceanMode.submarine.position.z+=35;timer();await settle();assert.equal(api.canPilot,true);assert.equal(api.snapshot().error,'');assert.equal(events.filter(e=>e.type==='pose').length,2);
  await api.leave({restore:false});
+ assert.equal(panel.parentNode,null);
 });
 test('uncertain response stops prediction; rejoin adopts authoritative state and clears recovery',async()=>{
  let now=0,current=true,fail=true,reconciled=0,state={controlRevision:1,deployment:1,updatedAtMs:1000000};
@@ -41,9 +62,7 @@ test('uncertain response stops prediction; rejoin adopts authoritative state and
  current=false;await assert.rejects(link.send('pose'),/Room connection changed/);assert.equal(reconciled,1);link.dispose();
 });
 test('stage publications converge during entry and leaving cancels a pending entry',async t=>{
- const elements=[],pending=[];let subscription,recovered=0;
- const element=()=>{const e={dataset:{},style:{},append(){},setAttribute(){},replaceChildren(){},remove(){},blur(){}};elements.push(e);return e;};
- const previous=globalThis.document;globalThis.document={createElement:element,head:element(),body:element()};t.after(()=>{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;});
+ const {elements}=installDocument(t),pending=[];let subscription,recovered=0;
  t.mock.method(globalThis,'setInterval',()=>1);t.mock.method(globalThis,'clearInterval',()=>{});
  let state={id:'lifecycle',revision:1,deployment:0,stage:'aboard',updatedAtMs:1000,site:{},ship:{id:'ship',anchor:{}},submarine:{id:'sub',pose:{x:0,y:-12,z:-65,yaw:0},poseAtMs:1000},crew:{},seats:{},manifest:[],rescues:[]};
  const ctx={oceanMode:{active:false},boatMode:{active:false},startOceanMode:options=>new Promise(resolve=>pending.push({options,resolve})),transferSubmarineToBoat:async()=>{recovered++;return true;}};

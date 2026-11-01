@@ -17,6 +17,7 @@ export function captureTransportTerrain(appCtx) {
       userData:{isTerrainMesh:mesh.userData.isTerrainMesh,isFarTerrainClipmap:mesh.userData.isFarTerrainClipmap,
         terrainTile:mesh.userData.terrainTile ? { ...mesh.userData.terrainTile } : undefined,
         renderProvenance:mesh.userData.renderProvenance,
+        reviewedTerrainCells:mesh.userData.reviewedTerrainCells?[...mesh.userData.reviewedTerrainCells]:undefined,
         structureTerrainPortalDescriptors:mesh.userData.structureTerrainPortalDescriptors}
     }));
   return {meshes,segments:appCtx.TERRAIN_SEGMENTS,far,
@@ -27,7 +28,7 @@ export function restoreTransportTerrain(snapshot) {
     ? new Map(snapshot.far.grid.boundaryTriangles) : snapshot.far.grid.boundaryTriangles} : null;
   const meshes=snapshot.meshes.map(item=>{
     const a=item.positions;
-    return {visible:true,position:item.position,userData:item.userData,geometry:{
+    return {visible:true,position:item.position,userData:{...item.userData,...(item.userData.reviewedTerrainCells?{reviewedTerrainCells:new Map(item.userData.reviewedTerrainCells)}:{})},geometry:{
       parameters:{widthSegments:item.segments},attributes:{position:{array:a,count:a.length/3,getX:i=>a[i*3],getY:i=>a[i*3+1],getZ:i=>a[i*3+2]}},
       getIndex:()=>item.indices?{array:item.indices}:null
     }};

@@ -102,7 +102,8 @@ function gridPart({
   southMeters,
   northMeters,
   spacingMeters,
-  maxSamples
+  maxSamples,
+  includePoints = true
 }) {
   const minColumn = Math.floor(westMeters / spacingMeters);
   const maxColumn = Math.ceil(eastMeters / spacingMeters);
@@ -116,7 +117,7 @@ function gridPart({
     );
   }
   const points = [];
-  for (let row = minRow; row <= maxRow; row += 1) {
+  if (includePoints) for (let row = minRow; row <= maxRow; row += 1) {
     for (let column = minColumn; column <= maxColumn; column += 1) {
       const eastingMeters = column * spacingMeters;
       const northingMeters = row * spacingMeters;
@@ -162,6 +163,17 @@ function gridPart({
     }),
     points: Object.freeze(points)
   });
+}
+
+// Fine source compilers traverse their grid in bounded rows. Avoid allocating
+// a separate JS object for every point when only the canonical grid is needed.
+export function createGroundGridPatch(options={}){
+  const {id,westMeters,eastMeters,southMeters,northMeters,spacingMeters,maxSamples=1500000}=options;
+  if(typeof id!=='string'||!id||![westMeters,eastMeters,southMeters,northMeters].every(Number.isFinite)||
+     westMeters>=eastMeters||southMeters>=northMeters||Math.max(Math.abs(westMeters),Math.abs(eastMeters),Math.abs(southMeters),Math.abs(northMeters))>WEB_MERCATOR_HALF_WORLD_METERS)throw Error('invalid_ground_patch_bounds');
+  assertPositive(spacingMeters,'spacingMeters');
+  if(!Number.isSafeInteger(maxSamples)||maxSamples<1||maxSamples>1500000)throw Error('invalid_ground_patch_budget');
+  return gridPart({id,westMeters,eastMeters,southMeters,northMeters,spacingMeters,maxSamples,includePoints:false});
 }
 
 export function createGroundBuildPlan(options = {}) {
@@ -235,7 +247,8 @@ export function createGroundBuildPlan(options = {}) {
     southMeters: south,
     northMeters: north,
     spacingMeters,
-    maxSamples
+    maxSamples,
+    includePoints: options.includePoints !== false
   }));
   const sampleCount = parts.reduce((total, part) =>
     total + part.grid.sampleCount, 0);

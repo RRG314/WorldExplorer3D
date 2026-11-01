@@ -109,6 +109,7 @@ function getLeaderboardStorageKey(challengeType) {
   if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
   if (type === 'property') return LOCAL_PROPERTY_LEADERBOARD_KEY;
   if (type === 'deflock') return LOCAL_DEFLOCK_LEADERBOARD_KEY;
+  if (type === 'racing') return null;
   return LOCAL_LEADERBOARD_KEY;
 }
 
@@ -119,6 +120,7 @@ function getLeaderboardCollection(challengeType) {
   if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
   if (type === 'property') return FIREBASE_PROPERTY_COLLECTION;
   if (type === 'deflock') return FIREBASE_DEFLOCK_COLLECTION;
+  if (type === 'racing') return null;
   return FIREBASE_COLLECTION;
 }
 
@@ -188,6 +190,12 @@ function setTitleStatus(message, tone = 'info') {
 function setTitlePanelOpen(open) {
   if (!ui.titlePanel) return;
   const shouldOpen = !!open;
+  const changed = ui.titlePanel.classList.contains('open') !== shouldOpen;
+  // Reviewing a board cannot leave the local actor coasting behind it. The
+  // existing pause/layout owners retain other panels' and activities' reasons.
+  appCtx.setPauseReason?.('rankings', shouldOpen && appCtx.gameStarted === true);
+  appCtx.screenLayout?.setPanelLayer('rankings', shouldOpen && appCtx.gameStarted === true);
+  if(changed)appCtx.clearControlInputState?.(shouldOpen?'rankings-open':'rankings-close');
   ui.titlePanel.classList.toggle('open', shouldOpen);
   if (ui.titleToggleBtn) {
     ui.titleToggleBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
@@ -205,6 +213,10 @@ function toggleTitlePanel() {
 
 function closeTitlePanel() {
   setTitlePanelOpen(false);
+}
+function openLeaderboardView(type='flower') {
+  setupFlowerChallenge();setTitlePanelOpen(true);const result=setChallengeLeaderboardView(type);
+  ui.titlePanel?.querySelector('.flowerLeaderboardTab.active')?.focus({preventScroll:true});return result;
 }
 
 function setGameHud(message, elapsedMs = null) {
@@ -571,6 +583,11 @@ function setupFlowerChallenge() {
   ui.titleExplorerTabBtn = document.getElementById('leaderboardTabExplorer');
   ui.titlePropertyTabBtn = document.getElementById('leaderboardTabProperty');
   ui.titleDeFlockTabBtn = document.getElementById('leaderboardTabDeFlock');
+  ui.titleRacingTabBtn = document.getElementById('leaderboardTabRacing');
+  ui.racingFilters = document.getElementById('racingRecordFilters');
+  ui.racingSource = document.getElementById('racingRecordSource');
+  ui.racingCourse = document.getElementById('racingRecordCourse');
+  ui.racingSetup = document.getElementById('racingRecordSetup');
   ui.titleHint = document.getElementById('gameLeaderboardHint');
   ui.titleBadge = document.getElementById('gameLeaderboardBadge');
   ui.titleScope = document.getElementById('gameLeaderboardScope');
@@ -583,7 +600,11 @@ function setupFlowerChallenge() {
   ui.flowerActionChallenge = document.getElementById('flowerActionChallengeBtn');
   ui.flowerActionClose = document.getElementById('flowerActionCloseBtn');
 
+  document.getElementById('leaderboardCloseBtn')?.addEventListener('click',closeTitlePanel);
+  ui.titlePanel?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeTitlePanel();}});
+
   hydratePlayerName();
+  ui.titleRacingTabBtn?.addEventListener('click',()=>void setChallengeLeaderboardView('racing'));
   updateTitleSelectedLocation();
   bindTitleLocationWatchers();
   bindFlowerActionMenu();
@@ -678,6 +699,7 @@ function getFlowerChallengeBackendStatus() {
 }
 
 Object.assign(appCtx, {
+  openLeaderboardView,
   closeFlowerChallengeTitlePanel: closeTitlePanel,
   consumePendingFlowerChallengeStart,
   getFlowerChallengeBackendStatus,

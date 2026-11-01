@@ -153,7 +153,13 @@ function setupGlobeHub({
     });
   };
 
+  const releaseOverlayFocus = () => {
+    const focused = overlay?.ownerDocument.activeElement;
+    if (focused instanceof HTMLElement && overlay.contains(focused)) focused.blur();
+  };
+
   const closePanel = () => {
+    releaseOverlayFocus();
     if (liveEarthPanel && liveEarthHome && liveEarthPanel.parentElement === panelHost) {
       liveEarthHome.insertBefore(liveEarthPanel, liveEarthNextSibling);
       liveEarthPanel.classList.remove('hub-center-panel');
@@ -171,6 +177,7 @@ function setupGlobeHub({
 
   const openPanel = (destination) => {
     if (destination === 'library' && overlay && panelHost) {
+      releaseOverlayFocus();
       panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));
       renderLibraryPanel();
       libraryPanel.hidden = false;
@@ -203,9 +210,12 @@ function setupGlobeHub({
     const target = HUB_PANELS[destination];
     const panel = target ? document.getElementById(`tab-${target.tab}`) : null;
     if (!target || !panel || !overlay || !panelHost) return false;
-    if (destination === 'controls') {
+    releaseOverlayFocus();
+    if (destination === 'controls' || destination === 'settings') {
       const accessibilitySettings = document.getElementById('accessibilitySettings');
       if (accessibilitySettings && accessibilitySettings.parentElement !== panel) panel.prepend(accessibilitySettings);
+    }
+    if (destination === 'controls') {
       const capabilities = panel.querySelector('#capabilityGuide');
       if (capabilities) panel.prepend(capabilities);
     }
@@ -231,6 +241,14 @@ function setupGlobeHub({
     const challengePanel = document.getElementById('flowerChallengePanel');
     if (challengePanel && overlay) overlay.appendChild(challengePanel);
   }
+
+  // These are the same live controls borrowed by the in-world Controls dialog.
+  const mobileSettings = document.getElementById('mobileControlSettings');
+  const quickStart = document.getElementById('tab-controls');
+  if (mobileSettings && quickStart) quickStart.prepend(mobileSettings);
+  const accessibilitySettings = document.getElementById('accessibilitySettings');
+  const settings = document.getElementById('tab-settings');
+  if (accessibilitySettings && settings) settings.prepend(accessibilitySettings);
 
   const selectLibraryPlace = (event, activate = false) => {
     const button = event.target instanceof Element

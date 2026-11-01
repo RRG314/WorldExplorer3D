@@ -34,7 +34,8 @@ function createConnectedPlayerState(options = {}) {
       pending: !conditionLoaded || !upgradesLoaded || sync.snapshot().pending,
       sync: sync.snapshot(),
       condition: conditionAuthority.snapshot(),
-      vehicles: vehicleUpgradeStore.exportState()
+      vehicles: vehicleUpgradeStore.exportState(),
+      garage:vehicleUpgradeStore.garageSnapshot()
     }),
     retry: sync.retry,
     dispose() {
@@ -68,6 +69,8 @@ function createConnectedPlayerState(options = {}) {
     if (!isCurrent()) return;
     const data = snapshot.exists() ? snapshot.data() : null;
     upgradesLoaded = true;
+    try{vehicleUpgradeStore.hydrateGarage(data?.garage);}
+    catch(error){options.onError?.(error);return;}
     if (data?.vehicles && typeof data.vehicles === 'object') vehicleUpgradeStore.hydrate(data.vehicles);
     options.onChange?.(api.snapshot());
   }, (error) => { if (isCurrent()) options.onError?.(error); });

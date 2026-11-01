@@ -1,4 +1,7 @@
 import {publishedRoadSourceTopology} from './road-source-topology.js';
+import {reviewedDeckSurveyInWorld} from './reviewed-deck-world-profile.js';
+import {roadSourceSurvey,reviewedRoadTransportRecord} from './road-source-survey.js';
+import {alignReviewedRoadPoints} from './reviewed-road-alignment.js';
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
 import {roadDimensionsFromSource} from './road-units.js';
 import {streetScaleForWorld} from './compiler/street-frontage-policy.js';
@@ -69,7 +72,9 @@ export async function buildRoadGeometryPass(options = {}) {
         Math.hypot(Number(point?.x) || 0, Number(point?.z) || 0)
       );
     }
-    const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
+    const sourceSurvey=roadSourceSurvey(way);
+    const alignedPts=alignReviewedRoadPoints(rawPts,sourceSurvey,streetScaleForWorld(appCtx));
+    const pts = sanitizeWorldPathPoints(alignedPts, geometryGuards);
     if (pts.length < 2) {
       diagnostics.rejectedByGeometryGuards += 1;
       continue;
@@ -87,7 +92,9 @@ export async function buildRoadGeometryPass(options = {}) {
       subtype: type
     });
     const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
-    const transportRecord = normalizeTransportSource({
+    const survey=reviewedDeckSurveyInWorld(sourceSurvey,pts,{geoToWorld:(lat,lon)=>appCtx.geoToWorld(lat,lon),
+      heightToWorld:meters=>meters*appCtx.WORLD_UNITS_PER_METER*appCtx.TERRAIN_Y_EXAGGERATION,metersPerWorldUnit:streetScaleForWorld(appCtx)});
+    const sourceRecord = normalizeTransportSource({
       sourceId: sourceFeatureId,
       id: way.id,
       type: 'way',
@@ -97,10 +104,13 @@ export async function buildRoadGeometryPass(options = {}) {
       completeness: sourceFeatureId.startsWith('shortbread:')
         ? 'generalized'
         : 'lossless',
-      geometryProvenance: sourceFeatureId.startsWith('shortbread:')
+      geometryProvenance: sourceSurvey?.usableAlignment ? 'reviewed-usable-pit-corridor' : sourceFeatureId.startsWith('shortbread:')
         ? 'shortbread-v1'
         : 'osm-overpass'
     }, way.tags || {});
+    // Retain OSM tags and their widths. A reviewed, conservative usable race
+    // corridor is a separate authoring fact, never a fabricated OSM width tag.
+    const transportRecord=reviewedRoadTransportRecord(sourceRecord,survey);
     const dimensions = roadDimensionsFromSource(transportRecord,streetScaleForWorld(appCtx));
     const {width} = dimensions;
     const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
@@ -126,7 +136,7 @@ export async function buildRoadGeometryPass(options = {}) {
     const sourceRoadPts = pts;
     if (sourceRoadPts.length < 2) continue;
 
-    const sourceTopologyNodes = publishedRoadSourceTopology(rawNodeRecords, rawPts, sourceRoadPts);
+    const sourceTopologyNodes = publishedRoadSourceTopology(rawNodeRecords, alignedPts, sourceRoadPts);
     const roadFeature = {
       pts: sourceRoadPts,
       ...dimensions,
@@ -137,6 +147,7 @@ export async function buildRoadGeometryPass(options = {}) {
       sourceNodeIds: Object.freeze(sourceTopologyNodes.map(node => node.id)),
       sourceTopologyNodes,
       transportRecord,
+      ...(survey?{surfaceSurveyEvidence:survey}:{}),
       type,
       surfaceTag: String(way.tags?.surface || '').toLowerCase(),
       litTag: String(way.tags?.lit || '').toLowerCase(),
@@ -154,7 +165,9 @@ export async function buildRoadGeometryPass(options = {}) {
       bounds: polylineBounds(sourceRoadPts, width * 0.5 + 18)
     };
     appCtx.roads.push(roadFeature);
-    updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { publicationStorage, surfaceBias: ROAD_SURFACE_BIAS });
+    updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, {
+      publicationStorage, surfaceBias: ROAD_SURFACE_BIAS, reviewedSurfacePhase: 'preparation'
+    });
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += sourceRoadPts.length;
     } finally {

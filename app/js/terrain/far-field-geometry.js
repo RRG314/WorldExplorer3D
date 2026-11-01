@@ -1,3 +1,5 @@
+import {refineReviewedCorridorCells,corridorSegmentDistance} from './reviewed-corridor-refinement.js';
+import {REVIEWED_CORRIDOR_INNER_SPACING_METERS,REVIEWED_CORRIDOR_OUTER_SPACING_METERS,REVIEWED_CORRIDOR_INNER_MARGIN_METERS,REVIEWED_CORRIDOR_OUTER_MARGIN_METERS} from './reviewed-corridor-policy.js';
 import {mappedWaterBedMetersAt, createMappedWaterBedSampler} from './mapped-water-bed.js';
 import {
   addCoverageEdges,
@@ -6,8 +8,10 @@ import {
   publishedDetailedTerrainTileKeys
 } from './far-field-coverage.js?v=2';
 import { yieldToMainThread, yieldToWorldFrame } from '../world/cooperative-scheduling.js?v=1';
-import { createNormalizedTerrainAttribute } from './surface-material-blend.js?v=2';
+import { createNormalizedTerrainAttribute,setNormalizedTerrainAttribute,setTerrainSurfaceMaterialMixAt } from './surface-material-blend.js?v=2';
 import {collectDetailBoundaryLines,detailPointsOnEdge,detailHeightAt,triangleHeightAt} from './detail-boundary.js';
+import {reviewedRoadBoundaryPartition} from './road-boundary-triangulation.js';
+import {currentMappedGroundIndex} from './mapped-ground-evidence.js';
 
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -441,7 +445,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       spec.detailedCoverage,
       'minX',
       'maxX'
-    ).filter(value => value >= spec.outer.minX && value <= spec.outer.maxX);
+    ).filter(value => value >= spec.outer.minX && value <= spec.outer.maxX).map(Math.fround);
     const zValues = addCoverageEdges(
       buildClipmapAxis(
         spec.outer.minZ,
@@ -454,7 +458,11 @@ function createFarFieldGeometryPlanner(deps = {}) {
       spec.detailedCoverage,
       'minZ',
       'maxZ'
-    ).filter(value => value >= spec.outer.minZ && value <= spec.outer.maxZ);
+    ).filter(value => value >= spec.outer.minZ && value <= spec.outer.maxZ).map(Math.fround);
+    // Cell ownership and queries use the actual published coordinate frame.
+    // A double axis a few micrometres beyond a detailed edge can select an
+    // obsolete coarse cell beside refined terrain. Retain coincident column
+    // slots: height arrays and transition-cell keys share these indices.
     const positions = [];
     const surfaceWorldYs = [];
     const colors = [];
@@ -467,7 +475,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const boundaryBindings=new Map(),pointsByIndex=new Map();
     let positionData=positions;
     const point=index=>{
-      if(!pointsByIndex.has(index))pointsByIndex.set(index,{x:positionData[index*3],y:positionData[index*3+1],z:positionData[index*3+2]});
+      if(!pointsByIndex.has(index))pointsByIndex.set(index,{x:positionData[index*3],y:positionData[index*3+1],z:positionData[index*3+2],vertexIndex:index});
       return pointsByIndex.get(index);
     };
     const xRange = spec.outer.maxX - spec.outer.minX || 1;
@@ -478,6 +486,13 @@ function createFarFieldGeometryPlanner(deps = {}) {
     let maxElevationMeters = -Infinity;
     const maskStats = { waterMaskedVertices: 0 };
 
+    const mappedSurfaceAt=(x,z)=>{
+      const sample=insetFarFieldSamplePoint(x,z,spec.outer),geographic=worldToLatLon(sample.x,sample.z),tile=latLonToTileXY(geographic.lat,geographic.lon,Number(mappedContext?.contextZoom||0)),
+        key=`${mappedContext.contextZoom}/${tile.x}/${tile.y}`,spatial=mappedContext?.landAreaSpatialByTile?.get?.(key);
+      let bucket=mappedContext?.landAreasByTile?.get?.(key)||[];
+      if(spatial){const {bounds,lonSpan,latSpan,size}=spatial,cx=Math.max(0,Math.min(size-1,Math.floor((geographic.lon-bounds.minLon)/lonSpan*size))),cz=Math.max(0,Math.min(size-1,Math.floor((geographic.lat-bounds.minLat)/latSpan*size)));bucket=spatial.cells[cz*size+cx];}
+      return bucket.find(area=>typeof pointInMappedLandArea==='function'&&pointInMappedLandArea(geographic.lon,geographic.lat,area))||mappedContext?.surfaceFallbackByTile?.get?.(key)||null;
+    };
     let sliceStarted=performance.now();
     for (let row = 0; row < zValues.length; row += 1) {
       const z = zValues[row];
@@ -507,20 +522,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
         // The fixed-location LOD uses the same PBR base, WorldCover tint, and
         // built-surface shader as detailed terrain. White is the neutral vertex
         // multiplier until that shared presentation is applied to the mesh.
-        const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
-        const geographicPoint = worldToLatLon(samplePoint.x, samplePoint.z);
-        const contextTile = latLonToTileXY(
-          geographicPoint.lat,
-          geographicPoint.lon,
-          Number(mappedContext?.contextZoom || 0)
-        );
-        const contextTileKey = `${mappedContext.contextZoom}/${contextTile.x}/${contextTile.y}`;
-        const landBucket = mappedContext?.landAreasByTile?.get?.(contextTileKey) || [];
-        const mappedSurface = landBucket.find((area) => (
-          typeof pointInMappedLandArea === 'function' &&
-          pointInMappedLandArea(geographicPoint.lon, geographicPoint.lat, area)
-        ));
-        const resolvedSurface = mappedSurface || mappedContext?.surfaceFallbackByTile?.get?.(contextTileKey) || null;
+        const resolvedSurface = mappedSurfaceAt(x,z);
         const mappedTint = resolvedSurface?.tint;
         if (Array.isArray(mappedTint) && mappedTint.length >= 3) {
           colors.push(mappedTint[0], mappedTint[1], mappedTint[2]);
@@ -589,6 +591,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
         });
         const center={x:(xValues[column]+xValues[column+1])/2,z:(zValues[row]+zValues[row+1])/2,y:corners.reduce((sum,index)=>sum+positions[index*3+1],0)/4};
         const centerIndex=appendPoint(center,a),triangles=[];
+        center.vertexIndex=centerIndex;
         perimeter.forEach((index,i)=>{
           const next=perimeter[(i+1)%perimeter.length];
           indices.push(centerIndex,index,next);triangles.push([center,point(index),point(next)]);
@@ -627,8 +630,114 @@ function createFarFieldGeometryPlanner(deps = {}) {
       if(changed){attribute.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();}
       return changed;
     };
+    let reviewedRefinement=null;
+    async function refineReviewedCorridors(mesh,{current=()=>true,yieldWork=yieldForRegion}={}){
+      const runtime=appCtx.worldLoadRuntimeState,pack=runtime?.venuePack,venue=pack?.venueSource;
+      if(!venue||runtime.sequence!==appCtx._worldLoadSequence)return null;
+      if(reviewedRefinement)return reviewedRefinement;
+      const selected=new Set([...venue.sourceFeatureIds,...(venue.pitSourceFeatureIds||[])]),roads=(appCtx.roads||[]).filter(r=>selected.has(r.sourceFeatureId));
+      if(roads.length!==selected.size||roads.some(r=>r.surfaceSurveyEvidence?.venueSource!==venue||r.transportSurfaceModel?.surveyedSurface?.venueSource!==venue||r.transportSurfaceModel.reviewedSurfacePhase!=='accepted'))throw Error('reviewed_terrain_source_unavailable');
+      const scale=Number(appCtx.WORLD_UNITS_PER_METER)||1,exaggeration=Number(appCtx.TERRAIN_Y_EXAGGERATION)||1,landscape=pack.landscapeRefinement,segments=[];
+      for(const road of roads){
+        if(road.structureSemantics?.terrainMode!=='at_grade')continue;
+        const half=road.width*.5;
+        for(let i=1;i<road.pts.length;i++)segments.push({a:road.pts[i-1],b:road.pts[i],innerRadius:half+REVIEWED_CORRIDOR_INNER_MARGIN_METERS*scale,outerRadius:half+REVIEWED_CORRIDOR_OUTER_MARGIN_METERS*scale,...(landscape?{landscapeRadius:landscape.radiusMeters*scale}:{})});
+      }
+      const originalCount=geometry.attributes.position.count,lines=collectDetailBoundaryLines(appCtx.terrainGroup?.children),
+        oldGrid={xValues,zValues,worldYs,boundaryTriangles,detailedCoverage:spec.detailedCoverage};
+      const active=()=>current()&&appCtx.worldLoadRuntimeState===runtime&&!mesh.userData?.farFieldDisposed;
+      const refined=await refineReviewedCorridorCells({xValues,zValues,basePositions:positionData,segments,current:active,yieldWork,partitionTriangle:reviewedRoadBoundaryPartition(appCtx),
+        edgeStations:[...lines.values()].flatMap(groups=>groups.flat()),
+        innerSpacing:REVIEWED_CORRIDOR_INNER_SPACING_METERS*scale,outerSpacing:REVIEWED_CORRIDOR_OUTER_SPACING_METERS*scale,landscapeSpacing:(landscape?.spacingMeters??32)*scale,
+        skipCell:c=>cellFullyInsideDetailedCoverage(c.minX,c.maxX,c.minZ,c.maxZ,spec.detailedCoverage),
+        heightAt:(x,z,candidates)=>{
+          const seam=detailHeightAt(lines,'x',x,z)??detailHeightAt(lines,'z',x,z);
+          if(Number.isFinite(seam))return seam;
+          // The existing mesh stores float32 coordinates, which can round an
+          // outer edge a few micrometres beyond its double-precision grid.
+          // Read that same boundary value without extending terrain coverage.
+          const queryX=Math.max(xValues[0],Math.min(xValues.at(-1),x)),queryZ=Math.max(zValues[0],Math.min(zValues.at(-1),z)),
+            old=sampleFarFieldGridWorldY(queryX,queryZ,oldGrid);
+          if(!Number.isFinite(old))throw Error(`reviewed_terrain_boundary_unavailable: ${x},${z}`);
+          const {lat,lon}=worldToLatLon(x,z),smooth=n=>{const t=Math.max(0,Math.min(1,n));return t*t*(3-2*t);};
+          let weight=0,landscapeWeight=0;
+          for(const segment of candidates){
+            const distance=corridorSegmentDistance(x,z,segment),t=Math.max(0,Math.min(1,(distance-segment.innerRadius)/(segment.outerRadius-segment.innerRadius)));
+            weight=Math.max(weight,1-t*t*(3-2*t));
+            if(landscape)landscapeWeight=Math.max(landscapeWeight,1-smooth((distance/scale-landscape.fullHeightRadiusMeters)/(landscape.radiusMeters-landscape.fullHeightRadiusMeters)));
+          }
+          if(landscapeWeight){
+            const c=landscape.coverage,metersPerDegree=6371008.8*Math.PI/180,
+              clearance=Math.min((lat-c.south)*metersPerDegree,(c.north-lat)*metersPerDegree,
+                (lon-c.west)*metersPerDegree*Math.cos(lat*Math.PI/180),(c.east-lon)*metersPerDegree*Math.cos(lat*Math.PI/180));
+            weight=Math.max(weight,landscapeWeight*smooth(clearance/landscape.coverageFadeMeters));
+          }
+          if(!weight)return old;
+          const meters=acceptedElevation(lat,lon);
+          if(!Number.isFinite(meters))throw Error(`reviewed_terrain_source_ground_unavailable: ${lat},${lon}`);
+          const base=meters*scale*exaggeration,graded=terrainTileDeps.applyStructureTerrainCuts(x,z,base),
+            ground=terrainTileDeps.resolveWaterTerrainY(x,z,graded);
+          return old+(ground-old)*weight;
+        }});
+      const count=refined.positions.length/3,staged=new Map();let slice=performance.now();
+      const recipe=i=>{
+        const x=refined.positions[i*3],z=refined.positions[i*3+2],column=intervalIndex(xValues,Math.max(xValues[0],Math.min(xValues.at(-1),x))),row=intervalIndex(zValues,Math.max(zValues[0],Math.min(zValues.at(-1),z))),
+          u=Math.max(0,Math.min(1,(x-xValues[column])/(xValues[column+1]-xValues[column]))),v=Math.max(0,Math.min(1,(z-zValues[row])/(zValues[row+1]-zValues[row]))),a=row*xValues.length+column,b=a+1,c=a+xValues.length,d=c+1;
+        return u+v<=1?[[a,1-u-v],[b,u],[c,v]]:[[d,u+v-1],[c,1-u],[b,1-v]];
+      };
+      for(const [name,attribute] of Object.entries(geometry.attributes)){
+        if(name==='position'||name==='normal')continue;
+        if(attribute.count!==originalCount)throw Error('reviewed_terrain_attribute_shape');
+        const array=new attribute.array.constructor(count*attribute.itemSize);array.set(attribute.array);
+        for(let i=originalCount;i<count;i++){
+          const weights=recipe(i);
+          for(let component=0;component<attribute.itemSize;component++)array[i*attribute.itemSize+component]=weights.reduce((sum,[index,weight])=>sum+attribute.array[index*attribute.itemSize+component]*weight,0);
+          if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
+        }
+        staged.set(name,new THREE.BufferAttribute(array,attribute.itemSize,attribute.normalized));
+      }
+      const tints=mesh.userData.mappedSurfaceTints,modes=mesh.userData.mappedSurfaceModes;
+      let nextTints=tints,nextModes=modes;
+      if(tints){nextTints=new Float32Array(count*3);nextTints.set(tints);}
+      if(modes)nextModes=[...modes];
+      const color=staged.get('color'),mixA=staged.get('terrainSurfaceMixA'),mixB=staged.get('terrainSurfaceMixB'),detailedGround=currentMappedGroundIndex(appCtx);
+      for(let i=originalCount;i<count;i++){
+        // New fine vertices can fall inside a narrow mapped lawn/forest that
+        // had no coarse vertex. Resolve the same retained geographic polygons
+        // again instead of copying a neighbour's urban classification.
+        const x=refined.positions[i*3],z=refined.positions[i*3+2],surface=detailedGround.sample(x,z)||mappedSurfaceAt(x,z),tint=surface?.tint,mode=String(surface?.mode||surface?.kind||'');
+        if(nextTints)for(let component=0;component<3;component++)nextTints[i*3+component]=tint?.[component]??NaN;
+        if(nextModes)nextModes[i]=mode;
+        if(tint){if(color)setNormalizedTerrainAttribute(color,i,tint);if(mixA&&mixB)setTerrainSurfaceMaterialMixAt({mixA,mixB},i,mode||'grass');}
+        if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
+      }
+      const nextBoundaryBindings=new Map(boundaryBindings);
+      for(let i=0;i<count;i++){
+        const x=refined.positions[i*3],z=refined.positions[i*3+2];
+        if(Number.isFinite(detailHeightAt(lines,'x',x,z)))nextBoundaryBindings.set(i,'x');
+        else if(Number.isFinite(detailHeightAt(lines,'z',x,z)))nextBoundaryBindings.set(i,'z');
+        if(performance.now()-slice>=8){if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');await yieldWork();slice=performance.now();}
+      }
+      if(!active())throw new DOMException('Reviewed terrain superseded','AbortError');
+      // One atomic adoption into the same mesh and query. No provisional
+      // geometry or separate height field becomes visible while preparing.
+      geometry.setAttribute('position',new THREE.BufferAttribute(refined.positions,3));
+      for(const [name,attribute]of staged)geometry.setAttribute(name,attribute);
+      geometry.setIndex(new THREE.BufferAttribute(refined.indices,1));geometry.deleteAttribute('normal');geometry.computeVertexNormals();geometry.computeBoundingSphere();
+      positionData=refined.positions;
+      boundaryBindings.clear();for(const [index,axis]of nextBoundaryBindings)boundaryBindings.set(index,axis);
+      for(const [index,p]of pointsByIndex){p.x=positionData[index*3];p.y=positionData[index*3+1];p.z=positionData[index*3+2];}
+      for(let i=0;i<worldYs.length;i++)worldYs[i]=positionData[i*3+1];
+      boundaryTriangles.clear();
+      for(const [id,triangles]of refined.trianglesByCell)boundaryTriangles.set(id,triangles.map(ids=>ids.map(point)));
+      mesh.userData.mappedSurfaceTints=nextTints;mesh.userData.mappedSurfaceModes=nextModes;
+      reviewedRefinement=Object.freeze({...refined.stats,venueId:venue.id,sourceSha256:venue.sourceSha256});
+      mesh.userData.reviewedCorridorRefinement=reviewedRefinement;
+      return reviewedRefinement;
+    }
     return {
       geometry,
+      refineReviewedCorridors,
       refreshBoundaryHeights,
       columns: xValues.length,
       rows: zValues.length,

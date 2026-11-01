@@ -19,6 +19,16 @@ function road(id, points) {
   return f;
 }
 
+test('excavation overlap stops at the published approach caps and preserves adjoining pavement',()=>{
+ const f=road('approach',[{x:0,z:0},{x:100,z:0}]),excavation=compileEngineeredApproachExcavation(f,()=>40);
+ for(const x of [-.01,100.01]){
+  assert.equal(terrainHeightWithPortalCuts(excavation.masks,x,0,40),40,'an internal overlap cannot excavate beyond the source endpoint');
+  const p=Float32Array.from([x-.003,40.18,-1,x+.003,40.18,-1,x,40.18,1]),indices=Uint16Array.from([0,2,1]),cut=createPortalSurfaceClipper(excavation.masks)(p,indices);
+  assert.equal(cut.positions,p,'the adjoining rendered pavement remains supported');
+ }
+ for(const ring of excavation.rings.slice(1,-1))for(const dx of [-.000001,.000001])assert.ok(terrainHeightWithPortalCuts(excavation.masks,ring.x+dx,0,40)<40,'internal cut sections retain their overlap');
+});
+
 test('approach excavation preserves a separate upper street edge and still cuts its open entrances',()=>{
  const lower=road('lower',[{x:0,z:0},{x:100,z:0}]);
  const upper={sourceFeatureId:'upper',pts:[{x:50,z:3},{x:50,z:30}],width:5,structureSemantics:{terrainMode:'at_grade'}};

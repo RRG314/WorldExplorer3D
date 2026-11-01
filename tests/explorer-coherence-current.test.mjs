@@ -76,11 +76,11 @@ test('server receipt vocabulary accepts current field and fishing evidence witho
 });
 
 test('Explorer surfaces use player language, one menu input authority, and distinct Backpack viewing state', async () => {
-  const [html, runtime, equipmentRuntime, shellStyles, uiRuntime] = await Promise.all([
+  const [html, runtime, equipmentRuntime, backpackStyles, uiRuntime] = await Promise.all([
     readFile(new URL('../app/index.html', import.meta.url), 'utf8'),
     readFile(new URL('../app/js/discovery/runtime.js', import.meta.url), 'utf8'),
     readFile(new URL('../app/js/urban-sandbox/equipment-runtime.js', import.meta.url), 'utf8'),
-    readFile(new URL('../app/styles/runtime-shell.css', import.meta.url), 'utf8'),
+    readFile(new URL('../app/styles/backpack.css', import.meta.url), 'utf8'),
     readFile(new URL('../app/js/ui.js', import.meta.url), 'utf8')
   ]);
   assert.doesNotMatch(html, /game-generated field lead/i);
@@ -96,7 +96,9 @@ test('Explorer surfaces use player language, one menu input authority, and disti
   assert.match(html, /Your Journal, Guide, companions, and local Backpack history are stored in this browser/);
   assert.match(equipmentRuntime, /selected \? ' aria-current="true"'/);
   assert.match(equipmentRuntime, /item\.equipped \? ' equipped'/);
-  assert.match(shellStyles, /urbanBackpackItem\.selected/);
-  assert.match(shellStyles, /content:'VIEWING'/);
+  assert.match(html, /href="styles\/backpack\.css\?v=1"/);
+  assert.match(backpackStyles, /urbanBackpackItem\.selected\s*\{\s*outline:\s*2px solid var\(--wx-action\)/);
+  assert.match(backpackStyles, /urbanBackpackItem\.selected::after\s*\{\s*content:\s*'Selected'/);
+  assert.match(backpackStyles, /urbanBackpackItem\.equipped\s*\{\s*border-color:\s*var\(--wx-success\)/);
   assert.doesNotMatch(uiRuntime, /floatMenuContainer\.addEventListener\('touchend'/);
 });

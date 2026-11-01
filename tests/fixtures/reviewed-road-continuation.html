@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#375332;color:white;font:15px system-ui}canvas{display:block}p{margin:8px}</style>
+<p>Controlled source-way corner. Right switches the exact-node continuation.</p>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script type="module">
+import {reviewedRoadContinuations} from '/app/js/terrain/reviewed-road-continuations.js';
+import {prepareCarriagewayTiles} from '/app/js/world/compiler/street-carriageway.js';
+import {meshCarriagewayTile} from '/app/js/world/compiler/street-carriageway-mesh.js';
+import {createRoadContactIndex} from '/app/js/terrain/road-contact-index.js?v=1';
+const x=1750,z=-1400,venue={sourceFeatureIds:['incoming','outgoing']};
+const road=(id,pts,nodes,width)=>({sourceFeatureId:id,pts,sourceNodeIds:nodes,width,
+ structureSemantics:{terrainMode:'at_grade'},surfaceSurveyEvidence:{venueSource:venue},
+ transportSurfaceModel:{reviewedSurfacePhase:'accepted',surveyedSurface:{venueSource:venue}}});
+const roads=[road('incoming',[{x:x-14,z},{x,z}],[1,2],8),road('outgoing',[{x,z},{x:x+14,z:z+6}],[2,3],7.8)];
+const continuations=reviewedRoadContinuations(roads,venue),renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:true});renderer.setSize(800,500);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#375332');
+const camera=new THREE.OrthographicCamera(-16,16,10,-10,.1,100);camera.position.set(x,30,z+2);camera.up.set(0,0,-1);camera.lookAt(x,0,z+2);
+const material=new THREE.MeshBasicMaterial({color:0x454648,side:THREE.DoubleSide}),groups=[],contacts=[];
+for(const enabled of [false,true]){
+ const group=new THREE.Group(),surfaces=[];
+ for(const tile of prepareCarriagewayTiles(roads.map(r=>enabled?{...r,endpointContinuations:continuations.get(r)}:r))){
+  const compiled=meshCarriagewayTile(tile,()=>.18,vertices=>vertices),geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(compiled.positions,3));geometry.setIndex(new THREE.BufferAttribute(compiled.indices,1));
+  const mesh=new THREE.Mesh(geometry,material);group.add(mesh);surfaces.push({geometry,userData:{terrainMode:'at_grade'}});
+ }
+ const index=createRoadContactIndex(surfaces);try{contacts.push(index.sampleAt(x+.12,z-2));}finally{index.dispose();}
+ scene.add(group);groups.push(group);
+}
+if(contacts[0]!==null||!Number.isFinite(contacts[1]))throw Error('The actual compiled corner did not close the butt-cap gap');
+let enabled=true;
+function draw(){groups.forEach((group,i)=>group.visible=i===Number(enabled));renderer.render(scene,camera);}
+addEventListener('keydown',event=>{if(event.code==='ArrowRight'){enabled=!enabled;draw();}});
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({enabled,contacts,joinCount:[...continuations.values()].flat().length,glError:renderer.getContext().getError(),programs:renderer.info.programs.length});draw();
+</script>

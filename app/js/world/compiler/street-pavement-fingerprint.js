@@ -32,7 +32,8 @@ export function serializeStreetPavementFingerprint(tile, metersPerWorldUnit) {
 export function serializePavementSurfaceFingerprint(tile, result, metersPerWorldUnit) {
   return JSON.stringify({version:1,metersPerWorldUnit,bounds:tile.bounds,combineRegionCurbs:tile.designRegions?.length>1,
     polygons:result.polygons,markingPolygons:result.markingPolygons,ramps:result.ramps,
-    heightSegments:tile.segments.map(({a,b,wa,wb,offset,road})=>({a,b,wa,wb,
+    heightSegments:tile.segments.map(({a,b,wa,wb,offset,nextOffset,road})=>({a,b,wa,wb,
+      ...(nextOffset!==undefined?{nextOffset}:{}),
       offset:Number(offset)||0,metersPerWorldUnit:roadMetersPerWorldUnit(road),
       surfaceBias:Number.isFinite(road.surfaceBias)?road.surfaceBias:.18}))});
 }

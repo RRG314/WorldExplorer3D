@@ -1,0 +1,200 @@
+import {roadPavementSectionForSegment} from '../world/road-pavement-sections.js';
+import {readPublishedLateralSection,compilePublishedLateralSpans} from './published-lateral-profile.js';
+import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
+import {streetEdgeStationFractions,streetEdgeLateralKnots,streetEdgeIntervalHasLift} from '../world/compiler/street-edge-recipe.js';
+import {traversalSegmentCount,readTraversalSegment}from'../world/traversal-graph-storage.js';
+import {minimumRoadWidthOnInterval,roadSegmentIsDriveable}from'../world/road-cross-section-profile.js?v=1';
+import {roadMetersPerWorldUnit}from'../world/road-units.js';
+import {createBuildingCollisionQuery}from'../physics/building-collision.js?v=5';
+import {resolveTunnelSpace}from'../world/compiler/tunnel-space-query.js';
+import {drainCooperatively,yieldToWorldFrame}from'../world/cooperative-scheduling.js?v=1';
+import {STREET_POLYGON_GRID_WORLD}from'../world/compiler/street-coordinate-grid.js';
+import {roadSourceCoordinateTolerance}from'../terrain/published-road-integrity.js';
+import {assertReviewedSurfaceAccepted}from'../world/compiler/transport-surface-model.js?v=25';
+import {hasReviewedPavement}from'../world/compiler/reviewed-deck-profile.js';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_CROSSFALL,AUTHORED_ROAD_EDGE_MODEL,PROFILED_ROAD_PAVEMENT_MODEL}from'../physics/road-plane-dynamics.js';
+import {normalizeRaceVenueSource,assertRaceVenueRoads,raceVenueMinimumWidth,raceVenueContainsInterval}from'./venue-course-policy.js';
+import {buildRaceRoadGraph,createRaceCourse,shortestRacePath,RACE_MINIMUM_SPAN_METERS}from'./course-rules.js';
+
+// Read published world facts through their existing owners. Qualification never
+// replaces a road, runs a provider query, flattens terrain or changes residency.
+export async function collectRaceDistrict(context,{locationId,locationLabel,radiusWorld=270,sourceFeatureIds=null,current=()=>true,yieldWork=yieldToWorldFrame,allowEmpty=false}={}){
+ const publication=context.worldPublication,publishedTraversal=context.buildTraversalNetworks?.()?.drive,traversal=publishedTraversal?.segments?publishedTraversal:allowEmpty?{segments:[]}:null;
+ if(!publication?.requestId||context.worldLoading||!traversal?.segments||!context.SurfaceQuery?.driveAt||!context.sampleFeatureSurfaceY)throw Error('race_world_not_ready');
+ const metersPerUnit=Number(context.METERS_PER_WORLD_UNIT)||1.11,envelope={width:2.35,length:6.5,height:2.4};
+ const runtime=context.worldLoadRuntimeState,pack=runtime&&runtime.sequence===publication.sequence?runtime.venuePack:null;
+ const adopted=pack?.status==='source-prepared'?pack.venueSource:undefined,venueSource=normalizeRaceVenueSource(adopted);
+ if(venueSource&&(pack.id!==venueSource.id||pack.sourceSha256!==venueSource.sourceSha256||JSON.stringify(pack.sourceFeatureIds)!==JSON.stringify(venueSource.sourceFeatureIds)||JSON.stringify(pack.pitSourceFeatureIds)!==JSON.stringify(venueSource.pitSourceFeatureIds)))throw Error('race_invalid_venue_extent');
+ const radius=venueSource?venueSource.qualificationRadiusWorld:Math.max(100,Math.min(1200,Number(radiusWorld)||270)),checkBuilding=createBuildingCollisionQuery(context),roads=[];
+ const selectedSources=venueSource?new Set([...venueSource.sourceFeatureIds,...(venueSource.pitSourceFeatureIds||[])]):sourceFeatureIds?new Set(sourceFeatureIds):null;
+ if(selectedSources&&(!selectedSources.size||selectedSources.size>(venueSource?550:500)||[...selectedSources].some(id=>typeof id!=='string'||!id||id.length>180)))throw Error('invalid_race_source_selection');
+ const diagnostics={sourceSegments:traversalSegmentCount(traversal.segments),eligible:0,rejected:{},sampledPositions:0,
+  precisionContacts:0,maximumPrecisionDistanceWorld:0,maximumGroundProfileDepartureMeters:0,maximumLateralProfileDepartureMeters:0};
+ const rejected=reason=>{diagnostics.rejected[reason]=(diagnostics.rejected[reason]||0)+1;};
+ const active=()=>current()&&context.worldPublication===publication&&!context.worldLoading;
+ function* collect(){
+  const cursor={};
+  for(let index=0;index<diagnostics.sourceSegments;index++){
+   if(!active())throw Error('race_world_changed');
+   const segment=readTraversalSegment(traversal.segments,index,cursor),feature=segment?.feature;
+   if(!feature||!segment.p1||!segment.p2)continue;
+   const {p1,p2,segIndex,sourceTStart=0,sourceTEnd=1}=segment;
+   if(Math.max(Math.hypot(p1.x,p1.z),Math.hypot(p2.x,p2.z))>radius)continue;
+   const sourceFeatureId=String(feature.transportRecord?.identity||feature.sourceFeatureId||feature.sourceRoadId||feature.id||'');
+   if(selectedSources&&!selectedSources.has(sourceFeatureId))continue;
+   if(!raceVenueContainsInterval(venueSource,sourceFeatureId,segIndex,sourceTStart,sourceTEnd))continue;
+   const length=Math.hypot(p2.x-p1.x,p2.z-p1.z)*metersPerUnit;
+   const widthMeters=minimumRoadWidthOnInterval(feature,segIndex,sourceTStart,sourceTEnd)*roadMetersPerWorldUnit(feature);
+   if(length<RACE_MINIMUM_SPAN_METERS||widthMeters<raceVenueMinimumWidth(venueSource)||!roadSegmentIsDriveable(feature,segIndex,sourceTStart,sourceTEnd)){rejected('width_or_access');yield;continue;}
+   if(!sourceFeatureId){rejected('unstable_source');yield;continue;}
+   const model=feature.transportSurfaceModel;
+   if(feature.surfaceSurveyEvidence){
+    try{if(!model?.surveyedSurface)throw Error('missing_reviewed_surface');assertReviewedSurfaceAccepted(model);}
+    catch{rejected('unqualified_reviewed_surface');yield;continue;}
+   }
+   if(venueSource&&(feature.surfaceSurveyEvidence?.venueSource!==adopted||model?.surveyedSurface?.venueSource!==adopted)){rejected('unqualified_venue_source');yield;continue;}
+   const banked=model?.reviewedSurfacePhase==='accepted'&&model.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL;
+   const edgeRecipe=reviewedRoadEdgeRecipe(feature),edgeRoad=edgeRecipe?{...feature,edgeBandRecipe:edgeRecipe}:null,hasEdges=edgeRoad&&streetEdgeIntervalHasLift(edgeRoad,segIndex,sourceTStart,sourceTEnd),sections=[];
+   const profiled=!!feature.transportRecord?.crossSection?.pavementSections,hasLateralProfile=hasEdges||profiled;
+   const structureName=String(feature.structureSemantics?.structureKind||'surface');
+   const tunnel=/tunnel/.test(structureName),structure=tunnel?'tunnel':/bridge|elevated|viaduct/.test(structureName)?'bridge':'surface';
+   const fx=(p2.x-p1.x)/(length/metersPerUnit),fz=(p2.z-p1.z)/(length/metersPerUnit),samples=[],surfacePoints=[];
+   let failure='',minimumClearance=Infinity;
+   const steps=Math.max(1,Math.ceil(length/4)),spanMeters=1.2;
+   const mode=feature.structureSemantics?.terrainMode;
+   const groundOwned=mode==='at_grade'&&feature.transportSurfaceModel?.engineeredApproach!==true&&!hasReviewedPavement(feature);
+   function surface(x,z,t){
+    const center={x:p1.x+(p2.x-p1.x)*t,z:p1.z+(p2.z-p1.z)*t};
+    const projection={...center,segIndex,t:sourceTStart+(sourceTEnd-sourceTStart)*t};
+    const guide=context.sampleFeatureSurfaceY(feature,x,z,projection);
+    if(!Number.isFinite(guide))return null;
+    const contacts=context.roadContactIndex;let contact=null;
+    if(contacts){
+     if(hasEdges&&typeof contacts.sampleProfileAt!=='function')return null;
+     const profile=hasEdges?contacts.sampleProfileAt(x,z,guide,mode||null):null,y=hasEdges?profile?.y:contacts.sampleAt(x,z,guide,mode||null);
+     if(Number.isFinite(y))contact={x,z,y,distance:0,...(hasEdges?{baseY:profile.baseY}:{})};
+     else {
+      // Project source precision to a real uploaded triangle. Collision is
+      // never expanded, and a missing road cannot be filled by this reader.
+      contact=hasEdges?contacts.nearestProfileAt?.(x,z,roadSourceCoordinateTolerance(x,z,STREET_POLYGON_GRID_WORLD),mode||null):contacts.nearestSurfaceAt?.(x,z,roadSourceCoordinateTolerance(x,z,STREET_POLYGON_GRID_WORLD),mode||null);
+      if(!contact)return null;
+      diagnostics.precisionContacts++;
+      diagnostics.maximumPrecisionDistanceWorld=Math.max(diagnostics.maximumPrecisionDistanceWorld,contact.distance);
+     }
+    }
+    const px=contact?.x??x,pz=contact?.z??z;
+    const drive=context.SurfaceQuery.driveAt(px,pz,{preferRoad:true,currentY:contact?.y??guide,
+     nearestRoad:{road:feature,dist:Math.hypot(px-center.x,pz-center.z),pt:center,segIndex,t:projection.t,y:guide}});
+    if(drive?.kind!=='road'||!Number.isFinite(drive.position?.y)||
+       contact&&Math.abs(drive.position.y-contact.y)*metersPerUnit>.35||
+       !groundOwned&&Math.abs(drive.position.y-guide)*metersPerUnit>.35)return null;
+    // Ordinary at-grade profiles are grading inputs. The published road top
+    // owns driving height after terrain tessellation and intersecting corridors.
+    // Engineered bridges/tunnels retain the independent profile/layer fence.
+    if(groundOwned)diagnostics.maximumGroundProfileDepartureMeters=Math.max(diagnostics.maximumGroundProfileDepartureMeters,Math.abs(drive.position.y-guide)*metersPerUnit);
+    if(hasEdges){
+     // The selected uploaded triangle owns both values, even where an
+     // independent approach or later terrain update differs from its base.
+     const baseY=contact?.baseY;
+     if(!Number.isFinite(baseY))return null;
+     return {x:px,z:pz,y:drive.position.y,baseY};
+    }
+    return {x:px,z:pz,y:drive.position.y};
+   }
+   const stations=hasEdges?[...new Set([...Array.from({length:steps+1},(_,i)=>i/steps),...streetEdgeStationFractions(edgeRoad,segIndex,sourceTStart,sourceTEnd)])].sort((a,b)=>a-b):Array.from({length:steps+1},(_,i)=>i/steps);
+   for(let sample=0;sample<stations.length;sample++){
+    const t=stations[sample],x=p1.x+(p2.x-p1.x)*t,z=p1.z+(p2.z-p1.z)*t;diagnostics.sampledPositions++;
+    if(context.transportDetail?.hasReadyCoverageAt?.({x,z},0)===false){failure='road_publication_pending';break;}
+    const point=surface(x,z,t);
+    if(!point){failure='surface_layer_mismatch';break;}
+    const y=point.y;
+    const water=context.SurfaceQuery.waterAt?.(x,z),space=tunnel?resolveTunnelSpace(feature,x,z,y+.5):null;
+    if(tunnel){if(!space?.inside){failure='unqualified_tunnel';break;}minimumClearance=Math.min(minimumClearance,space.clearance*metersPerUnit);}
+    if(water?.feature&&Number.isFinite(water.position?.y)&&water.position.y>y+.15&&!space?.inside){failure='submerged_road';break;}
+    for(const along of [-1,0,1]){
+     const offset=along*(envelope.length-envelope.width)*.5/metersPerUnit;
+     if(checkBuilding(x+fx*offset,z+fz*offset,envelope.width*.5/metersPerUnit,{actorBaseY:y,actorHeight:envelope.height/metersPerUnit}).collision){failure='blocked_clearance';break;}
+    }
+    if(failure)break;
+    const lateral=spanMeters/metersPerUnit,leftY=surface(x-fz*lateral,z+fx*lateral,t)?.y,rightY=surface(x+fz*lateral,z-fx*lateral,t)?.y;
+    if(!Number.isFinite(leftY)||!Number.isFinite(rightY)){failure='missing_crossfall';break;}
+    const previous=samples.at(-1);
+    if(previous&&Math.abs(y-previous.y)*metersPerUnit/(length*(t-previous.t))>.22){failure='steep_grade';break;}
+    if(Math.max(Math.abs(y-leftY),Math.abs(y-rightY))*metersPerUnit/spanMeters>
+      (banked?Math.min(model.surveyedSurface.maximumCrossfall,BANKED_ROAD_MAXIMUM_CROSSFALL):.15)){failure='steep_crossfall';break;}
+    if(hasLateralProfile)try{
+     const section=profiled?roadPavementSectionForSegment(feature,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t):null,unit=roadMetersPerWorldUnit(feature);
+     sections.push({...readPublishedLateralSection({contacts:context.roadContactIndex,x,z,nx:fz,nz:-fx,widthMeters,metersPerUnit,spanMeters,surface,t,edgeKnots:profiled?[section.bankNegative*unit]:streetEdgeLateralKnots(edgeRoad,segIndex,sourceTStart+(sourceTEnd-sourceTStart)*t,widthMeters),...(profiled?{boundsMeters:{minimumMeters:-section.positive*unit,maximumMeters:section.negative*unit}}:{})}),...(profiled?{racingOffsetMeters:-section.bankOffset*unit,racingWidthMeters:section.bankWidth*unit-.1}:{})});}
+    catch(error){failure=error.message;break;}
+    samples.push({t,y,leftY,rightY});
+    surfacePoints.push({x:point.x,z:point.z,y:point.y});
+    // Budgeted by the same construction scheduler as the world compiler.
+    yield;
+   }
+   if(failure){rejected(failure);continue;}
+   let spans=[{first:0,last:samples.length-1}];
+   if(hasLateralProfile)try{
+    spans=compilePublishedLateralSpans(sections,metersPerUnit);
+    for(const span of spans)diagnostics.maximumLateralProfileDepartureMeters=Math.max(diagnostics.maximumLateralProfileDepartureMeters,span.maximumErrorMeters);
+   }catch(error){rejected(error.message);continue;}
+   const sourceAt=t=>sourceTStart+(sourceTEnd-sourceTStart)*t;
+   if(spans.length>1&&spans.some(s=>(samples[s.last].t-samples[s.first].t)*length<RACE_MINIMUM_SPAN_METERS||
+    Number(sourceAt(samples[s.first].t).toFixed(6))>=Number(sourceAt(samples[s.last].t).toFixed(6)))){rejected('race_edge_profile_capacity');continue;}
+   for(const span of spans){
+   const start=samples[span.first].t,end=samples[span.last].t,key=`${sourceFeatureId}:${segIndex}:${sourceAt(start).toFixed(6)}:${sourceAt(end).toFixed(6)}`;
+   const internalLayer=i=>`source-node:${segment.fromId}:profile:${segment.toId}:${i}`;
+   const a={...surfacePoints[span.first],connectionLayer:span.first===0?`source-node:${segment.fromId}`:internalLayer(span.first)},
+    b={...surfacePoints[span.last],connectionLayer:span.last===samples.length-1?`source-node:${segment.toId}`:internalLayer(span.last)};
+   // The six-metre chassis admission floor is separate from the actual bank
+   // lane. Retain its variable source width with five centimetres of inset at
+   // each painted edge; the independently published apron remains physical.
+   const heights=samples.slice(span.first,span.last+1).map((s,i)=>({...s,t:(s.t-start)/(end-start),...(hasLateralProfile?{lateralSamples:span.profiles[i]}:{}),...(profiled?{racingOffsetMeters:sections[span.first+i].racingOffsetMeters,racingWidthMeters:sections[span.first+i].racingWidthMeters}:{})}));
+   roads.push({sourceId:key,sourceFeatureId,label:String(feature.name||feature.transportRecord?.sourceTags?.name||''),a,b,widthMeters,direction:segment.direction,
+    ...(banked?{surfaceModel:BANKED_ROAD_MODEL}:{}),...(profiled?{pavementModel:PROFILED_ROAD_PAVEMENT_MODEL,racingWidthMeters:feature.surfaceSurveyEvidence.usableWidthMeters}:{}),...(hasEdges?{edgeBandModel:AUTHORED_ROAD_EDGE_MODEL}:{}),
+    driveable:true,supported:true,structure,clearanceMeters:tunnel?minimumClearance:0,heightSamples:heights,heightSampleSpanMeters:spanMeters,
+    sourceAuthority:String(feature.transportRecord?.provenance?.authority||feature.sourceAuthority||'published-world-road')});
+   diagnostics.eligible++;yield;
+   }
+  }
+ }
+ await drainCooperatively(collect(),{current:active,yieldWork,budgetMs:2});
+ if(!active())throw Error('race_world_changed');
+ if(!roads.length&&!allowEmpty)throw Error('no_qualified_racing_roads');
+ assertRaceVenueRoads(roads,venueSource);
+ const anchor=publication.location||context.LOC,identity=context.livingWorldPublication?.worldIdentity;
+ const loaded=context.worldLoadRuntimeState&&context.worldLoadRuntimeState.sequence===publication.sequence?context.worldLoadRuntimeState.location:null;
+ const stableLocationId=identity?.latitudeE7!==undefined?`earth:${identity.latitudeE7}:${identity.longitudeE7}`:
+  `earth:${Math.round(Number(anchor?.lat)*1e7)}:${Math.round(Number(anchor?.lon)*1e7)}`;
+ return {type:'RaceDistrictFacts',version:1,...(venueSource?{venueSource}:{}),locationId:String(locationId||stableLocationId).slice(0,80),
+  locationLabel:String(locationLabel||loaded?.name||identity?.location?.name||context.LOC?.name||'Mapped district').slice(0,80),anchor:{lat:Number(anchor?.lat),lon:Number(anchor?.lon)},metersPerUnit,
+  radiusWorld:radius,vehicleEnvelope:envelope,roads,diagnostics,provenance:{authority:'published-world-road-qualification-v1',requestId:publication.requestId}};
+}
+
+export function recommendRaceCourses(district){
+ const graph=buildRaceRoadGraph(district.roads,{metersPerUnit:district.metersPerUnit,venueSource:district.venueSource}),events=[],signatures=new Set(),failures={};
+ const rejected=error=>{failures[error.message]=(failures[error.message]||0)+1;};
+ const starts=graph.edges.filter(e=>e.length>=2).sort((a,b)=>Math.hypot(graph.nodes[a.from].x,graph.nodes[a.from].z)-Math.hypot(graph.nodes[b.from].x,graph.nodes[b.from].z)).slice(0,30);
+ const settings={locationId:district.locationId,locationLabel:district.locationLabel,anchor:district.anchor,participants:4};
+ for(const first of starts){
+  if(events.length>=4)break;
+  try{
+   const other=first.id.endsWith(':forward')?first.id.replace(/:forward$/,':reverse'):first.id.replace(/:reverse$/,':forward');
+   const back=shortestRacePath(graph,first.to,first.from,{excludedEdges:new Set([first.id,other])});
+   const signature=[first.id,...back].map(id=>id.replace(/:(forward|reverse)$/,'')).sort().join('|');
+   if(back.length&& !signatures.has(signature)){
+    const course=createRaceCourse(graph,[first.id,...back],{...settings,discipline:'circuit',laps:2,name:`${district.locationLabel} · Circuit ${events.filter(e=>e.discipline==='circuit').length+1}`});
+    signatures.add(signature);events.push(course);
+   }
+  }catch(error){if(!/race_|disconnected/.test(error.message))throw error;rejected(error);}
+ }
+ for(const first of starts.slice(0,12)){
+  if(events.some(e=>e.discipline==='sprint'))break;
+  const targets=[...graph.nodes].sort((a,b)=>Math.hypot(b.x-graph.nodes[first.from].x,b.z-graph.nodes[first.from].z)-Math.hypot(a.x-graph.nodes[first.from].x,a.z-graph.nodes[first.from].z)).slice(0,20);
+  for(const target of targets)try{
+   const path=[first.id,...shortestRacePath(graph,first.to,target.id,{excludedEdges:new Set([first.id.replace(/:(forward|reverse)$/,first.id.endsWith(':forward')?':reverse':':forward')])})];
+   const sprint=createRaceCourse(graph,path,{...settings,discipline:'sprint',name:`${district.locationLabel} · District sprint`});events.push(sprint);
+   const trial=createRaceCourse(graph,path,{...settings,participants:1,discipline:'time-trial',name:`${district.locationLabel} · Time trial`});events.push(trial);break;
+  }catch(error){if(!/race_|disconnected/.test(error.message))throw error;rejected(error);}
+ }
+ return {graph,events,diagnostics:{attemptFailures:failures,starts:starts.length,nodes:graph.nodes.length,edges:graph.edges.length}};
+}

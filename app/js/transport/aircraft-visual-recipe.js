@@ -1,5 +1,6 @@
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import { transportDamagePresentation } from './damage-model.js?v=1';
+import {attachLicensedAircraftVisual} from './licensed-aircraft-visual.js';
 
 const PALETTE = Object.freeze({
   body: 0xc6c1b1,
@@ -672,6 +673,21 @@ function createAircraftVisual(THREE, entry, options = {}) {
       ? helicopterVisual(THREE, entry, options, mats)
       : fixedWingVisual(THREE, entry, options, mats);
   }
+  const fallback=root;
+  root=new THREE.Group();
+  root.add(fallback);
+  const disposeGeometry=object=>object.traverse(part=>{
+    part.geometry?.dispose?.();
+    for(const mat of (Array.isArray(part.material)?part.material:[part.material]))mat?.dispose?.();
+  });
+  let fallbackReleased=false;
+  const releaseFallback=()=>{
+    if(fallbackReleased)return;
+    fallbackReleased=true;
+    detachSceneObject(fallback);
+    disposeGeometry(fallback);
+  };
+  const licensed=attachLicensedAircraftVisual(THREE,root,entry,{groundOffset:aircraftGroundOffset(entry),onReady:releaseFallback});
   root.name = entry.label;
   root.userData.transportCatalogId = entry.id;
   root.userData.transportDomain = 'aviation';
@@ -686,7 +702,12 @@ function createAircraftVisual(THREE, entry, options = {}) {
   smoke.position.set(0, entry.dimensions.height * .2, entry.dimensions.length * .25);
   smoke.userData.aircraftDamageSmoke = true;
   root.add(smoke);
+  let disposed=false;
   const dispose = () => {
+    if(disposed)return;
+    disposed=true;
+    licensed?.dispose();
+    releaseFallback();
     if (root.parent?.remove) root.parent.remove(root);
     else detachSceneObject(root);
     root.traverse((object) => {
@@ -695,7 +716,7 @@ function createAircraftVisual(THREE, entry, options = {}) {
       else object.material?.dispose?.();
     });
   };
-  return { root, dispose };
+  return { root, dispose, ready:licensed?.ready||Promise.resolve(true) };
 }
 
 function updateAircraftVisual(visual, condition = 1, dt = 0) {

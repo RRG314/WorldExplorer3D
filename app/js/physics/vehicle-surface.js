@@ -1,3 +1,6 @@
+import {resolveVehicleRoadContactPose} from '../engine/vehicle-road-attitude.js?v=3';
+import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_ROLL} from './road-plane-dynamics.js';
+
 const SURFACE_PROFILES = Object.freeze({
   asphalt: Object.freeze({ kind: 'asphalt', label: 'ROAD', grip: 1, rolling: 1, accel: 1, topSpeed: 1, drift: 1 }),
   gravel: Object.freeze({ kind: 'gravel', label: 'GRAVEL', grip: 0.74, rolling: 1.34, accel: 0.84, topSpeed: 0.76, drift: 0.96 }),
@@ -87,6 +90,22 @@ export function sampleEarthVehicleGroundContact(appCtx, options = {}) {
   const rearY = Number.isFinite(byId.rear?.y) ? byId.rear.y : centerY;
   const rightY = Number.isFinite(byId.right?.y) ? byId.right.y : centerY;
   const leftY = Number.isFinite(byId.left?.y) ? byId.left.y : centerY;
+  const feature=center.feature,model=feature?.transportSurfaceModel,survey=model?.surveyedSurface,venue=survey?.venueSource;
+  if(roadCentered&&model?.reviewedSurfacePhase==='accepted'&&survey?.surfaceModel===BANKED_ROAD_MODEL&&venue&&
+    feature.surfaceSurveyEvidence?.venueSource===venue&&survey.sourceFeatureId===feature.sourceFeatureId&&
+    (venue.sourceFeatureIds?.includes(feature.sourceFeatureId)||venue.pitSourceFeatureIds?.includes(feature.sourceFeatureId))){
+    // Reuse the published-road four-wheel solve already used by racing and
+    // vehicle presentation. A highest-probe root floats above a bank even when
+    // its body roll is correct. Ordinary roads retain their conservative fit.
+    const pose=resolveVehicleRoadContactPose({x,y:centerY,z,yaw:angle,maximumRoll:BANKED_ROAD_MAXIMUM_ROLL,
+      variant:{wheelBase:halfWheelBase*2,halfTrack},sampleSurface:(px,pz)=>{
+        const sample=appCtx.SurfaceQuery.driveAt(px,pz,{preferRoad:true,currentY:centerY,sampleRenderedMesh:false,preferredRoadOnly:true}),y=Number(sample?.position?.y);
+        return sample?.kind==='road'&&Number.isFinite(y)&&(sample.feature===feature||Math.abs(y-centerY)<=2.5)?y:NaN;
+      }});
+    if(pose.sampledWheelContacts===4)return Object.freeze({centerY,supportY:pose.y,pitch:pose.pitch,roll:pose.roll,
+      sampleCount:samples.length,supportSampleCount:supportSamples.length,roadCentered,
+      sampledWheelContacts:pose.sampledWheelContacts,maximumWheelGap:pose.maximumWheelGap,maximumWheelPenetration:pose.maximumWheelPenetration});
+  }
   return Object.freeze({
     centerY,
     supportY: Math.max(centerY, ...supportSamples.map((sample) => sample.y)),

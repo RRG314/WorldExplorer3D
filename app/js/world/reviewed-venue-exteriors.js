@@ -1,3 +1,4 @@
+import {reserveSilverstoneStandRepresentations,createSilverstoneGrandstandExteriors,isSilverstoneStandRepresentation} from './silverstone-grandstand-exterior.js';
 import {AQUARIUM_EXTERIOR_PARTS} from './aquarium-exterior-survey.js';
 import {AQUARIUM_GEOGRAPHY} from '../interiors/aquarium-geography.js';
 import {reviewedVenueForBuilding} from '../interiors/venue-exterior-policy.js';
@@ -6,6 +7,12 @@ import {batchOwnedStaticStructure} from './static-structure-batching.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {finishVenueSurface} from './venue-surface-materials.js';
 import {replaceVenueCollision,venueComponentCollider} from './venue-collision.js';
+import {createSilverstoneWingExterior,isSilverstoneWing} from './silverstone-wing-exterior.js';
+import {createNordschleifeT13Exterior,isT13StandRepresentation} from './nordschleife-t13-exterior.js';
+import {createDaytonaGrandstandExterior,isDaytonaStandRepresentation,reserveDaytonaGrandstandRepresentations} from './daytona-grandstand-exterior.js';
+import {createDaytonaPerimeterExterior} from './daytona-perimeter-exterior.js';
+import {createDaytonaPaddockExteriors,isDaytonaPaddockRepresentation,reserveDaytonaPaddockRepresentations} from './daytona-paddock-exterior.js';
+import {addBuildingToSpatialIndex} from './building-spatial-index.js?v=7';
 
 const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){
  const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;
@@ -187,6 +194,65 @@ export function publishReviewedVenueExteriors(ctx,THREE){
   const door=ctx.buildingEntranceCatalog?.entrances?.find(e=>e.buildingSourceId===mesh.userData.sourceBuildingId);
   const root=peale(THREE,mesh,door);if(root)added.push(root);
  }
+ // Exterior interpretation does not confer the interior/door permissions used
+ // by reviewedVenueForBuilding. The closed pit building retains its existing
+ // mapped collision and identity; neighboring venue buildings are untouched.
+ const wings=ctx.buildingMeshes.filter(m=>!m.userData?.isRoofDetail&&isSilverstoneWing(m.userData));
+ for(const mesh of wings){
+  const root=createSilverstoneWingExterior(THREE,mesh);if(!root)continue;
+  const retired=new Set(ctx.buildingMeshes.filter(m=>isSilverstoneWing(m.userData)));
+  for(const old of retired){
+   detachSceneObject(old);old.geometry?.dispose();
+   for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();
+  }
+  ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
+  added.push(root);
+ }
+ const published=added.map(r=>r.name),venue=ctx.worldLoadRuntimeState?.venuePack,sequence=ctx._worldLoadSequence;
+ reserveSilverstoneStandRepresentations(ctx);
+ reserveDaytonaGrandstandRepresentations(ctx);
+ reserveDaytonaPaddockRepresentations(ctx);
+ // The existing transport-dependent publication phase runs after final road
+ // grading. A pre-grade flat foundation buries this long stand on the hillside.
+ const standFactory=venue?.id==='nurburgring-nordschleife'?createNordschleifeT13Exterior:venue?.id==='daytona-tri-oval'?createDaytonaGrandstandExterior:null,
+  standMatch=venue?.id==='daytona-tri-oval'?isDaytonaStandRepresentation:isT13StandRepresentation;
+ if(standFactory&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
+  if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
+  const stand=standFactory(THREE,ctx);if(!stand)return;
+  const retired=new Set(ctx.buildingMeshes.filter(m=>standMatch(m.userData,stand.footprint)||m.userData?.deferredReviewedExterior===venue.id));
+  for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
+  ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
+  replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>standMatch(b,stand.footprint)),[
+   venueComponentCollider(stand.root.userData.sourceBuildingId,stand.footprint,stand.bottom,stand.top)
+  ]);
+  ctx.addEarthWorldObject(stand.root);ctx.buildingMeshes.push(stand.root);published.push(stand.root.name);
+ });
+ if(venue?.id==='silverstone-grand-prix'&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
+  if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
+  for(const exterior of createSilverstoneGrandstandExteriors(THREE,ctx)){
+   const matches=data=>isSilverstoneStandRepresentation(data,exterior)||data?.deferredReviewedExterior==='silverstone-stand:'+exterior.sourceBuildingId;
+   const retired=new Set(ctx.buildingMeshes.filter(m=>matches(m.userData)));
+   for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
+   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
+   replaceVenueCollision(ctx,(ctx.buildings||[]).filter(matches),[venueComponentCollider(exterior.sourceBuildingId,exterior.footprint,exterior.bottom,exterior.top)]);
+   ctx.addEarthWorldObject(exterior.root);ctx.buildingMeshes.push(exterior.root);published.push(exterior.root.name);
+  }
+ });
+ if(venue?.id==='daytona-tri-oval'&&Array.isArray(ctx.deferredTransportLandmarkPublishers))ctx.deferredTransportLandmarkPublishers.push(()=>{
+  if(ctx._worldLoadSequence!==sequence||ctx.worldLoadRuntimeState?.venuePack!==venue)return;
+  for(const exterior of createDaytonaPaddockExteriors(THREE,ctx)){
+   const retired=new Set(ctx.buildingMeshes.filter(m=>isDaytonaPaddockRepresentation(m.userData,exterior)||m.userData?.deferredReviewedExterior==='daytona-paddock:'+exterior.sourceBuildingId));
+   for(const old of retired){detachSceneObject(old);old.geometry?.dispose();for(const mat of Array.isArray(old.material)?old.material:[old.material])if(!mat?.userData?.sharedRuntimeMaterial)mat?.dispose();}
+   ctx.replaceWorldCollection('buildingMeshes',ctx.buildingMeshes.filter(m=>!retired.has(m)));
+   replaceVenueCollision(ctx,(ctx.buildings||[]).filter(b=>isDaytonaPaddockRepresentation(b,exterior)),exterior.colliders||[
+    venueComponentCollider(exterior.sourceBuildingId,exterior.footprint,exterior.bottom,exterior.top)
+   ]);
+   ctx.addEarthWorldObject(exterior.root);ctx.buildingMeshes.push(exterior.root);published.push(exterior.root.name);
+  }
+  const exterior=createDaytonaPerimeterExterior(THREE,ctx);if(!exterior)return;
+  ctx.addEarthWorldObject(exterior.root);ctx.buildingMeshes.push(exterior.root);published.push(exterior.root.name);
+  for(const collider of exterior.colliders){ctx.buildings.push(collider);addBuildingToSpatialIndex(collider);}
+ });
  for(const root of added){ctx.addEarthWorldObject(root);ctx.buildingMeshes.push(root);}
- return {published:added.map(r=>r.name)};
+ return {published};
 }

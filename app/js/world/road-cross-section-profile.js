@@ -1,4 +1,6 @@
 import {roadMetersPerWorldUnit} from './road-units.js';
+import {roadPavementSectionForSegment} from './road-pavement-sections.js';
+import {reviewedStageDrivingInterval} from './road-source-survey.js';
 const MIN_PUBLISHED_ROAD_WIDTH_METERS = 1.2;
 const MIN_DRIVEABLE_ROAD_WIDTH_METERS = 4.8;
 const WIDTH_TRANSITION_METERS = 8;
@@ -45,7 +47,8 @@ function smoothstep(value) {
 }
 
 function roadWidthAtSegmentMeters(feature, segmentIndex = 0, segmentT = 0.5) {
-  const sourceWidth = sourceRoadWidthMeters(feature);
+  const pavement=roadPavementSectionForSegment(feature,segmentIndex,segmentT);
+  const sourceWidth = Math.min(sourceRoadWidthMeters(feature),pavement?pavement.width*roadMetersPerWorldUnit(feature):Infinity);
   const widths = segmentWidths(feature);
   if (!widths || widths.length === 0) return sourceWidth;
 
@@ -147,6 +150,12 @@ function minimumRoadWidthOnInterval(feature, segmentIndex = 0, startT = 0, endT 
 }
 
 function roadSegmentIsDriveable(feature, segmentIndex = 0, startT = 0, endT = 1) {
+  const stage=reviewedStageDrivingInterval(feature,segmentIndex,startT,endT);
+  if(stage){
+    if(!stage.selected&&!stage.originalDriveable)return false;
+    return feature?.driveable!==false&&minimumRoadWidthOnInterval(feature,segmentIndex,startT,endT)*roadMetersPerWorldUnit(feature)>=
+      (stage.selected?stage.minimumWidthMeters:MIN_DRIVEABLE_ROAD_WIDTH_METERS);
+  }
   return feature?.driveable !== false &&
     minimumRoadWidthOnInterval(feature, segmentIndex, startT, endT)*roadMetersPerWorldUnit(feature) >=
       MIN_DRIVEABLE_ROAD_WIDTH_METERS;

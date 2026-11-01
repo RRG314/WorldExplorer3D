@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "venueId": "nurburgring-nordschleife",
+  "sourceFile": "app/assets/racing/nordschleife/source.json",
+  "sourceSha256": "0fcd281250a971a66b795850d1657541b475cba5e3ac249e21a3a0439d3a5d26",
+  "normalizedObservations": {
+    "file": "config/racing-venues/observations/nordschleife-decks.json",
+    "sha256": "58bbb7338d53c51741fd091f4274726dd8095f395c069e7a032bc1d8ee5c6c72"
+  },
+  "groundArtifacts": [
+    {
+      "artifactId": "nordschleife-fine-sw-v1",
+      "contentSha256": "bb51f5766addeb02d59e2d6a9f68c84787b32f2e0907586b5f0ccfcd68cc82c1"
+    },
+    {
+      "artifactId": "nordschleife-fine-se-v1",
+      "contentSha256": "085e6b3bf3919b20fbd7419c734a1392ddf19c28d9216c96c96185b8b0c4552d"
+    },
+    {
+      "artifactId": "nordschleife-fine-nw-v1",
+      "contentSha256": "8ef2dc7bb03787f248da570967d902cfa917f2dbce02929f5581e1a64baba428"
+    },
+    {
+      "artifactId": "nordschleife-fine-ne-v1",
+      "contentSha256": "11e185425a7ae941d59bb666a0ac14132d8e2892bb290f86a91c115897711945"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "filename": "dom1_32_352_5578_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_352_5578_1_rp_2025.tif",
+      "bytes": 2312167,
+      "sha256": "2a7991a0d7d158386a0e9a151d7b857c5369f419a95c7c166b9dbcfaac0895b3"
+    },
+    {
+      "filename": "dom1_32_354_5578_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_354_5578_1_rp_2025.tif",
+      "bytes": 2067298,
+      "sha256": "305c363024404b79720136aeeaf9259554d4194f6a987e82154d2b9102173632"
+    },
+    {
+      "filename": "dom1_32_354_5582_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_354_5582_1_rp_2025.tif",
+      "bytes": 2314934,
+      "sha256": "00bdef7f7ffb529459c23de805b67f782c722cb4b37e50a909661787957a61a8"
+    },
+    {
+      "filename": "dom1_32_356_5579_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_356_5579_1_rp_2025.tif",
+      "bytes": 1906895,
+      "sha256": "ec427c39b647cfd6385fb83752ff5eb3f6062c67d93cbc55f17141a7930ff845"
+    },
+    {
+      "filename": "dom1_32_352_5579_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_352_5579_1_rp_2025.tif",
+      "bytes": 2213308,
+      "sha256": "3cba233ddf04cb031abd15a02dc7f49c78c5f0ac38022ba9d4dfc01820eb78f6"
+    },
+    {
+      "filename": "dom1_32_353_5578_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_353_5578_1_rp_2025.tif",
+      "bytes": 2371661,
+      "sha256": "a0f37f1fb394b783a2edabfa0a621b5b561925241960fb1b5668dfaa20174a5c"
+    },
+    {
+      "filename": "dom1_32_355_5579_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_355_5579_1_rp_2025.tif",
+      "bytes": 2079665,
+      "sha256": "45f4125c157e485a6aa90f3b6314368eed11e1746bca00b78e8957dc01911d10"
+    },
+    {
+      "filename": "dom1_32_356_5580_1_rp_2025.tif",
+      "url": "https://geobasis-rlp.de/data/dom1/current/tif/dom1_32_356_5580_1_rp_2025.tif",
+      "bytes": 2335424,
+      "sha256": "eefa55f56d45abf26489e9b2555bf9ef7b28eefe6c47b160aa115b047d540208"
+    }
+  ],
+  "license": "DL-DE-BY-2.0",
+  "licenseUrl": "https://www.govdata.de/dl-de/by-2-0",
+  "attribution": "\u00a9 GeoBasis-DE / LVermGeoRP; DOM1 file-year 2025. Core fitting, datum normalization and wider pavement reconstruction by World Explorer 3D. Geographic path \u00a9 OpenStreetMap contributors, ODbL 1.0.",
+  "observedCoreWidthMeters": 4,
+  "maximumCoreResidualMeters": 0.05,
+  "pavementObservations": {
+    "file": "config/racing-venues/observations/nordschleife-approaches.json",
+    "sha256": "203e2897cb59c7f12443f2a916163bbd59bf59deb3e18e48cbb71dec4728da39"
+  },
+  "maximumReconstructedSpanMeters": 8.05,
+  "maximumPavementAdjustmentMeters": 0.05
+}

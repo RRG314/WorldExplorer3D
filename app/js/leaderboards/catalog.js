@@ -1,4 +1,10 @@
 const LEADERBOARD_CATALOG = Object.freeze({
+  racing: Object.freeze({
+    id:'racing',icon:'⚑',label:'My racing times',scope:'This device • Practice',
+    resultDisclosure:'Personal bests for each car setup. These are not verified online rankings.',
+    objective:'Choose a course to see your saved practice times.',
+    empty:'Finish a road race to add a practice time. Existing progress stays in your Journal.'
+  }),
   flower: Object.freeze({
     id: 'flower',
     icon: '🌹',

@@ -12,19 +12,20 @@ export function createWalkingFrameCommands({context,state,car,carMesh,eyeHeight,
   }
   function enterShipFrame(interior,point) {
     if(!context.activeShipInterior||context.activeInterior!==interior||interior?.environmentKind!=='expedition-ship'||
-      !point||![point.x,point.y,point.z].every(Number.isFinite)||
+      !point||![point.x,point.y,point.z].every(Number.isFinite)||(point.yaw!==undefined&&!Number.isFinite(point.yaw))||
       point.y<Number(interior.floorBaseY||0)+eyeHeight-.15||point.y>Number(interior.ceilingY||3.6)-.18||
       !pointInPolygon(point.x,point.z,interior.usableFootprint))return false;
     const collision=context.checkBuildingCollision?.(point.x,point.z,.35,{actorBaseY:point.y-eyeHeight,actorHeight:eyeHeight});
     if(collision?.collision)return false;
     context.clearControlInputState?.('ship-frame-entry');
     context.Walk?.deactivateWater?.();
-    Object.assign(state.walker,{x:point.x,y:point.y,z:point.z,angle:0,yaw:0,pitch:0,lookYawOffset:0,vy:0,vx:0,vz:0,
+    const yaw=point.yaw??0;
+    Object.assign(state.walker,{x:point.x,y:point.y,z:point.z,angle:yaw,yaw,pitch:0,lookYawOffset:0,vy:0,vx:0,vz:0,
       onGround:true,onBuilding:false,swimming:null,waterTraversal:'dry',_resolvedGroundState:null,_walkSupportFeature:null});
     state.mode='walk';state.view='first';
-    Object.assign(car,{x:point.x,y:point.y-eyeHeight+1.2,z:point.z,angle:0,vx:0,vy:0,vz:0,speed:0});
+    Object.assign(car,{x:point.x,y:point.y-eyeHeight+1.2,z:point.z,angle:yaw,vx:0,vy:0,vz:0,speed:0});
     if(carMesh)carMesh.visible=false;
-    if(state.characterMesh){state.characterMesh.visible=false;state.characterMesh.position.set(point.x,point.y-eyeHeight,point.z);state.characterMesh.rotation.y=0;}
+    if(state.characterMesh){state.characterMesh.visible=false;state.characterMesh.position.set(point.x,point.y-eyeHeight,point.z);state.characterMesh.rotation.y=yaw;}
     return true;
   }
   function restoreFrameState(saved) {

@@ -63,7 +63,7 @@ export function compileEngineeredApproachExcavation(feature, sampleTerrain, {roa
     }
     const cutHeight=Math.min(Math.max(.1,roof+.2),ceiling-Math.max(a.y,b.y));
     appendCollinearMask(masks, {x:(a.x+b.x)*.5,z:(a.z+b.z)*.5,tangentX:tx,tangentZ:tz,
-      roadY:(a.y+b.y)*.5,grade:(b.y-a.y)/length,halfWidth,halfDepth:length*.5+.02,cutHeight,
+      roadY:(a.y+b.y)*.5,grade:(b.y-a.y)/length,halfWidth,halfDepth:length*.5,cutHeight,
       ...(Number.isFinite(ceiling)?{protectedCeiling:ceiling}:{})});
     for (const side of [-1, 1]) {
       if (tunnelWallIsOpen({wallOpenings}, side, mid)) continue;
@@ -79,8 +79,20 @@ export function compileEngineeredApproachExcavation(feature, sampleTerrain, {roa
     }
   }
   if (!masks.length) return null;
+  // Overlap internal sections, but never cut pavement beyond the independent
+  // approach's published cap. Applying the same 2 cm pad at a source endpoint
+  // excavated a strip of the adjoining terrain-owned street with no road above.
+  const first=rings[0],last=rings.at(-1);
+  const publishedMasks=masks.map(mask=>{
+    const {tangentX:tx,tangentZ:tz,halfDepth:h}=mask;
+    const startPad=Math.hypot(mask.x-tx*h-first.x,mask.z-tz*h-first.z)<1e-5?0:.02;
+    const endPad=Math.hypot(mask.x+tx*h-last.x,mask.z+tz*h-last.z)<1e-5?0:.02;
+    const shift=(endPad-startPad)*.5;
+    return Object.freeze({...mask,x:mask.x+tx*shift,z:mask.z+tz*shift,
+      roadY:mask.roadY+mask.grade*shift,halfDepth:h+(startPad+endPad)*.5});
+  });
   return Object.freeze({kind:'engineered_approach_excavation',halfWidth,
-    rings:Object.freeze(rings),wallOpenings,masks:Object.freeze(masks.map(Object.freeze)),walls:Object.freeze(walls)});
+    rings:Object.freeze(rings),wallOpenings,masks:Object.freeze(publishedMasks),walls:Object.freeze(walls)});
 }
 
 // A straight grade is one cut volume even when terrain/wall sampling requires
@@ -92,7 +104,7 @@ function appendCollinearMask(masks, next) {
   if (previous && Math.abs(previous.tangentX-next.tangentX)<1e-7 &&
       Math.abs(previous.tangentZ-next.tangentZ)<1e-7 && previous.halfWidth===next.halfWidth &&
       previous.protectedCeiling===undefined && next.protectedCeiling===undefined) {
-    const aLength=previous.halfDepth*2-.04, bLength=next.halfDepth*2-.04;
+    const aLength=previous.halfDepth*2, bLength=next.halfDepth*2;
     const endX=previous.x+previous.tangentX*aLength*.5, endZ=previous.z+previous.tangentZ*aLength*.5;
     const startX=next.x-next.tangentX*bLength*.5, startZ=next.z-next.tangentZ*bLength*.5;
     const startY=previous.roadY-previous.grade*aLength*.5, endY=next.roadY+next.grade*bLength*.5;
@@ -106,7 +118,7 @@ function appendCollinearMask(masks, next) {
       previous.x=(previous.x-previous.tangentX*aLength*.5)+previous.tangentX*length*.5;
       previous.z=(previous.z-previous.tangentZ*aLength*.5)+previous.tangentZ*length*.5;
       previous.roadY=(startY+endY)*.5; previous.grade=grade;
-      previous.halfDepth=length*.5+.02; previous.cutHeight=Math.max(previous.cutHeight,next.cutHeight); previous.floorError=errorBound;
+      previous.halfDepth=length*.5; previous.cutHeight=Math.max(previous.cutHeight,next.cutHeight); previous.floorError=errorBound;
       return;
     }
   }

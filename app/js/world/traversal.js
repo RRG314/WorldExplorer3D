@@ -1,3 +1,4 @@
+import {ROAD_SOURCE_MINIMUM_SPAN_METERS,roadMetersPerWorldUnit} from './road-units.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
 import {
@@ -114,6 +115,20 @@ function buildTraversalGraph(mode = 'walk') {
   const segments = [];
   const nodesByKey = new Map();
   const featureKinds = {};
+  // Connections describe pairs of incident roads. Several pairs can be the
+  // same physical junction; aliases are temporary compilation data, not a
+  // second graph owner. A retained source node must never collapse into the
+  // legacy 2.5-unit proximity bucket with a different mapped node.
+  const aliases = new Map();
+  const rootKey = key => {
+    if (!aliases.has(key)) aliases.set(key,key);
+    let root = key;
+    while (aliases.get(root) !== root) root = aliases.get(root);
+    while (aliases.get(key) !== root) {
+      const next=aliases.get(key);aliases.set(key,root);key=next;
+    }
+    return root;
+  };
 
   const upsertNode = (point, feature, explicitKey = '') => {
     const key = explicitKey || traversalNodeKey(point.x, point.z, feature);
@@ -152,36 +167,44 @@ function buildTraversalGraph(mode = 'walk') {
       distances[index] = distances[index - 1] +
         Math.hypot(points[index].x - points[index - 1].x, points[index].z - points[index - 1].z);
     }
-    if (stations.length === 0) {
-      return {distances, samples: points.map((point, index) => ({
-        point,
-        distanceAlong: distances[index],
-        segmentIndex: Math.min(points.length - 2, index),
-        segmentT: index === points.length - 1 ? 1 : 0,
-        graphNodeId: ''
-      }))};
+    const sourceNodes = new Map();
+    if (feature.transportRecord?.completeness === 'lossless') {
+      const namespace=String(feature.transportRecord.identity || feature.sourceFeatureId || '').split(':')[0];
+      for (const node of feature.sourceTopologyNodes || []) {
+        if (node?.id !== undefined && Number.isFinite(node.x) && Number.isFinite(node.z)) {
+          sourceNodes.set(`${node.x}:${node.z}`,
+            `source:${namespace}:${String(node.id)}:${runtime.featureTraversalKey(feature)}`);
+        }
+      }
     }
     const samples = points.map((point, index) => ({
       point,
       distanceAlong: distances[index],
       segmentIndex: Math.min(points.length - 2, index),
       segmentT: index === points.length - 1 ? 1 : 0,
-      graphNodeId: ''
+      sourceNodeKey: sourceNodes.get(`${point.x}:${point.z}`) || '',
+      graphNodeId: '',
+      aliases: []
     }));
+    for (const sample of samples) if (sample.sourceNodeKey) sample.aliases.push(sample.sourceNodeKey);
     for (const station of stations) {
       samples.push({
         point: station.point,
         distanceAlong: Number(station.distanceAlong),
         segmentIndex: Number(station.segmentIndex),
         segmentT: Number(station.segmentT),
-        graphNodeId: `transport:${station.nodeId}`
+        graphNodeId: `transport:${station.nodeId}`,
+        aliases: [`transport:${station.nodeId}`]
       });
     }
     samples.sort((left, right) => left.distanceAlong - right.distanceAlong);
     const compact = [];
     for (const sample of samples) {
       const previous = compact[compact.length - 1];
-      if (previous && Math.abs(previous.distanceAlong - sample.distanceAlong) <= 0.02) {
+      if (previous && Math.abs(previous.distanceAlong - sample.distanceAlong) <= 0.02 &&
+          !(previous.sourceNodeKey && sample.sourceNodeKey && previous.sourceNodeKey !== sample.sourceNodeKey)) {
+        previous.aliases.push(...sample.aliases);
+        previous.sourceNodeKey ||= sample.sourceNodeKey;
         if (sample.graphNodeId) {
           previous.point = sample.point;
           previous.segmentIndex = sample.segmentIndex;
@@ -195,15 +218,27 @@ function buildTraversalGraph(mode = 'walk') {
     return {samples: compact, distances};
   };
 
+  // Resolve aliases across all incident features before assigning node IDs.
+  // Otherwise the first of three roads can retain an obsolete pair identity.
+  const paths = new Map();
+  for (const feature of features) {
+    if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
+    const path=compiledPathPoints(feature);paths.set(feature,path);
+    for (const sample of path.samples) {
+      if (!sample.aliases.length) continue;
+      const first=sample.aliases[0];rootKey(first);
+      for (const alias of sample.aliases.slice(1)) aliases.set(rootKey(alias),rootKey(first));
+    }
+  }
   for (let f = 0; f < features.length; f++) {
     const feature = features[f];
     if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
 
     const kind = traversalFeatureKind(feature);
     featureKinds[kind] = (featureKinds[kind] || 0) + 1;
-    const {samples: pathPoints, distances} = compiledPathPoints(feature);
+    const {samples: pathPoints, distances} = paths.get(feature);
     const nodeIds = pathPoints.map((sample) =>
-      upsertNode(sample.point, feature, sample.graphNodeId)
+      upsertNode(sample.point, feature, sample.aliases.length ? rootKey(sample.aliases[0]) : '')
     );
     const segmentPenalty = mode === 'drive' ? 1 : walkSurfacePenalty(feature);
     const direction = mode === 'drive'
@@ -218,7 +253,11 @@ function buildTraversalGraph(mode = 'walk') {
       const p1 = pathPoints[i].point;
       const p2 = pathPoints[i + 1].point;
       const length = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-      if (!(length > 0.05)) continue;
+      const exact=feature.transportRecord?.completeness==='lossless'&&pathPoints[i].aliases.length&&pathPoints[i+1].aliases.length;
+      // A certified connection can split a retained source span less than five
+      // centimetres from its node. Dropping just that interval disconnects the
+      // path. Preserve its metric source precision; legacy proximity is unchanged.
+      if (!(length > 0.05) && !(exact&&length*roadMetersPerWorldUnit(feature)>=ROAD_SOURCE_MINIMUM_SPAN_METERS)) continue;
       const source = traversalSourceInterval(
         feature.pts, distances,
         pathPoints[i].distanceAlong,

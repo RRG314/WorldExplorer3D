@@ -906,7 +906,10 @@ async function deleteRoomTree(roomRef) {
     'state',
     'urbanEntities',
     'urbanActors',
-    'urbanCivic'
+    'urbanCivic',
+    'racing',
+    'racingCourses',
+    'racingDistricts'
   ];
   for (const name of subcollections) {
     await deleteDocsByQuery(roomRef.collection(name));
@@ -981,6 +984,7 @@ async function deleteUserData(uid) {
   await releaseWorldPropertiesForUser(uid);
   await db.collection('propertyLeaderboard').doc(uid).delete();
   await deleteDiscoveryTradesForUser(uid);
+  await deleteDocsByQuery(db.collection('portalPairings').where('approvedUid','==',uid),200,'portalPairings(approvedUid)');
 
   if (db && typeof db.recursiveDelete === 'function') {
     await db.recursiveDelete(userRef);
@@ -993,6 +997,7 @@ async function deleteUserData(uid) {
     await deleteDocsByQuery(userRef.collection('myRooms'), 200, 'users/{uid}/myRooms');
     await deleteDocsByQuery(userRef.collection('economy'), 200, 'users/{uid}/economy');
     await deleteDocsByQuery(userRef.collection('commerceReceipts'), 200, 'users/{uid}/commerceReceipts');
+    await deleteDocsByQuery(userRef.collection('vehicleReceipts'), 200, 'users/{uid}/vehicleReceipts');
     await deleteDocsByQuery(userRef.collection('commerceItems'), 200, 'users/{uid}/commerceItems');
     await deleteDocsByQuery(userRef.collection('commerceStock'), 200, 'users/{uid}/commerceStock');
     await deleteDocsByQuery(userRef.collection('gameplay'), 200, 'users/{uid}/gameplay');
@@ -1005,6 +1010,9 @@ async function deleteUserData(uid) {
   } else {
     await deleteDocsByQuery(explorerProfileRef.collection('items'), 200, 'explorerProfiles/{uid}/items');
     await deleteDocsByQuery(explorerProfileRef.collection('claims'), 200, 'explorerProfiles/{uid}/claims');
+    for (const name of ['portalTrail','portalOperations','portalLimits']) {
+      await deleteDocsByQuery(explorerProfileRef.collection(name), 200, `explorerProfiles/{uid}/${name}`);
+    }
     await explorerProfileRef.delete();
   }
 }
@@ -1935,6 +1943,7 @@ exports.claimUrbanVehicle = functions.region('us-central1').runWith({ invoker: '
     const result = await claimUrbanVehicleLease({
       runTransaction: (callback) => db.runTransaction(callback),
       entityRef: context.roomRef.collection('urbanEntities').doc(documentId),
+      personalGarageRef:entityId.startsWith('personal:')?db.collection('users').doc(auth.uid).collection('gameplay').doc('vehicleUpgrades'):null,
       uid: auth.uid,
       nowMs: context.nowMs,
       timestampFromMs: urbanTimestampFromMs,
@@ -2159,6 +2168,73 @@ exports.settleExplorerCommerceOutcome = functions.region('us-central1').runWith(
     console.error('[settleExplorerCommerceOutcome] failed:', error);
     res.status(500).json({ error: 'The Explorer Wallet could not settle this service.' });
   }
+});
+
+exports.commitExplorerVehicleAction = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req,res)=>{
+  if(setCors(req,res))return;
+  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+  const auth=await verifyAuth(req,res);if(!auth)return;
+  const input=req.body||{};
+  if(!/^[A-Za-z0-9:._-]{12,120}$/.test(input.requestId||'')||String(input.homeId||'').length>420)
+    return res.status(400).json({error:'A valid vehicle command is required.'});
+  const user=db.collection('users').doc(auth.uid),homeId=String(input.homeId||'');
+  try {
+    const result=await require('./economy-authority').settleVehicleGarageAction({
+      runTransaction:fn=>db.runTransaction(fn),walletRef:user.collection('economy').doc('wallet'),
+      progressRef:user.collection('gameplay').doc('vehicleUpgrades'),
+      receiptRef:user.collection('vehicleReceipts').doc(input.requestId),
+      propertyRef:homeId?db.collection('worldProperties').doc(propertyDocumentId(homeId)):null,
+      uid:auth.uid,input,nowMs:Date.now(),timestampFromMs:urbanTimestampFromMs});
+    return res.status(200).json(result);
+  }catch(error){
+    const reason=String(error.message||'');
+    if(/^(vehicle_|invalid_vehicle_|not_enough_credits)/.test(reason))return res.status(reason==='vehicle_garage_changed'?409:422).json({error:reason,reason});
+    console.error('[commitExplorerVehicleAction] failed:',error);
+    return res.status(500).json({error:'Your garage could not be saved. Please try again.'});
+  }
+});
+
+function racingAccountHandler(operation){return functions.region('us-central1').runWith({invoker:'public'}).https.onRequest(async(req,res)=>{
+ if(setCors(req,res))return;
+ if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+ const auth=await verifyAuth(req,res);if(!auth)return;
+ if(!await verifyAppCheck(req,res))return;
+ if(auth.firebase?.sign_in_provider==='anonymous')return res.status(403).json({error:'Sign in with an account to use online racing.'});
+ try{await require('./community-consent').requireCommunityConsent(db,auth.uid);
+  res.set('Cache-Control','no-store');return res.status(200).json(await operation(auth.uid,req.body));
+ }catch(error){return res.status(error.status||500).json({error:error.status?error.message:'Racing could not be read. Try again.'});}
+});}
+exports.getRacingService=racingAccountHandler(async()=>require('./racing-api').racingServiceDescriptor(db));
+exports.getRacingCareer=racingAccountHandler(async(uid,input)=>{
+ const api=require('./racing-career');
+ return input?.view==='history'?api.readRacingCareerHistory({db,uid,kind:input.kind,cursor:input.cursor}):api.readRacingCareer({db,uid,roomCode:input?.roomCode});
+});
+exports.commitRacingCareer=racingAccountHandler(async(uid,input)=>{
+ const user=await admin.auth().getUser(uid);return require('./racing-career').commitRacingCareer({db,uid,input,label:user.displayName||'Explorer'});
+});
+exports.cleanupRacingDeletedAccount=functions.region('us-central1').runWith({failurePolicy:true}).auth.user().onDelete(async user=>{
+ const job=db.collection('captureAccountDeletions').doc(user.uid);
+ await db.runTransaction(async tx=>{if(!(await tx.get(job)).exists)tx.create(job,{status:'auth-deleted',updatedAt:admin.firestore.Timestamp.now()});});
+ await require('./racing-account-cleanup').cleanupRacingAccount({db,uid:user.uid});
+});
+exports.projectRacingCareer=functions.region('us-central1').runWith({failurePolicy:true}).firestore.document('racingResults/{resultId}').onCreate(async snapshot=>{
+ await require('./racing-career').projectRacingCareerResult({db,id:snapshot.id});
+});
+exports.getRacingRecords=racingAccountHandler(async(uid,input)=>require('./racing-api').readRacingRecords({db,uid,boardId:input?.boardId,cursor:input?.cursor}));
+exports.getRacingCatalog=racingAccountHandler(async(uid,input)=>require('./racing-publication').readRacingCatalog({db,uid,locationId:input?.locationId,cursor:input?.cursor,roomCode:input?.roomCode,roomCourseId:input?.roomCourseId}));
+exports.getMyRacingRoutes=racingAccountHandler(async(uid)=>require('./racing-publication').readMyRacingRoutes({db,uid}));
+exports.commitRacingRoute=racingAccountHandler(async(uid,input)=>{
+ if(Buffer.byteLength(JSON.stringify(input||{}))>(input?.action==='share-room'?256:128)*1024)throw Object.assign(Error('race_route_too_large'),{status:413});
+ return require('./racing-publication').writeRacingRoute({db,admin,uid,input});
+});
+exports.reviewRacingRoutes=functions.region('us-central1').runWith({invoker:'public'}).https.onRequest(async(req,res)=>{
+ if(setCors(req,res))return;if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+ if(!await verifyAppCheck(req,res))return;const moderator=await requireModerator(req,res);if(!moderator)return;
+ res.set('Cache-Control','no-store');
+ try{const api=require('./racing-publication'),input=req.body||{};
+  const result=input.action==='list'?await api.listRacingReview({db,status:input.status,cursor:input.cursor}):await api.moderateRacingRoute({db,admin,moderatorUid:moderator.auth.uid,input});
+  return res.status(200).json(result);
+ }catch(error){return res.status(error.status||500).json({error:error.status?error.message:'Racing review could not be saved. Try again.'});}
 });
 
 exports.saveExplorerPlayerCondition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
@@ -2753,6 +2829,10 @@ Object.assign(exports, buildDiscoveryExports({
   db,
   admin
 }));
+
+Object.assign(exports, require('./portal').buildPortalExports({functions,db,setCors,verifyAuth,verifyAppCheck}));
+Object.assign(exports, require('./portal-pairing').buildPortalPairingExports({functions,db,setCors,verifyAuth,verifyAppCheck,
+  projectId:require('./tester-mail').runtimeProject(),getUser:uid=>admin.auth().getUser(uid),createCustomToken:uid=>admin.auth().createCustomToken(uid)}));
 
 Object.assign(exports, buildCommunityRealityCaptureExports({
   db,

@@ -17,7 +17,7 @@ const definitions = [
     visualRecipeId: 'aviation:explorer-aerobatic-jet'
   },
   {
-    id: 'expedition-prop', label: 'Expedition plane', aircraftKind: 'fixed-wing', role: 'bush',
+    id: 'expedition-prop', label: 'Cessna 172', aircraftKind: 'fixed-wing', role: 'bush',
     width: 1.65, height: 2.2, length: 7.9, wingspan: 10.9, massKg: 1280,
     topSpeedMph: 145, performance: { topSpeed: 145, topSpeedUnit: 'knots-ias', accelerationScale: 1.05, steeringScale: 1.08, gripScale: 1, brakeScale: 1.05, turningRadius: 7.5 },
     seatCount: 4, boardingPoints: ['front-left', 'front-right'], resistance: 150,
@@ -25,7 +25,7 @@ const definitions = [
     visualRecipeId: 'aviation:expedition-prop'
   },
   {
-    id: 'business-jet', label: 'Business jet', aircraftKind: 'fixed-wing', role: 'business',
+    id: 'business-jet', label: 'Dassault Falcon 10', aircraftKind: 'fixed-wing', role: 'business',
     width: 2.1, height: 3.8, length: 15.2, wingspan: 14.1, massKg: 8450,
     topSpeedMph: 430, performance: { topSpeed: 430, topSpeedUnit: 'knots-ias', accelerationScale: 1.22, steeringScale: .86, gripScale: 1.08, brakeScale: 1.12, turningRadius: 14 },
     seatCount: 9, boardingPoints: ['front-left'], resistance: 290,
@@ -73,9 +73,9 @@ const AVIATION_CATALOG = Object.freeze(definitions.map((definition) => defineTra
     referenceEvidence: REFERENCE_EVIDENCE
   },
   rights: {
-    kind: 'original-generic-design',
-    brand: 'unbranded',
-    attribution: 'World Explorer original vehicle design'
+    kind: ['expedition-prop','business-jet'].includes(definition.id)?'licensed-model':'original-generic-design',
+    brand: ['expedition-prop','business-jet'].includes(definition.id)?definition.label:'unbranded',
+    attribution: definition.id==='expedition-prop'?'Cessna 172 by Nobilis the Palaeovespa, CC BY 4.0':definition.id==='business-jet'?'Falcon10 by manilov.ap, CC BY 4.0':'World Explorer original vehicle design'
   }
 })));
 

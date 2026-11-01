@@ -329,7 +329,9 @@ function ensureTerrainSemanticTextureSets(mesh, repeats) {
     snowTextureSupported: Number(appCtx.renderer?.capabilities?.maxTextures || 0) >= 16,
     snowUvScale: 1 / (2 * (Number(appCtx.WORLD_UNITS_PER_METER) || 1)),
     baseSnowNormal: mesh.userData?.terrainVisualProfile?.mode === 'snow' && !mesh.userData?.worldCoverResult && !mesh.userData?.isFixedLocationTerrainLod,
-    biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || '')
+    biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || ''),
+    preferNearSurface: !!appCtx.worldLoadRuntimeState?.venuePack?.venueSource,
+    nearSurfaceRange: [35,140].map(meters=>meters*(Number(appCtx.WORLD_UNITS_PER_METER)||1))
   };
 }
 

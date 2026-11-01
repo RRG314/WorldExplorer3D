@@ -1,13 +1,13 @@
 // ES module bootstrap: modular loader + legacy app compatibility.
 // The runtime binds shell controls, so wait for that module before booting.
-import './app-shell-fragments.js?v=91';
+import './app-shell-fragments.js?v=93';
 import {
   classicScripts,
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=606';
-import { loadScriptList } from './modules/script-loader.js?v=56';
+} from './modules/manifest.js?v=617';
+import { loadScriptList, STARTUP_SCRIPT_TIMEOUT_MS } from './modules/script-loader.js?v=57';
 import {
   initStartupDiagnostics,
   recordStartupDiagnostic,
@@ -69,10 +69,10 @@ async function boot() {
     recordStartupDiagnostic('bootstrap', 'loading critical vendor scripts');
     const [coreThreeScript, ...dependentVendorScripts] = vendorScriptsCritical;
     if (coreThreeScript) {
-      await loadScriptList([coreThreeScript], { timeoutMs: 12000 });
+      await loadScriptList([coreThreeScript], { timeoutMs: STARTUP_SCRIPT_TIMEOUT_MS });
     }
     if (dependentVendorScripts.length > 0) {
-      await loadScriptList(dependentVendorScripts, { timeoutMs: 12000, parallel: true });
+      await loadScriptList(dependentVendorScripts, { timeoutMs: STARTUP_SCRIPT_TIMEOUT_MS, parallel: true });
     }
     recordStartupDiagnostic('bootstrap', 'critical vendor scripts ready', {
       hasTHREE: !!globalThis.THREE,
@@ -93,7 +93,7 @@ async function boot() {
       (relativePath) => new URL(relativePath, import.meta.url).toString()
     );
     recordStartupDiagnostic('bootstrap', 'loading classic scripts', { count: resolvedClassicScripts.length });
-    await loadScriptList(resolvedClassicScripts, { timeoutMs: 12000 });
+    await loadScriptList(resolvedClassicScripts, { timeoutMs: STARTUP_SCRIPT_TIMEOUT_MS });
 
     const configuredEntrypoint = String(
       globalThis.__WORLD_EXPLORER_PRODUCTION__?.appEntrypoint || ''

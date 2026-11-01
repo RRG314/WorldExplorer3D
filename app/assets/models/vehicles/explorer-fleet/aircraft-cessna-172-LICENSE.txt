@@ -1,0 +1,11 @@
+Model Information:
+* title:	Cessna 172
+* source:	https://sketchfab.com/3d-models/cessna-172-64cddaee5aff470682659a8c08525046
+* author:	e737 (https://sketchfab.com/e0057537)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Cessna 172" (https://sketchfab.com/3d-models/cessna-172-64cddaee5aff470682659a8c08525046) by e737 (https://sketchfab.com/e0057537) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

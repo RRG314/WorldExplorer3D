@@ -1,12 +1,17 @@
 import { VEHICLE_CATALOG } from '../engine/vehicle-catalog.js?v=6';
+import {personalVehicleById,personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 
 export function publishedRoomVehicleDefinition(entity, driveOnLeft = false) {
-  if (entity?.kind !== 'vehicle' || !entity.entityId) return null;
-  const variant = VEHICLE_CATALOG.find(entry => entry.bodyStyle === entity.style && entry.label === entity.label)
+  if (entity?.kind !== 'vehicle' || typeof entity.entityId!=='string' || !entity.entityId) return null;
+  const separator=entity.entityId.lastIndexOf(':');
+  const personal=entity.entityId.startsWith('personal:')&&separator>9?personalVehicleById(entity.entityId.slice(separator+1)):null;
+  if(entity.entityId.startsWith('personal:')&&(!personal||entity.label!==personal.label||entity.style!==personal.category))return null;
+  const variant = personal?VEHICLE_CATALOG.find(entry=>entry.id===personal.variantId):VEHICLE_CATALOG.find(entry => entry.bodyStyle === entity.style && entry.label === entity.label)
     || VEHICLE_CATALOG.find(entry => entry.bodyStyle === entity.style);
   if (!variant || !['x', 'y', 'z', 'yaw'].every(key => Number.isFinite(entity.pose?.[key]))) return null;
   return {
     id: entity.entityId, variant, color: entity.color, condition: entity.condition,
+    ...(personal?{personalVehicleId:personal.id,vehicleIdentity:personalVehicleIdentity(personal.id),assetId:personal.assetId}:{}),
     durabilityPolicy: variant.durabilityPolicy, resistance: variant.resistance,
     playable: variant.playable, enterable: variant.enterable,
     source: 'room-published-vehicle', roomPublished: true,
@@ -28,12 +33,20 @@ export function reconcilePublishedRoomVehicles(state, options) {
     state.roomTrafficOwnership.delete(id);
   }
   for (const entity of state.remoteEntities.values()) {
-    if (!publishedRoomVehicleDefinition(entity, state.driveOnLeft)) continue;
+    const published = publishedRoomVehicleDefinition(entity, state.driveOnLeft);
+    if (!published) continue;
     if (!state.roomTrafficOwnership.has(entity.entityId)) {
       const agentId = options.claimTrafficAgent?.(entity.entityId);
       if (agentId) state.roomTrafficOwnership.set(entity.entityId, agentId);
     }
     const local = state.vehicles.find(vehicle => vehicle.id === entity.entityId && vehicle.ambientTraffic);
+    if (local?.variant?.id && local.variant.id !== published.variant.id && !protectedVehicle(local)) {
+      // Fleet additions can change a local traffic seed. The published room
+      // identity keeps its actual model; recreate through the existing owner.
+      options.disposeVehicle(local);
+      state.vehicles.splice(state.vehicles.indexOf(local),1);
+      continue;
+    }
     if (local) {
       local.ambientTraffic = false;
       local.roomPublished = true;

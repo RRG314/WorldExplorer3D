@@ -81,6 +81,14 @@
         ]
       },
       {
+        "source": "/runtime/**",
+        "headers": [{"key":"Cache-Control","value":"public, max-age=31536000, immutable"}]
+      },
+      {
+        "source": "/app/js/bundles/**",
+        "headers": [{"key":"Cache-Control","value":"public, max-age=31536000, immutable"}]
+      },
+      {
         "source": "**/*.@(jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map|glb|gltf)",
         "headers": [
           {
@@ -109,6 +117,14 @@
       }
     ],
     "rewrites": [
+      {"source":"/getRacingService","function":"getRacingService"},
+      {"source":"/getRacingRecords","function":"getRacingRecords"},
+      {"source":"/getRacingCatalog","function":"getRacingCatalog"},
+      {"source":"/getMyRacingRoutes","function":"getMyRacingRoutes"},
+      {"source":"/commitRacingRoute","function":"commitRacingRoute"},
+      {"source":"/reviewRacingRoutes","function":"reviewRacingRoutes"},
+      {"source":"/getRacingCareer","function":"getRacingCareer"},
+      {"source":"/commitRacingCareer","function":"commitRacingCareer"},
       {"source":"/manageAppTesters","function":"manageAppTesters"},
       {"source":"/appTesterEmailWebhook","function":"appTesterEmailWebhook"},
       {
@@ -196,6 +212,42 @@
         "function": "listExplorerDiscoveries"
       },
       {
+        "source": "/mutatePortalTrail",
+        "function": "mutatePortalTrail"
+      },
+      {
+        "source": "/confirmPortalVisit",
+        "function": "confirmPortalVisit"
+      },
+      {
+        "source": "/startPortalPairing",
+        "function": "startPortalPairing"
+      },
+      {
+        "source": "/inspectPortalPairing",
+        "function": "inspectPortalPairing"
+      },
+      {
+        "source": "/approvePortalPairing",
+        "function": "approvePortalPairing"
+      },
+      {
+        "source": "/claimPortalPairing",
+        "function": "claimPortalPairing"
+      },
+      {
+        "source": "/cancelPortalPairing",
+        "function": "cancelPortalPairing"
+      },
+      {
+        "source": "/cancelPortalApproval",
+        "function": "cancelPortalApproval"
+      },
+      {
+        "source": "/listPortalTrail",
+        "function": "listPortalTrail"
+      },
+      {
         "source": "/createDiscoveryTrade",
         "function": "createDiscoveryTrade"
       },
@@ -207,6 +259,7 @@
         "source": "/cancelDiscoveryTrade",
         "function": "cancelDiscoveryTrade"
       },
+      { "source": "/commitExplorerVehicleAction", "function": "commitExplorerVehicleAction" },
       {
         "source": "/commitExplorerCommerceAction",
         "function": "commitExplorerCommerceAction"

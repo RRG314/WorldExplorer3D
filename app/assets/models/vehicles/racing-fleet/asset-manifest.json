@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "road-bmw-m3-e46",
+      "label": "BMW M3 E46",
+      "variantId": "bmw_m3_e46",
+      "sourceUrl": "https://sketchfab.com/3d-models/bmw-m3-e46-f1b00ff37d504629b10031da32bc7497",
+      "attribution": "BMW M3 E46 by MMC Works",
+      "sourceCredit": "Márcio Meireles (https://sketchfab.com/marciomeireles)",
+      "license": "CC-BY-4.0",
+      "filename": "road-bmw-m3-e46.glb",
+      "sourceArchiveSha256": "646b76b04853df219522d73162bb3108e5d85f00729fd460ce05120ed1c9d054",
+      "sha256": "8f35afdd3e228adbd98364ed56e242ab590788429d417cd873ca048f132bff5e",
+      "bytes": 3056732,
+      "sourceTriangles": 846922,
+      "triangles": 101181,
+      "materials": 37,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 1.9006898684883853,
+        "height": 1.3690595307716498,
+        "length": 4.493
+      },
+      "driverEyeGroundMeters": [
+        0.345,
+        1.075,
+        0.015
+      ],
+      "paintMaterialNames": [
+        "Car_Paint_-_All_Colors"
+      ],
+      "wheelLayout": [
+        {
+          "id": "front-right",
+          "position": [
+            0.7402718961238861,
+            0.3208164716925239,
+            1.4547739028930664
+          ],
+          "radius": 0.32033197629789356
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.7258506417274475,
+            0.3220483546028845,
+            1.4835588932037354
+          ],
+          "radius": 0.32033200218575075
+        },
+        {
+          "id": "rear-right",
+          "position": [
+            0.7378740608692169,
+            0.32033199071884155,
+            -1.2492441236972809
+          ],
+          "radius": 0.32033199071884155
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.740881621837616,
+            0.32033199071884155,
+            -1.249243974685669
+          ],
+          "radius": 0.32033199071884155
+        }
+      ],
+      "aircraft": false,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel pivots. Adjusted paint/trim roughness and selected body colors. Front wheel assemblies straightened from the original 20 degree showcase pose; four runtime wheel pivots. No gameplay simulation imported. Original four gauge bodies retained at source detail; cap UVs prepared for instance-owned speed/RPM/gear instruments; auxiliary values unavailable."
+    },
+    {
+      "id": "road-bmw-m3-e92-race",
+      "label": "BMW M3 E92 race car",
+      "variantId": "bmw_m3_e92_race",
+      "sourceUrl": "https://blendswap.com/blend/3697",
+      "attribution": "BMW M3 racing exterior by Neubi",
+      "sourceCredit": "Neubi (https://blendswap.com/profile/1050)",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "filename": "road-bmw-m3-e92-race.glb",
+      "sourceArchiveSha256": "e2193befa1da6a7394b3eadee3704727290a1c2520108fe909827c6052e0417f",
+      "sourceBlendSha256": "d13417a226c00ddfd1b14711431f66cbe98d588412e1c74ca77d91f6f829a143",
+      "sha256": "e3c823c3cb6243a8786b5e22877735f91dfb86586f8c56633a54787e3df51cdc",
+      "bytes": 2527492,
+      "sourceTriangles": 95758,
+      "triangles": 95434,
+      "materials": 12,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 1.921459138393402,
+        "height": 1.2318495512008667,
+        "length": 4.634
+      },
+      "driverEyeGroundMeters": [
+        0.34,
+        0.975,
+        0.02
+      ],
+      "paintMaterialNames": [
+        "Race_Paint"
+      ],
+      "wheelLayout": [
+        {
+          "id": "front-right",
+          "position": [
+            0.7949231863021851,
+            0.313029408454895,
+            1.3881207704544067
+          ],
+          "radius": 0.313029408454895
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.7949246168136597,
+            0.31302958726882935,
+            1.3881196975708008
+          ],
+          "radius": 0.313029408454895
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.796084463596344,
+            0.3247285485267639,
+            -1.2729437351226807
+          ],
+          "radius": 0.3229954242706299
+        },
+        {
+          "id": "rear-right",
+          "position": [
+            0.7960859537124634,
+            0.3247283697128296,
+            -1.2729429006576538
+          ],
+          "radius": 0.3229954242706299
+        }
+      ],
+      "modifications": "Original racing exterior; uniform metric normalization; prepared PBR materials without source reference/logo maps; four rigid wheel assemblies and fixed calipers; original racing-cabin interpretation with seat, harness, safety cage, dashboard, controls and telemetry screen. No source gameplay code or factory-cockpit/homologation claim."
+    },
+    {
+      "id": "road-porsche-911-carrera-4s",
+      "label": "Porsche 911 Carrera 4S",
+      "variantId": "porsche_carrera_4s",
+      "sourceUrl": "https://sketchfab.com/3d-models/free-porsche-911-carrera-4s-d01b254483794de3819786d93e0e1ebf",
+      "attribution": "Porsche 911 Carrera 4S by Karol Miklas",
+      "sourceCredit": "Karol Miklas (https://sketchfab.com/karolmiklas)",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "filename": "road-porsche-911-carrera-4s.glb",
+      "sourceArchiveSha256": "57731111fbb0d6958df64454e9ba51939fefd39ab48e55f423a0bb2d76918454",
+      "sha256": "dd85e370b205f11c5015f1a9f0693ca2c4bb81cbc4e1bc13e78119ed2a06c7dd",
+      "bytes": 3157228,
+      "sourceTriangles": 73209,
+      "triangles": 73209,
+      "materials": 19,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 1.999070167541504,
+        "height": 1.2717047929763794,
+        "length": 4.435
+      },
+      "driverEyeGroundMeters": [
+        0.33,
+        1.055,
+        -0.08
+      ],
+      "paintMaterialNames": [
+        "paint"
+      ],
+      "wheelLayout": [
+        {
+          "id": "rear-right",
+          "position": [
+            0.7599073946475983,
+            0.3324559108007179,
+            -1.2608085870742798
+          ],
+          "radius": 0.3324499949228539
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.7611260116100311,
+            0.3324559108007179,
+            -1.260556697845459
+          ],
+          "radius": 0.3324499949228539
+        },
+        {
+          "id": "front-right",
+          "position": [
+            0.7489397823810577,
+            0.3324500024318695,
+            1.210951954126358
+          ],
+          "radius": 0.3324500024318695
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.7582807838916779,
+            0.3324500024318695,
+            1.212295264005661
+          ],
+          "radius": 0.3324500024318695
+        }
+      ],
+      "modifications": "Original Carrera 4S exterior; showroom floor removed; duplicate coat replaced by PBR clearcoat; uniform metric normalization; 512px maps; bounded simplification; front wheels restored from 20 degree showcase pose to a straight common axle; four rigid wheel assemblies and fixed calipers. No source simulation or GT3 identity. Original interpreted four-seat Carrera cabin with leather surfaces, a five-dial instrument cluster, steering/selector/console controls and headliner. Speed, RPM and gear use shared accepted telemetry; auxiliary readings remain unavailable. Not an exact factory cockpit."
+    }
+  ],
+  "licenseUrls": [
+    "https://creativecommons.org/licenses/by/4.0/",
+    "https://creativecommons.org/publicdomain/zero/1.0/",
+    "https://creativecommons.org/licenses/by-sa/4.0/"
+  ]
+}

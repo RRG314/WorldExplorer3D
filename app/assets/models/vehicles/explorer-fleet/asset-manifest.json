@@ -1,0 +1,381 @@
+{
+  "schemaVersion": 1,
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "assets": [
+    {
+      "id": "road-delorean-dmc12",
+      "label": "DeLorean DMC-12",
+      "variantId": "delorean",
+      "sourceUrl": "https://sketchfab.com/3d-models/delorean-dmc-12-7001f739fe594314b5a3081163577139",
+      "attribution": "DeLorean DMC-12 by JandroS",
+      "sourceCredit": "JandroS (https://sketchfab.com/JandroS)",
+      "license": "CC-BY-4.0",
+      "filename": "road-delorean-dmc12.glb",
+      "sourceArchiveSha256": "d8c6f90333c55e0f6ec343d56b16ccf82790a004441092f06bad2e618dc998f6",
+      "sha256": "bf1522e34dfac3394259ddc2ea22b7a9eb29b4c2665b7db5bc2ede9185ee93fa",
+      "bytes": 2342904,
+      "sourceTriangles": 169930,
+      "triangles": 65216,
+      "materials": 17,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 2.17,
+        "height": 1.2,
+        "length": 4.27
+      },
+      "paintMaterialNames": [],
+      "wheelLayout": [
+        {
+          "id": "front-right",
+          "position": [
+            0.8910983204841614,
+            0.3385186465602601,
+            1.2409984469413757
+          ],
+          "radius": 0.3382132975239074
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.8910983204841614,
+            0.3385186167579377,
+            1.2409984171390533
+          ],
+          "radius": 0.338213267721585
+        },
+        {
+          "id": "rear-right",
+          "position": [
+            0.8910983204841614,
+            0.33851864957250655,
+            -1.179979145526886
+          ],
+          "radius": 0.33381554461084306
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.8910983204841614,
+            0.33851858996786177,
+            -1.179979145526886
+          ],
+          "radius": 0.3338154850061983
+        }
+      ],
+      "aircraft": false,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel / Cessna propeller pivots. Adjusted paint/trim roughness and selected body colors. No gameplay simulation imported."
+    },
+    {
+      "id": "road-cadillac-coupe-deville",
+      "label": "Cadillac Coupe deVille",
+      "variantId": "cadillac_coupe",
+      "sourceUrl": "https://sketchfab.com/3d-models/cadillac-coupe-deville-2adc47898c3145078f0b3bc51995cfe9",
+      "attribution": "Cadillac Coupe deVille by its.anjaney",
+      "sourceCredit": "its.anjaney (https://sketchfab.com/rajanjaney)",
+      "license": "CC-BY-4.0",
+      "filename": "road-cadillac-coupe-deville.glb",
+      "sourceArchiveSha256": "dc60fe594645a62c1046fc4d1d95644915d578861282de24bd1117434fc30a5e",
+      "sha256": "92c62be641b95d42d38407af018adfad0414e97e0d1b607b878b5891686aea5b",
+      "bytes": 1813916,
+      "sourceTriangles": 372894,
+      "triangles": 55013,
+      "materials": 14,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 2.03,
+        "height": 1.42,
+        "length": 5.7
+      },
+      "paintMaterialNames": [
+        "car_colour"
+      ],
+      "wheelLayout": [
+        {
+          "id": "front-right",
+          "position": [
+            0.7717157304286957,
+            0.32863111421465874,
+            1.8847010731697083
+          ],
+          "radius": 0.32292645052075386
+        },
+        {
+          "id": "rear-right",
+          "position": [
+            0.7717182636260986,
+            0.32292643189430237,
+            -1.3604450225830078
+          ],
+          "radius": 0.32292643189430237
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.8527450263500214,
+            0.32292643189430237,
+            1.8847002387046814
+          ],
+          "radius": 0.32292643189430237
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.8527425229549408,
+            0.32863111421465874,
+            -1.36044579744339
+          ],
+          "radius": 0.32292645052075386
+        }
+      ],
+      "aircraft": false,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel / Cessna propeller pivots. Adjusted paint/trim roughness and selected body colors. No gameplay simulation imported."
+    },
+    {
+      "id": "road-cadillac-fleetwood-brougham",
+      "label": "Cadillac Fleetwood Brougham · early 1980s",
+      "variantId": "cadillac_fleetwood",
+      "sourceUrl": "https://sketchfab.com/3d-models/1980s-cadillac-e0bbaf9283b2413a8dae9b991fe121ff",
+      "attribution": "Cadillac Fleetwood Brougham · early 1980s by scorpion81",
+      "sourceCredit": "scorpion81 (https://sketchfab.com/scorpion81)",
+      "license": "CC-BY-4.0",
+      "filename": "road-cadillac-fleetwood-brougham.glb",
+      "sourceArchiveSha256": "d4cf76997c59de96bac519f1b39614235aa65fa0f12e41e6f2dbf169931f48b7",
+      "sha256": "409074e36c3cde01edb30451ffa9b63320e931d6028575acea5637037116aa76",
+      "bytes": 4842116,
+      "sourceTriangles": 1766920,
+      "triangles": 106224,
+      "materials": 24,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 2.02,
+        "height": 1.46,
+        "length": 5.62
+      },
+      "paintMaterialNames": [
+        "Paint"
+      ],
+      "wheelLayout": [
+        {
+          "id": "rear-right",
+          "position": [
+            0.7990407645702362,
+            0.3582015491119819,
+            -1.3263687491416931
+          ],
+          "radius": 0.3578828119643731
+        },
+        {
+          "id": "front-right",
+          "position": [
+            0.7703105509281158,
+            0.3582015491119819,
+            1.8154231905937195
+          ],
+          "radius": 0.3578828119643731
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.8069601953029633,
+            0.3582015491119819,
+            -1.3263687491416931
+          ],
+          "radius": 0.3578828119643731
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.8066717982292175,
+            0.3582015491119819,
+            1.8154231905937195
+          ],
+          "radius": 0.3578828119643731
+        }
+      ],
+      "aircraft": false,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel / Cessna propeller pivots. Adjusted paint/trim roughness and selected body colors. No gameplay simulation imported."
+    },
+    {
+      "id": "road-volkswagen-golf-ii",
+      "label": "Volkswagen Golf II",
+      "variantId": "golf_ii",
+      "sourceUrl": "https://sketchfab.com/3d-models/volkswagen-golf-ii-740500f10bc94e7a91c2290e445fcb39",
+      "attribution": "Volkswagen Golf II by ARDmation",
+      "sourceCredit": "ARDmation (https://sketchfab.com/ardmation)",
+      "license": "CC-BY-4.0",
+      "filename": "road-volkswagen-golf-ii.glb",
+      "sourceArchiveSha256": "88a7eb592d06c0a47a113b20feff2cf2e9175fee674e95cff26cc574f6e96e97",
+      "sha256": "c174db184a03fefe00b1226a8233121caf73e41d57ca1e6e1e4815362e479846",
+      "bytes": 3454328,
+      "sourceTriangles": 15128,
+      "triangles": 15128,
+      "materials": 10,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 1.86,
+        "height": 1.41,
+        "length": 3.99
+      },
+      "paintMaterialNames": [
+        "paint"
+      ],
+      "wheelLayout": [
+        {
+          "id": "rear-right",
+          "position": [
+            0.7235738337039948,
+            0.32376161217689514,
+            -1.2782131135463715
+          ],
+          "radius": 0.32376161217689514
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.7261285781860352,
+            0.32376161217689514,
+            -1.2782131135463715
+          ],
+          "radius": 0.32376161217689514
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.7261285781860352,
+            0.32376161217689514,
+            1.1820045709609985
+          ],
+          "radius": 0.32376161217689514
+        },
+        {
+          "id": "front-right",
+          "position": [
+            0.7235738337039948,
+            0.32376161217689514,
+            1.1820045709609985
+          ],
+          "radius": 0.32376161217689514
+        }
+      ],
+      "aircraft": false,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel / Cessna propeller pivots. Adjusted paint/trim roughness and selected body colors. No gameplay simulation imported."
+    },
+    {
+      "id": "road-datsun-280z",
+      "label": "Datsun 280Z",
+      "variantId": "datsun_280z",
+      "sourceUrl": "https://sketchfab.com/3d-models/free-datsun-280z-0789ab2ece9442de94b3c41595e0ecbd",
+      "attribution": "Datsun 280Z by Martin Trafas",
+      "sourceCredit": "Martin Trafas (https://sketchfab.com/Bexxie)",
+      "license": "CC-BY-4.0",
+      "filename": "road-datsun-280z.glb",
+      "sourceArchiveSha256": "53c3d0c9d61eb71d016c794a77503b1b8c7cc854ae7afbe9eafc8a36fcb0a63d",
+      "sha256": "84138ca61ccd470d5518aa3303724f382b0f6eb0c89a28edbe548e98e244c36e",
+      "bytes": 3372132,
+      "sourceTriangles": 106810,
+      "triangles": 44076,
+      "materials": 15,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 1.73,
+        "height": 1.3,
+        "length": 4.42
+      },
+      "paintMaterialNames": [
+        "280z_CarPaint"
+      ],
+      "wheelLayout": [
+        {
+          "id": "front-right",
+          "position": [
+            0.6351710855960846,
+            0.3450880591117311,
+            1.076420158147812
+          ],
+          "radius": 0.3442734535492491
+        },
+        {
+          "id": "front-left",
+          "position": [
+            -0.6351837515830994,
+            0.34508739854209125,
+            1.0764634907245636
+          ],
+          "radius": 0.3442221984732896
+        },
+        {
+          "id": "rear-right",
+          "position": [
+            0.63646100461483,
+            0.34508805177756585,
+            -1.2901999652385712
+          ],
+          "radius": 0.34458841182640754
+        },
+        {
+          "id": "rear-left",
+          "position": [
+            -0.6364549398422241,
+            0.34508805177756585,
+            -1.2901553213596344
+          ],
+          "radius": 0.34458841182640754
+        }
+      ],
+      "aircraft": false,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel / Cessna propeller pivots. Adjusted paint/trim roughness and selected body colors. No gameplay simulation imported."
+    },
+    {
+      "id": "aircraft-cessna-172",
+      "label": "Cessna 172",
+      "variantId": null,
+      "sourceUrl": "https://sketchfab.com/3d-models/cessna-172-64cddaee5aff470682659a8c08525046",
+      "attribution": "Cessna 172 by Nobilis the Palaeovespa",
+      "sourceCredit": "e737 (https://sketchfab.com/e0057537)",
+      "license": "CC-BY-4.0",
+      "filename": "aircraft-cessna-172.glb",
+      "sourceArchiveSha256": "2158053fbc82df7e10ea698f5be90f9f65f1191e3b56012ddc536fc03ce5d6a5",
+      "sha256": "d030c88ce25c425f0eeb725a866a8ae67983239bd0808590ae190695340e7acc",
+      "bytes": 858872,
+      "sourceTriangles": 14240,
+      "triangles": 14240,
+      "materials": 2,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 10.9,
+        "height": 2.2,
+        "length": 7.9
+      },
+      "paintMaterialNames": [],
+      "wheelLayout": [],
+      "aircraft": true,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel / Cessna propeller pivots. Adjusted paint/trim roughness and selected body colors. No gameplay simulation imported."
+    },
+    {
+      "id": "aircraft-falcon-10",
+      "label": "Dassault Falcon 10",
+      "variantId": null,
+      "sourceUrl": "https://sketchfab.com/3d-models/falcon10-0d5a676f75da403b8419154b102d55a7",
+      "attribution": "Dassault Falcon 10 by manilov.ap",
+      "sourceCredit": "manilov.ap (https://sketchfab.com/manilov.ap)",
+      "license": "CC-BY-4.0",
+      "filename": "aircraft-falcon-10.glb",
+      "sourceArchiveSha256": "a8f1f2fef503c8079d81038daf8ab25d9035aaf84a25bfc4dc5b390286323bbd",
+      "sha256": "54983d108cceca3d6ed4212ab72cfdc9ccb5b4e7a1f2ac8f5156eaeff029620e",
+      "bytes": 1399288,
+      "sourceTriangles": 22245,
+      "triangles": 22245,
+      "materials": 32,
+      "textureEdgePixels": 512,
+      "dimensionsMeters": {
+        "width": 14.1,
+        "height": 3.8,
+        "length": 15.2
+      },
+      "paintMaterialNames": [],
+      "wheelLayout": [],
+      "aircraft": true,
+      "modifications": "Offline axis/scale/base normalization; 512px color / 256px data maps; bounded mesh simplification; rigid wheel / Cessna propeller pivots. Adjusted paint/trim roughness and selected body colors. No gameplay simulation imported."
+    }
+  ]
+}

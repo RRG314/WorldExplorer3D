@@ -2,9 +2,9 @@ export const ROAD_CAR_CONFIG = Object.freeze({
   // Simulation speed is 2 units per displayed MPH. Keep the road-car envelope
   // in one importable data contract so physics and verification share values.
   maxSpd: 240,
-  accel: 108,
-  boostAccel: 156,
-  brake: 150,
+  accel: 32,
+  boostAccel: 44,
+  brake: 38,
   friction: 25,
   // Boost improves acceleration and recovery, but never exceeds the advertised
   // 120 mph road-car ceiling.
@@ -28,3 +28,7 @@ export const ROAD_CAR_CONFIG = Object.freeze({
   policeAccel: 60,
   policeDist: 800
 });
+
+// Rover controls use their existing planetary tuning, independently of Earth
+// road-car calibration. Body-specific multipliers remain in the mode owner.
+export const PLANETARY_ROVER_CONFIG=Object.freeze({accel:108,boostAccel:156,brake:150});

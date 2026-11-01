@@ -1,9 +1,32 @@
+import {applyRoadCreaseNormals} from './terrain/road-crease-normals.js';
 import { normalizePublishedRoadIndices } from './terrain/published-road-integrity.js';
 
-export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8}={}) {
+export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8,
+  vertexColors=false,side,depthWrite=true,filteredStroke=false}={},T=globalThis.THREE) {
   // Roads use -2. Paint must stay ahead of their depth bias at grazing angles.
-  return new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,
+  const material=new T.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,vertexColors,side:side??T.FrontSide,depthWrite,
     polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6});
+  if(filteredStroke){
+    // A thin transverse line can fall entirely between sample centres on the
+    // normal non-MSAA renderer. Projected padding supplies the pixel footprint;
+    // derivative coverage retains the authored physical stroke dimensions.
+    material.transparent=true;material.depthWrite=false;(material.extensions??={}).derivatives=true;
+    material.onBeforeCompile=shader=>{
+      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec4 markingStroke;\nvarying vec4 vMarkingStroke;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvMarkingStroke=markingStroke;');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec4 vMarkingStroke;')
+        .replace('#include <alphatest_fragment>',`vec2 markingFootprint=max(fwidth(vMarkingStroke.xy),vec2(0.0001));
+vec2 markingHigh=clamp((vMarkingStroke.zw-vMarkingStroke.xy)/markingFootprint+0.5,0.0,1.0);
+vec2 markingLow=clamp((-vMarkingStroke.zw-vMarkingStroke.xy)/markingFootprint+0.5,0.0,1.0);
+vec2 markingCoverage=markingHigh-markingLow;
+if(vMarkingStroke.z<0.0)markingCoverage.x=1.0;
+if(vMarkingStroke.w<0.0)markingCoverage.y=1.0;
+diffuseColor.a*=markingCoverage.x*markingCoverage.y;
+#include <alphatest_fragment>`);
+    };
+    material.customProgramCacheKey=()=> 'road-marking-filtered-stroke-v1';
+  }
+  return material;
 }
 
 function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = [], indices = []) {
@@ -23,12 +46,17 @@ function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = []
   return true;
 }
 
+export function createRoadEdgeBandMaterial(T=globalThis.THREE){
+  return new T.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.96,metalness:0,side:T.DoubleSide,
+    polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2,depthWrite:true,depthTest:true});
+}
+
 function createRoadSurfaceMaterials({
   sidewalkTex = null,
   sidewalkNormal = null,
   sidewalkRoughness = null,
   includeMarkings = false,
-  includeSidewalk = false
+  includeSidewalk = false,includeEdgeBands = false
 } = {}) {
   const roadMainMaterial = new THREE.MeshStandardMaterial({
     color: 0x303236,
@@ -56,6 +84,8 @@ function createRoadSurfaceMaterials({
     roadMainMaterial,
     roadSkirtMaterial
   };
+
+  if(includeEdgeBands)materials.roadEdgeBandMaterial=createRoadEdgeBandMaterial();
 
   if (includeMarkings) {
     materials.roadMarkMaterial = createRoadMarkingMaterial();
@@ -121,6 +151,7 @@ function buildIndexedBatchMesh({
   targetList = null,
   verts = [],
   indices = [],
+  colors = null,baseY = null,normalCreaseAngleRadians,
   material = null,
   renderOrder = 0,
   userData = null,
@@ -130,8 +161,13 @@ function buildIndexedBatchMesh({
   if (!scene || !material || !(Array.isArray(verts)||ArrayBuffer.isView(verts)) || !(Array.isArray(indices)||ArrayBuffer.isView(indices)) || !verts.length || !indices.length) {
     return null;
   }
+  if(colors!==null&&(!((Array.isArray(colors)||ArrayBuffer.isView(colors)))||colors.length!==verts.length||!colors.every(n=>Number.isInteger(n)&&n>=0&&n<=255)))throw Error('invalid_road_batch_colors');
+  if(baseY!==null&&(!((Array.isArray(baseY)||ArrayBuffer.isView(baseY)))||baseY.length!==verts.length/3||!baseY.every(Number.isFinite)))throw Error('invalid_road_base_witness');
+  if(normalCreaseAngleRadians!==undefined&&(!Number.isFinite(normalCreaseAngleRadians)||normalCreaseAngleRadians<=0||normalCreaseAngleRadians>Math.PI/2))throw Error('invalid_road_normal_crease');
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  if(colors!==null)geometry.setAttribute('color',new THREE.BufferAttribute(new Uint8Array(colors),3,true));
+  if(baseY!==null)geometry.setAttribute('roadBaseY',new THREE.Float32BufferAttribute(baseY,1));
   const uv = [];
   for (let i = 0; i < verts.length; i += 3) uv.push(verts[i] * 1.11 / 4, verts[i + 2] * 1.11 / 4);
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -146,7 +182,7 @@ function buildIndexedBatchMesh({
       correctedDownwardTriangles: normalized.correctedDownwardTriangles };
   }
   geometry.setIndex(new THREE.BufferAttribute(publishedIndices, 1));
-  geometry.computeVertexNormals();
+  if(normalCreaseAngleRadians!==undefined)applyRoadCreaseNormals(geometry,normalCreaseAngleRadians);else geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = renderOrder;
   mesh.receiveShadow = !!receiveShadow;

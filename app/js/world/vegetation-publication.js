@@ -6,7 +6,9 @@ import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 export async function publishVegetationCooperatively(ctx, {collect,render,dispose,current=()=>true,onSlice=()=>{},...scheduler}) {
   const meshes=[];
   let features=[], status, committed=false;
-  const schedule={...scheduler,current,onSlice};
+  const farSurface=ctx.getFarTerrainSurfaceSnapshot?.()?.grid;
+  const active=()=>current()&&farSurface===ctx.getFarTerrainSurfaceSnapshot?.()?.grid;
+  const schedule={...scheduler,current:active,onSlice};
   const stage={
     get _worldLoadSequence(){return ctx._worldLoadSequence;},
     worldSurfaceProfile:ctx.worldSurfaceProfile, LOC:ctx.LOC,
@@ -20,9 +22,9 @@ export async function publishVegetationCooperatively(ctx, {collect,render,dispos
   try {
     const placements=await collect(schedule);
     const count=await render(stage,placements,schedule);
-    if(!current())return null;
+    if(!active())return null;
     const obstacleIndex=await prepareVegetationObstacleIndex(ctx,features,schedule);
-    if(!current())return null;
+    if(!active())return null;
     const previous=ctx.vegetationMeshes || [];
     for(const mesh of previous)mesh?.parent?.remove(mesh);
     for(const mesh of meshes)ctx.addEarthWorldObject(mesh);

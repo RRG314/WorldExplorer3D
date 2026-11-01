@@ -1,15 +1,21 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:gravity="center" android:padding="24dp"
-    android:fitsSystemWindows="true" android:background="@color/brand_background">
+    android:fillViewport="true" android:fitsSystemWindows="true"
+    android:background="@color/portal_roam_background">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:gravity="center" android:padding="24dp">
     <ImageView android:layout_width="96dp" android:layout_height="96dp"
         android:src="@mipmap/ic_launcher" android:contentDescription="@null" />
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="24dp" android:gravity="center" android:text="@string/offline_title"
-        android:textColor="#ffffff" android:textSize="26sp" android:textStyle="bold" />
+        android:textColor="@color/portal_roam_text" android:textSize="26sp" android:textStyle="bold" />
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="16dp" android:gravity="center" android:text="@string/offline_message"
-        android:textColor="#dce6ef" android:textSize="17sp" />
+        android:textColor="@color/portal_roam_muted" android:textSize="17sp" />
     <Button android:id="@+id/retry_connection" android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:layout_marginTop="24dp" android:text="@string/retry_connection" />
-</LinearLayout>
+        android:layout_marginTop="24dp" android:minWidth="160dp" android:minHeight="48dp"
+        android:padding="12dp" android:text="@string/retry_connection" android:textAllCaps="false"
+        android:textSize="16sp" android:textColor="@color/portal_roam_action_text"
+        android:backgroundTint="@color/portal_roam_accent" />
+    </LinearLayout>
+</ScrollView>

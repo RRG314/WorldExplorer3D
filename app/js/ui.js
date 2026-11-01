@@ -1,3 +1,5 @@
+import {bindRacingUI} from './ui/racing.js';
+import {bindVehicleGarage,vehicleGarageMessage} from './ui/vehicle-garage.js';
 import { mountCapabilityGuide } from './product/capability-guide.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
@@ -5,15 +7,18 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=62";
-import { initMobileControls } from "./ui/mobile-controls.js?v=87";
+import { initMobileControls } from "./ui/mobile-controls.js?v=90";
 import { initShareUi } from "./ui/share-links.js?v=64";
-import { setupSettingsUi } from "./ui/settings.js?v=2";
+import { setupSettingsUi } from "./ui/settings.js?v=3";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=120";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=123";
 import { captureEnvironmentSession, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 import { createEarthReturnAction } from './travel/earth-return.js';
 import {bindSurfaceRecoveryControls} from './ui/recovery-controls.js';
 import {mountTesterInvitation} from './ui/tester-invitation.js';
+import {bindWorldFocusControls} from './ui/world-focus.js';
+import {bindControlPanel} from './ui/control-panel.js';
+import {getScreenLayoutService} from './ui/screen-layout.js?v=3';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -22,7 +27,9 @@ function emitTutorialEvent(eventName, payload = {}) {
 }
 
 function setupUI() {
+  appCtx.screenLayout ||= getScreenLayoutService();
   mountTesterInvitation();
+  bindVehicleGarage({closeMenus:closeAllFloatMenus,requestWorldFocus:()=>worldFocus.requestWorldFocus()});
   mountCapabilityGuide();
   const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {
@@ -131,9 +138,6 @@ function setupUI() {
 
   const {
     clearVirtualHeldInputs,
-    controlsTab,
-    ctrlContent,
-    ctrlHeader,
     isTouchPreferredClient,
     updateControlsModeUI
   } = initMobileControls();
@@ -171,7 +175,12 @@ function setupUI() {
       if (menuEl && menuEl.classList.contains('open')) appCtx.toggleFlowerActionMenu();
     }
   }
+  const worldFocus = bindWorldFocusControls(appCtx, closeAllFloatMenus);
+  bindRacingUI({closeMenus:closeAllFloatMenus,requestWorldFocus:worldFocus.requestWorldFocus,chooseDestination:()=>{goToMainMenu();titleUi.selectGameMode('racing');}});
+  bindControlPanel(appCtx, {updateMode: updateControlsModeUI, clearHeld: clearVirtualHeldInputs, requestWorldFocus: worldFocus.requestWorldFocus});
+  appCtx.screenLayout.bindHudLayout();
   function goToMainMenu() {
+    appCtx.closeControlsPanel?.();
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     appCtx.stopLiveGpsMode?.({ reason: 'main-menu' });
     appCtx.stopGameplayPlugin?.('main-menu', { resumeFree: false });
@@ -187,7 +196,7 @@ function setupUI() {
     document.getElementById('titleScreen').classList.remove('hidden');
     window.requestAnimationFrame(() => appCtx.openGlobeSelector?.());
     if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
-    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'worldQuickControls', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'liveGpsHud', 'liveGpsPermissionPanel', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'worldQuickControls', 'pauseScreen', 'resultScreen', 'caughtScreen', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'liveGpsHud', 'liveGpsPermissionPanel', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
@@ -195,7 +204,6 @@ function setupUI() {
     if (flowerActionMenu) flowerActionMenu.classList.remove('open');
     document.getElementById('boatPrompt')?.classList.remove('show');
     clearVirtualHeldInputs();
-    if (ctrlContent) ctrlContent.classList.add('hidden');
     if (typeof appCtx.closeMemoryComposer === 'function') appCtx.closeMemoryComposer();
     const memoryInfoPanel = document.getElementById('memoryInfoPanel');
     if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
@@ -329,13 +337,12 @@ function setupUI() {
       appCtx.showToast?.('Multiplayer is unavailable right now.');
     });
   });
-  document.getElementById('fCommunityBoard')?.addEventListener('click', async () => {
+  document.getElementById('fCommunityBoard')?.addEventListener('click', async event => {
+    event.stopPropagation();
     closeAllFloatMenus();
     try {
       await appCtx.ensureFlowerChallengeReady?.();
-      await appCtx.setChallengeLeaderboardView?.('explorer');
-      const panel = document.getElementById('flowerChallengePanel');
-      if (!panel?.classList.contains('open')) document.getElementById('flowerChallengeToggleBtn')?.click();
+      await appCtx.openLeaderboardView?.('explorer');
     } catch (error) {
       console.error('[community-board] Could not open the board.', error);
       appCtx.showToast?.('Rankings are unavailable right now.');
@@ -452,9 +459,11 @@ function setupUI() {
     });
   }
   // Travel mode switchers - mutually exclusive
-  document.getElementById('fDriving').addEventListener('click', () => {
+  document.getElementById('fDriving').addEventListener('click', async () => {
     if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode('drive', { source: 'ui_button' });
+      const selected=document.getElementById('travelVehicleSelect')?.value||'bmw_e34';
+      const result=await appCtx.selectPersonalVehicle?.(selected);
+      if(!result?.ok)appCtx.showToast?.(vehicleGarageMessage(result));
     } else {
       console.error('Travel mode controller is unavailable.');
     }
@@ -483,7 +492,9 @@ function setupUI() {
   });
 
   document.getElementById('fPlane')?.addEventListener('click', () => {
-    appCtx.setTravelMode?.('plane', { source: 'ui_button' });
+    const selected=document.getElementById('travelAircraftSelect')?.value;
+    const transportCatalogId=['expedition-prop','business-jet'].includes(selected)?selected:'personal-prop';
+    appCtx.setTravelMode?.('plane', { source: 'ui_button', transportCatalogId });
     updateControlsModeUI();
     closeAllFloatMenus();
   });
@@ -581,38 +592,6 @@ function setupUI() {
     document.getElementById('fConstellations').classList.toggle('on', appCtx.constellationsVisible);
     closeAllFloatMenus();
   });
-  if (ctrlHeader && ctrlContent) {
-    ctrlHeader.addEventListener('click', (e) => {
-      e.stopPropagation();
-      ctrlContent.classList.toggle('hidden');
-      updateControlsModeUI();
-    });
-  }
-  const controlsBarBtn = document.getElementById('controlsBarBtn');
-  if (controlsBarBtn && ctrlContent) {
-    let lastTouchToggleAt = 0;
-    const toggleControlsPanel = (e) => {
-      e.stopPropagation();
-      document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
-      ctrlContent.classList.toggle('hidden');
-      controlsTab?.classList.toggle('bar-open', !ctrlContent.classList.contains('hidden'));
-      updateControlsModeUI();
-    };
-    controlsBarBtn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      lastTouchToggleAt = performance.now();
-      toggleControlsPanel(e);
-    }, { passive: false });
-    controlsBarBtn.addEventListener('click', (e) => {
-      if (performance.now() - lastTouchToggleAt < 700) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-      toggleControlsPanel(e);
-    });
-  }
-
   // Main Menu Button
   document.getElementById('mainMenuBtn').addEventListener('click', () => {
     goToMainMenu();
@@ -651,11 +630,7 @@ function setupUI() {
     {
       closeAllFloatMenus();
     }
-    if (controlsTab && !controlsTab.contains(e.target) && !controlsBarBtn?.contains(e.target) && ctrlContent) {
-      ctrlContent.classList.add('hidden');
-      controlsTab.classList.remove('bar-open');
-      updateControlsModeUI();
-    }
+
   });
 
   document.getElementById('resumeBtn').addEventListener('click', () => {appCtx.setPauseReason?.('manual_pause', false);document.getElementById('pauseScreen').classList.remove('show');});

@@ -1,3 +1,4 @@
+import {normalizeVehicleGarage,prepareVehicleGarageChange,personalVehicleIdentity} from '../transport/vehicle-garage-rules.js';
 import { createConnectedCommerceRecovery } from '../economy/connected-commerce-recovery.js';
 import { TRANSFERABLE_MATERIAL_DEFINITIONS } from '../resources/material-catalog.js?v=2';
 import { normalizePoi } from '../poi/semantic-authority.js?v=3';
@@ -468,6 +469,11 @@ function createLocalCommerceModel(options = {}) {
     if (outcome!==true && outcome!==false) return Object.freeze({ok:false,reason:'settlement_recovery_required',credits:state.credits});
     const change=commerceChange(state,outcome?0:pending.price,outcome?'service':'service-refund',{catalogId:definition.id,receiptId:requestId},Number(clock()));
     if (!change.ok) return Object.freeze(change);
+    if(outcome&&definition.id==='vehicle-full-repair'){
+      const garage=normalizeVehicleGarage(state.vehicleGarage);
+      const row=Object.values(garage.vehicles).find(v=>personalVehicleIdentity(v.id)===pending.targetId);
+      if(row){row.condition=1;garage.revision++;change.next.vehicleGarage=garage;}
+    }
     delete change.next.pendingSettlements[requestId];
     const committed=commitLocal(change.next);
     if (!committed.ok) return Object.freeze({...committed,reason:'settlement_recovery_required'});
@@ -489,7 +495,20 @@ function createLocalCommerceModel(options = {}) {
 
   return Object.freeze({
     type: 'WorldExplorerEconomy',
+    accountUid:transactionAuthority?.uid||'',
     localBackpackStore: backpackStore,
+    vehicleGarage: () => normalizeVehicleGarage(state.vehicleGarage),
+    changeVehicleGarage(command,ownsHome=()=>false) {
+      if(transactionAuthority)return {ok:false,reason:'connected_wallet_action_required'};
+      try {
+        const change=prepareVehicleGarageChange(state.vehicleGarage,command,{ownsHome,now:Number(clock())});
+        const debit=commerceChange(state,-change.cost,'vehicle_garage',{vehicleId:command.vehicleId,action:command.action},Number(clock()));
+        if(!debit.ok)return debit;
+        debit.next.vehicleGarage=change.garage;
+        const saved=commitLocal(debit.next);
+        return {...saved,...(saved.ok?{garage:change.garage}:{})};
+      }catch(error){return {ok:false,reason:error.message};}
+    },
     commitHomeChange(delta, nextHousing, detail, expectedHousing) { return changeCredits(delta,detail,nextHousing,expectedHousing); },
     buy,
     credit,

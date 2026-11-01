@@ -1,4 +1,4 @@
-import {getScreenLayoutService} from '../ui/screen-layout.js?v=2';
+import {getScreenLayoutService} from '../ui/screen-layout.js?v=3';
 import {roomRing,layoutEntrance,pointInRoom,floorWalls} from '../../../functions/interior-layout.mjs';
 
 const node=(tag,text,className)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;};

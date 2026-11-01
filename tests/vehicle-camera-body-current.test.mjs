@@ -65,3 +65,56 @@ test('roof clearance preserves requested orbit heading and avoids a vertical cha
     assert.equal(point.y,roof.y);
   }
 });
+
+test('fleet driving views follow the prepared body envelope while the BMW keeps its authored cabin',async()=>{
+ const T=await import('three'),{applyDrivingCabinCamera}=await import('../app/js/hud/driving-cabin-camera.js'),{driverCameraMount,vehicleDriverCamera,BMW_DRIVER_CAMERA}=await import('../app/js/transport/vehicle-camera-mount.js');
+ const {VEHICLE_CATALOG,VEHICLE_ROOT_TO_GROUND_METERS}=await import('../app/js/engine/vehicle-catalog.js');
+ const body=new T.Group(),camera=new T.PerspectiveCamera();assert.equal(driverCameraMount(body),BMW_DRIVER_CAMERA);
+ for(const id of ['delorean','cadillac_coupe','cadillac_fleetwood','pickup','city_bus']){
+  const variant=VEHICLE_CATALOG.find(v=>v.id===id),mount=vehicleDriverCamera(variant);body.userData.driverCameraMount=mount;body.position.set(12,VEHICLE_ROOT_TO_GROUND_METERS,-8);body.rotation.y=.7;
+  const before=body.position.clone();applyDrivingCabinCamera(T,camera,body);const expected=body.localToWorld(new T.Vector3(mount.eye.x,mount.eye.y,mount.eye.z));
+  assert.ok(camera.position.distanceTo(expected)<1e-9);assert.ok(camera.position.y>variant.height);assert.deepEqual(body.position,before);assert.equal(mount.kind,'raised');assert.ok(Object.isFrozen(mount.eye));
+ }
+ delete body.userData.driverCameraMount;applyDrivingCabinCamera(T,camera,body);assert.equal(driverCameraMount(body),BMW_DRIVER_CAMERA);
+ assert.throws(()=>vehicleDriverCamera({height:NaN,length:4}),/envelope/);
+});
+
+test('mounted cars keep wheel contact and the cabin eye in one ground frame on grades and banks',async()=>{
+ const T=await import('three');
+ const {applyDrivingCabinCamera}=await import('../app/js/hud/driving-cabin-camera.js');
+ const {vehicleDriverCamera,BMW_DRIVER_CAMERA}=await import('../app/js/transport/vehicle-camera-mount.js');
+ const {syncVehicleGroundPivot}=await import('../app/js/engine/vehicle-ground-pivot.js');
+ const {VEHICLE_CATALOG}=await import('../app/js/engine/vehicle-catalog.js');
+ const m3=VEHICLE_CATALOG.find(v=>v.id==='bmw_m3_e46');
+ for(const kind of ['default-bmw','traffic','mounted']){
+  const parent=new T.Group(),host=new T.Group(),visual=new T.Group(),camera=new T.PerspectiveCamera(60,1.6,.5,2000);
+  parent.position.set(17,4,-30);parent.rotation.y=-.4;parent.scale.setScalar(2.3);parent.add(host);
+  host.position.set(12,7,-8);const height=kind==='default-bmw'?1.1:1.12;
+  if(kind==='default-bmw'){visual.userData.vehicleRootHeightMeters=height;host.userData.curatedVehicleVisual=visual;host.add(visual);}
+  else {
+   host.userData.driverCameraMount=vehicleDriverCamera(m3);
+   if(kind==='traffic'){host.userData.curatedTrafficVehicleAttachment={visual};host.add(visual);}
+   else {const adoptedRoot=new T.Group();host.add(adoptedRoot);adoptedRoot.add(visual);adoptedRoot.userData.curatedTrafficVehicleAttachment={visual};host.userData.mountedVehicleVisualHost=adoptedRoot;}
+  }
+  const mount=host.userData.driverCameraMount||BMW_DRIVER_CAMERA;
+  for(const [pitch,roll,yaw] of [[0,0,0],[.18,33*Math.PI/180,1.2],[-.2,-33*Math.PI/180,-2.4]]){
+   host.rotation.set(pitch,yaw,roll,'YXZ');syncVehicleGroundPivot(host);host.updateWorldMatrix(true,true);
+   const origin=host.getWorldPosition(new T.Vector3()),q=host.getWorldQuaternion(new T.Quaternion());
+   const scale=host.getWorldScale(new T.Vector3()).x;
+   const ground=origin.clone().add(new T.Vector3(0,-height*scale,0).applyQuaternion(parent.getWorldQuaternion(new T.Quaternion())));
+   // Actual wheel vertices and the prepared eye must share the same rigid
+   // ground plane, including the nested root used by ordinary player custody.
+   for(const [x,z]of [[-.78,-1.36],[.78,-1.36],[-.78,1.36],[.78,1.36]]){
+    const expected=ground.clone().add(new T.Vector3(x,0,z).multiplyScalar(scale).applyQuaternion(q));
+    assert.ok(visual.localToWorld(new T.Vector3(x,0,z)).distanceTo(expected)<1e-10,kind);
+   }
+   applyDrivingCabinCamera(T,camera,host,{yaw:.25,pitch:.1});
+   const eye=new T.Vector3(mount.eye.x,mount.eye.y+height,mount.eye.z);
+   assert.ok(camera.position.distanceTo(ground.clone().add(eye.multiplyScalar(scale).applyQuaternion(q)))<1e-10,kind);
+   const forward=new T.Vector3(Math.sin(.25),Math.sin(.1),Math.cos(.25)).applyQuaternion(q).normalize();
+   assert.ok(camera.getWorldDirection(new T.Vector3()).distanceTo(forward)<1e-10,kind);
+   assert.equal(camera.near,.04);
+  }
+  setCabinNearClip(camera,false);assert.equal(camera.near,.5);
+ }
+});

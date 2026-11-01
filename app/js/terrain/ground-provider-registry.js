@@ -2,6 +2,20 @@ export const GROUND_ARTIFACT_SCHEMA_VERSION = 1;
 export const GROUND_TARGET_VERTICAL_DATUM = 'EGM2008';
 
 const PROVIDERS = Object.freeze({
+  'rlp-lidar-dgm1': Object.freeze({
+    id: 'rlp-lidar-dgm1',
+    label: 'Rheinland-Pfalz DGM1 bare-earth LIDAR terrain',
+    sourceKind: 'bare-earth-dem',
+    sourceClassification: 'accepted-ground',
+    nativeVerticalDatum: 'DHHN2016 height (EPSG:7837); artifact transformed to EGM2008',
+    nominalResolutionMeters: 1,
+    coverage: 'Rheinland-Pfalz; artifact coverage manifest required; bridge decks excluded from source',
+    licenseStatus: 'dl-de-by-2.0-with-attribution',
+    runtimeDelivery: 'precompiled-artifact-only',
+    priority: 100,
+    sourceDocument: 'https://lvermgeo.rlp.de/geodaten-geoshop/open-data/',
+    datumDocument: 'https://cdn.proj.org/de_bkg_README.txt'
+  }),
   'ea-lidar-composite-dtm-2022': Object.freeze({
     id: 'ea-lidar-composite-dtm-2022',
     label: 'Environment Agency LIDAR Composite 2022 bare-earth DTM',
@@ -246,6 +260,30 @@ export function selectGroundArtifacts(options = {}) {
     throw new TypeError('longitude must be finite');
   }
   const manifests = Array.isArray(options.manifests) ? options.manifests : [];
+  // A finite reviewed venue can span adjoining ground tiles. Its pinned group
+  // is explicit; ordinary location selection still loads only anchor coverage.
+  // Never expand manifest coverage or mix providers to fill an absent tile.
+  if (options.requiredArtifacts !== undefined && options.requiredArtifacts !== null) {
+    const required = options.requiredArtifacts;
+    const blocked = reason => Object.freeze({status:'blocked',reason,provider:null,manifest:null,rejected:Object.freeze([])});
+    if (!Array.isArray(required) || !required.length || required.length>32 ||
+        required.some(item=>!item || typeof item.artifactId!=='string' || !item.artifactId || item.artifactId.length>160 || !isSha256(item.contentSha256)) ||
+        new Set(required.map(item=>item.artifactId)).size!==required.length) return blocked('invalid-required-ground-group');
+    const selected=[];
+    for (const item of required) {
+      const matching=manifests.filter(manifest=>manifest.artifactId===item.artifactId);
+      if (matching.length!==1) return blocked('required-ground-artifact-missing-or-ambiguous');
+      const manifest=matching[0],validation=validateGroundArtifactManifest(manifest);
+      if (!validation.valid || manifest.contentSha256.toLowerCase()!==item.contentSha256.toLowerCase()) return blocked('required-ground-artifact-mismatch');
+      selected.push({manifest,provider:validation.provider});
+    }
+    const first=selected[0];
+    if (selected.some(item=>item.provider.id!==first.provider.id || item.manifest.sourceRelease!==first.manifest.sourceRelease)) return blocked('required-ground-authority-mismatch');
+    if (!selected.some(item=>coversLocation(item.manifest.coverage,latitude,longitude))) return blocked('required-ground-does-not-cover-anchor');
+    selected.sort((a,b)=>Number(a.manifest.spacingMeters)-Number(b.manifest.spacingMeters)||a.manifest.artifactId.localeCompare(b.manifest.artifactId));
+    return Object.freeze({status:'accepted',reason:null,provider:first.provider,
+      manifests:Object.freeze(selected.map(item=>Object.freeze({...item.manifest}))),rejected:Object.freeze([])});
+  }
   const accepted = [];
   const rejected = [];
   for (const manifest of manifests) {

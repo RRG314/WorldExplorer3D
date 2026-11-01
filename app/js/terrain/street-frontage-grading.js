@@ -22,7 +22,7 @@ export function createStreetFrontageGrading(buildings = [], metersPerWorldUnit =
       const cacheKey=roadCache ? `${px}:${pz}:${halfWidth}:${sign}` : null;
       if(roadCache?.has(cacheKey))return roadCache.get(cacheKey);
       const section=policy.section(road,projection.segIndex)[sign>0?'left':'right'];
-      const edge=streetSideEdge(road,halfWidth,sign);
+      const edge=streetSideEdge(road,halfWidth,sign,projection.segIndex,projection.t);
       let outer=edge;
       if(section.presence==='present')outer+=section.widthMeters/scale;
       // A spatial bucket is deliberately broader than the physical influence.

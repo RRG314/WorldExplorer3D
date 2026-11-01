@@ -76,13 +76,16 @@ function normalizeWay(way, provider, normalizedNodes) {
     );
   }
 
-  return Object.freeze({
+  const normalized = {
     type: 'way',
     id: String(way.id),
     sourceId: providerSourceId(provider, 'way', way.id),
     nodes: Object.freeze(nodeIds),
     tags: immutableTags(way.tags)
-  });
+  };
+  const survey=roadSourceSurvey(way);
+  if(survey)annotateRoadSourceSurvey(normalized,survey);
+  return Object.freeze(normalized);
 }
 
 function freezeCompleteness(completeness = {}) {
@@ -218,3 +221,4 @@ export function districtSourceLegacySelection(districtSource) {
     poiNodes: districtSource.features.pois
   });
 }
+import {roadSourceSurvey,annotateRoadSourceSurvey} from '../road-source-survey.js';

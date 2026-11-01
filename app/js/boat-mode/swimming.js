@@ -1,6 +1,6 @@
 import {resolveSwimHullCamera} from '../walking/water/hull-camera.js';
 import {getMaritimeCatalogEntry} from '../transport/maritime-catalog.js?v=1';
-import {styleMarinePanel,setMarineText} from '../ocean/interface.js';
+import {mountMarinePanel,setMarineText} from '../ocean/interface.js';
 import {RCRV_LAYOUT} from './research/layout.js';
 
 export function boatSwimAdmission({speed,coverage,depth,synthetic=false,walkingReady=true}) {
@@ -111,9 +111,9 @@ export function createBoatSwimming({ctx,sample,groundY,park,resume,updateParked,
 
 function createBoatSwimHud({start,board}) {
   const panel=document.createElement('section');panel.id='boatSwimmingControls';panel.setAttribute('aria-label','Vessel swimming');
-  styleMarinePanel(panel,'swimmer');
+  mountMarinePanel(panel,'swimmer');
   const button=document.createElement('button'),status=document.createElement('div');button.type='button';button.id='boatSwimmingToggle';status.setAttribute('role','status');
-  panel.append(button,status);document.body.append(panel);let swimming=false;
+  panel.append(button,status);let swimming=false;
   button.onclick=()=>{button.blur();if(swimming)board();else start()};
   return {hide:()=>{panel.hidden=true},dispose:()=>{panel.remove()},show:value=>{
     panel.hidden=false;swimming=value.swimming;button.disabled=!value.allowed;

@@ -1,6 +1,9 @@
 import {roadPlacementOffsetWorld} from './world/road-units.js';
+import {roadPavementSectionForSegment,sampleRoadPavementSection} from './world/road-pavement-sections.js';
+import {projectRoadPavementPoint} from './world/road-pavement-coordinate-frame.js';
 import {
   attachCompiledTransportSurface,
+  assertReviewedSurfaceAccepted,
   compileTransportSurfaceModel,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
@@ -567,6 +570,7 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
     feature,
     compileTransportSurfaceModel(feature, sampleTerrainY, {
       publicationStorage: options.publicationStorage,
+      reviewedSurfacePhase: options.reviewedSurfacePhase,
       surfaceBias,
       width: Number.isFinite(options.width) ? Number(options.width) : undefined,
       sampleStep: surfaceSampleStep
@@ -614,15 +618,18 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
       width: halfWidth * 2
     });
   }
+  assertReviewedSurfaceAccepted(feature.transportSurfaceModel);
 
   const { distances: pointDistances, total } = polylineDistances(points);
   const profileTotal = feature.surfaceDistances?.length ? feature.surfaceDistances[feature.surfaceDistances.length - 1] : total;
-  const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const leftEdge = [];
   const rightEdge = [];
   const centerlineHeights = [];
   for (let i = 0; i < points.length; i++) {
     const point = points[i];
+    const pavementProfile=feature.transportRecord?.crossSection?.pavementSections,
+      pavement=pavementProfile?sampleRoadPavementSection(pavementProfile,profileTotal*(total>1e-6?pointDistances[i]/total:0)):null,
+      nodeHalfWidth=pavement?pavement.width/2:halfWidth,corridorCenterOffset=pavement?pavement.offset:roadPlacementOffsetWorld(feature);
     let nx;
     let nz;
     let joinFactor = 1;
@@ -674,7 +681,7 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const profileDistance = profileTotal * distanceRatio;
     const model = feature.transportSurfaceModel || null;
     const atGrade = feature.structureSemantics?.terrainMode === 'at_grade';
-    const terrainDraped = atGrade && model?.engineeredApproach !== true;
+    const terrainDraped = atGrade && model?.engineeredApproach !== true && !model?.surveyedSurface;
     const terrainY = Number(sampleTerrainY(point.x, point.z));
     const surfaceOffset = feature.surfaceOffsets instanceof Float32Array ?
       Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceOffsets, profileDistance)) || 0 :
@@ -696,19 +703,19 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
       : transitionedCenterY;
     centerlineHeights.push(centerY);
 
-    const leftX = point.x + nx * (halfWidth + corridorCenterOffset) * joinFactor;
-    const leftZ = point.z + nz * (halfWidth + corridorCenterOffset) * joinFactor;
-    const rightX = point.x + nx * (-halfWidth + corridorCenterOffset) * joinFactor;
-    const rightZ = point.z + nz * (-halfWidth + corridorCenterOffset) * joinFactor;
+    const leftX = point.x + nx * (nodeHalfWidth + corridorCenterOffset) * joinFactor;
+    const leftZ = point.z + nz * (nodeHalfWidth + corridorCenterOffset) * joinFactor;
+    const rightX = point.x + nx * (-nodeHalfWidth + corridorCenterOffset) * joinFactor;
+    const rightZ = point.z + nz * (-nodeHalfWidth + corridorCenterOffset) * joinFactor;
     const rawLeftY = terrainDraped
       ? Number(sampleTerrainY(leftX, leftZ)) + baseTopBias
       : model
-        ? sampleTransportSurfaceAtDistance(model, profileDistance, halfWidth)
+        ? sampleTransportSurfaceAtDistance(model, profileDistance, pavement?nodeHalfWidth+corridorCenterOffset:halfWidth)
         : centerY;
     const rawRightY = terrainDraped
       ? Number(sampleTerrainY(rightX, rightZ)) + baseTopBias
       : model
-        ? sampleTransportSurfaceAtDistance(model, profileDistance, -halfWidth)
+        ? sampleTransportSurfaceAtDistance(model, profileDistance, pavement?-nodeHalfWidth+corridorCenterOffset:-halfWidth)
         : centerY;
     const transitionedLeftY = applyJunctionTransitionY(feature, leftX, leftZ, rawLeftY);
     const transitionedRightY = applyJunctionTransitionY(feature, rightX, rightZ, rawRightY);
@@ -743,7 +750,7 @@ function shouldRenderRoadSkirts(feature) {
 
 function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return NaN;
-  const projection = projected || projectPointToFeature(feature, x, z);
+  const projection = projected?projectRoadPavementPoint(feature,x,z,projected):projectPointToFeature(feature, x, z);
   if (!projection) return NaN;
   const model = feature.transportSurfaceModel || null;
   const distances = isNumericProfileArray(model?.distances)
@@ -783,7 +790,7 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
       : p1.z + (p2.z - p1.z) * projectionT;
     const tangentX = (p2.x - p1.x) / Math.max(1e-6, segLen);
     const tangentZ = (p2.z - p1.z) / Math.max(1e-6, segLen);
-    const lateralOffset = (x - sampleX) * -tangentZ + (z - sampleZ) * tangentX;
+    const lateralOffset = projection.pavementLateral??((x - sampleX) * -tangentZ + (z - sampleZ) * tangentX);
     return applyJunctionTransitionY(
       feature,
       x,
@@ -826,7 +833,9 @@ function roadSurfaceAttachmentThreshold(road, options = {}) {
 }
 
 function roadSurfaceLateralThreshold(road, options = {}) {
-  const halfWidth = roadWidthAtProjection(road, options?.projection) * 0.5;
+  const profile=road?.transportRecord?.crossSection?.pavementSections,projection=options?.projection,
+    pavement=profile&&Number.isInteger(projection?.segIndex)&&Number.isFinite(projection?.t)?roadPavementSectionForSegment(road,projection.segIndex,projection.t):null;
+  const halfWidth = pavement?Math.max(pavement.positive,pavement.negative):profile?.maximumExtent??roadWidthAtProjection(road, projection) * 0.5;
   const semantics = road?.structureSemantics || null;
   let padding =
     semantics?.terrainMode === 'elevated' ? 1.05 :
@@ -923,7 +932,7 @@ function projectPointToFeature(feature, x, z) {
       };
     }
   }
-  return best;
+  return projectRoadPavementPoint(feature,x,z,best);
 }
 
 function featureTraversalKey(feature) {

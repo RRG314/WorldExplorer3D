@@ -318,14 +318,14 @@ function createRuntimeKernel(options = {}) {
   }
 
   function stop(reason = 'stopped') {
-    if (!running && frameHandle === null) return false;
+    const changed = running || frameHandle !== null;
     running = false;
     stopReason = String(reason || 'stopped');
     if (frameHandle !== null && typeof cancelFrame === 'function') cancelFrame(frameHandle);
     frameHandle = null;
     previousTimestamp = null;
     accumulator = 0;
-    return true;
+    return changed;
   }
 
   function dispose(reason = 'disposed') {

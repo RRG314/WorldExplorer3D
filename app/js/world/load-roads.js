@@ -43,6 +43,8 @@ import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.
 import { compileTransportFacilityGraph, selectFacilitySourceElements } from "../transport/facility-compiler.js?v=4";
 import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=7";
 import { fetchMappedAirportData, isAirportSelection } from "./osm-airport-source.js?v=1";
+import {racingVenueSourceAt,loadRacingVenueSource,prepareVenueSourceMerge,createRacingVenueGroundPlan} from '../racing/venue-source-packs.js';
+import {SurfacePublicationError} from './surface-publication-error.js';
 
 export function selectExactFacilityElements(data = {}) {
   return selectFacilitySourceElements(Array.isArray(data?.elements) ? data.elements : []);
@@ -224,12 +226,21 @@ export function createWorldRoadLoader(deps = {}) {
       useSyntheticFallbackRoads,
       worldSession
     } = session;
+    const venueSource=racingVenueSourceAt(appCtx.LOC);
+    let venueData=null,venueGroundPlan=null;
+    if(venueSource){
+      try{
+        venueData=await runProviderWork('reviewed-geographic-pack',venueSource.id,signal=>loadRacingVenueSource(venueSource,{signal}));
+        if(!isActiveLoadContext())return finishSupersededWorldLoadRuntimeSession(session,'superseded-during-venue-source');
+        venueGroundPlan=createRacingVenueGroundPlan(venueSource,venueData);
+      }catch(error){if(!isActiveLoadContext())throw error;throw new SurfacePublicationError('reviewed-venue-source',error);}
+    }
     let acceptedGroundReady = false;
     try {
       acceptedGroundReady = await runProviderWork('accepted-ground', 'activate', (signal) =>
         activateAcceptedGroundForWorldLoad({
           appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
-          signal, startLoadPhase
+          signal, startLoadPhase, venueGroundPlan
         })
       );
     } catch (error) {
@@ -273,6 +284,7 @@ export function createWorldRoadLoader(deps = {}) {
         earthSceneSuppressed,
         hideEarthSceneMeshes,
         loadMetrics,
+        loadProfile,
         markLoaded: () => {
           // A late title/session restoration must not replace the location
           // that this load actually published.
@@ -769,6 +781,12 @@ export function createWorldRoadLoader(deps = {}) {
         });
         appCtx.addEarthWorldObject?.(appCtx.transportFacilityVisual.group);
         const nodes = {};
+        if(venueSource){
+          try{
+            const prepared=prepareVenueSourceMerge(data,venueData,venueSource,appCtx.getAcceptedGroundRuntimeSnapshot?.());
+            data=prepared.data;runtimeState.venuePack=loadMetrics.venuePack=prepared.metadata;
+          }catch(error){if(!isActiveLoadContext())throw error;throw new SurfacePublicationError('reviewed-venue-source',error);}
+        }
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
         const baselineFullWorld = perfModeNow === 'baseline';
         worldSession.transition('compiling', 'compile-selected-location');
@@ -1167,6 +1185,7 @@ export function createWorldRoadLoader(deps = {}) {
 
   const { loadWorld: loadRoads } = createWorldLoadCoordinator({
     appCtx,
+    prepareLoad: () => appCtx.vrPresentation?.stop?.('world-loading'),
     admitRequest: () => {
       const accepted = !!createWorldLoadRequest(appCtx.resolveLocationSelection?.(), Number(appCtx._worldLoadSequence || 0) + 1);
       if (!accepted) appCtx.showToast?.('Choose a valid location. The current world has been kept.');

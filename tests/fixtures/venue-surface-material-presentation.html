@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#263039;color:white;font:15px system-ui}canvas{display:block}p{margin:8px}</style>
+<p>Reviewed foreground · ordinary foreground · reviewed distance. Right switches the reviewed material preference.</p>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script type="module">
+import {configureTerrainSurfaceMaterialBlend,applyTerrainProfileSurfaceMaterialMix} from '/app/js/terrain/surface-material-blend.js';
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:false});renderer.setSize(800,400);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#263039');scene.add(new THREE.AmbientLight(0xffffff,1));
+const camera=new THREE.OrthographicCamera(-8,8,4,-4,.1,500);camera.position.set(0,0,10);camera.lookAt(0,0,0);
+const texture=rgb=>{const t=new THREE.DataTexture(new Uint8Array([...rgb,255]),1,1,THREE.RGBAFormat);t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;return t;};
+const grass=texture([35,130,45]),photo=texture([130,165,180]),maps={urban:{map:grass},sand:{map:grass},forest:{map:grass},soil:{map:grass},rock:{map:grass},snow:{map:grass}},meshes=[];
+for(let i=0;i<3;i++){
+ const geometry=new THREE.PlaneGeometry(3.5,5,2,2);geometry.setAttribute('terrainGeographicUv',geometry.getAttribute('uv').clone());
+ const material=new THREE.MeshStandardMaterial({map:grass,roughness:1});material.defines={WE3D_TERRAIN_REGIONAL_IMAGE:1};
+ const mesh=new THREE.Mesh(geometry,material);mesh.position.set(-5+i*5,0,i===2?-200:0);scene.add(mesh);meshes.push(mesh);
+ configureTerrainSurfaceMaterialBlend(mesh,{...maps,preferNearSurface:false,nearSurfaceRange:[35,140]});applyTerrainProfileSurfaceMaterialMix(mesh,'grass');
+ const u=material.userData.terrainSurfaceMaterialBlend.uniforms;u.terrainRegionalMap.value=photo;u.terrainLocalMap.value=photo;u.terrainRegionalReady.value=1;u.terrainLocalReady.value=1;
+}
+let enabled=false;
+function draw(){for(let i=0;i<meshes.length;i++)meshes[i].material.userData.terrainSurfaceMaterialBlend.uniforms.terrainPreferNearSurface.value=enabled&&i!==1?1:0;renderer.render(scene,camera);}
+function pixels(){const gl=renderer.getContext();return [150,400,650].map(x=>{const p=new Uint8Array(4);gl.readPixels(x,200,1,1,gl.RGBA,gl.UNSIGNED_BYTE,p);return [...p];});}
+draw();const legacy=pixels();enabled=true;draw();const physical=pixels();
+if(!(physical[0][1]>physical[0][0]*2&&physical[0][2]<physical[0][1]*.6))throw Error('Reviewed foreground did not retain the physical grass material');
+if(JSON.stringify(legacy[1])!==JSON.stringify(physical[1]))throw Error('Ordinary foreground changed');
+if(JSON.stringify(legacy[2])!==JSON.stringify(physical[2]))throw Error('Distant geographic colour changed');
+if(JSON.stringify(legacy[0])===JSON.stringify(physical[0]))throw Error('The photographic foreground regression was not reproduced');
+addEventListener('keydown',event=>{if(event.code==='ArrowRight'){enabled=!enabled;draw();}});
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({enabled,legacy,physical,pixels:pixels(),glError:renderer.getContext().getError(),programs:renderer.info.programs.length});window.ready=true;
+</script>

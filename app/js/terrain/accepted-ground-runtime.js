@@ -191,15 +191,20 @@ export function createAcceptedGroundRuntime(options = {}) {
     longitude,
     manifests = [],
     coverageProbes = null,
+    requiredArtifacts = null,
     signal = null
   } = {}) => {
+    const abortError = () => signal.reason instanceof Error ? signal.reason
+      : new DOMException(String(signal.reason || 'Accepted ground load aborted'), 'AbortError');
+    if (signal?.aborted) throw abortError();
     const location = locationRecord(latitude, longitude);
     const requestGeneration = ++generation;
     activeArtifacts = [];
     const selection = selectGroundArtifacts({
       latitude: location.latitude,
       longitude: location.longitude,
-      manifests
+      manifests,
+      requiredArtifacts
     });
     if (selection.status !== 'accepted') {
       return publish({
@@ -234,6 +239,8 @@ export function createAcceptedGroundRuntime(options = {}) {
       artifactIds: selection.manifests.map((manifest) => manifest.artifactId)
     });
     const loadedArtifacts = [];
+    const superseded = () => freezeState({generation:requestGeneration,status:'superseded',
+      reason:'newer-ground-request-active',location,artifactId:selection.manifests[0].artifactId,providerId:selection.provider.id});
     try {
       for (const entry of manifestsWithUrls) {
         const loaded = await loadArtifact({
@@ -241,6 +248,10 @@ export function createAcceptedGroundRuntime(options = {}) {
           url: entry.url,
           signal
         });
+        // A failed older tile must not clear or reject a replacement world's
+        // accepted stack. Check ownership before every success/failure publish.
+        if (requestGeneration !== generation) return superseded();
+        if (signal?.aborted) throw abortError();
         if (loaded?.status !== 'accepted') {
           activeArtifacts = [];
           return publish({
@@ -256,16 +267,11 @@ export function createAcceptedGroundRuntime(options = {}) {
         loadedArtifacts.push(loaded);
       }
     } catch (error) {
-      if (signal?.aborted) throw error;
-      if (requestGeneration !== generation) {
-        return freezeState({
-          generation: requestGeneration,
-          status: 'superseded',
-          reason: 'newer-ground-request-active',
-          location,
-          artifactId: selection.manifests[0].artifactId,
-          providerId: selection.provider.id
-        });
+      if (requestGeneration !== generation) return superseded();
+      if (signal?.aborted) {
+        activeArtifacts=[];
+        publish({status:'blocked',reason:'ground-request-aborted',location});
+        throw error;
       }
       activeArtifacts = [];
       return publish({
@@ -276,19 +282,7 @@ export function createAcceptedGroundRuntime(options = {}) {
         providerId: selection.provider.id
       });
     }
-    if (signal?.aborted) throw signal.reason instanceof Error
-      ? signal.reason
-      : new DOMException(String(signal.reason || 'Accepted ground load aborted'), 'AbortError');
-    if (requestGeneration !== generation) {
-      return freezeState({
-        generation: requestGeneration,
-        status: 'superseded',
-        reason: 'newer-ground-request-active',
-        location,
-        artifactId: selection.manifests[0].artifactId,
-        providerId: selection.provider.id
-      });
-    }
+    if (requestGeneration !== generation) return superseded();
     activeArtifacts = loadedArtifacts;
     const primary = activeArtifacts[0];
     publish({

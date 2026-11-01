@@ -1,6 +1,17 @@
 import {terrainGridInterval} from '../terrain/world-grid.js';
 import {createRoadContactIndex,createRoadContactIndexCooperatively} from '../terrain/road-contact-index.js?v=1';
 import {projectDecalTriangle} from '../terrain/surface-decal-projection.js';
+import {createPavementJoinPartition} from './pavement-join-partition.js';
+
+const refinedDetailed=mesh=>mesh.userData?.isTerrainMesh&&mesh.userData.reviewedTerrainCells?.size>0;
+function indexedTerrainSupports(meshes,includeFarTerrain){
+ return meshes.filter(m=>m.visible!==false&&(refinedDetailed(m)||includeFarTerrain&&m.userData?.isFarTerrainClipmap)).map(mesh=>{
+  if(!refinedDetailed(mesh))return mesh;
+  const source=mesh.geometry.attributes.position.array,positions=new Float32Array(source.length),origin=mesh.position||{};
+  for(let i=0;i<source.length;i+=3){positions[i]=source[i]+(origin.x||0);positions[i+1]=source[i+1]+(origin.y||0);positions[i+2]=source[i+2]+(origin.z||0);}
+  return {geometry:{attributes:{position:{array:positions}},getIndex:()=>mesh.geometry.getIndex()},userData:mesh.userData};
+ });
+}
 
 // Conservative separating-axis rejection before allocating support triangles.
 // A thin diagonal road can have a large grid-cell bounding box; most cells in
@@ -20,12 +31,13 @@ export function triangleMayOverlapCell(points, minX, maxX, minZ, maxZ) {
 
 // Split against the rendered terrain planes. This preserves creases exactly
 // without recursively multiplying skinny pavement triangles near a grid edge.
-export function createPavementTerrainPartition(meshes = [], {includeFarTerrain = false,farSupportIndex} = {}) {
-  const farMeshes=includeFarTerrain ? meshes.filter(m=>m.visible!==false && m.userData?.isFarTerrainClipmap) : [];
+export function createPavementTerrainPartition(meshes = [], {includeFarTerrain = false,farSupportIndex,pavementJoins=[]} = {}) {
+  const farMeshes=indexedTerrainSupports(meshes,includeFarTerrain);
   const farIndex=farSupportIndex ?? (farMeshes.length ? createRoadContactIndex(farMeshes,64) : null);
+  const joins=createPavementJoinPartition(pavementJoins);
   const grids=[];
   for(const mesh of meshes){
-    if(!mesh.userData?.isTerrainMesh || mesh.visible===false || mesh.userData.pendingTerrainTile)continue;
+    if(!mesh.userData?.isTerrainMesh || mesh.visible===false || mesh.userData.pendingTerrainTile||refinedDetailed(mesh))continue;
     const source=mesh.geometry?.attributes?.position,segments=mesh.geometry?.parameters?.widthSegments;
     if(!source || !Number.isInteger(segments)||segments<1)continue;
     // Near tiles use local Float32 vertices plus a translated origin; the far
@@ -62,8 +74,9 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
     }
     return projectDecalTriangle(points,supports(),0,workspace);
   }
-  function* partitionSteps(vertices,sampleTop){
+  function* partitionSteps(vertices,sampleTop,tile){
     const output=[],world=[{x:0,z:0},{x:0,z:0},{x:0,z:0}];
+    const selectedJoins=joins.select(tile);
     // One workspace per iterator, including concurrent/cooperative callers.
     // Clipped coordinates are consumed before its next use; published output
     // and failure diagnostics never reference borrowed storage.
@@ -79,14 +92,16 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
         if(!clipped)continue;
         for(let j=0;j<clipped.length;j+=9){
           coveredArea+=Math.abs((clipped[j+3]-clipped[j])*(clipped[j+8]-clipped[j+2])-(clipped[j+5]-clipped[j+2])*(clipped[j+6]-clipped[j]))/2;
-          for(let k=j;k<j+9;k+=3){const x=clipped[k]+g.ox,z=clipped[k+2]+g.oz;output.push(x,sampleTop(x,z),z);}
+          if(selectedJoins.length)joins.append(clipped,j,output,sampleTop,selectedJoins);
+          else for(let k=j;k<j+9;k+=3){const x=clipped[k]+g.ox,z=clipped[k+2]+g.oz;output.push(x,sampleTop(x,z),z);}
         }
       }
       if(farIndex) {
         const clipped=farIndex.projectTriangle(world,0);
         for(let j=0;j<clipped.length;j+=9) {
           coveredArea+=Math.abs((clipped[j+3]-clipped[j])*(clipped[j+8]-clipped[j+2])-(clipped[j+5]-clipped[j+2])*(clipped[j+6]-clipped[j]))/2;
-          for(let k=j;k<j+9;k+=3)output.push(clipped[k],sampleTop(clipped[k],clipped[k+2]),clipped[k+2]);
+          if(selectedJoins.length)joins.append(clipped,j,output,sampleTop,selectedJoins);
+          else for(let k=j;k<j+9;k+=3)output.push(clipped[k],sampleTop(clipped[k],clipped[k+2]),clipped[k+2]);
         }
       }
       const difference=coveredArea-areaBefore-area;
@@ -104,18 +119,18 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
     }
     return complete ? output : null;
   };
-  const partition=(vertices,sampleTop)=>{
-    const steps=partitionSteps(vertices,sampleTop);let step;
+  const partition=(vertices,sampleTop,tile)=>{
+    const steps=partitionSteps(vertices,sampleTop,tile);let step;
     do{step=steps.next();}while(!step.done);
     return step.value;
   };
   partition.steps=partitionSteps;
-  partition.dispose=()=>{farIndex?.dispose();grids.length=0;};
+  partition.dispose=()=>{farIndex?.dispose();joins.dispose();grids.length=0;};
   return partition;
 }
 
 export async function createPavementTerrainPartitionCooperatively(meshes=[],options={}) {
-  const far=options.includeFarTerrain ? meshes.filter(m=>m.visible!==false && m.userData?.isFarTerrainClipmap) : [];
+  const far=indexedTerrainSupports(meshes,options.includeFarTerrain);
   const farSupportIndex=far.length ? await createRoadContactIndexCooperatively(far,64,options) : null;
   try {
     if(options.current?.()===false)throw new Error('Terrain support construction superseded');

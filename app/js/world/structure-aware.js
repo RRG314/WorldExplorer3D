@@ -1,4 +1,5 @@
 import {createNumericPublicationStore} from '../structure-semantics/numeric-publication.js';
+import {BANKED_ROAD_MODEL} from '../physics/road-plane-dynamics.js';
 import { compileEngineeredApproachExcavation } from './compiler/engineered-approach-excavation.js';
 import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
 import {compileTunnelObstructionLimits, compileTunnelRoadObstructionLimits, compileSurfaceRoadOverlapRanges} from './compiler/tunnel-obstruction-limits.js';
@@ -99,7 +100,7 @@ function publishAtGradeTerrainCorridors(roads = []) {
     // it from a spatial bucket made a continuous shoulder stop at cell edges.
     paddingForRoad: road => {
       const width = Math.max(Number(road.width) || 5, Number(road.resolvedCrossSection?.sourceWidthMeters)/roadMetersPerWorldUnit(road) || 0);
-      return width * .5 + 44 / streetScaleForWorld(appCtx) + Math.max(3.5, Math.min(8, width * .65));
+      return (road.transportRecord?.crossSection?.pavementSections?.maximumExtent??width*.5) + 44 / streetScaleForWorld(appCtx) + Math.max(3.5, Math.min(8, width * .65));
     }
   });
   appCtx.transportTerrainCorridorPublication = Object.freeze({
@@ -413,7 +414,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       if (!feature) continue;
       feature.structureTransitionAnchors = [];
       updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-        publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
       });
     }
   });
@@ -436,7 +437,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       for (let i = 0; i < structureFeatures.length; i++) {
         const feature = structureFeatures[i];
         updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
     } finally {
@@ -494,7 +495,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
           feature,
           worldBaseTerrainY,
           {
-          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
           }
         );
       }
@@ -516,7 +517,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       updateFeatureSurfaceProfile(
         feature,
         worldBaseTerrainY,
-        { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+        { publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
       );
     }
 
@@ -539,7 +540,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
         );
         feature.structureTransitionAnchors.push(...replacements.values());
         updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-          publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
     }
@@ -566,7 +567,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
         updateFeatureSurfaceProfile(
           feature,
           worldBaseTerrainY,
-          { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+          { publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
         );
       }
     }
@@ -591,7 +592,7 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
         updateFeatureSurfaceProfile(
           feature,
           worldBaseTerrainY,
-          { publicationStorage, surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+          { publicationStorage, reviewedSurfacePhase: 'preparation', surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
         );
       }
     }
@@ -644,6 +645,11 @@ function* compileStructureAwareFeatureProfileSteps(options = {}) {
       continuity,
       junctionPasses
     });
+    const bankedIds=new Set(transportFeatures.filter(f=>f.transportSurfaceModel?.surveyedSurface?.surfaceModel===BANKED_ROAD_MODEL)
+      .map(f=>String(f.transportGraphRef?.featureId||f.sourceFeatureId||'')));
+    if(continuity.discontinuities.some(d=>bankedIds.has(d.leftFeatureId)||bankedIds.has(d.rightFeatureId))){
+      throw Error('reviewed_road_junction_discontinuity');
+    }
   });
   yield;
 

@@ -196,7 +196,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
       const mesh = appCtx.buildingMeshes[i];
       try {
       if (!mesh) continue;
-      if (mesh.userData?.isMappedVessel) {
+      if (mesh.userData?.isMappedVessel || mesh.userData?.deferredReviewedExterior) {
         keep.push(mesh);
         continue;
       }

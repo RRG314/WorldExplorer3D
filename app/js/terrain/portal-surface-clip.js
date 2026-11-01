@@ -5,7 +5,7 @@ import {PORTAL_FLOOR_MARGIN} from './structure-terrain-portals.js?v=2';
 // pavement. Shader-only clipping would leave invisible driving/walking floors.
 // Bridges and engineered approach surfaces must not pass through this adapter.
 export function createPortalSurfaceClipper(masks = []) {
-  if (!masks.length) return (positions, indices = null) => ({positions, indices});
+  if (!masks.length) return (positions, indices = null, baseY = null) => ({positions, indices,...(baseY?{baseY}:{})});
   const grid = buildPortalSpatialGrid(masks);
   const candidates = new Set();
   const planes = masks.map(m => {
@@ -30,6 +30,7 @@ export function createPortalSurfaceClipper(masks = []) {
         if(da>=0)outside.push(a);
         if((da<0&&db>0)||(da>0&&db<0)) {
           const t=da/(da-db),p={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t};
+          if(a.baseY!==undefined)p.baseY=a.baseY+(b.baseY-a.baseY)*t;
           next.push(p);outside.push(p);
         }
       }
@@ -39,19 +40,20 @@ export function createPortalSurfaceClipper(masks = []) {
     }
     return retained;
   }
-  return (positions, indices = null) => {
-    const count=indices?.length??positions.length/3,output=[],outputIndices=[],sourceVertices=new Map();
+  return (positions, indices = null, baseY = null) => {
+    if(baseY&& (baseY.length!==positions.length/3||!baseY.every(Number.isFinite)))throw Error('invalid_road_base_witness');
+    const count=indices?.length??positions.length/3,output=[],outputIndices=[],outputBase=[],sourceVertices=new Map();
     const append = point => {
       if(indices && point.index!==undefined && sourceVertices.has(point.index)) {
         outputIndices.push(sourceVertices.get(point.index));return;
       }
-      const index=output.length/3;output.push(point.x,point.y,point.z);
+      const index=output.length/3;output.push(point.x,point.y,point.z);if(baseY)outputBase.push(point.baseY);
       if(indices){outputIndices.push(index);if(point.index!==undefined)sourceVertices.set(point.index,index);}
     };
-    const original = at => {const index=indices?indices[at]:at,a=index*3;return {x:positions[a],y:positions[a+1],z:positions[a+2],index};};
+    const original = at => {const index=indices?indices[at]:at,a=index*3;return {x:positions[a],y:positions[a+1],z:positions[a+2],index,...(baseY?{baseY:baseY[index]}:{})};};
     const appendSource = index => {
       if(indices && sourceVertices.has(index)) {outputIndices.push(sourceVertices.get(index));return;}
-      const at=index*3,next=output.length/3;output.push(positions[at],positions[at+1],positions[at+2]);
+      const at=index*3,next=output.length/3;output.push(positions[at],positions[at+1],positions[at+2]);if(baseY)outputBase.push(baseY[index]);
       if(indices){outputIndices.push(next);sourceVertices.set(index,next);}
     };
     let changed=false;
@@ -111,6 +113,6 @@ export function createPortalSurfaceClipper(masks = []) {
         append(a);append(b);append(c);
       }
     }
-    return changed ? {positions:Float32Array.from(output),indices:indices?Uint32Array.from(outputIndices):null} : {positions,indices};
+    return changed ? {positions:Float32Array.from(output),indices:indices?Uint32Array.from(outputIndices):null,...(baseY?{baseY:Float32Array.from(outputBase)}:{})} : {positions,indices,...(baseY?{baseY}:{})};
   };
 }

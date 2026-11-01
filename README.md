@@ -1,6 +1,6 @@
 # World Explorer 3D
 
-[5.6.1 release notes](RELEASE_NOTES_5.6.1.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
+[Racing update](RELEASE_NOTES_RACING.md) · [5.6.1 release notes](RELEASE_NOTES_5.6.1.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
 [![Play in your browser](https://img.shields.io/badge/Play-in_your_browser-1677ff?style=flat-square)](https://worldexplorer3d.io/app/)
 [![Latest release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=release)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
@@ -25,6 +25,27 @@ remain part of the same game.
   · <a href="RELEASE_NOTES_5.6.1.md">5.6.1 release notes</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
+
+## Race real places and create your own tracks
+
+The racing update is live. Drive Silverstone's full GP loop and pit lane,
+the full Nordschleife T13 layout, or Daytona's tri-oval and pit branch. The
+BMW M3 E46, BMW M3 E92 race car and Porsche 911 Carrera 4S share your existing
+garage, upgrades and vehicle condition. Barrier damage affects handling and
+returns with the car to your garage.
+
+Open **Racing → Create track** to choose connected roads on the overhead map,
+record a drive, or place a clean marked circuit on supported open ground.
+Preview, edit and test the layout, save it locally, or share it with your
+current multiplayer room. Room-created tracks are unranked; reviewed public
+races keep their separate leaderboards and reward rules.
+
+Practice results go to your Journal. Room racing, rivals and crews use the
+same Explorer account, vehicles and progression. Existing location-based play,
+optional continuous exploration, buildings, Ocean, Space and saves remain
+available.
+
+[Read the racing update and how to start](RELEASE_NOTES_RACING.md).
 
 ## Explore by land, sea, air and space
 

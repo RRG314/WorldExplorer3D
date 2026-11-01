@@ -3,7 +3,7 @@ import {normalizeOceanWaterContext,defaultOceanWaterContext,oceanWaterContextFro
 import {OCEAN_DEPTH_MODEL,normalizeOceanDepthProfile} from './depth-model.js';
 import {createInvestigationControls} from '../campaign/coastal-investigation-ui.js';
 import {ensureMarineResearch,REEF_SURVEY} from './research-outing.js';
-import {styleMarinePanel} from './interface.js';
+import {mountMarinePanel} from './interface.js';
 import {earthLocalToGeographic} from '../earth-core/location-origin.js?v=1';
 import {createOceanVoyageStore,validateOceanVoyage} from './voyage-store.js';
 import {createCoastalDepartureControls} from '../campaign/coastal-departure-ui.js';
@@ -111,12 +111,12 @@ export function ensureOceanVoyage(ctx,{store=createOceanVoyageStore()}={}){
   const scan=document.createElement('button');scan.id='marineResearchScan';scan.type='button';scan.style.cssText=recover.style.cssText;scan.onclick=()=>{scan.blur();void research.scan().then(refresh)};
   const site=document.createElement('select');site.id='marineResearchSite';site.setAttribute('aria-label','Follow-up study site');site.style.cssText='width:100%;min-height:44px;margin-top:5px;background:#173d4c;color:white';
   REEF_SURVEY.sites.forEach((id,index)=>{const option=document.createElement('option');option.value=id;option.textContent=REEF_SURVEY.labels[index];site.append(option)});site.onchange=()=>{research.select(site.value);site.blur();refresh()};
-  styleMarinePanel(panel,'voyage');
+  mountMarinePanel(panel,'voyage');
   const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Voyage details & crew';more.append(summary,distance,statusElement,shared);
   const investigation=createInvestigationControls({api:()=>research.investigation,prefix:'coastalOcean'});
   const reef=document.createElement('details'),reefTitle=document.createElement('summary');reefTitle.textContent='Optional reef mapping · Scanner II';reef.append(reefTitle);more.append(reef);
   const coastal=createCoastalDepartureControls({api:()=>research.coastal,prefix:'coastalOcean'});
-  panel.append(title,site,scan,recover,coastal.node,investigation.node,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');document.body.append(panel);ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site,coastal,investigation,reef};refresh();
+  panel.append(title,site,scan,recover,coastal.node,investigation.node,more);for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');ui={resume:resumeButton,panel,title,status:statusElement,distance,recover,scan,site,coastal,investigation,reef};refresh();
  }
  const api={restorePersonal(){if(personalBeforeShared){current=personalBeforeShared.current;personalBeforeShared=null;}return current;},begin,beginAboard,checkpoint,surfaceCheckpoint,surfaced,tick,tickSurface,mount,resume,refresh,get current(){return current},get saved(){return saved},get status(){return status}};
  ctx.oceanVoyage=api;

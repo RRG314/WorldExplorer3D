@@ -11,7 +11,7 @@ function fixture(displays,run){
   const measured=[];
   const element=(id,rect,display='block')=>({style:{display},getBoundingClientRect(){measured.push(id);return rect;}});
   const elements={
-    hud:element('hud',{left:0,right:200,top:10,width:200,height:40}),
+    hudBox:element('hudBox',{left:0,right:200,top:10,width:200,height:40}),
     mainMenuBtn:element('mainMenuBtn',{left:900,right:1000,top:10,width:100,height:40}),
     debugOverlay:element('debugOverlay',{width:100,height:30},displays[0]),
     perfPanel:element('perfPanel',{width:120,height:30},displays[1])
@@ -36,7 +36,7 @@ test('visible diagnostic overlays retain their bounded positions and resume afte
   assert.equal(elements.debugOverlay.style.left,'325px');
   assert.equal(elements.perfPanel.style.left,'665px');
   assert.equal(elements.perfPanel.style.right,'auto');
-  assert.ok(measured.includes('hud')&&measured.includes('mainMenuBtn'));
+  assert.ok(measured.includes('hudBox')&&measured.includes('mainMenuBtn'));
   elements.debugOverlay.style.display='none';elements.perfPanel.style.display='none';
   const count=measured.length;positionTopOverlays();assert.equal(measured.length,count);
 }));

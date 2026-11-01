@@ -11,7 +11,7 @@ import com.google.androidbrowserhelper.trusted.LauncherActivity;
 public final class GameLauncherActivity extends LauncherActivity {
     private Uri playUrl(Uri original) {
         if (original == null || !"https".equalsIgnoreCase(original.getScheme()) ||
-                !"worldexplorer3d.io".equalsIgnoreCase(original.getHost())) return original;
+                !Uri.parse(BuildConfig.PORTAL_ORIGIN).getHost().equalsIgnoreCase(original.getHost())) return original;
         Uri.Builder builder = original.buildUpon().clearQuery();
         for (String name : original.getQueryParameterNames()) {
             if ("distribution".equals(name)) continue;

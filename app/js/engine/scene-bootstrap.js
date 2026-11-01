@@ -1,6 +1,7 @@
 import { installRenderLightUniformReuse } from './light-uniform-reuse.js';
+import {classifyGraphicsTier, initialRenderQuality as resolveInitialRenderQuality} from './initial-graphics-profile.js';
 import { applyDisplayColorPolicy } from './display-color-policy.js';
-import { setupEngineInputHandlers } from "./input-handlers.js?v=16";
+import { setupEngineInputHandlers } from "./input-handlers.js?v=18";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=2";
@@ -123,23 +124,16 @@ function showInitFailure(alertText, loadingHtml) {
 }
 
 function detectGpuTier(renderer) {
-  let gpuTier = 'high';
+  let rendererName = '';
   try {
     const debugExt = renderer.getContext().getExtension('WEBGL_debug_renderer_info');
     if (debugExt) {
-      const gpuRenderer = renderer.getContext().getParameter(debugExt.UNMASKED_RENDERER_WEBGL).toLowerCase();
-      const isMobile = /mobile|mali|adreno|powervr|apple gpu|sgx|tegra/.test(gpuRenderer);
-      const isIntegrated = /intel|uhd|iris|hd graphics|mesa|swiftshader|llvmpipe/.test(gpuRenderer);
-      if (isMobile || /swiftshader|llvmpipe/.test(gpuRenderer)) {
-        gpuTier = 'low';
-      } else if (isIntegrated) {
-        gpuTier = 'mid';
-      }
+      rendererName = renderer.getContext().getParameter(debugExt.UNMASKED_RENDERER_WEBGL);
     }
-    if (innerWidth * innerHeight < 500000) gpuTier = 'low';
   } catch {
-    // Keep the optimistic default.
+    // Some browsers withhold the renderer name; keep the existing fallback.
   }
+  const gpuTier = classifyGraphicsTier(rendererName, innerWidth * innerHeight);
   console.log('GPU tier:', gpuTier);
   return gpuTier;
 }
@@ -457,6 +451,7 @@ export function initEngineRuntime(ctx) {
   // A previous landscape pixel width must not widen the mobile layout
   // viewport before the resize handler can measure the new portrait width.
   Object.assign(appCtx.renderer.domElement.style, { maxWidth: '100vw', maxHeight: '100vh' });
+  appCtx.renderer.domElement.tabIndex = 0;
   appCtx.renderer.setSize(innerWidth, innerHeight);
   try {
     appCtx.renderer.info.autoReset = false;
@@ -501,11 +496,10 @@ export function initEngineRuntime(ctx) {
 
   const savedRenderQuality = ctx.readStorage(ctx.RENDER_QUALITY_STORAGE_KEY);
   const savedSsao = ctx.readStorage(ctx.SSAO_STORAGE_KEY);
-  const initialRenderQuality = savedRenderQuality
-    ? ctx.normalizeRenderQualityLevel(savedRenderQuality)
-    : ctx.isLikelyMobileDevice() || state.currentGpuTier === 'low'
-      ? ctx.RENDER_QUALITY_LOW
-      : ctx.RENDER_QUALITY_MED;
+  const initialRenderQuality = resolveInitialRenderQuality({
+    savedQuality: savedRenderQuality ? ctx.normalizeRenderQualityLevel(savedRenderQuality) : null,
+    mobile: ctx.isLikelyMobileDevice(), gpuTier: state.currentGpuTier
+  });
   state.renderQualityLevel = initialRenderQuality;
   appCtx.renderQualityLevel = initialRenderQuality;
   ctx.setSsaoEnabled(savedSsao === '1', { persist: false });

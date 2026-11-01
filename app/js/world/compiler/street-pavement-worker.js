@@ -37,7 +37,7 @@ self.onmessage = async ({ data }) => {
       const result = compilePavementTile(tile, plan.metersPerWorldUnit);
       const surfaceFingerprint=await fingerprint(serializePavementSurfaceFingerprint(tile,result,plan.metersPerWorldUnit));
       const metadata={key:tile.key,fingerprint:sourceFingerprint,surfaceFingerprint,bounds:tile.bounds,
-        segments:tile.segments.map(({road,a,b,wa,wb,offset})=>({a,b,wa,wb,offset,roadIndex:road.auditIndex})),
+        segments:tile.segments.map(({road,a,b,wa,wb,offset,nextOffset})=>({a,b,wa,wb,offset,...(nextOffset!==undefined?{nextOffset}:{}),roadIndex:road.auditIndex})),
         inferredFrontages:result.inferredFrontages,ramps:result.ramps,rampCount:result.ramps?.length||0,completed:cursor,total:plan.tiles.length};
       const retained=surfaces[tile.key];
       if(data.type!=='retry'&&retained?.surfaceFingerprint===surfaceFingerprint){

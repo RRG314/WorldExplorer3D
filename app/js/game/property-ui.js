@@ -315,7 +315,7 @@ export function createPropertyCard(property, suppliedView = null) {
     <div class="propertyHomeInfo"><span class="propertyHomeKicker">${escapeHtml(statusLabel)}</span><strong>${escapeHtml(property.label)}</strong>
       ${property.address?.formatted ? `<small>${escapeHtml(property.address.formatted)}</small>` : ''}<small>${escapeHtml(propertyAreaSummary(property))}</small>${property.parcelId ? `<small>${escapeHtml(property.landUseDescription || 'Land use not reported')} · ${escapeHtml(property.jurisdictionName)}</small>` : ''}<small>${property.hasStructures === false ? 'Land-only property · Quick Build permission after ownership' : `${property.mappedResidential ? 'Move-in ready furnished interior · ' : ''}${property.storageCapacity} storage spaces · ${escapeHtml(describeDestinationEntrySupport(property))}`}</small><small>Estimated game value${property.sourceAssessment ? ' · informed by public assessment data' : ''}</small><b>${credits(property.price)}</b></div>
     <div class="propertyCardActions"><button type="button" data-property-action="navigate" data-property-id="${escapeHtml(property.id)}">Set Route</button><button type="button" data-property-action="details" data-property-id="${escapeHtml(property.id)}">Details</button>
-      ${transactionAction}</div>
+      ${transactionAction}${owned?'<button type="button" data-property-action="garage">Vehicle garage</button>':''}</div>
   </article>`;
 }
 
@@ -669,6 +669,7 @@ async function loadConnectedMarket() {
 
 async function handlePropertyAction(button) {
   const action = button.dataset.propertyAction;
+  if(action==='garage'){appCtx.openVehicleGarage?.();return;}
   const propertyId = button.dataset.propertyId || '';
   const offerId = button.dataset.offerId || '';
   const itemId = button.dataset.itemId || '';

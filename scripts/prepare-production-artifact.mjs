@@ -27,7 +27,9 @@ const stagingAssetsJson = fs.readFileSync('dist/asset-manifest.json', 'utf8');
 const stagingIdentity = currentArtifactIdentity(process.cwd(), 'dist');
 // Retain the tested manifests/evidence, not another full project or world copy.
 fs.rmSync(PROMOTION_RECEIPT, { force: true });
-run('scripts/hosting-artifact.mjs', ['build', '--firebase-env', 'production']);
+const previousProduction = String(process.env.WE3D_PREVIOUS_PRODUCTION_ARTIFACT || '').trim();
+run('scripts/hosting-artifact.mjs', ['build', '--firebase-env', 'production',
+  ...(previousProduction ? ['--retain-runtime-from', previousProduction] : [])]);
 const receipt = { contract: 'world-explorer-production-promotion-v1', baseline,
   stagingIdentity, stagingBuildJson, stagingAssetsJson, productionIdentity: currentArtifactIdentity(process.cwd(), 'dist'),
   createdAt: new Date().toISOString(), evidenceScope: 'Staging-tested product assets with separately verified production configuration; no production browser journey claimed' };

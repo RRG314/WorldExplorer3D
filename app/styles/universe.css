@@ -411,6 +411,11 @@
   height: 130px;
 }
 
+/* The existing phone controls take priority over this optional reference map. */
+body:has(#mobileTouchControls.show.mode-rocket) .solar-system-scale {
+  display: none !important;
+}
+
 @media (max-width: 720px) {
   .solar-system-scale {
     display: none !important;

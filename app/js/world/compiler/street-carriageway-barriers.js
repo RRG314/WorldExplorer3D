@@ -41,7 +41,7 @@ export function createStreetCarriagewayBarriers(roads=[]) {
       const polygon=carriagewaySegmentPolygon(segment);if(polygon)insert(polygon,owner);
     }
     for(let i=1;i<(road.pts?.length||0)-1;i++){
-      const join={road,previous:road.pts[i-1],point:road.pts[i],next:road.pts[i+1],halfWidth:roadWidthAtSegment(road,i,0)/2,offset:roadPlacementOffsetWorld(road)};
+      const join={road,previous:road.pts[i-1],point:road.pts[i],next:road.pts[i+1],halfWidth:roadWidthAtSegment(road,i,0)/2,offset:roadPlacementOffsetWorld(road,i,0)};
       for(const polygon of carriagewayJoinPolygons(join))insert(polygon,owner);
     }
   }

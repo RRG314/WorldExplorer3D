@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "venueId": "daytona-tri-oval",
+  "providerId": "usgs-3dep-best-available",
+  "sourceRelease": "USGS-3DEP:FL_Peninsular_2018_D18:20221020",
+  "sourceCrs": "EPSG:26917+5703",
+  "sourceClassification": "bare-earth-dtm",
+  "sourceVerticalAccuracyMeters": null,
+  "sourceAccuracyStatement": "USGS tile metadata identifies one-metre bare-earth data acquired 2018-12-04 through 2019-04-25 and published 2022-10-20. It does not state a vertical RMSE. The reported datum-operation uncertainty excludes that unknown source accuracy; no total terrain accuracy is claimed.",
+  "attribution": "U.S. Geological Survey, 3D Elevation Program (3DEP); World Explorer 3D extracted unchanged native pixels, resampled and normalized heights, and quantized the delivery grid. No USGS endorsement.",
+  "licenseDocument": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/metadata/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.xml",
+  "sourceDocument": "https://www.usgs.gov/3d-elevation-program",
+  "raster": {
+    "filename": "daytona-native-window-v1/daytona-native-window.f32",
+    "bytes": 8488800,
+    "sha256": "b1fb449aba41639d5b83915b5d6054ca0bb82d88e1e98037e104e9a7981d89bb",
+    "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/TIFF/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.tif",
+    "sourceEtag": "\"405e3dc1e0383cbba06009224e92a2b8-81\"",
+    "sourceDimensions": [
+      10012,
+      10012
+    ],
+    "metadata": {
+      "filename": "daytona-native-window-v1/metadata.json",
+      "bytes": 1247,
+      "sha256": "d043db12d0e6451a2931e6cf211f37fb2b66d244570fc065893a7fae9901cd83"
+    },
+    "authorityMetadata": {
+      "filename": "daytona-usgs-x49y323-metadata-v1.xml",
+      "bytes": 13586,
+      "sha256": "ef864de604d532a4d484b3a51eb4970b93a04dfab4f071b1ed027032db2bef4a",
+      "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/FL_Peninsular_2018_D18/metadata/USGS_1M_17_x49y323_FL_Peninsular_2018_D18.xml"
+    }
+  },
+  "grids": [
+    {
+      "filename": "grids/us_nga_egm08_25.tif",
+      "bytes": 80585622,
+      "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
+      "url": "https://cdn.proj.org/us_nga_egm08_25.tif"
+    },
+    {
+      "filename": "grids/us_noaa_g2018u0.tif",
+      "url": "https://cdn.proj.org/us_noaa_g2018u0.tif",
+      "bytes": 16742155,
+      "sha256": "fa9a407ac7ee3f5a3694008e4bcd09ce9cc250452f0c3b11700a4960340abce2"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+      "bytes": 3522682,
+      "sha256": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+      "bytes": 39965338,
+      "sha256": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+      "bytes": 42709110,
+      "sha256": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a"
+    },
+    {
+      "filename": "grids/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+      "bytes": 9111570,
+      "sha256": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff"
+    }
+  ],
+  "patches": [
+    {
+      "id": "daytona-tri-oval-fine-v3",
+      "westMeters": -9025292,
+      "eastMeters": -9023761,
+      "southMeters": 3398325,
+      "northMeters": 3400120,
+      "spacingMeters": 2,
+      "quantizationMeters": 0.01
+    }
+  ]
+}

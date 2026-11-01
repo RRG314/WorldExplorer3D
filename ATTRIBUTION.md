@@ -11,6 +11,11 @@ This is the concise public attribution index. Asset-level details are in `app/as
 - ESA WorldCover 2021: contains modified Copernicus Sentinel data processed by the ESA WorldCover consortium, CC BY 4.0. <https://esa-worldcover.org/>
 - GEBCO Compilation Group bathymetry: CC BY 4.0. <https://www.gebco.net/>
 - Mapzen Terrarium elevation service and upstream elevation sources: provider terms apply.
+- Environment Agency LIDAR Composite 2022 terrain: Environment Agency copyright
+  and/or database right 2022. All rights reserved. Modified under the
+  [Open Government Licence v3](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+  Source, normalization and precision evidence is retained in each ground manifest.
+- Racing geographic packs: [source-level attribution and adapted-data recipes](app/assets/racing/ATTRIBUTION.md).
 
 ### DeFlock Hunt
 

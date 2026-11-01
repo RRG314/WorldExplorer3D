@@ -1,0 +1,44 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Explorer fleet · component review</title>
+<style>body{margin:0;background:#182a38;color:white;font:18px system-ui}canvas{display:block}#labels{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);pointer-events:none}#labels div{padding:16px;background:linear-gradient(#14232bb0,transparent 70px)}</style><div id="labels"></div>
+<script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {loadModelAsset,modelAssetCacheSnapshot} from '/app/js/assets/model-asset-runtime.js?v=16';
+import {EXPLORER_FLEET_ASSETS} from '/app/js/assets/explorer-fleet-assets.js';
+import {vehicleWheelRig,updateVehicleWheels} from '/app/js/transport/vehicle-wheel-motion.js';
+import {createAircraftVisual,updateAircraftVisual} from '/app/js/transport/aircraft-visual-recipe.js?v=11';
+import {getAviationCatalogEntry} from '/app/js/transport/aviation-catalog.js?v=5';
+import {getLifecycleRegistrySnapshot} from '/app/js/runtime/lifecycle-scope.js';
+const isolated=new URLSearchParams(location.search).has('isolated'),rows=Math.ceil(EXPLORER_FLEET_ASSETS.length/3);
+document.querySelector('#labels').style.gridTemplateRows=`repeat(${rows},1fr)`;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1500,rows*480);renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;document.body.append(renderer.domElement);renderer.setScissorTest(true);
+const hemi=new THREE.HemisphereLight(0xbfdfff,0x65777c,1.5),sun=new THREE.DirectionalLight(0xffead9,2),fill=new THREE.DirectionalLight(0xe1f1ff,.8);sun.position.set(-2,5,3);fill.position.set(3,2,-3);
+const report=[];
+for(const [i,record] of (isolated?[]:EXPLORER_FLEET_ASSETS).entries()){
+ const instance=await loadModelAsset(THREE,record.id),root=instance.root;
+ const wheels=vehicleWheelRig(root),before=wheels.map(w=>w.rotation.x);updateVehicleWheels(wheels,1.5,.3);
+ const wheelMotion=wheels.every((w,j)=>w.rotation.x!==before[j]&&(!w.parent.userData.front||w.parent.rotation.y===.3));
+ updateVehicleWheels(wheels,-1.5,0);
+ const b=new THREE.Box3().setFromObject(root),s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());root.position.sub(c);root.position.y-=b.min.y-c.y;
+ const norm=new THREE.Group();norm.scale.setScalar(5/Math.max(s.x,s.z));norm.add(root);
+ const scene=new THREE.Scene();scene.background=new THREE.Color(0x243545);scene.add(norm,hemi,sun,fill);
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x384b56,roughness:.85}));ground.rotation.x=-Math.PI/2;ground.position.y=-.02;scene.add(ground);
+ const camera=new THREE.PerspectiveCamera(36,500/480,.1,100);camera.position.set(6,3.7,7.4);camera.lookAt(0,.65,0);const x=i%3*500,y=(rows-1-Math.floor(i/3))*480;renderer.setViewport(x,y,500,480);renderer.setScissor(x,y,500,480);renderer.render(scene,camera);
+ document.querySelector('#labels').append(Object.assign(document.createElement('div'),{textContent:record.label}));
+ report.push({id:record.id,size:s.toArray(),wheels:wheels.length,wheelMotion,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles});instance.dispose();ground.geometry.dispose();ground.material.dispose();
+}
+window.componentReport={models:report,cache:modelAssetCacheSnapshot(),gpu:renderer.info.memory};
+window.checkAircraft=async()=>{
+ const results=[];
+ for(const id of ['expedition-prop','business-jet']){
+  const v=createAircraftVisual(THREE,getAviationCatalogEntry(id));await v.ready;
+  let propeller;v.root.traverse(n=>{if(n.userData?.aircraftRotor==='propeller')propeller=n;});
+  const before=propeller?.rotation.z;updateAircraftVisual(v,1,.1);
+  results.push({id,asset:v.root.userData.curatedAircraftAssetId,status:v.root.userData.aircraftAssetStatus,children:v.root.children.length,propellerMoves:propeller?propeller.rotation.z!==before:null});v.dispose();v.dispose();
+ }
+ const cancelled=createAircraftVisual(THREE,getAviationCatalogEntry('expedition-prop'));cancelled.dispose();await cancelled.ready;
+ return {results,cancelledAsset:cancelled.root.userData.curatedAircraftAssetId||null,cache:modelAssetCacheSnapshot(),scopes:getLifecycleRegistrySnapshot()};
+};
+window.beginAircraft=()=>{window.pendingAircraft=createAircraftVisual(THREE,getAviationCatalogEntry('expedition-prop'));};
+window.cancelAircraft=()=>window.pendingAircraft.dispose();
+window.aircraftOutcome=async()=>{const ready=await window.pendingAircraft.ready;const result={ready,asset:window.pendingAircraft.root.userData.curatedAircraftAssetId||null,status:window.pendingAircraft.root.userData.aircraftAssetStatus};window.pendingAircraft.dispose();return {...result,cache:modelAssetCacheSnapshot(),scopes:getLifecycleRegistrySnapshot()};};
+window.ready=true;
+</script>

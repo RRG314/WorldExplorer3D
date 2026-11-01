@@ -42,7 +42,7 @@ function rejection(reason, diagnostics) {
   });
 }
 
-function decodeFloat64Base64(value, expectedCount) {
+function decodeBase64Bytes(value, expectedBytes) {
   const text = String(value || '');
   let binary;
   try {
@@ -50,13 +50,19 @@ function decodeFloat64Base64(value, expectedCount) {
   } catch {
     return null;
   }
-  if (binary.length !== expectedCount * Float64Array.BYTES_PER_ELEMENT) {
+  if (binary.length !== expectedBytes) {
     return null;
   }
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
   }
+  return bytes;
+}
+
+function decodeFloat64Base64(value, expectedCount) {
+  const bytes = decodeBase64Bytes(value, expectedCount * Float64Array.BYTES_PER_ELEMENT);
+  if (!bytes) return null;
   const view = new DataView(bytes.buffer);
   const values = new Float64Array(expectedCount);
   for (let index = 0; index < expectedCount; index += 1) {
@@ -70,13 +76,33 @@ function decodeFloat64Base64(value, expectedCount) {
 
 function compileEncodedSamples(encoding, expectedCount, minimumConfidence) {
   if (
-    encoding?.type !== 'row-major-f64-shared-metadata-v1' ||
+    !['row-major-f64-shared-metadata-v1', 'row-major-u16-shared-ground-v1'].includes(encoding?.type) ||
     encoding?.byteOrder !== 'little-endian' ||
     Number(encoding?.sampleCount) !== expectedCount ||
     encoding?.shared?.available !== true
   ) return null;
   const confidence = Number(encoding.shared.confidence);
   if (!Number.isFinite(confidence) || confidence < minimumConfidence) return null;
+  if (encoding.type === 'row-major-u16-shared-ground-v1') {
+    const offset = encoding.offsetMeters, scale = encoding.scaleMeters;
+    if (!Number.isFinite(offset) || !Number.isFinite(scale) || scale < .001 || scale > .25) return null;
+    const bytes = decodeBase64Bytes(encoding.groundElevationMetersBase64, expectedCount * 2);
+    if (!bytes) return null;
+    const view = new DataView(bytes.buffer), heights = new Float64Array(expectedCount);
+    for (let index = 0; index < expectedCount; index += 1) {
+      const height = offset + scale * view.getUint16(index * 2, true);
+      if (!Number.isFinite(height)) return null;
+      heights[index] = height;
+    }
+    return Object.freeze({type: encoding.type,
+      // Bare-earth inputs are already ground. The immutable sampler owns this
+      // single decoded view; no second raw/ground copy or height authority.
+      rawElevationMeters: heights, groundElevationMeters: heights,
+      shared: Object.freeze({confidence,
+        correctionReason: String(encoding.shared.correctionReason || 'none'),
+        provenance: String(encoding.shared.provenance || 'unknown'),
+        normalizationUncertaintyMeters: Number(encoding.shared.normalizationUncertaintyMeters)})});
+  }
   const rawElevationMeters = decodeFloat64Base64(
     encoding.rawElevationMetersBase64,
     expectedCount

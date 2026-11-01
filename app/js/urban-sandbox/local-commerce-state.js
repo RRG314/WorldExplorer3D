@@ -6,6 +6,7 @@ export function localCommerceState(value) {
   const credits = Number(value.credits) * (Number(value.schemaVersion || 1) < 4 ? 2000 : 1);
   if (!Number.isSafeInteger(credits) || credits < 0) throw Error('Invalid local wallet balance');
   return {schemaVersion:4,revision:Math.max(0,Number(value.revision)||0),credits,
+    ...(value.vehicleGarage?{vehicleGarage:structuredClone(value.vehicleGarage)}:{}),
     purchases:{...value.purchases},claimedTrades:{...value.claimedTrades},pendingSettlements:{...value.pendingSettlements},
     transactions:Array.isArray(value.transactions)?value.transactions.slice(-60):[]};
 }
