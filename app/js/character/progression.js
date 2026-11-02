@@ -9,6 +9,7 @@ const ACTIVITY_PROGRESS_MAP = Object.freeze({
   survey: Object.freeze({ specialties: Object.freeze([['surveying', 1]]), proficiencies: Object.freeze([['survey-equipment', 1]]) }),
   'metal-detect': Object.freeze({ specialties: Object.freeze([['geology', 1]]), proficiencies: Object.freeze([['detector', 1]]) }),
   'geology-inspect': Object.freeze({ specialties: Object.freeze([['geology', 1], ['surveying', 0.35]]), proficiencies: Object.freeze([['survey-equipment', 0.55]]) }),
+  'virtual-archaeology': Object.freeze({ specialties: Object.freeze([['surveying', 1]]), proficiencies: Object.freeze([['excavation', 1], ['survey-equipment', 0.5]]) }),
   'pan-sediment': Object.freeze({ specialties: Object.freeze([['geology', 1]]), proficiencies: Object.freeze([['excavation', 0.65]]) }),
   'fossil-document': Object.freeze({ specialties: Object.freeze([['geology', 1]]), proficiencies: Object.freeze([['excavation', 1]]) }),
   photograph: Object.freeze({ specialties: Object.freeze([['wildlife', 0.65], ['photography', 1]]), proficiencies: Object.freeze([['photography', 1]]) }),

@@ -146,7 +146,7 @@ function setupUI() {
   let shareUi = null;
   let titleUi;
   const experiences=createExperienceController({runtime:appCtx,getTitleUi:()=>titleUi,onJournal:()=>openExplorerSection('journal'),closeMenus:closeAllFloatMenus,requestWorldFocus:()=>worldFocus.requestWorldFocus()});
-  bindResearchCareers(appCtx,experiences,{onJournal:()=>openExplorerSection('journal')});
+  bindResearchCareers(appCtx,experiences,{onJournal:()=>openExplorerSection('journal'),requestWorldFocus:()=>worldFocus.requestWorldFocus()});
   titleUi = initTitleScreenUi({
     openActivities:()=>experiences.open(),
     openJournal:()=>openExplorerSection('journal'),

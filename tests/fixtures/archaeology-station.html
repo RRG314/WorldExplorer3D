@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="data:,"><title>Archaeology station check</title><link rel="stylesheet" href="/app/styles/experiences.css"><style>body{background:#101e1a;color:#f3f0e4;font:16px system-ui;padding:24px}#open{min-height:44px;padding:10px 20px}#world{display:block;margin-top:20px}</style><button id="open" disabled>Open station</button><canvas id="world" tabindex="0" width="320" height="180" aria-label="World focus check"></canvas><script type="module">
+import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js';
+import {createArchaeologyUI} from '/app/js/campaign/archaeology-ui.js';
+import {archaeologyTarget} from '/app/js/campaign/archaeology-career.js';
+import {trainingSite,studyHarness} from '/tests/helpers/archaeology-study.mjs';
+const store=createIndexedDbDiscoveryProfileStore(),site=trainingSite(),params=new URLSearchParams(location.search);
+let state=(await store.getProfile()).researchCareers.archaeology;
+if(!state.active){
+ const h=studyHarness(undefined,'campaign','archaeology-station-fixture');
+ if(['excavate','lab','interpretation','complete'].includes(params.get('phase')))h.survey();
+ if(['lab','interpretation','complete'].includes(params.get('phase')))h.excavate();
+ if(['interpretation','complete'].includes(params.get('phase')))h.lab();
+ if(params.get('phase')==='complete')h.report();
+ for(const event of h.events)state=(await store.updateResearchCareer('archaeology',event.metadata.action,{now:event.occurredAt})).state;
+}
+const world=document.querySelector('#world'),c=world.getContext('2d');c.fillStyle='#233c30';c.fillRect(0,0,320,180);c.fillStyle='#efd079';c.font='18px system-ui';c.fillText('World focus check',24,85);
+const check=window.archaeologyCheck={store,failNextSave:false,globalEscapes:0};
+addEventListener('keydown',event=>{if(event.key==='Escape')check.globalEscapes++;});
+const runtime={Walk:{state:{walker:{x:0,z:0}}},getEnv:()=> 'EARTH',screenLayout:{setPanelLayer(){}},setPauseReason(){},stopGameplayPlugin(){}};
+const ui=createArchaeologyUI({runtime,getState:()=>state,near:(_id,asDistance)=>asDistance?1:true,requestWorldFocus:()=>world.focus(),
+ save:async command=>{if(check.failNextSave){check.failNextSave=false;throw Error('The field record could not save. Your previous context and finds are kept. Try again.');}
+  const now=Date.now(),target=archaeologyTarget(state.active),custody=Object.values(state.active.artifacts).map(row=>row.instanceId);
+  state=(await store.updateResearchCareer('archaeology',{...command,revision:state.revision,custody,evidence:{environment:'EARTH',travelMode:'walk',liveGps:false,supported:true,verticalDistance:1.7,siteId:site.id,position:site.points[target],at:now}},{now})).state;
+ },onJournal(){check.journalOpened=true;},onNext(){check.nextChosen=true;}});
+document.querySelector('#open').disabled=false;document.querySelector('#open').onclick=()=>ui.open();ui.update();
+document.body.append(world);
+if(params.has('open'))ui.open();
+window.advanceTime=async()=>{};
+window.render_game_to_text=()=>JSON.stringify({scope:'Actual station UI and IndexedDB with controlled physical evidence; not world gameplay',phase:state.active.phase,layerIndex:state.active.layerIndex,excavation:state.active.excavation,contexts:Object.keys(state.active.contexts),items:Object.keys(state.active.artifacts),revision:state.revision});
+</script></html>

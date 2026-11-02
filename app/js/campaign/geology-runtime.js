@@ -6,7 +6,7 @@ import {qualifyResearchSite,researchStationEvidence} from './research-site.js';
 import {createGeologyPresentation} from './geology-presentation.js';
 import {createGeologyUI,geologyTarget} from './geology-ui.js';
 import {projectDiscoveryItemsToBackpack} from '../discovery/backpack-projection.js?v=1';
-import {lookupGeology} from '../geospatial/geology.js?v=1';
+import {lookupGeology} from '../geospatial/geology.js';
 
 export async function createGeologyCareerRuntime({runtime,store,intent,onJournal,onNext,isActive=()=>true}){
  const session=captureEnvironmentSession(),scope=createLifecycleScope('research-career:geology'),abort=new AbortController();

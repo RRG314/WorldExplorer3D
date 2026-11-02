@@ -3,6 +3,7 @@ export const currentContractTests = [
   'tests/experience-entry-current.test.mjs',
   'tests/solo-racer-current.test.mjs',
   'tests/geology-career-current.test.mjs',
+  'tests/archaeology-career-current.test.mjs',
   'tests/geology-places-current.test.mjs',
   'tests/host-resource-guard-current.test.mjs',
   'tests/research-site-current.test.mjs',

@@ -1,4 +1,6 @@
 import {geologyCareerBadge} from '../campaign/geology-career.js';
+import {archaeologyCareerBadge} from '../campaign/archaeology-career.js';
+import {archaeologyReportMarkup} from '../campaign/archaeology-report.js';
 import {soloRacerBadge} from '../campaign/solo-racer.js';
 import {setDomText} from '../ui/dom-state.js?v=1';
 import {journalReturnDestination,returnToJournalRecord} from './journal-return.js';
@@ -481,7 +483,7 @@ function createDiscoveryUi(state) {
       const eventPath = event.pathId || 'field';
       const chapterFinish = openingChapter.schemaVersion === 1 && openingChapter.phase === 'review' && event.eventId === openingChapter.eventId
         ? `<button class="discoveryChapterFinish" type="button" data-chapter-action="finish"${chapterBusy ? ' disabled' : ''}>Finish First Bearings · earn your badge</button>` : '';
-      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${returnButton}${chapterFinish}</article>`;
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${archaeologyReportMarkup(event.metadata?.archaeologyReport)}${returnButton}${chapterFinish}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
     if (open && activeTab === 'journal') globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-records-visible', { detail: { eventIds: filtered.map((event) => event.eventId) } }));
   }
@@ -647,7 +649,7 @@ function createDiscoveryUi(state) {
         .sort((left, right) => Number(right[1].xp) - Number(left[1].xp));
       const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
       const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
-      const badges = [...(progress.badgeAwards || []), ...lunarCampaignBadges(profile,investigationEvents), ...investigationBadges(investigationEvents), ...homeAchievementBadges(profile), ...[geologyCareerBadge(profile.researchCareers?.geology),soloRacerBadge(profile.soloRacer), openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun), threeViewsBadge(profile.threeViews)].filter(Boolean)];
+      const badges = [...(progress.badgeAwards || []), ...lunarCampaignBadges(profile,investigationEvents), ...investigationBadges(investigationEvents), ...homeAchievementBadges(profile), ...[archaeologyCareerBadge(profile.researchCareers?.archaeology),geologyCareerBadge(profile.researchCareers?.geology),soloRacerBadge(profile.soloRacer), openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun), threeViewsBadge(profile.threeViews)].filter(Boolean)];
       const activeCompanion = ownedCompanions.find((entry) => entry.active);
       const background = definitionById(BACKGROUND_DEFINITIONS, profile.characterState?.backgroundId) || BACKGROUND_DEFINITIONS[0];
       const strengths = ATTRIBUTE_DEFINITIONS.map((definition) => ({

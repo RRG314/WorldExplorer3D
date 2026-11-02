@@ -1,4 +1,4 @@
-import {normalizeGeologyCareer,transitionGeologyCareer} from '../campaign/geology-career.js';
+import {normalizeResearchCareers,researchCareerDefinition} from '../campaign/research-career-definitions.js';
 import {normalizeSoloRacer,projectSoloRacer,soloRacerReceipt} from '../campaign/solo-racer.js';
 import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
 import { homeAchievementEvent } from '../campaign/home-achievements.js';
@@ -104,7 +104,7 @@ function createDefaultProfile() {
     fieldGuideCount: 0,
     explorerProgress: defaultExplorerProgress(),
     openingChapter: normalizeOpeningChapter(),
-    researchCareers: {geology:normalizeGeologyCareer()},
+    researchCareers: normalizeResearchCareers(),
     soloRacer: normalizeSoloRacer(),
     harborRun: normalizeHarborRun(),
     threeViews: normalizeThreeViews(),
@@ -125,7 +125,7 @@ function normalizeProfile(profile) {
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
     openingChapter: normalizeOpeningChapter(profile?.openingChapter),
-    researchCareers: {...(profile?.researchCareers||{}),geology:normalizeGeologyCareer(profile?.researchCareers?.geology)},
+    researchCareers: normalizeResearchCareers(profile?.researchCareers),
     soloRacer: normalizeSoloRacer(profile?.soloRacer),
     harborRun: normalizeHarborRun(profile?.harborRun),
     threeViews: normalizeThreeViews(profile?.threeViews),
@@ -598,7 +598,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   }
 
   async function updateResearchCareer(id,command,options={}) {
-    if(id!=='geology')throw Error('Choose a supported field career.');
+    const definition=researchCareerDefinition(id);
     const db=await open();let transaction,abort;
     try {
       await ensureCharacterMigration(db);
@@ -608,8 +608,9 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const profiles=transaction.objectStore('profiles'),events=transaction.objectStore('events');
       const current=normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
       if(options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
-      const result=transitionGeologyCareer(current.researchCareers.geology,command,options.now??Date.now());
+      const result=definition.transition(current.researchCareers[id],command,options.now??Date.now());
       if(!result.event){await transactionPromise(transaction);return clone(result);}
+      for(const instanceId of result.requiredItems||[]){const item=await requestPromise(transaction.objectStore('items').get(instanceId));if(item?.researchLabel?.careerId!==id||item.researchLabel.runId!==result.state.active.runId)throw Error('A contextual find is missing from your saved collection.');}
       const event=createExplorerStoryEvent(result.event);
       const explorer=event.projections.profile?projectExplorerStoryProgress(current.explorerProgress,event):current.explorerProgress;
       const character=event.projections.profile?projectCharacterProgress(current.characterState,event,{meaningful:true,explorerPointsBefore:current.explorerProgress.points,explorerPointsAfter:explorer.points}).character:current.characterState;
@@ -1234,10 +1235,11 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
     async updateResearchCareer(id,command,options={}) {
-      if(id!=='geology')throw Error('Choose a supported field career.');
+      const definition=researchCareerDefinition(id);
       if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
-      const result=transitionGeologyCareer(profile.researchCareers.geology,command,options.now??Date.now());
+      const result=definition.transition(profile.researchCareers[id],command,options.now??Date.now());
       if(!result.event)return clone(result);
+      for(const instanceId of result.requiredItems||[]){const item=items.get(instanceId);if(item?.researchLabel?.careerId!==id||item.researchLabel.runId!==result.state.active.runId)throw Error('A contextual find is missing from your saved collection.');}
       for(const item of result.samples)if(claims.has(item.claimId))throw Error('That labeled sample has already been collected.');
       const event=createExplorerStoryEvent(result.event);
       const explorer=event.projections.profile?projectExplorerStoryProgress(profile.explorerProgress,event):profile.explorerProgress;

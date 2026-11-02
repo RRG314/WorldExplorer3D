@@ -2419,3 +2419,4 @@
     font: inherit;
   }
 }
+.home-archaeology-display{display:grid;gap:8px;margin:16px 0 8px}.home-archaeology-display select{box-sizing:border-box;min-height:44px;width:100%;max-width:100%;padding:8px;background:var(--wx-panel,#14262d);color:var(--wx-text,#e1ebef);border:1px solid var(--wx-line,#496157);border-radius:6px;font:inherit}
