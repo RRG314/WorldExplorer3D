@@ -20,6 +20,8 @@ import {
   requestCurrentPosition
 } from './title-screen/geolocation.js?v=1';
 function initTitleScreenUi({
+  openActivities,
+  openJournal,
   lastLocationStorageKey,
   shareExperienceStatus,
   perfSettingsStatus,
@@ -482,7 +484,9 @@ function initTitleScreenUi({
         console.error(`[title] ${mode} launch failed:`, error);
       });
     },
-    primeMultiplayerUi
+    primeMultiplayerUi,
+    onActivities:openActivities,
+    onJournal:openJournal
   });
 
   appCtx.globeSelector = globeSelector;
@@ -611,7 +615,7 @@ function initTitleScreenUi({
   });
   function selectTitleGameMode(mode) {
     const elements=[...document.querySelectorAll('.mode')],target=elements.find(element=>element.dataset.mode===mode);
-    if(!target)return false;
+    if(!['free','trial','checkpoint','painttown','flower','deflock','livegps','racing'].includes(mode))return false;
     for(const element of elements)element.classList.toggle('sel',element===target);
     appCtx.gameMode=mode;return true;
   }

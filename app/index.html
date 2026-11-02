@@ -38,6 +38,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=40">
 <link rel="stylesheet" href="styles/start-hub.css?v=24">
+<link rel="stylesheet" href="styles/experiences.css?v=1">
 <link rel="stylesheet" href="styles/navigation.css?v=3">
 <link rel="stylesheet" href="styles/discovery.css?v=21">
 <link rel="stylesheet" href="styles/backpack.css?v=1">
@@ -250,26 +251,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
-<div class="tab-content" id="tab-games">
-<div style="padding:8px 0">
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-🎮 Game Mode
-</div>
-<div class="mode-grid">
-<div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
-<div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="racing"><div class="mode-icon">🏁</div><div><div class="mode-name">Road Racing</div><div class="mode-desc">Race rivals on qualified real roads. Choose a city, keep your cars, or create your own route.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Drive through the gold destination ring before time runs out. Pause stops the timer.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Drive through every pink road marker, in any order. Free Roam ends the run.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Flower Sprint</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
-<div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Cycle through walking, the BMW, the plane, and the drone with <b>F</b>, or choose a mode directly from Travel</div>
-</div>
-</div>
-</div>
-</div>
+<div class="tab-content" id="tab-games"><button type="button" data-globe-destination="games">Browse Activities</button></div>
 <div class="tab-content" id="tab-multiplayer">
 <div class="mp-card">
 <header class="mp-heading"><div><span class="mp-eyebrow">SHARED EXPLORATION</span><h2 class="mp-title">Explore together</h2></div><button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button></header>
@@ -660,10 +642,8 @@ Continue ocean exploration beyond the dive site
 <nav class="globe-app-rail" aria-label="Main sections">
   <button class="active" type="button" data-globe-destination="location"><span>◎</span>Explore</button>
   <button type="button" data-globe-destination="games"><span>⌖</span>Activities</button>
-  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Multiplayer</button>
-  <button type="button" data-globe-destination="live-earth"><span>⌁</span>Live Data</button>
-  <button type="button" data-globe-destination="library"><span>▥</span>My Places</button>
-  <button type="button" data-globe-destination="controls"><span>⌨</span>Quick Start</button>
+  <button type="button" data-globe-destination="journal"><span>▤</span>Journal</button>
+  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Community</button>
 </nav>
 <div class="globe-selector-top">
 <div class="globe-hub-search">
@@ -681,6 +661,7 @@ Continue ocean exploration beyond the dive site
 </div>
 </div>
 <div class="globe-selector-side">
+<nav class="globe-explore-tools" aria-label="Explore tools"><button type="button" data-globe-destination="library">My Places</button><button type="button" data-globe-destination="live-earth">Live Data</button><button type="button" data-globe-destination="controls">Quick Start</button></nav>
 <div class="globe-location-entry-pair" aria-label="Choose how to use your location">
   <button id="globeSelectorLocateBtn" class="globe-location-entry-card globe-location-current" type="button">
     <span class="location-entry-icon" aria-hidden="true">◎</span>

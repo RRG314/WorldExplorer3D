@@ -8,8 +8,8 @@ import {
 } from '../globe-selector/helpers.js?v=9';
 
 const HUB_PANELS = {
-  games: { tab: 'games', title: 'Activities & Games' },
-  multiplayer: { tab: 'multiplayer', title: 'Multiplayer' },
+  games: { tab: 'games', title: 'Activities' },
+  multiplayer: { tab: 'multiplayer', title: 'Community' },
   settings: { tab: 'settings', title: 'Settings' },
   controls: { tab: 'controls', title: 'Controls & Quick Start' }
 };
@@ -49,7 +49,9 @@ function setupGlobeHub({
   globeSelector,
   onEarthMode,
   onLaunchMode,
-  primeMultiplayerUi
+  primeMultiplayerUi,
+  onActivities,
+  onJournal
 }) {
   const overlay = document.getElementById('globeHubOverlay');
   const panelHost = document.getElementById('globeHubPanelHost');
@@ -176,6 +178,8 @@ function setupGlobeHub({
   };
 
   const openPanel = (destination) => {
+    if(destination==='games'&&onActivities){closePanel();void onActivities();return true;}
+    if(destination==='journal'&&onJournal){closePanel();onJournal();return true;}
     if (destination === 'library' && overlay && panelHost) {
       releaseOverlayFocus();
       panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));

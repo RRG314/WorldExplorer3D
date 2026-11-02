@@ -1168,7 +1168,7 @@ function outpostMarkup(expedition) {
     const condition = Math.round(Number(outpost.condition || 0) * 100);
     const details = outpost.state === 'operational'
       ? `${String(outpost.operationsStatus || 'operational').replaceAll('-', ' ')} · ${outpost.assignedCrewIds.length} crew · ${condition}% condition · ${Number(outpost.power?.storedMWh || 0).toFixed(1)} MWh · ${Math.round(Number(outpost.stores?.waterKg || 0))} kg water`
-      : `Planned at the existing survey-world address · ${outpost.blueprint.length} structural records`;
+      : `Site reserved · ${outpost.blueprint.length} structures in your design`;
     const action = outpost.state === 'planned'
       ? `<button type="button" data-build-outpost="${outpost.id}" ${availability.enabled ? '' : 'disabled'}>Build field station</button>${availability.reason ? `<small>${availability.reason}</small>` : ''}`
       : `<button type="button" data-service-outpost="${outpost.id}">Service station</button><button type="button" data-enter-contact="${contact.id}">Visit station</button>`;

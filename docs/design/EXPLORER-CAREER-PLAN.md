@@ -1,5 +1,7 @@
 # Explorer career, campaigns and a world worth returning to
 
+November 2 integration update: [One coherent World Explorer experience](COHERENT-EXPERIENCE-DELIVERY.md) is the current UI/architecture delivery sequence and portfolio completion board specification. The mission and authority requirements below remain the content baseline; they are not replaced by a menu redesign.
+
 Design baseline: October 9, 2026. Implementation begins from `eb18b9c7` on
 `steven/visual-quality`. This is an implementation specification, not a statement
 that the later features already work. Delivery evidence is kept in

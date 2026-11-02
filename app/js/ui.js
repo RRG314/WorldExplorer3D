@@ -1,3 +1,4 @@
+import {createExperienceController} from './experiences/runtime.js';
 import {bindRacingUI} from './ui/racing.js';
 import {bindVehicleGarage,vehicleGarageMessage} from './ui/vehicle-garage.js';
 import { mountCapabilityGuide } from './product/capability-guide.js?v=1';
@@ -142,7 +143,11 @@ function setupUI() {
     updateControlsModeUI
   } = initMobileControls();
   let shareUi = null;
-  const titleUi = initTitleScreenUi({
+  let titleUi;
+  const experiences=createExperienceController({runtime:appCtx,getTitleUi:()=>titleUi,onJournal:()=>openExplorerSection('journal'),closeMenus:closeAllFloatMenus});
+  titleUi = initTitleScreenUi({
+    openActivities:()=>experiences.open(),
+    openJournal:()=>openExplorerSection('journal'),
     lastLocationStorageKey: LAST_LOCATION_STORAGE_KEY,
     shareExperienceStatus,
     perfSettingsStatus,
@@ -306,7 +311,7 @@ function setupUI() {
   }));
   document.getElementById('sandboxNearbyActivities')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);
-    appCtx.openActivityBrowser?.();
+    void experiences.open({view:'quick'});
   });
   document.getElementById('sandboxHomes')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);
