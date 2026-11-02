@@ -1,3 +1,4 @@
+import {normalizeSoloRacer,projectSoloRacer,soloRacerReceipt} from '../campaign/solo-racer.js';
 import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
 import { homeAchievementEvent } from '../campaign/home-achievements.js';
 import {supportRecorder} from '../runtime/support-receipt.js';
@@ -102,6 +103,7 @@ function createDefaultProfile() {
     fieldGuideCount: 0,
     explorerProgress: defaultExplorerProgress(),
     openingChapter: normalizeOpeningChapter(),
+    soloRacer: normalizeSoloRacer(),
     harborRun: normalizeHarborRun(),
     threeViews: normalizeThreeViews(),
     characterState: createDefaultCharacterState()
@@ -121,6 +123,7 @@ function normalizeProfile(profile) {
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
     openingChapter: normalizeOpeningChapter(profile?.openingChapter),
+    soloRacer: normalizeSoloRacer(profile?.soloRacer),
     harborRun: normalizeHarborRun(profile?.harborRun),
     threeViews: normalizeThreeViews(profile?.threeViews),
     characterState: normalizeCharacterState(profile?.characterState),
@@ -616,9 +619,13 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
             explorerPointsAfter: nextExplorerProgress.points
           })
         : { character: current.characterState, reward: null };
-      const profile = event.projections.profile
+      const projectedRacer = projectSoloRacer(current.soloRacer, event);
+      const baseProfile = event.projections.profile
         ? normalizeProfile({ ...current, explorerProgress: nextExplorerProgress, characterState: characterProjection.character })
         : current;
+      const profile = normalizeProfile({...baseProfile,soloRacer:projectedRacer});
+      const capstone = soloRacerReceipt(projectedRacer,event);
+      if(capstone&&!await requestPromise(events.get(capstone.eventId))){const receipt=createExplorerStoryEvent(capstone);events.put(receipt);putJournalOrder(transaction,'events',receipt);}
       events.put(event);
       putJournalOrder(transaction, 'events', event);
       profiles.put(profile);
@@ -1175,6 +1182,8 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       characterReward = characterProjection.reward;
       profile = normalizeProfile({ ...profile, explorerProgress: nextExplorerProgress, characterState: characterProjection.character });
     }
+    profile=normalizeProfile({...profile,soloRacer:projectSoloRacer(profile.soloRacer,event)});
+    const capstone=soloRacerReceipt(profile.soloRacer,event);if(capstone&&!events.has(capstone.eventId))events.set(capstone.eventId,createExplorerStoryEvent(capstone));
     return { recorded: true, event: clone(event), profile: clone(profile), characterReward: clone(characterReward) };
   }
 

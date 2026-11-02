@@ -1,3 +1,4 @@
+import {beginSoloRacer,soloRacerSummary} from '../campaign/solo-racer.js';
 import {createExperienceEntry} from './entry.js';
 import {createExperienceBrowser} from '../ui/experience-browser.js';
 import {ACTIVITY_TEMPLATES} from '../activity-discovery/schema-core.js?v=1';
@@ -31,9 +32,10 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
  adapters.set('racing',{
   equipment:'Your owned cars, upgrades and condition are in the Garage. Practice is available without an online account.',
   async places(){const {RACING_VENUE_SOURCES}=await import('../racing/venue-source-packs.js');return RACING_VENUE_SOURCES.map(p=>({id:p.id,name:p.name,...p.anchor,environment:'earth'}));},
-  offer:input=>ready(input,'Choose an event'),
-  summary:()=>({stages:[{label:'Prepare your car and class'},{label:'Finish an event'},{label:'Review your saved time and condition'},{label:'Improve with a clean finish'},{label:'Complete the next challenge'}]}),
-  async start({isCurrent}){if(!isCurrent())return false;return runtime.startGameplayPlugin?.('racing');}
+  prepareLabel:'Garage',prepare:async()=>{const {openVehicleGarage}=await import('../ui/vehicle-garage.js');openVehicleGarage();},
+  offer:input=>{if(context().loaded){try{const garage=runtime.getVehicleGarage?.();if(!garage?.vehicles?.[garage.selectedId]||garage.vehicles[garage.selectedId].condition<.3)return {state:'needs-equipment',label:'Prepare your car',reason:'Open the Garage and choose an owned car with at least 30% condition.',enabled:false};}catch{return {state:'temporarily-unavailable',label:'Garage unavailable',reason:'Your garage could not load. Close Activities and try again.',enabled:false};}}return ready(input,'Choose an event');},
+  summary:({profile,variantId})=>soloRacerSummary(profile?.soloRacer,{variantId}),
+  async start({isCurrent,intent}){if(!isCurrent())return false;const garage=runtime.getVehicleGarage?.(),ownerUid=runtime.getAccountUserId?.()||'';const store=await getStore();if(!isCurrent())return false;await store.saveProfile(current=>({...current,soloRacer:beginSoloRacer(current.soloRacer,{garage,ownerUid,variantId:intent.variantId})}));if(!isCurrent())return false;return runtime.startGameplayPlugin?.('racing');}
  });
  const browser=createExperienceBrowser({
   readContext:context,readProfile:async()=> (await getStore()).getProfile(),resolveAdapter:(id,row)=>adapters.get(id)||adapters.get(row.id),

@@ -1,8 +1,9 @@
 import {experienceById} from './catalog.js';
 const clone=value=>value==null?null:JSON.parse(JSON.stringify(value));
 const environments=new Set(['earth','ocean','moon','mars','space']);
-export function createExperienceIntent({experienceId,place=null,resumeId='',revision=1,definitionVersion=1,schemaVersion=1}={}){
+export function createExperienceIntent({experienceId,place=null,resumeId='',revision=1,variantId='campaign',definitionVersion=1,schemaVersion=1}={}){
  if(schemaVersion!==1||definitionVersion!==1)throw new TypeError('This saved activity needs a newer version of World Explorer.');
+ if(!/^[a-z][a-z0-9-]{0,59}$/.test(variantId))throw new TypeError('Choose a valid assignment.');
  const entry=experienceById(experienceId);if(!entry)throw new TypeError('Choose a valid activity.');
  let target=null;
  if(place){
@@ -12,7 +13,7 @@ export function createExperienceIntent({experienceId,place=null,resumeId='',revi
   target={id:String(place.id||'').slice(0,120),name:String(place.name||'Selected place').slice(0,120),environment,lat:place.lat,lon:place.lon};
  }
  if(resumeId&&!/^[a-zA-Z0-9:._-]{1,180}$/.test(resumeId))throw new TypeError('That saved assignment cannot be opened.');
- return Object.freeze({schemaVersion:1,experienceId:entry.id,definitionVersion:1,revision:Math.max(1,Math.floor(Number(revision)||1)),place:target?Object.freeze(target):null,resumeId});
+ return Object.freeze({schemaVersion:1,experienceId:entry.id,definitionVersion:1,revision:Math.max(1,Math.floor(Number(revision)||1)),variantId,place:target?Object.freeze(target):null,resumeId});
 }
 export function experienceOffer(entry,{adapter,place=null,profile=null}={}){
  if(!entry)return {state:'unavailable',label:'Choose an activity',reason:'Select an activity to see its details.',enabled:false};

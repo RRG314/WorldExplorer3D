@@ -6,9 +6,9 @@ The stopping rule for each row is its exit condition. Once satisfied, close that
 
 | Stage | Fixed deliverable | Exit condition | State |
 | --- | --- | --- | --- |
-| 0 | Catalog, stable IDs, ownership and entry/readiness contracts | All 20 career IDs, existing quick games and route templates mapped; legacy IDs preserved; unknown IDs/stale entry rejected; no new progression or world authority | Active |
+| 0 | Catalog, stable IDs, ownership and entry/readiness contracts | All 20 career IDs, existing quick games and route templates mapped; legacy IDs preserved; unknown IDs/stale entry rejected; no new progression or world authority | Complete locally |
 | 1 | Shared Activities entry and navigation | Continue/Careers/Quick play share one model in globe/world; brief, supported place and one next action; Back retains selection; desktop/portrait/short landscape/keyboard checks pass | Complete locally |
-| 2 | Racer career | Existing three venues/garage/condition/results connected into finite ladder; ordinary event result saves once; next/replay and reload/resume work; optional rivals/online remain available | Pending |
+| 2 | Racer career | Existing three venues/garage/condition/results connected into finite ladder; ordinary event result saves once; next/replay and reload/resume work; optional rivals/online remain available | Complete locally; integrated release remains open |
 | 3 | Geologist career | Five distinct specified field/sample/bench/interpretation stages, capstone and two meaningful repeat variations; genuine evidence and saved custody; failure/resume checks pass | Pending |
 | 4 | Archaeologist career | Training site/grid/stratigraphy/context/lab/conservation, capstone and two repeat variations; layer-before-removal and interrupted custody checks pass | Pending |
 | 5a | Palaeontology, wildlife ecology, botany/restoration | Each named campaign satisfies its existing five-stage specification, capstone, two variations, actual result and reload | Pending |
@@ -23,3 +23,5 @@ The stopping rule for each row is its exit condition. Once satisfied, close that
 No stage closes from a source listing, mocked completion or visual card alone. Write one short evidence record per stage: changed files, tests, observed UI/gameplay, limitations, and exact next row. If a check fails, diagnose the failure and recheck its affected boundary; do not restart the whole audit or a passed gameplay matrix.
 
 The final stop is the verified deployable candidate and clean GitHub handoff. Production deployment is a separate recorded action; do not imply an artifact is live before checking the hosted identity. Any remaining required work keeps stage 7 open.
+
+Stages 0/1 are committed in `ceb4b61c`. Stage 2 has focused model, actual IndexedDB/reload and actual source entry/start/drive/resume evidence. It reuses accepted unchanged full-lap and result-producer evidence; it does not claim a newly driven full career. Controlled receipt cases cover the new transaction/projection boundary. Final candidate acceptance remains Stage 7.
