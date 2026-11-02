@@ -7,7 +7,7 @@ import {createPavementTerrainMask,createPavementMaterialBinding} from './pavemen
 // cannot bury this distant layer because it is part of the terrain itself.
 export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation=false}={}){
  const sequence=appCtx._worldLoadSequence,startedAt=performance.now();
- let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,coveragePrepared=false,mask=null,stagedMask=null,completedBounds=null,generation=0;
+ let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,coveragePrepared=false,mask=null,stagedMask=null,completedBounds=null,generation=0,workerError=null;
  const completedKeys=new Set();
  let coverageReady=false,preparedBounds=null,initialTask=null,initialProgress=()=>{},completionTask=null;
  let plannedKeys=[],initialKeys=[],initialBounds=null,initialFocus={x:0,z:0};
@@ -32,8 +32,12 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
  }
  function initialSufficient(){const p=initialStatus();return coveragePrepared&&sourcesMatch()&&p.total!==null&&p.completed===p.total;}
  const request=data=>new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>{pending=null;reject(new Error('Overview cell exceeded 15 seconds'));},15000);
-   pending={resolve:value=>{clearTimeout(timer);pending=null;resolve(value);},reject:error=>{clearTimeout(timer);pending=null;reject(error);}};
+   if(workerError){reject(workerError);return;}
+   const timeoutMs=15000,started=performance.now();
+   stats.requestPhase=data.type;
+   const finish=()=>{clearTimeout(timer);pending=null;stats.requestPhase=null;stats.requestDurationsMs ||= {};stats.requestDurationsMs[data.type]=Math.max(stats.requestDurationsMs[data.type]||0,performance.now()-started);};
+   const timer=setTimeout(()=>{finish();reject(new Error(`Street overview ${data.type} exceeded ${timeoutMs/1000} seconds`));},timeoutMs);
+   pending={resolve:value=>{finish();resolve(value);},reject:error=>{finish();reject(error);}};
    try{worker.postMessage(data);}catch(error){pending.reject(error);}
  });
  function setDetailBounds(bounds){mask?.setDetailBounds(bounds);stagedMask?.setDetailBounds(bounds);}
@@ -42,10 +46,11 @@ export function createStreetOverview(appCtx,{onComplete=()=>{},deferPresentation
    if(!worker){
      const workerUrl=globalThis.__WORLD_EXPLORER_PRODUCTION__?.streetOverviewWorkerUrl ||
        new URL('./compiler/street-overview-worker.js',import.meta.url);
-     worker=new Worker(workerUrl,{type:'module'});stats.workerActive=true;
+     workerError=null;worker=new Worker(workerUrl,{type:'module'});stats.workerActive=true;stats.workerUrl=String(workerUrl);
+     const workerStarted=performance.now();
      const instance=worker;
-     worker.onmessage=event=>{if(worker===instance)event.data.type==='error'?pending?.reject(new Error(event.data.message)):pending?.resolve(event.data);};
-     worker.onerror=event=>{if(worker===instance)pending?.reject(new Error(event.message));};
+     worker.onmessage=event=>{if(worker!==instance)return;stats.firstReplyMs ??= performance.now()-workerStarted;if(event.data.type==='error'){workerError=new Error(event.data.message);pending?.reject(workerError);}else pending?.resolve(event.data);};
+     worker.onerror=event=>{if(worker!==instance)return;workerError=new Error(event.message||'Street overview worker could not start');stats.workerError=workerError.message;pending?.reject(workerError);};
    }
    if(!prepared||!sourcesMatch()){
      const newSources=!coveragePrepared||!sourcesMatch();

@@ -11,7 +11,10 @@ export function finishFailedWorldLoad(session = {}, error, options = {}) {
       updatedAt: performance.now()});
     runtimeState.finishedAt = runtimeState.updatedAt;
   }
-  if (loadMetrics) loadMetrics.error = String(error?.message || error);
+  if (loadMetrics) {
+    loadMetrics.error = String(error?.message || error);
+    if (appCtx?.streetOverview?.stats) loadMetrics.streetOverview = {...appCtx.streetOverview.stats};
+  }
   // An old rejection must never stop or dispose a newer publication.
   if (appCtx && runtimeState && appCtx.worldLoadRuntimeState === runtimeState) {
     appCtx.worldLoading = false;

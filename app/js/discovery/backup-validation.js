@@ -1,3 +1,4 @@
+import {validateGeologyCareerBackup} from '../campaign/geology-career.js';
 import {validateSoloRacerBackup} from '../campaign/solo-racer.js';
 import {validateLunarHomecomingBackup} from '../campaign/lunar-homecoming.js';
 import {validateInvestigationBackup} from '../campaign/coastal-investigation.js';
@@ -70,6 +71,7 @@ export function validateJournalBackup(input) {
   if(data.albums==null)data.albums=[];
   if(!Array.isArray(data.albums)||data.albums.length>1||data.albums.some(a=>a?.id!==THREE_VIEWS.albumId))fail();
   try{validateThreeViewsBackup(data.profile.threeViews,data.albums[0],data.events);}catch{fail();}
+  try{validateGeologyCareerBackup(data.profile.researchCareers?.geology,data.events,data.items);}catch{fail();}
   try{validateSoloRacerBackup(data.profile.soloRacer,data.events);}catch{fail();}
   return data;
 }

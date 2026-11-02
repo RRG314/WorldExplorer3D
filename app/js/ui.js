@@ -1,3 +1,4 @@
+import {bindResearchCareers} from './ui/research-careers.js';
 import {createExperienceController} from './experiences/runtime.js';
 import {bindRacingUI} from './ui/racing.js';
 import {bindVehicleGarage,vehicleGarageMessage} from './ui/vehicle-garage.js';
@@ -144,7 +145,8 @@ function setupUI() {
   } = initMobileControls();
   let shareUi = null;
   let titleUi;
-  const experiences=createExperienceController({runtime:appCtx,getTitleUi:()=>titleUi,onJournal:()=>openExplorerSection('journal'),closeMenus:closeAllFloatMenus});
+  const experiences=createExperienceController({runtime:appCtx,getTitleUi:()=>titleUi,onJournal:()=>openExplorerSection('journal'),closeMenus:closeAllFloatMenus,requestWorldFocus:()=>worldFocus.requestWorldFocus()});
+  bindResearchCareers(appCtx,experiences,{onJournal:()=>openExplorerSection('journal')});
   titleUi = initTitleScreenUi({
     openActivities:()=>experiences.open(),
     openJournal:()=>openExplorerSection('journal'),

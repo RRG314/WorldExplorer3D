@@ -3,7 +3,7 @@ import {createExperienceEntry} from './entry.js';
 import {createExperienceBrowser} from '../ui/experience-browser.js';
 import {ACTIVITY_TEMPLATES} from '../activity-discovery/schema-core.js?v=1';
 
-export function createExperienceController({runtime,getTitleUi,onJournal,closeMenus=()=>{}}){
+export function createExperienceController({runtime,getTitleUi,onJournal,closeMenus=()=>{},requestWorldFocus=()=>{}}){
  const adapters=new Map();let profileStore=null;
  const getStore=async()=>{if(runtime.discoveryProfileStore)return runtime.discoveryProfileStore;if(!profileStore){const {createIndexedDbDiscoveryProfileStore}=await import('../discovery/profile-store.js?v=5');profileStore=createIndexedDbDiscoveryProfileStore();}return profileStore;};
  function context(){const selection=getTitleUi()?.getGlobeSelector?.()?.getSelection?.(),location=runtime.gameStarted?runtime.LOC:selection;return {loaded:runtime.gameStarted===true&&!runtime.worldLoading,environment:String(runtime.getEnv?.()||'EARTH').toLowerCase(),offline:globalThis.navigator?.onLine===false,place:location&&Number.isFinite(location.lat)&&Number.isFinite(location.lon)?{id:'selected-place',name:location.name||selection?.name||'Selected place',lat:location.lat,lon:location.lon,environment:'earth'}:null};}
@@ -40,7 +40,7 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
  const browser=createExperienceBrowser({
   readContext:context,readProfile:async()=> (await getStore()).getProfile(),resolveAdapter:(id,row)=>adapters.get(id)||adapters.get(row.id),
   saveSelection:async intent=>(await getStore()).saveProfile(current=>({...current,activeExperience:{...intent,selectedAt:Date.now()}})),
-  onBegin:intent=>entry.start(intent),onJournal,
+  onBegin:intent=>entry.start(intent),onEntered:requestWorldFocus,onJournal,
   onLayer:open=>{runtime.screenLayout?.setPanelLayer('experiences',open);runtime.setPauseReason?.('experience-browser',open&&runtime.gameStarted);if(open)closeMenus();}
  });
  return Object.freeze({...browser,registerAdapter(id,adapter){if(adapters.has(id))throw Error('Activity adapter already registered: '+id);adapters.set(id,adapter);return()=>adapters.delete(id);},getStore,cancelEntry:()=>entry.cancel(),context});

@@ -1,7 +1,7 @@
 import {experienceById,filterExperiences} from '../experiences/catalog.js';
 import {createExperienceIntent,experienceOffer} from '../experiences/entry.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function createExperienceBrowser({documentRef=document,readContext=()=>({}),readProfile=async()=>null,saveSelection=async()=>{},resolveAdapter=()=>null,onBegin=async()=>false,onJournal=()=>{},onLayer=()=>{}}={}){
+export function createExperienceBrowser({documentRef=document,readContext=()=>({}),readProfile=async()=>null,saveSelection=async()=>{},resolveAdapter=()=>null,onBegin=async()=>false,onEntered=()=>{},onJournal=()=>{},onLayer=()=>{}}={}){
  const dialog=documentRef.createElement('dialog');dialog.id='experienceBrowser';dialog.className='experience-browser';dialog.setAttribute('aria-labelledby','experienceHeading');
  dialog.innerHTML=`<header class="experience-header"><div><span class="experience-eyebrow">World Explorer</span><h2 id="experienceHeading">Activities</h2></div><button type="button" data-experience-close aria-label="Close Activities">×</button></header>
  <nav class="experience-tabs" role="tablist" aria-label="Activities"><button type="button" role="tab" data-experience-view="continue" aria-selected="false" tabindex="-1">Continue</button><button type="button" role="tab" data-experience-view="careers" aria-selected="true">Careers</button><button type="button" role="tab" data-experience-view="quick" aria-selected="false" tabindex="-1">Quick play</button></nav>
@@ -40,8 +40,9 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
    render();if(focus)detail.focus({preventScroll:true});
   }catch{if(run===revision)message('Starting places could not load. Select the activity to try again.');}
  }
- function close(){revision++;if(dialog.open)dialog.close();onLayer(false);if(origin?.isConnected)origin.focus({preventScroll:true});}
+ function close({restoreFocus=true}={}){revision++;if(dialog.open)dialog.close();onLayer(false);if(restoreFocus&&origin?.isConnected)origin.focus({preventScroll:true});}
  dialog.addEventListener('close',()=>onLayer(false));dialog.addEventListener('cancel',event=>{if(busy){event.preventDefault();return;}close();});
+ dialog.addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation();});
  dialog.addEventListener('click',async event=>{
   const button=event.target.closest('button');if(!button||busy)return;
   if(button.hasAttribute('data-experience-close')){close();return;}
@@ -54,7 +55,7 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
    const entry=experienceById(selected),place=selectedPlace(),offer=experienceOffer(entry,{adapter:adapterFor(entry),place,profile});if(!offer.enabled)return;
    if(!place){message('Choose a starting place first.');find('[data-experience-place]')?.focus();return;}
    busy=true;message('');render();const run=++revision;
-   try{const intent=createExperienceIntent({experienceId:selected,place,variantId});await saveSelection(intent);if(run!==revision)return;dialog.close();onLayer(false);const started=await onBegin(intent);if(run!==revision)return;if(started===false){dialog.showModal();onLayer(true);message('That activity could not start here. Your selection is kept. Choose another place or try again.');}else close();}
+   try{const intent=createExperienceIntent({experienceId:selected,place,variantId});await saveSelection(intent);if(run!==revision)return;dialog.close();onLayer(false);const started=await onBegin(intent);if(run!==revision)return;if(started===false){dialog.showModal();onLayer(true);message('That activity could not start here. Your selection is kept. Choose another place or try again.');}else{close({restoreFocus:false});onEntered();}}
    catch{if(run===revision){if(!dialog.open)dialog.showModal();onLayer(true);message('The activity could not open. Your saved progress is kept. Try again.');}}
    finally{busy=false;if(dialog.open)render();}
   }

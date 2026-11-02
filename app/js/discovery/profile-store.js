@@ -1,3 +1,4 @@
+import {normalizeGeologyCareer,transitionGeologyCareer} from '../campaign/geology-career.js';
 import {normalizeSoloRacer,projectSoloRacer,soloRacerReceipt} from '../campaign/solo-racer.js';
 import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
 import { homeAchievementEvent } from '../campaign/home-achievements.js';
@@ -103,6 +104,7 @@ function createDefaultProfile() {
     fieldGuideCount: 0,
     explorerProgress: defaultExplorerProgress(),
     openingChapter: normalizeOpeningChapter(),
+    researchCareers: {geology:normalizeGeologyCareer()},
     soloRacer: normalizeSoloRacer(),
     harborRun: normalizeHarborRun(),
     threeViews: normalizeThreeViews(),
@@ -123,6 +125,7 @@ function normalizeProfile(profile) {
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
     openingChapter: normalizeOpeningChapter(profile?.openingChapter),
+    researchCareers: {...(profile?.researchCareers||{}),geology:normalizeGeologyCareer(profile?.researchCareers?.geology)},
     soloRacer: normalizeSoloRacer(profile?.soloRacer),
     harborRun: normalizeHarborRun(profile?.harborRun),
     threeViews: normalizeThreeViews(profile?.threeViews),
@@ -594,6 +597,34 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function updateResearchCareer(id,command,options={}) {
+    if(id!=='geology')throw Error('Choose a supported field career.');
+    const db=await open();let transaction,abort;
+    try {
+      await ensureCharacterMigration(db);
+      if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
+      transaction=db.transaction(['profiles','events','items','claims',JOURNAL_ORDER_STORE],'readwrite');
+      abort=()=>{try{transaction.abort();}catch{}};options.signal?.addEventListener('abort',abort,{once:true});
+      const profiles=transaction.objectStore('profiles'),events=transaction.objectStore('events');
+      const current=normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      if(options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
+      const result=transitionGeologyCareer(current.researchCareers.geology,command,options.now??Date.now());
+      if(!result.event){await transactionPromise(transaction);return clone(result);}
+      const event=createExplorerStoryEvent(result.event);
+      const explorer=event.projections.profile?projectExplorerStoryProgress(current.explorerProgress,event):current.explorerProgress;
+      const character=event.projections.profile?projectCharacterProgress(current.characterState,event,{meaningful:true,explorerPointsBefore:current.explorerProgress.points,explorerPointsAfter:explorer.points}).character:current.characterState;
+      const profile=normalizeProfile({...current,researchCareers:{...current.researchCareers,[id]:result.state},collectionCount:current.collectionCount+result.samples.length,explorerProgress:explorer,characterState:character});
+      for(const item of result.samples){
+        if(await requestPromise(transaction.objectStore('claims').get(item.claimId)))throw Error('That labeled sample has already been collected.');
+        transaction.objectStore('items').put(item);putJournalOrder(transaction,'items',item);
+        transaction.objectStore('claims').put({claimId:item.claimId,item,event});
+      }
+      events.put(event);putJournalOrder(transaction,'events',event);profiles.put(profile);
+      await transactionPromise(transaction);return clone({...result,event,profile});
+    }catch(error){try{transaction?.abort();}catch{}supportRecorder.record({operation:'journal-save',error});throw error;}
+    finally{if(abort)options.signal?.removeEventListener('abort',abort);db.close();}
+  }
+
   async function recordExplorerEvent(record) {
     const event = createExplorerStoryEvent(record);
     const db = await open();
@@ -670,6 +701,17 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     } finally {
       db.close();
     }
+  }
+
+  async function getItemsById(ids = []) {
+    if (!Array.isArray(ids) || ids.length > 32 || ids.some(id => typeof id !== 'string' || id.length > 260)) throw new TypeError('Expected at most 32 stable item IDs');
+    const db = await open();
+    try {
+      const transaction = db.transaction(['items'], 'readonly');
+      const records = await Promise.all(ids.map(id => requestPromise(transaction.objectStore('items').get(id))));
+      await transactionPromise(transaction);
+      return records.filter(Boolean).map(clone);
+    } finally { db.close(); }
   }
 
   async function getEventsById(ids = []) {
@@ -1048,6 +1090,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     listCompanions,
     listEvents,
     getEventsById,
+    getItemsById,
     listEventsByIdPrefix,
     listFieldGuide,
     listItems,
@@ -1055,6 +1098,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     importData,
     recordDiscovery,
     recordExplorerEvent,
+    updateResearchCareer,
     recordObservation,
     startOpeningChapter,
     completeOpeningChapter,
@@ -1189,6 +1233,19 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    async updateResearchCareer(id,command,options={}) {
+      if(id!=='geology')throw Error('Choose a supported field career.');
+      if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
+      const result=transitionGeologyCareer(profile.researchCareers.geology,command,options.now??Date.now());
+      if(!result.event)return clone(result);
+      for(const item of result.samples)if(claims.has(item.claimId))throw Error('That labeled sample has already been collected.');
+      const event=createExplorerStoryEvent(result.event);
+      const explorer=event.projections.profile?projectExplorerStoryProgress(profile.explorerProgress,event):profile.explorerProgress;
+      const character=event.projections.profile?projectCharacterProgress(profile.characterState,event,{meaningful:true,explorerPointsBefore:profile.explorerProgress.points,explorerPointsAfter:explorer.points}).character:profile.characterState;
+      profile=normalizeProfile({...profile,researchCareers:{...profile.researchCareers,[id]:result.state},collectionCount:profile.collectionCount+result.samples.length,explorerProgress:explorer,characterState:character});
+      for(const item of result.samples){items.set(item.instanceId,clone(item));claims.set(item.claimId,{claimId:item.claimId,item,event});}
+      events.set(event.eventId,event);return clone({...result,event,profile});
+    },
     ...portalTrail,
     async recordHomeAchievement(kind,home) {
       if(profile.homeAchievements?.[kind])return clone(profile.homeAchievements[kind]);
@@ -1249,6 +1306,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async hasClaim(claimId) { return claims.has(String(claimId)); },
     async listItems(limit = 200) { return [...items.values()].sort((a,b)=>compareJournalRows('items',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async listFieldGuide(limit = 500) { return [...guide.values()].sort((a,b)=>compareJournalRows('fieldGuide',a,b)).slice(0, journalPageSize(limit)).map(clone); },
+    async getItemsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable item IDs');return ids.map(id=>items.get(id)).filter(Boolean).map(clone);},
     async getEventsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable event IDs');return ids.map(id=>events.get(id)).filter(Boolean).map(clone);},
     async listEventsByIdPrefix(prefix, page = {}) {
       const {after, limit} = eventPrefixPage(prefix, page);

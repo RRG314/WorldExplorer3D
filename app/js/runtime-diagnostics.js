@@ -1350,6 +1350,7 @@ if (developerDiagnosticsEnabled) {
   });
 }
 globalThis.render_game_to_text = () => JSON.stringify({
+  fieldwork: appCtx.getGameplayRegistrySnapshot?.().activeId === 'research-career' ? appCtx.saveActiveGameplay?.() : null,
   developerDiagnostics: {
     enabled: developerDiagnosticsEnabled,
     networkWrites: false,

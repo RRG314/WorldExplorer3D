@@ -2,6 +2,10 @@
 export const currentContractTests = [
   'tests/experience-entry-current.test.mjs',
   'tests/solo-racer-current.test.mjs',
+  'tests/geology-career-current.test.mjs',
+  'tests/geology-places-current.test.mjs',
+  'tests/host-resource-guard-current.test.mjs',
+  'tests/research-site-current.test.mjs',
   // Racing, reviewed venue surfaces and vehicle ownership component contracts.
   'tests/accepted-ground-catalog-delivery-current.test.mjs',
   'tests/aircraft-selection-current.test.mjs',
