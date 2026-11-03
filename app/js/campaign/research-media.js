@@ -8,6 +8,7 @@ const hash = async (data) =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data)))]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
+export {hash as photoDataFingerprint};
 export function researchPhotoId(careerId, runId, slot) {
   if (
     !/^[a-z][a-z-]{1,40}$/.test(careerId) ||

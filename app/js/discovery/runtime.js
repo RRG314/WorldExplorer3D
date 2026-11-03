@@ -1,3 +1,5 @@
+import {documentaryReportMarkup,showDocumentaryStoryPhotos} from '../campaign/documentary-ui.js';
+import {DOCUMENTARY_STORY,documentaryJournalRecords} from '../campaign/documentary-story.js';
 import {setJournalMarkup} from './journal-record-dom.js';
 import {pilotReportMarkup} from '../campaign/pilot-report.js';
 import {workspaceReportMarkup} from '../campaign/engineering-workspace.js';
@@ -496,6 +498,7 @@ function createDiscoveryUi(state) {
     return '<details class="discoveryGeologyEvidence"><summary>Mapped geology and sources</summary>'+evidence.units.map(unit=>'<p><strong>'+escapeHtml(unit.name)+'</strong><br>'+escapeHtml(unit.material)+'<br>Age: '+escapeHtml(unit.age||'Unspecified')+'<br>'+escapeHtml(unit.citation)+'<br>'+escapeHtml(unit.provider+' · '+unit.license)+'</p>').join('')+'<small>Regional mapped evidence; exposure and collecting permission are not established. '+escapeHtml((evidence.warnings||[]).join(' '))+'</small></details>';
   }
 
+  let documentaryPhotosAvailable=false;
   function renderJournal() {
     if (disposed || !elements.journal || elements.panel?.dataset.journeyJournalOwner) return;
     const path = String(elements.journalCategory?.value || 'all');
@@ -522,7 +525,7 @@ function createDiscoveryUi(state) {
       const eventPath = event.pathId || 'field';
       const chapterFinish = openingChapter.schemaVersion === 1 && openingChapter.phase === 'review' && event.eventId === openingChapter.eventId
         ? `<button class="discoveryChapterFinish" type="button" data-chapter-action="finish"${chapterBusy ? ' disabled' : ''}>Finish First Bearings · earn your badge</button>` : '';
-      return `<article class="discoveryItem discoveryJournalEvent" data-journal-record="${escapeHtml(event.eventId)}"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.metadata?.oceanographyReport ? oceanographyConclusion(event.metadata.oceanographyReport) : event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${archaeologyReportMarkup(event.metadata?.archaeologyReport)}${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${astronomyReportMarkup(event.metadata?.astronomyReport)}${miningReportMarkup(event.metadata?.miningReport)}${acceleratorReportMarkup(event.metadata?.acceleratorReport)}${pilotReportMarkup(event.metadata?.pilotDeliveryReport)}${workspaceReportMarkup(event.metadata?.workspaceDesignReport)}${planetaryReportMarkup(event)}${botanyReportMarkup(event.metadata?.botanyReport)}${botanyArchiveMarkup(event.metadata?.botanyArchive)}${wildlifeReportMarkup(event.metadata?.wildlifeReport)}${wildlifeArchiveMarkup(event.metadata?.wildlifeArchive)}${palaeontologyReportMarkup(event.metadata?.palaeontologyReport)}${palaeontologyArchiveMarkup(event.metadata?.palaeontologyArchive)}${returnButton}${chapterFinish}</article>`;
+      return `<article class="discoveryItem discoveryJournalEvent" data-journal-record="${escapeHtml(event.eventId)}"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.metadata?.oceanographyReport ? oceanographyConclusion(event.metadata.oceanographyReport) : event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${archaeologyReportMarkup(event.metadata?.archaeologyReport)}${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${astronomyReportMarkup(event.metadata?.astronomyReport)}${miningReportMarkup(event.metadata?.miningReport)}${acceleratorReportMarkup(event.metadata?.acceleratorReport)}${pilotReportMarkup(event.metadata?.pilotDeliveryReport)}${documentaryReportMarkup(event.metadata?.documentaryStoryReport,null,{lazy:true,mediaAvailable:documentaryPhotosAvailable})}${workspaceReportMarkup(event.metadata?.workspaceDesignReport)}${planetaryReportMarkup(event)}${botanyReportMarkup(event.metadata?.botanyReport)}${botanyArchiveMarkup(event.metadata?.botanyArchive)}${wildlifeReportMarkup(event.metadata?.wildlifeReport)}${wildlifeArchiveMarkup(event.metadata?.wildlifeArchive)}${palaeontologyReportMarkup(event.metadata?.palaeontologyReport)}${palaeontologyArchiveMarkup(event.metadata?.palaeontologyArchive)}${returnButton}${chapterFinish}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>');
     if (open && activeTab === 'journal') globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-records-visible', { detail: { eventIds: filtered.map((event) => event.eventId) } }));
   }
@@ -537,6 +540,7 @@ function createDiscoveryUi(state) {
       state.profileStore.listEvents?.(100) || []
     ]);
     if (request !== refreshSequence || elements.panel?.dataset.journeyJournalOwner) return;
+    documentaryPhotosAvailable = profile.threeViews?.story?.schemaVersion === 1 && !profile.threeViews.mediaDeleted;
     openingChapter = normalizeOpeningChapter(profile.openingChapter);
     if (openingChapter.schemaVersion === 1 && openingChapter.eventId && !events.some(event => event.eventId === openingChapter.eventId)) {
       const [evidence] = await state.profileStore.getEventsById([openingChapter.eventId]);
@@ -544,7 +548,7 @@ function createDiscoveryUi(state) {
       if (evidence) events.unshift(evidence);
       else chapterMessage = 'The referenced record is missing. Restore your complete Journal backup to continue.';
     }
-    const investigationEvents=await state.profileStore.getEventsById([...new Set([...harborJourneyEventIds,...lunarStudyEventIds])]);
+    const investigationEvents=await state.profileStore.getEventsById([...new Set([...harborJourneyEventIds,...lunarStudyEventIds,DOCUMENTARY_STORY.receiptId])]);
     if(request!==refreshSequence||elements.panel?.dataset.journeyJournalOwner)return;
     void state.appCtx.marineResearch?.investigation?.refresh();
     renderOpeningChapter();
@@ -552,7 +556,7 @@ function createDiscoveryUi(state) {
     void state.threeViews?.refresh(profile);
     void state.personalHome?.refresh(profile);
     guideRecords = guide;
-    journalRecords = mergeLunarJournalRecords(events,investigationEvents);
+    journalRecords = mergeLunarJournalRecords(documentaryJournalRecords(events,investigationEvents),investigationEvents);
     projectDiscoveryItemsToBackpack(state.appCtx, items);
     if (elements.saveStatus) {
       const ownerUid = state.appCtx.getAccountUserId?.();
@@ -844,6 +848,7 @@ function createDiscoveryUi(state) {
   listen(elements.guideSearch, 'input', renderGuide);
   listen(elements.guideScope, 'change', renderGuide);
   listen(elements.guideCategory, 'change', renderGuide);
+  listen(elements.journal, 'click', event=>{const button=event.target.closest('[data-documentary-photos]');if(button)void showDocumentaryStoryPhotos(button,state.profileStore);});
   listen(elements.journalCategory, 'change', renderJournal);
   listen(elements.journalRegion, 'change', renderJournal);
   listen(elements.chapter, 'change', (event) => {

@@ -1,3 +1,4 @@
+import {bindDocumentaryCareer} from '../campaign/documentary-career-adapter.js';
 import {bindPilotCareer} from '../campaign/pilot-career-adapter.js';
 import {bindEngineeringCareer} from '../campaign/engineering-career-adapter.js';
 import { miningCareerSummary } from '../campaign/mining-career.js';
@@ -37,9 +38,11 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   bindPlanetaryCareer(runtime,experiences);
   bindEngineeringCareer(runtime,experiences);
   bindPilotCareer(runtime,experiences);
+  bindDocumentaryCareer(runtime,experiences);
   let active = null,
     generation = 0;
   const domains = {
+    'career:documentary-explorer':async()=>(await import('../campaign/documentary-career-adapter.js')).createDocumentaryCareerRuntime,
     'career:expedition-pilot':async()=>(await import('../campaign/pilot-career-adapter.js')).createPilotCareerRuntime,
     'career:field-engineer':async()=>(await import('../campaign/engineering-career-adapter.js')).createEngineeringCareerRuntime,
     'career:accelerator-scientist': async () =>

@@ -1,3 +1,5 @@
+import {documentaryReportMarkup,showDocumentaryStoryPhotos} from '../campaign/documentary-ui.js';
+import {DOCUMENTARY_STORY,documentaryJournalRecords} from '../campaign/documentary-story.js';
 import {setJournalMarkup} from './journal-record-dom.js';
 import { miningReportMarkup } from '../campaign/mining-report.js';
 import {pilotReportMarkup} from '../campaign/pilot-report.js';
@@ -40,7 +42,7 @@ function render(ctx,session){
   const rows=session.events.filter(e=>(category==='all'||(e.pathId||'field')===category)&&(region==='all'||e.regionId===region));
   const article=event=>{
     const destination=journalReturnDestination(event,ctx.LOCS),date=new Date(Number(event.occurredAt)||0).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-    return `<article class="discoveryItem discoveryJournalEvent" data-journal-record="${escape(event.eventId)}"><span class="discoveryJournalTime">${escape(date)}</span><span class="discoveryJournalPath">${escape(paths[event.pathId]||'Fieldwork')}</span><strong>${escape(event.name||'Explorer record')}</strong><small>${escape(event.regionLabel||'Saved journey')}</small><small>${escape(event.metadata?.oceanographyReport?oceanographyConclusion(event.metadata.oceanographyReport):event.detail||'')}</small><span class="discoveryJournalProgress">Saved on this device</span>${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${astronomyReportMarkup(event.metadata?.astronomyReport)}${miningReportMarkup(event.metadata?.miningReport)}${acceleratorReportMarkup(event.metadata?.acceleratorReport)}${pilotReportMarkup(event.metadata?.pilotDeliveryReport)}${workspaceReportMarkup(event.metadata?.workspaceDesignReport)}${planetaryReportMarkup(event)}${destination?`<button class="discoveryJournalReturn" data-journey-return="${escape(event.eventId)}" type="button">${escape(destination.label)}</button>`:''}</article>`;
+    return `<article class="discoveryItem discoveryJournalEvent" data-journal-record="${escape(event.eventId)}"><span class="discoveryJournalTime">${escape(date)}</span><span class="discoveryJournalPath">${escape(paths[event.pathId]||'Fieldwork')}</span><strong>${escape(event.name||'Explorer record')}</strong><small>${escape(event.regionLabel||'Saved journey')}</small><small>${escape(event.metadata?.oceanographyReport?oceanographyConclusion(event.metadata.oceanographyReport):event.detail||'')}</small><span class="discoveryJournalProgress">Saved on this device</span>${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${astronomyReportMarkup(event.metadata?.astronomyReport)}${miningReportMarkup(event.metadata?.miningReport)}${acceleratorReportMarkup(event.metadata?.acceleratorReport)}${pilotReportMarkup(event.metadata?.pilotDeliveryReport)}${documentaryReportMarkup(event.metadata?.documentaryStoryReport,null,{lazy:true,mediaAvailable:session.documentaryPhotosAvailable})}${workspaceReportMarkup(event.metadata?.workspaceDesignReport)}${planetaryReportMarkup(event)}${destination?`<button class="discoveryJournalReturn" data-journey-return="${escape(event.eventId)}" type="button">${escape(destination.label)}</button>`:''}</article>`;
   };
   const list=document.getElementById('discoveryJournalList');if(list)setJournalMarkup(list,rows.length?rows.map(article).join(''):'<div class="discoveryEmpty">No Journal records match these filters.</div>');
   const search=(document.getElementById('discoveryGuideSearch')?.value||'').trim().toLowerCase(),family=document.getElementById('discoveryGuideCategory')?.value||'all';
@@ -52,10 +54,10 @@ function render(ctx,session){
 export async function refreshJourneyJournal(ctx){
   const session=sessions.get(ctx);if(!session)return false;const revision=++session.revision;
   try{
-    const [recent,guide,studyEvents]=await Promise.all([session.store.listEvents(100),session.store.listFieldGuide(200),session.store.getEventsById?.(lunarStudyEventIds)||[]]);
-    const events=mergeLunarJournalRecords(recent,studyEvents);
+    const [recent,guide,studyEvents,profile]=await Promise.all([session.store.listEvents(100),session.store.listFieldGuide(200),session.store.getEventsById?.([...lunarStudyEventIds,DOCUMENTARY_STORY.receiptId])||[],session.store.getProfile()]);
+    const events=mergeLunarJournalRecords(documentaryJournalRecords(recent,studyEvents),studyEvents);
     if(sessions.get(ctx)!==session||revision!==session.revision)return false;
-    session.events=events;session.guide=guide;
+    session.events=events;session.guide=guide;session.documentaryPhotosAvailable=profile.threeViews?.story?.schemaVersion===1&&!profile.threeViews.mediaDeleted;
     const filter=document.getElementById('discoveryJournalRegion'),prior=filter?.value;
     if(filter){const regions=[...new Map(events.filter(e=>e.regionId).map(e=>[e.regionId,e.regionLabel||'Saved region']))];filter.innerHTML='<option value="all">All regions</option>'+regions.map(([id,label])=>`<option value="${escape(id)}">${escape(label)}</option>`).join('');filter.value=regions.some(([id])=>id===prior)?prior:'all';}
     render(ctx,session);return true;
@@ -82,6 +84,7 @@ export async function openJourneyJournal(ctx,section='journal'){
     panel.addEventListener('click',event=>{
       const button=event.target.closest('button');if(!button)return;
       event.stopImmediatePropagation();
+      if(button.hasAttribute('data-documentary-photos')){void showDocumentaryStoryPhotos(button,session.store);return;}
       if(button.id==='discoveryCloseBtn'){closeJourneyJournal(ctx);return;}
       if(button.dataset.discoveryTab){selectSection(session,button.dataset.discoveryTab);render(ctx,session);return;}
       if(button.hasAttribute('data-journey-retry')){void refreshJourneyJournal(ctx);return;}

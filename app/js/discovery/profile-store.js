@@ -1,3 +1,5 @@
+import {documentarySelected} from '../campaign/documentary-story.js';
+import {prepareDocumentaryMedia,assertDocumentaryMediaCurrent} from '../campaign/documentary-media.js';
 import {normalizeResearchCareers,researchCareerDefinition} from '../campaign/research-career-definitions.js';
 import {RESEARCH_MEDIA_BACKUP_VERSION,RESEARCH_MEDIA_PREFIX,prepareResearchPhoto,researchMediaProfileRows,validateTransitionMedia,verifyResearchMediaRecords} from '../campaign/research-media.js';
 import {normalizeSoloRacer,projectSoloRacer,soloRacerReceipt} from '../campaign/solo-racer.js';
@@ -483,21 +485,52 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(tx);return clone(album||emptyPhotoAlbum());
     } finally {db.close();}
   }
-  async function updateThreeViews(command, now=Date.now()) {
-    const db=await open();let transaction;
+  async function updateThreeViews(command, now = Date.now()) {
+    command = clone(command);
+    const photoState = command.type === 'story-publish' ? (await getProfile()).threeViews : null;
+    const checked =
+      photoState && photoState.story?.phase !== 'complete'
+        ? await prepareDocumentaryMedia(photoState, await getThreeViewsAlbum())
+        : null;
+    const db = await open();
+    let transaction;
     try {
       await ensureCharacterMigration(db);
-      transaction=db.transaction(['profiles','events',JOURNAL_ORDER_STORE],'readwrite');
-      const profiles=transaction.objectStore('profiles');
-      const [current,album]=await Promise.all([requestPromise(profiles.get(PROFILE_ID)),requestPromise(profiles.get(THREE_VIEWS.albumId))]);
-      if(command.type==='accept'&&current?.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
-      const result=transitionThreeViews(current?.threeViews,album,command,now);
-      profiles.put(normalizeProfile({...current,threeViews:result.state}));
-      if(result.album.photos.length)profiles.put(result.album);else profiles.delete(THREE_VIEWS.albumId);
-      if(result.event){const event=createExplorerStoryEvent(result.event);transaction.objectStore('events').put(event);putJournalOrder(transaction,'events',event);}
-      await transactionPromise(transaction);return clone(result);
-    } catch(error){try{transaction?.abort();}catch{}throw error;}
-    finally{db.close();}
+      transaction = db.transaction(['profiles', 'events', JOURNAL_ORDER_STORE], 'readwrite');
+      const profiles = transaction.objectStore('profiles');
+      const [current, album] = await Promise.all([
+        requestPromise(profiles.get(PROFILE_ID)),
+        requestPromise(profiles.get(THREE_VIEWS.albumId)),
+      ]);
+      if (
+        command.type === 'accept' &&
+        current?.openingChapter?.phase !== 'complete' &&
+        !documentarySelected(current)
+      )
+        throw Error(
+          'Choose Documentary explorer in Activities or finish First Bearings before starting this job.'
+        );
+      if (command.type === 'story-publish' && current?.threeViews?.story?.phase !== 'complete')
+        assertDocumentaryMediaCurrent(checked, album);
+      const result = transitionThreeViews(current?.threeViews, album, command, now);
+      profiles.put(normalizeProfile({ ...current, threeViews: result.state }));
+      if (result.album.photos.length) profiles.put(result.album);
+      else profiles.delete(THREE_VIEWS.albumId);
+      if (result.event) {
+        const event = createExplorerStoryEvent(result.event);
+        transaction.objectStore('events').put(event);
+        putJournalOrder(transaction, 'events', event);
+      }
+      await transactionPromise(transaction);
+      return clone(result);
+    } catch (error) {
+      try {
+        transaction?.abort();
+      } catch {}
+      throw error;
+    } finally {
+      db.close();
+    }
   }
 
   async function recordDiscovery(record, policy = {}) {
@@ -1034,6 +1067,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   async function importData(data = {}) {
     data = validateJournalBackup(data);
     await verifyResearchMediaRecords(data.researchMedia);
+    await prepareDocumentaryMedia(data.profile.threeViews, data.albums?.[0]);
     const db = await open();
     let transactionToAbort;
     try {
@@ -1306,11 +1340,28 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async getResearchPhoto(id){const row=researchMedia.get(id);return row?clone(row):null;},
     async getThreeViewsAlbum(){return clone(photoAlbum);},
-    async updateThreeViews(command,now=Date.now()){
-      if(command.type==='accept'&&profile.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
-      const result=transitionThreeViews(profile.threeViews,photoAlbum,command,now);
-      profile=normalizeProfile({...profile,threeViews:result.state});photoAlbum=clone(result.album);
-      if(result.event){const event=createExplorerStoryEvent(result.event);events.set(event.eventId,event);}
+    async updateThreeViews(command, now = Date.now()) {
+      command = clone(command);
+      if (
+        command.type === 'accept' &&
+        profile.openingChapter?.phase !== 'complete' &&
+        !documentarySelected(profile)
+      )
+        throw Error(
+          'Choose Documentary explorer in Activities or finish First Bearings before starting this job.'
+        );
+      const checked =
+        command.type === 'story-publish' && profile.threeViews.story?.phase !== 'complete'
+          ? await prepareDocumentaryMedia(profile.threeViews, photoAlbum)
+          : null;
+      if (command.type === 'story-publish' && profile.threeViews.story?.phase !== 'complete')
+        assertDocumentaryMediaCurrent(checked, photoAlbum);
+      const result = transitionThreeViews(profile.threeViews, photoAlbum, command, now),
+        event = result.event ? createExplorerStoryEvent(result.event) : null,
+        next = normalizeProfile({ ...profile, threeViews: result.state });
+      profile = next;
+      photoAlbum = clone(result.album);
+      if (event) events.set(event.eventId, event);
       return clone(result);
     },
     async updateHarborRun(command, now = Date.now()) {
@@ -1439,6 +1490,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async importData(data = {}) {
       data = validateJournalBackup(data);
       await verifyResearchMediaRecords(data.researchMedia);
+    await prepareDocumentaryMedia(data.profile.threeViews, data.albums?.[0]);
       beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows],researchMedia:[...researchMedia]});
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
