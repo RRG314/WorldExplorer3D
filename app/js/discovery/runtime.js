@@ -1,3 +1,4 @@
+import {workspaceReportMarkup} from '../campaign/engineering-workspace.js';
 import { miningCareerBadge } from '../campaign/mining-career.js';
 import { acceleratorCareerBadge } from '../campaign/accelerator-career.js';
 import { miningReportMarkup } from '../campaign/mining-report.js';
@@ -289,6 +290,18 @@ function createDiscoveryUi(state) {
   };
   const listeners = [];
   let activeTab = 'today';
+  let careerFocus=null;
+  function setCareerFocus(focus) {
+    const pane = document.querySelector('.discoveryPane[data-discovery-pane="today"]');
+    if (focus && !pane?.querySelector('#' + focus.sectionId)) return false;
+    careerFocus = focus;
+    for (const child of pane?.children || [])
+      child.classList.toggle('discoveryCareerUnfocused', !!focus && child.id !== focus.sectionId);
+    if (elements.title && activeTab === 'today') elements.title.textContent = focus?.title || 'Today';
+    const tab = document.querySelector('[data-discovery-tab="today"]');
+    if (tab) tab.textContent = focus?.title || 'Today';
+    return true;
+  }
   let open = false;
   let actionSignature = '';
   let guideRecords = [];
@@ -507,7 +520,7 @@ function createDiscoveryUi(state) {
       const eventPath = event.pathId || 'field';
       const chapterFinish = openingChapter.schemaVersion === 1 && openingChapter.phase === 'review' && event.eventId === openingChapter.eventId
         ? `<button class="discoveryChapterFinish" type="button" data-chapter-action="finish"${chapterBusy ? ' disabled' : ''}>Finish First Bearings · earn your badge</button>` : '';
-      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.metadata?.oceanographyReport ? oceanographyConclusion(event.metadata.oceanographyReport) : event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${archaeologyReportMarkup(event.metadata?.archaeologyReport)}${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${astronomyReportMarkup(event.metadata?.astronomyReport)}${miningReportMarkup(event.metadata?.miningReport)}${acceleratorReportMarkup(event.metadata?.acceleratorReport)}${planetaryReportMarkup(event)}${botanyReportMarkup(event.metadata?.botanyReport)}${botanyArchiveMarkup(event.metadata?.botanyArchive)}${wildlifeReportMarkup(event.metadata?.wildlifeReport)}${wildlifeArchiveMarkup(event.metadata?.wildlifeArchive)}${palaeontologyReportMarkup(event.metadata?.palaeontologyReport)}${palaeontologyArchiveMarkup(event.metadata?.palaeontologyArchive)}${returnButton}${chapterFinish}</article>`;
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.metadata?.oceanographyReport ? oceanographyConclusion(event.metadata.oceanographyReport) : event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${archaeologyReportMarkup(event.metadata?.archaeologyReport)}${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${astronomyReportMarkup(event.metadata?.astronomyReport)}${miningReportMarkup(event.metadata?.miningReport)}${acceleratorReportMarkup(event.metadata?.acceleratorReport)}${workspaceReportMarkup(event.metadata?.workspaceDesignReport)}${planetaryReportMarkup(event)}${botanyReportMarkup(event.metadata?.botanyReport)}${botanyArchiveMarkup(event.metadata?.botanyArchive)}${wildlifeReportMarkup(event.metadata?.wildlifeReport)}${wildlifeArchiveMarkup(event.metadata?.wildlifeArchive)}${palaeontologyReportMarkup(event.metadata?.palaeontologyReport)}${palaeontologyArchiveMarkup(event.metadata?.palaeontologyArchive)}${returnButton}${chapterFinish}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
     if (open && activeTab === 'journal') globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-records-visible', { detail: { eventIds: filtered.map((event) => event.eventId) } }));
   }
@@ -734,7 +747,7 @@ function createDiscoveryUi(state) {
   function setTab(tab) {
     const normalizedTab = tab === 'gear' || tab === 'progress' ? 'profile' : tab === 'collection' ? 'journal' : tab;
     activeTab = ['today', 'journal', 'guide', 'profile'].includes(normalizedTab) ? normalizedTab : 'today';
-    const tabTitles = { today: 'Today', journal: 'Journal', guide: 'Field Guide', profile: 'Explorer Profile' };
+    const tabTitles = { today: careerFocus?.title||'Today', journal: 'Journal', guide: 'Field Guide', profile: 'Explorer Profile' };
     if (elements.title) elements.title.textContent = tabTitles[activeTab] || 'Today';
     document.querySelectorAll('[data-discovery-tab]').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === activeTab));
     elements.profileButton?.classList.toggle('active', activeTab === 'profile');
@@ -1018,7 +1031,7 @@ function createDiscoveryUi(state) {
     const activeAction = actions.find((action) => action.id === activityId);
     const arEligibility = state.getArChallengeEligibility?.();
     if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
-    if (elements.title && activeTab === 'today') setDomText(elements.title, 'Today');
+    if (elements.title && activeTab === 'today') setDomText(elements.title, careerFocus?.title || 'Today');
     if (elements.quickLabel) setDomText(elements.quickLabel, snapshot?.phase === 'revealed'
       ? `Record ${snapshot.targetName || activeAction?.label || 'your finding'}`
       : `Resume ${activeAction?.label || 'Field Activity'}`);
@@ -1091,8 +1104,8 @@ function createDiscoveryUi(state) {
   return Object.freeze({
     get activeTab() { return activeTab; }, get open() { return open; },
     ownsFieldPrompt: !!elements.quick,
-    dispose() { disposed = true; refreshSequence += 1; listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
-    refreshData, render, setOpen, setTab, showResult, showSectionTutorial, showTutorial
+    dispose() { setCareerFocus(null); disposed = true; refreshSequence += 1; listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
+    setCareerFocus, refreshData, render, setOpen, setTab, showResult, showSectionTutorial, showTutorial
   });
 }
 

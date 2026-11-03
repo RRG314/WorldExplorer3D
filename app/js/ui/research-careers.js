@@ -1,3 +1,4 @@
+import {bindEngineeringCareer} from '../campaign/engineering-career-adapter.js';
 import { miningCareerSummary } from '../campaign/mining-career.js';
 import {
   acceleratorCareerSummary,
@@ -33,9 +34,11 @@ import { fieldResearchPlaces } from '../campaign/field-research-places.js';
 // Lazily mount the selected field domain through the existing single active gameplay owner.
 export function bindResearchCareers(runtime, experiences, { onJournal, requestWorldFocus } = {}) {
   bindPlanetaryCareer(runtime,experiences);
+  bindEngineeringCareer(runtime,experiences);
   let active = null,
     generation = 0;
   const domains = {
+    'career:field-engineer':async()=>(await import('../campaign/engineering-career-adapter.js')).createEngineeringCareerRuntime,
     'career:accelerator-scientist': async () =>
       (await import('../campaign/accelerator-runtime.js')).createAcceleratorCareerRuntime,
     'career:mining-engineer': async () =>

@@ -1,7 +1,10 @@
+import {exteriorApproach} from '../interiors/exterior-approach.js';
 import { harborJourneyEventIds, harborJourneyState, lunarHomecomingRecord, harborCompletionRecord } from './lunar-homecoming.js';
 import {lunarStudyEventIds,lunarStudyReport,lunarStudyHomecomingRecord} from '../planetary/lunar-study-records.js';
 import {LUNAR_STUDIES} from '../planetary/lunar-survey.js';
 import {planetaryReportMarkup} from './planetary-report.js';
+import {engineeringRoom,engineeringProposal,engineeringMarkup,workspaceProjectEvent,workspaceProjectEventId,workspaceBrief} from './engineering-workspace.js';
+import {workspaceProjectState,workspaceDesign} from './workspace-projects.js';
 import {personalWorkspaceEligible} from './personal-workspace-access.js';
 import {investigationId,investigationState,investigationEventIds} from './coastal-investigation.js';
 import {resolveBuildingEntrySupport} from '../building-entry.js?v=9';
@@ -22,6 +25,25 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   let storageOpen=false;
   let importedDesign=null;
   let releaseInteriorAction=null;
+  let career=null;
+  const room=()=>engineeringRoom(ctx,home);
+  async function publishProjects() {
+    if (!home) return;
+    const projects = workspaceProjectState(workspace());
+    if (projects.schemaVersion !== 1) return;
+    const rows = Object.values(projects.reports),
+      existing = new Set(
+        (await store.getEventsById(rows.map((r) => workspaceProjectEventId(home, r.id)))).map(
+          (r) => r.eventId
+        )
+      );
+    for (const report of rows) {
+      if (existing.has(workspaceProjectEventId(home, report.id))) continue;
+      const result = await store.recordExplorerEvent(workspaceProjectEvent(home, report));
+      if (result?.recorded !== true && result?.reason !== 'already-recorded')
+        throw Error('Your layout is saved. Retry to publish its Journal report.');
+    }
+  }
   const actor=()=>ctx.Walk?.state?.walker;
   const outdoors=()=>ctx.getEnv?.()==='EARTH'&&!ctx.worldLoading&&!ctx.activeInterior&&ctx.getCurrentTravelMode?.()==='walk'&&!ctx.getLiveGpsSnapshot?.().active;
   const insideHome=()=>home&&ctx.activeInterior?.ownedHome?.id===home.id&&Number(ctx.activeInterior.activeLevel||0)===0&&ctx.getCurrentTravelMode?.()==='walk';
@@ -44,10 +66,21 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     if(disposed||!element)return;
     const w=workspace(),v=housing.snapshot(),bag=ctx.playerBackpackInventory?.page?.({offset:0,limit:24})?.items||[];
     const supplies=bag.filter(item=>item.catalogId!=='hands'&&!item.equipped&&!item.verbs?.includes('equip')&&item.category!=='field-tool');
-    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,lunarJourney,lunarReports.map(r=>r.eventId),selectedLunarReport,exhibitionReports.map(row=>row.eventId),selectedExhibitionRecord,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity])]);
+    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,lunarJourney,lunarReports.map(r=>r.eventId),selectedLunarReport,exhibitionReports.map(row=>row.eventId),selectedExhibitionRecord,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity]),career?.variantId]);
     if(key===renderKey)return;renderKey=key;
     const button=(action,label,disabled=false)=>`<button type="button" data-home-action="${escape(action)}"${busy||disabled?' disabled':''}>${escape(label)}</button>`;
     let body='';
+    if(career){
+      body=button('engineering-next','Activities · workspace projects');
+      if(!loaded)body+='<p>Reading your saved workspace…</p>';
+      else if(!home)body+='<p>Choose your included personal workspace at a mapped residential entrance. It saves your own game room on this device.</p>'+button('find','Find nearby workspaces')+offers.map((o,i)=>`<article class="discoveryDeliveryOffer"><strong>${escape(o.label)}</strong><small>${Math.round(o.distance)} m · ${o.area} m² mapped footprint</small>${button(`route:${i}`,'Show walking route')}${button(`claim:${i}`,'Choose at entrance')}</article>`).join('');
+      else{
+        body+=`<p><strong>${escape(home.label)}</strong> · ${escape(home.locationLabel)}</p><div class="discoveryPhotoActions">${button('route','Route home')}${button('enter','Enter workspace',!outdoors())}</div>`;
+        body+=engineeringMarkup({workspace:w,home,room:insideHome()?room():null,variantId:career.variantId,button,record,reviewing,ready:!!visual});
+      }
+      if(saveFailed)body+=button('retry','Retry saved project');
+      element.innerHTML=`<span class="discoveryChapterEyebrow">FIELD ENGINEER</span><strong>Your working designs</strong>${body}<small role="status">${escape(message)}</small>`;element.setAttribute('aria-busy',String(busy));return;
+    }
     if(!loaded)body='<p>Reading your saved home…</p>';
     else if(!workspaceEligible())body='<p>Complete First Bearings, a research study or the Racer career to choose your included personal workspace.</p>';
     else if(!home){
@@ -93,10 +126,10 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       if(!lunarReports.some(row=>row.eventId===selectedLunarReport))selectedLunarReport=lunarReports.find(row=>row.eventId===workspace().recordId)?.eventId||lunarReports[0]?.eventId||'';
       exhibitionReports=(await store.getEventsById(['archaeology','palaeontology'].flatMap(id=>Object.values(profile.researchCareers?.[id]?.completed||{})))).filter(row=>row.eventType==='campaign-completed'&&['archaeology','palaeontology'].includes(row.metadata?.careerId)&&(row.metadata?.archaeologyReport||row.metadata?.palaeontologyReport));
       if(!exhibitionReports.some(row=>row.eventId===selectedExhibitionRecord))selectedExhibitionRecord=exhibitionReports.find(row=>row.eventId===workspace().recordId)?.eventId||exhibitionReports[0]?.eventId||'';
-      const recordId=workspace().recordId||profile.openingChapter?.eventId;
+      const recordId=workspace().recordId||(workspace().projects?.active?.inspection&&home?workspaceBrief(home,workspace().projects.active.inspection.room,Date.now()).eventId:null)||profile.openingChapter?.eventId;
       const [evidence]=recordId?await store.getEventsById([recordId]):[];
-      if(disposed)return;record=evidence||null;loaded=true;render();
-    }catch{if(!disposed){message='Your workspace could not refresh. Reopen the Journal to retry.';render();}}
+      if(disposed)return;record=evidence||null;loaded=true;await publishProjects();render();
+    }catch{if(!disposed){saveFailed=true;message='Your workspace could not refresh. Your saved layout is kept; retry when storage is available.';render();}}
   }
   function clearVisual(){generation++;releaseInteriorAction?.();releaseInteriorAction=null;visual?.dispose();visual=null;visualKey='';}
   async function present(){
@@ -128,21 +161,28 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     ctx.showToast?.(kind==='maker'?'Maker badge earned · your design is saved':'A Place to Return badge earned');await state.ui?.refreshData();
   }
   async function act(action){
-    if(disposed||busy)return;busy=true;message='';render();
+    if(disposed||busy)return false;busy=true;message='';render();
     try{
-      if(action==='find'){
+      if(action==='engineering-next'){career?.onNext?.();}
+      else if(action.startsWith('inspect:')){
+        const w=workspace(),actual=room(),proposal=workspace().projects?.active?.id==='reusable-design'?null:engineeringProposal(actual);
+        check(housing.updateWorkspace(home.id,{type:'inspect-project',room:actual,proposal:proposal?.pose,decision:action.slice(8),revision:w.revision}));
+        const brief=workspaceBrief(home,actual,Date.now()),result=await store.recordExplorerEvent(brief);
+        if(result?.recorded!==true&&result?.reason!=='already-recorded')throw Error('Your inspection is saved. Retry to save its field record.');
+        if(workspace().pose)check(housing.updateWorkspace(home.id,{type:'record',recordId:brief.eventId,revision:workspace().revision}));record=(await store.getEventsById([brief.eventId]))[0];await present();message='Room inspected. Arrange a useful, reachable desk.';
+      }else if(action==='find'){
         if(!outdoors())throw Error('Look for a workspace outdoors on foot, with Live GPS off.');
         offers=(dependencies.candidates||getPersonalHomeCandidates)().filter(c=>c.mappedResidential&&c.sharedEligible&&c.area>=40&&c.area<=500&&supportFor(c)?.enterable).slice(0,5);
         if(!offers.length)message='No suitable mapped homes are ready nearby. Try a residential street; your current progress is kept.';
       }else if(action.startsWith('route:')){const candidate=offers[Number(action.split(':')[1])];if(!candidate||!(dependencies.route||routeToPersonalHome)(candidate))throw Error('That route is unavailable in this region.');state.ui?.setOpen(false);}
       else if(action.startsWith('claim:')){
         if(!outdoors()||!workspaceEligible())throw Error('Complete your first study or First Bearings, then walk to the workspace entrance.');
-        const candidate=offers[Number(action.split(':')[1])],support=candidate&&supportFor(candidate),entry=support?.exteriorEntrance||support?.entryAnchor;
+        const candidate=offers[Number(action.split(':')[1])],support=candidate&&supportFor(candidate),entry=exteriorApproach(support,actor(),ctx.METERS_PER_WORLD_UNIT);
         if(!entry||Math.hypot(actor().x-entry.x,actor().z-entry.z)>5)throw Error('Follow the walking route and stand at the entrance before choosing this workspace.');
-        check(housing.claimStarter(candidate));offers=[];message='Workspace saved. Enter to arrange your desk.';
+        check(housing.claimStarter(candidate));if(career)check(housing.updateWorkspace(home.id,{type:'begin-project',worldOrigin:{lat:ctx.LOC?.lat,lon:ctx.LOC?.lon,name:ctx.LOC?.name||home.locationLabel},projectId:career.variantId,revision:workspace().revision}));offers=[];message='Workspace saved. Enter to arrange your desk.';
       }else if(action==='route'){if(!home||!(dependencies.route||routeToPersonalHome)(home))throw Error(`Return to ${home?.locationLabel||'your home region'} from Travel, then set this route.`);state.ui?.setOpen(false);}
       else if(action==='enter'){
-        const support=home&&supportFor(home),entry=support?.exteriorEntrance||support?.entryAnchor;
+        const support=home&&supportFor(home),entry=exteriorApproach(support,actor(),ctx.METERS_PER_WORLD_UNIT);
         if(!outdoors()||!entry||Math.hypot(actor().x-entry.x,actor().z-entry.z)>5)throw Error('Walk to your home entrance before entering.');
         const enter=ctx.enterInteriorForSupport||(await import('../interiors.js?v=24')).enterInteriorForSupport;
         if(!await enter(support))throw Error('This interior is not ready. Try entering again.');state.ui?.setOpen(false);
@@ -160,15 +200,16 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
         if(action==='undo')pose=w.previous;
         if(pose){const validation=currentPlacement(pose);if(!validation.ok)throw Error(validation.reason);}
         else if(action!=='undo')throw Error('This room has no clear position for the desk. Keep the entrance and interior corridor free.');
-        check(housing.updateWorkspace(home.id,{type:action==='undo'?'undo':'place',pose,purpose:['place','import'].includes(action)?selectedPurpose:w.purpose,revision:w.revision}));
+        check(housing.updateWorkspace(home.id,{type:action==='undo'?'undo':'place',pose,purpose:['place','import'].includes(action)?selectedPurpose:w.purpose,revision:w.revision,...(action==='import'?{projectAction:'import',importedDesign}:{})}));
         importedDesign=null;
+        if(workspace().projects?.active&&record&&!workspace().recordId&&workspace().pose)check(housing.updateWorkspace(home.id,{type:'record',recordId:record.eventId,revision:workspace().revision}));
         reviewing=false;await present();
       }else if(action==='walk'){state.ui?.setOpen(false);ctx.showToast?.('Walk to the side of your desk and use the interaction button.');}
       else if(action==='use'){if(!canUse())throw Error('Stand beside your desk to open the field record.');const placement=currentPlacement();if(!placement.ok)throw Error(placement.reason);reviewing=true;ctx.openWorldDiscoverySection?.('today');}
       else if(action==='review'){
         if(!canUse()||!record)throw Error('Review your saved field record while standing beside the desk.');
-        check(housing.updateWorkspace(home.id,{type:'use',revision:workspace().revision}));check(housing.recordHomeVisit(home.id,'displayed'));
-        await award('maker');reviewing=false;message='Record reviewed. Your working arrangement is saved for future visits.';
+        check(housing.updateWorkspace(home.id,{type:'use',revision:workspace().revision,...(workspace().projects?.active?{projectUse:{room:room(),position:{x:actor().x-ctx.activeInterior.center.x,z:actor().z-ctx.activeInterior.center.z},feetY:actor().y-(ctx.Walk?.CFG?.eyeHeight||1.7)-Number(ctx.activeInterior.floorBaseY||0),supported:actor().onGround===true,travelMode:ctx.getCurrentTravelMode?.(),liveGps:!!ctx.getLiveGpsSnapshot?.().active,recordId:record.eventId}}:{})}));check(housing.recordHomeVisit(home.id,'displayed'));
+        await publishProjects();await award('maker');reviewing=false;message='Record reviewed. Your working arrangement is saved for future visits.';
       }else if(action==='coastal-display'){
         if(!canUse())throw Error('Stand beside your desk to display the expedition.');
         const rows=await store.getEventsById(investigationEventIds),report=investigationState(rows).report;
@@ -209,11 +250,13 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       }else if(action==='journeys'){ctx.openWorldDiscoverySection?.('today');document.getElementById('discoveryOpeningChapter')?.scrollIntoView({block:'start'});}
       else if(action==='export'){
         const w=workspace();if(!w.pose)throw Error('Place a workspace first.');
-        const file={format:'world-explorer-workspace',schemaVersion:1,purpose:w.purpose,pose:w.pose,assets:['workspace-table','workspace-chair']};
+        const file=w.projects?.active?.exported?.design||workspaceDesign(w);
+        if(w.projects?.active?.id==='reusable-design'&&!w.projects.active.exported)check(housing.updateWorkspace(home.id,{type:'export-project',revision:w.revision}));
         const url=URL.createObjectURL(new Blob([JSON.stringify(file,null,2)],{type:'application/json'}));
         const a=document.createElement('a');a.href=url;a.download='world-explorer-workspace.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-      }else if(action==='retry'){saveFailed=false;clearVisual();await refresh();await present();}
-    }catch(error){message=error.message||'Your workspace action could not finish.';if(message.includes('saved')||message.includes('save'))saveFailed=true;ctx.showToast?.(message);}
+      }else if(action==='retry'){saveFailed=false;clearVisual();await refresh();await publishProjects();if(workspace().projects?.active?.inspection&&!record){const brief=workspaceBrief(home,workspace().projects.active.inspection.room,Date.now());await store.recordExplorerEvent(brief);if(workspace().pose)check(housing.updateWorkspace(home.id,{type:'record',recordId:brief.eventId,revision:workspace().revision}));await refresh();}await present();}
+      return true;
+    }catch(error){message=error.message||'Your workspace action could not finish.';if(message.includes('saved')||message.includes('save'))saveFailed=true;ctx.showToast?.(message);return false;}
     finally{busy=false;reloadHome();render();}
   }
   async function visit(){
@@ -242,7 +285,54 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     }
   },{signal:abort.signal});
   void refresh();
-  return {refresh,act,update(dt=.016){elapsed+=dt;if(elapsed<.3)return;elapsed=0;reloadHome();void present();void visit();render();},
-    snapshot:()=>({homeId:home?.id||null,workspace:workspace(),journey:home?.journey||{},furnitureReady:!!visual,interactionReady:canUse(),offers:offers.map(o=>({id:o.id,label:o.label})),busy,saveFailed,message}),
+  return {refresh,act,
+    async startCareer(options) {
+      career = options;
+      await refresh();
+      if (career !== options || disposed || !options.isActive()) return false;
+      if (
+        workspace().schemaVersion !== 1 ||
+        (workspace().projects && workspace().projects.schemaVersion !== 1)
+      )
+        throw Error('This saved workspace needs a newer version of World Explorer.');
+      if (
+        home &&
+        !workspace().projects?.reports?.[options.variantId] &&
+        !(
+          options.variantId === 'campaign' &&
+          workspace().usedAt > 0 &&
+          workspace().rotated &&
+          workspace().undone
+        )
+      ) {
+        check(
+          housing.updateWorkspace(home.id, {
+            type: 'begin-project',
+            worldOrigin: {
+              lat: ctx.LOC?.lat,
+              lon: ctx.LOC?.lon,
+              name: ctx.LOC?.name || home.locationLabel,
+            },
+            projectId: options.variantId,
+            revision: workspace().revision,
+          })
+        );
+      }
+      state.ui?.setCareerFocus?.({ sectionId: 'discoveryPersonalHome', title: 'Field engineer' });
+      ctx.openWorldDiscoverySection?.('today');
+      renderKey = '';
+      render();
+      return true;
+    },
+    stopCareer(options) {
+      if (options && career !== options) return false;
+      career = null;
+      reviewing = false;
+      state.ui?.setCareerFocus?.(null);
+      renderKey = '';
+      render();
+    },
+    update(dt=.016){elapsed+=dt;if(elapsed<.3)return;elapsed=0;reloadHome();void present();void visit();render();},
+    snapshot:()=>({careerId:career?'engineering':null,variantId:career?.variantId||null,revision:workspace().revision,phase:workspace().projects?.active?.phase||(workspace().projects?.reports?.[career?.variantId]||career?.variantId==='campaign'&&workspace().pose&&workspace().usedAt>0&&workspace().rotated&&workspace().undone?'complete':'workspace'),homeId:home?.id||null,workspace:workspace(),journey:home?.journey||{},furnitureReady:!!visual,interactionReady:canUse(),offers:offers.map(o=>({id:o.id,label:o.label})),busy,saveFailed,message}),
     dispose(){disposed=true;abort.abort();clearVisual();element?.replaceChildren();}};
 }

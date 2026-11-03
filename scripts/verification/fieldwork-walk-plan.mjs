@@ -4,7 +4,7 @@ import { createBuildingCollisionQuery } from '../../app/js/physics/building-coll
 export function planFieldworkWalk(
   runtime,
   destination,
-  { spacingMeters = 0.8, maximumCells = 10000, paddingMeters = 8, stepHeightMeters = 0 } = {}
+  { spacingMeters = 0.8, maximumCells = 10000, paddingMeters = 8, stepHeightMeters = 0, includeUrbanActors = false } = {}
 ) {
   const actor = runtime.Walk.state.walker,
     u = runtime.METERS_PER_WORLD_UNIT || 1.11,
@@ -45,6 +45,7 @@ export function planFieldworkWalk(
     const length = Math.hypot(b.x - a.x, b.z - a.z) * u,
       n = Math.max(1, Math.ceil(length / 0.25));
     const first = runtime.SurfaceQuery.walkAt(a.x, a.z);
+    if(includeUrbanActors&&typeof runtime.resolveUrbanActorCollision==='function'){const hit=runtime.resolveUrbanActorCollision(a,b,{mode:'walk',radius:.4/u,actorBaseY:first?.position?.y+(runtime.Walk?.CFG?.eyeHeight||1.7),actorHeight:1.8});if(hit.collision&&Math.hypot(hit.x-b.x,hit.z-b.z)>1e-6)return false;}
     let prior = first?.position?.y,
       priorKind = first?.kind;
     if (!Number.isFinite(prior)) return false;

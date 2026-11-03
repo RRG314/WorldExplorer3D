@@ -1,3 +1,4 @@
+import {validateWorkspaceJournal} from '../campaign/engineering-workspace.js';
 import {RESEARCH_MEDIA_BACKUP_VERSION,validateResearchMediaRecord,validateResearchMediaReferences} from '../campaign/research-media.js';
 import {validateResearchCareerBackups} from '../campaign/research-career-definitions.js';
 import {validateSoloRacerBackup} from '../campaign/solo-racer.js';
@@ -77,6 +78,6 @@ export function validateJournalBackup(input) {
   if(!Array.isArray(data.researchMedia)||data.researchMedia.length>128||new Set(data.researchMedia.map(row=>row?.id)).size!==data.researchMedia.length)fail();
   try{for(const row of data.researchMedia)validateResearchMediaRecord(row);validateResearchMediaReferences(data.profile.researchCareers,data.researchMedia,data.events);}catch{fail();}
   try{validateResearchCareerBackups(data.profile.researchCareers,data.events,data.items);}catch{fail();}
-  try{validateSoloRacerBackup(data.profile.soloRacer,data.events);}catch{fail();}
+  try{validateWorkspaceJournal(data.events);validateSoloRacerBackup(data.profile.soloRacer,data.events);}catch{fail();}
   return data;
 }

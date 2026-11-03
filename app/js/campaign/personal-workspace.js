@@ -1,5 +1,6 @@
 // Coordinates are metres relative to the current interior center. Furniture is
 // never resized to fit: unsupported rooms/positions fail admission instead.
+import {workspaceProjectState,beginWorkspaceProject,inspectWorkspaceProject,exportWorkspaceProject,workspaceProjectEdit,finishWorkspaceProject,validateWorkspaceProjectReport} from './workspace-projects.js';
 export const WORKSPACE_PARTS=Object.freeze([
   {id:'workspace-table',x:0,z:0,halfX:.568,halfZ:.354,height:.801},
   {id:'workspace-chair',x:0,z:.94,halfX:.284,halfZ:.339,height:1.007}
@@ -74,26 +75,82 @@ export function findWorkspacePlacement(active,colliders=[]) {
   }
   return null;
 }
-export function transitionWorkspace(value,command,now=Date.now()) {
-  const current=normalizeWorkspace(value);
-  if (current.schemaVersion!==1) throw Error('This workspace needs a newer version of World Explorer.');
-  if (command.revision!==current.revision) throw Error('The workspace changed. Reopen it before editing.');
-  const next={...current,revision:current.revision+1};
-  if (command.type==='place') {
-    if(!['journal','album'].includes(command.purpose))throw Error('Choose a workspace purpose.');
-    const p=command.pose;if(!p || ![p.x,p.z].every(n=>Number.isFinite(n)&&Math.abs(n)<=100)||![0,1,2,3].includes(p.turn))throw Error('Choose an available furniture position.');
-    next.previous=current.pose?{...current.pose}:null;next.pose={...p};next.purpose=command.purpose;
-    next.rotated=current.rotated||!!current.pose&&p.turn!==current.pose.turn;
-    next.usedAt=0;
-  } else if(command.type==='undo') {
-    if(!current.pose)throw Error('Place the desk first.');
-    next.pose=current.previous?{...current.previous}:null;next.previous=null;next.undone=true;next.usedAt=0;
-  } else if(command.type==='record') {
-    if(!current.pose||typeof command.recordId!=='string'||!command.recordId.trim()||command.recordId.length>200)throw Error('Choose a saved Journal record for your desk.');
-    next.recordId=command.recordId;
-  } else if(command.type==='use') {
-    if(!current.pose||!current.rotated||!current.undone)throw Error('Place the desk, try rotating it, then undo a change before reviewing your records.');
-    next.usedAt=current.usedAt||Math.max(1,now);
+export function transitionWorkspace(value, command, now = Date.now()) {
+  const current = normalizeWorkspace(value);
+  if (current.schemaVersion !== 1)
+    throw Error('This workspace needs a newer version of World Explorer.');
+  if (current.projects) {
+    const projects = workspaceProjectState(current);
+    if (projects.schemaVersion !== 1)
+      throw Error('This workspace project needs a newer World Explorer version.');
+    for (const report of Object.values(projects.reports))
+      validateWorkspaceProjectReport(report, validateWorkspacePlacement);
+  }
+  if (command.revision !== current.revision)
+    throw Error('The workspace changed. Reopen it before editing.');
+  const next = { ...current, revision: current.revision + 1 };
+  if (command.type === 'begin-project') {
+    next.projects = beginWorkspaceProject(current, command.projectId, now);
+    if (command.worldOrigin && !next.projects.worldOrigin) {
+      const o = command.worldOrigin;
+      if (
+        !Number.isFinite(o.lat) ||
+        Math.abs(o.lat) > 90 ||
+        !Number.isFinite(o.lon) ||
+        Math.abs(o.lon) > 180 ||
+        typeof o.name !== 'string'
+      )
+        throw Error('Keep the workspace’s original Earth location.');
+      next.projects.worldOrigin = { lat: o.lat, lon: o.lon, name: o.name.slice(0, 120) };
+    }
+  } else if (command.type === 'inspect-project')
+    next.projects = inspectWorkspaceProject(current, command, now, validateWorkspacePlacement);
+  else if (command.type === 'export-project') next.projects = exportWorkspaceProject(current, now);
+  else if (command.type === 'place') {
+    if (!['journal', 'album'].includes(command.purpose)) throw Error('Choose a workspace purpose.');
+    const p = command.pose;
+    if (
+      !p ||
+      ![p.x, p.z].every((n) => Number.isFinite(n) && Math.abs(n) <= 100) ||
+      ![0, 1, 2, 3].includes(p.turn)
+    )
+      throw Error('Choose an available furniture position.');
+    next.previous = current.pose ? { ...current.pose } : null;
+    next.pose = { ...p };
+    next.purpose = command.purpose;
+    next.rotated = current.rotated || (!!current.pose && p.turn !== current.pose.turn);
+    next.usedAt = 0;
+    if (current.projects) next.projects = workspaceProjectEdit(current, next, command, now);
+  } else if (command.type === 'undo') {
+    if (!current.pose) throw Error('Place the desk first.');
+    next.pose = current.previous ? { ...current.previous } : null;
+    next.previous = null;
+    next.undone = true;
+    next.usedAt = 0;
+    if (current.projects) next.projects = workspaceProjectEdit(current, next, command, now);
+  } else if (command.type === 'record') {
+    if (
+      !current.pose ||
+      typeof command.recordId !== 'string' ||
+      !command.recordId.trim() ||
+      command.recordId.length > 200
+    )
+      throw Error('Choose a saved Journal record for your desk.');
+    next.recordId = command.recordId;
+  } else if (command.type === 'use') {
+    if (!current.pose || !current.rotated || !current.undone)
+      throw Error(
+        'Place the desk, try rotating it, then undo a change before reviewing your records.'
+      );
+    next.usedAt = current.usedAt || Math.max(1, now);
+    if (current.projects?.active)
+      next.projects = finishWorkspaceProject(
+        current,
+        next,
+        command,
+        now,
+        validateWorkspacePlacement
+      );
   } else throw Error('Unknown workspace action.');
   return next;
 }
