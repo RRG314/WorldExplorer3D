@@ -138,6 +138,7 @@ export async function sailOceanStation(page, station) {
   return result;
 }
 export async function pilotOceanSub(page, goal) {
+  assert.ok(goal&&['x','y','z'].every(k=>Number.isFinite(goal[k]))&&(!goal.face||['x','z'].every(k=>Number.isFinite(goal.face[k]))),'Submarine verification requires a finite destination and sightline before starting its normal-frame leg');
   const result = await page.evaluate(async (goal) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55'),
       sub = ctx.oceanMode.submarine,

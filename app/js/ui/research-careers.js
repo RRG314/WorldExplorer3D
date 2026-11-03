@@ -1,3 +1,4 @@
+import {bindExplorerCareer} from '../campaign/explorer-career-adapter.js';
 import {bindDocumentaryCareer} from '../campaign/documentary-career-adapter.js';
 import {bindPilotCareer} from '../campaign/pilot-career-adapter.js';
 import {bindEngineeringCareer} from '../campaign/engineering-career-adapter.js';
@@ -39,9 +40,11 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   bindEngineeringCareer(runtime,experiences);
   bindPilotCareer(runtime,experiences);
   bindDocumentaryCareer(runtime,experiences);
+  bindExplorerCareer(runtime,experiences);
   let active = null,
     generation = 0;
   const domains = {
+    'career:explorer':async()=>(await import('../campaign/explorer-career-adapter.js')).createExplorerCareerRuntime,
     'career:documentary-explorer':async()=>(await import('../campaign/documentary-career-adapter.js')).createDocumentaryCareerRuntime,
     'career:expedition-pilot':async()=>(await import('../campaign/pilot-career-adapter.js')).createPilotCareerRuntime,
     'career:field-engineer':async()=>(await import('../campaign/engineering-career-adapter.js')).createEngineeringCareerRuntime,
@@ -82,6 +85,8 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
         store,
         intent,
         onJournal,
+        travelToOcean:experiences.travelToOcean,
+        onActivity:(experienceId)=>{runtime.stopGameplayPlugin?.('explorer-next-chapter');void experiences.open(experienceId?{experienceId}:{view:'careers'});},
         requestWorldFocus,
         isActive: () => run === generation,
         onNext: () => {

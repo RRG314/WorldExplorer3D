@@ -4,11 +4,11 @@ import {chromium} from 'playwright';
 import {closeOwnedBrowser, withinDeadline} from './owned-browser.mjs';
 import {createHostResourceGuard} from './host-resource-guard.mjs';
 
-export async function createFieldworkQaSession({output, careerId, maximumDurationMs = 12 * 60 * 1000, walkLegMaximumDurationMs = 22000}) {
+export async function createFieldworkQaSession({output, careerId, rootDir = process.cwd(), maximumDurationMs = 12 * 60 * 1000, walkLegMaximumDurationMs = 22000}) {
   await fs.mkdir(output, {recursive: true});
   let server, browser, page;
   const report = {scope: 'Actual source world; keyboard walking with controlled facing, no position teleport or time advance. Disposable browser data; production unchanged.', checks: [], errors: [], providerErrors: []};
-  const guard = createHostResourceGuard({rootDir: process.cwd(), maximumDurationMs,
+  const guard = createHostResourceGuard({rootDir, maximumDurationMs,
     stopOwnedTask: async cause => {report.resourceStop = cause; await server?.kill();}, record: row => fs.appendFile(`${output}/host-resources.jsonl`, JSON.stringify(row) + '\n')});
   await guard.start();
   try {

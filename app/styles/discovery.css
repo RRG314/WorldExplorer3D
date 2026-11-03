@@ -2467,3 +2467,9 @@
   max-height: 38dvh;
   object-fit: contain;
 }
+
+.discoveryExplorerJourney > strong { display: block; font-size: 1.2rem; }
+.discoveryExplorerJourney details { margin-top: 14px; }
+.discoveryExplorerJourney summary { min-height: 44px; align-content: center; cursor: pointer; }
+.discoveryExplorerJourney li { margin: 10px 0; }
+.discoveryExplorerJourney li button { display: block; margin-top: 6px; }

@@ -66,7 +66,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     if(disposed||!element)return;
     const w=workspace(),v=housing.snapshot(),bag=ctx.playerBackpackInventory?.page?.({offset:0,limit:24})?.items||[];
     const supplies=bag.filter(item=>item.catalogId!=='hands'&&!item.equipped&&!item.verbs?.includes('equip')&&item.category!=='field-tool');
-    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,lunarJourney,lunarReports.map(r=>r.eventId),selectedLunarReport,exhibitionReports.map(row=>row.eventId),selectedExhibitionRecord,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity]),career?.variantId]);
+    const key=JSON.stringify([state.ui?.explorerSnapshot?.().active,loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,lunarJourney,lunarReports.map(r=>r.eventId),selectedLunarReport,exhibitionReports.map(row=>row.eventId),selectedExhibitionRecord,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity]),career?.variantId]);
     if(key===renderKey)return;renderKey=key;
     const button=(action,label,disabled=false)=>`<button type="button" data-home-action="${escape(action)}"${busy||disabled?' disabled':''}>${escape(label)}</button>`;
     let body='';
@@ -111,6 +111,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       body+=button('journeys','Choose your next journey');
     }
     if(saveFailed)body+=button('retry','Retry saved home');
+    if(state.ui?.explorerSnapshot?.().active)body=button('explorer-back','Back to Explorer journey')+body;
     element.innerHTML=`<span class="discoveryChapterEyebrow">FROM THE HARBOR · MAKER &amp; HOME</span><strong>Your personal workspace</strong>${body}<small role="status">${escape(message)}</small>`;
     element.setAttribute('aria-busy',String(busy));
   }
@@ -163,6 +164,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   async function act(action){
     if(disposed||busy)return false;busy=true;message='';render();
     try{
+      if(action==='explorer-back'){await state.ui?.showExplorerJourney?.();return;}
       if(action==='engineering-next'){career?.onNext?.();}
       else if(action.startsWith('inspect:')){
         const w=workspace(),actual=room(),proposal=workspace().projects?.active?.id==='reusable-design'?null:engineeringProposal(actual);

@@ -13,7 +13,7 @@ import { validHandling, deliveryDistinction } from '../campaign/delivery-handlin
 import {validatePortalTrailEntry} from '../portal/trail-model.js';
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
-import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
+import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter, validateOpeningLocation } from '../campaign/first-bearings.js?v=1';
 export function validateJournalBackup(input) {
   const fail = () => { throw new TypeError('This Journal backup is incomplete, damaged, or from an unsupported version. Existing records have not been changed.'); };
   if (!input || typeof input !== 'object' || !input.profile || typeof input.profile !== 'object' || Array.isArray(input.profile)) fail();
@@ -45,6 +45,7 @@ export function validateJournalBackup(input) {
   }
   try{validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);validateLunarStudyBackups(data.events);}catch{fail();}
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
+  if(chapter.schemaVersion===1&&chapter.locationSnapshot)try{validateOpeningLocation(chapter.locationSnapshot);}catch{fail();}
   for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
     const definition=HOME_ACHIEVEMENTS[kind],receipt=data.events.find(event=>event.eventId===entry?.eventId);
     if(!definition || entry?.eventId!==`event:campaign:${definition.id}:v1` || !(entry.occurredAt>0) || !entry.metadata?.homeId || !receipt || receipt.eventType!=='campaign-completed' || receipt.metadata?.homeId!==entry.metadata.homeId)fail();

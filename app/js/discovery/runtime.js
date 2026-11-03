@@ -1,3 +1,4 @@
+import {explorerCareerView,explorerJourneyMarkup} from '../campaign/explorer-career.js';
 import {documentaryReportMarkup,showDocumentaryStoryPhotos} from '../campaign/documentary-ui.js';
 import {DOCUMENTARY_STORY,documentaryJournalRecords} from '../campaign/documentary-story.js';
 import {setJournalMarkup} from './journal-record-dom.js';
@@ -300,7 +301,12 @@ function createDiscoveryUi(state) {
     if (focus && !pane?.querySelector('#' + focus.sectionId)) return false;
     careerFocus = focus;
     for (const child of pane?.children || [])
-      child.classList.toggle('discoveryCareerUnfocused', !!focus && child.id !== focus.sectionId);
+      child.classList.toggle(
+        'discoveryCareerUnfocused',
+        !!focus &&
+          child.id !== focus.sectionId &&
+          !(focus.include || []).some((selector) => child.matches(selector))
+      );
     if (elements.title && activeTab === 'today') elements.title.textContent = focus?.title || 'Today';
     const tab = document.querySelector('[data-discovery-tab="today"]');
     if (tab) tab.textContent = focus?.title || 'Today';
@@ -311,8 +317,12 @@ function createDiscoveryUi(state) {
   let guideRecords = [];
   let journalRecords = [];
   let expeditionSignature = '';
+  let profileRenderedMarkup='',profileFirstNode=null;
   let openingChapter = normalizeOpeningChapter();
+  let explorerCareer=null,explorerView=explorerCareerView(),explorerBusy=false,explorerSection='journey';
+  let explorerReviewedId='';
   let chapterBusy = false;
+  let chapterRenderedMarkup='',chapterFirstNode=null;
   let starterChoice = 'general';
   let chapterMessage = '';
   let refreshSequence = 0;
@@ -326,28 +336,130 @@ function createDiscoveryUi(state) {
   function renderOpeningChapter() {
     if (disposed || !elements.chapter) return;
     const chapter = openingChapter;
+    if (explorerCareer)
+      setCareerFocus(
+        explorerSection === 'home'
+          ? { sectionId: 'discoveryPersonalHome', title: 'Explorer · your home' }
+          : {
+              sectionId: 'discoveryOpeningChapter',
+              title: 'Explorer',
+              include:
+                chapter.phase === 'active'
+                  ? ['.discoveryOperation', '.discoveryActions', '#discoveryResultCard']
+                  : ['#discoveryResultCard'],
+            }
+      );
     const here = chapter.regionId === state.worldIdentityId && state.appCtx.getEnv?.() === 'EARTH';
     const earth = state.appCtx.getEnv?.() === 'EARTH';
     const supported = chapter.schemaVersion === 1 && !!researchStarter(chapter.careerId);
     const choices = availableResearchStarters(state.chapterLeads?.('general') || []);
-    if (chapter.phase === 'available' && !choices.some(row=>row.id===starterChoice)) starterChoice = 'general';
+    if (chapter.phase === 'available' && !choices.some((row) => row.id === starterChoice))
+      starterChoice = 'general';
     const starter = researchStarter(chapter.phase === 'available' ? starterChoice : chapter.careerId);
     const hasLead = hasChapterLead();
     const phase = supported ? chapter.phase : 'unavailable';
-    const copy = phase === 'complete' ? 'Badge earned. Your first chapter is saved with your discoveries.'
-      : phase === 'review' ? `You recorded ${chapter.resultName || 'a discovery'}. Review that entry to finish your chapter.`
-      : phase === 'active' ? (here ? starter.brief : `Continue your fieldwork in ${chapter.regionLabel || 'the place where you started'}. Your progress is kept.`)
-      : phase === 'unavailable' ? 'This chapter needs a newer version of World Explorer.'
-      : earth ? (hasLead ? `${starter.question} Keep one field record and review it to earn First Bearings. Optional · no time limit.` : 'No fresh field lead is ready in this area. Try another Earth location to begin.') : 'Start this chapter when you return to an Earth location.';
-    const action = phase === 'available' && earth && hasLead ? ['start', 'Begin chapter']
-      : phase === 'active' && here && hasLead ? ['leads', 'Go to the field lead']
-      : phase === 'review' ? ['review', 'Review your record']
-      : phase === 'complete' ? ['profile', 'View your badge'] : null;
+    const copy =
+      phase === 'complete'
+        ? 'Badge earned. Your first chapter is saved with your discoveries.'
+        : phase === 'review'
+          ? `You recorded ${chapter.resultName || 'a discovery'}. Review that entry to finish your chapter.`
+          : phase === 'active'
+            ? here
+              ? starter.brief
+              : `Continue your fieldwork in ${chapter.regionLabel || 'the place where you started'}. Your progress is kept.`
+            : phase === 'unavailable'
+              ? 'This chapter needs a newer version of World Explorer.'
+              : earth
+                ? hasLead
+                  ? `${starter.question} Keep one field record and review it to earn First Bearings. Optional · no time limit.`
+                  : 'No fresh field lead is ready in this area. Try another Earth location to begin.'
+                : 'Start this chapter when you return to an Earth location.';
+    const action =
+      phase === 'available' && earth && hasLead
+        ? ['start', 'Begin chapter']
+        : phase === 'active' && here && hasLead
+          ? ['leads', 'Go to the field lead']
+          : phase === 'review'
+            ? ['review', 'Review your record']
+            : phase === 'complete'
+              ? ['profile', 'View your badge']
+              : null;
     const durable = state.profileStore.type === 'IndexedDbDiscoveryProfileStore';
     elements.chapter.dataset.chapterPhase = phase;
     elements.chapter.setAttribute('aria-busy', String(chapterBusy));
-    const chooser = phase === 'available' && earth && choices.length ? `<label class="discoveryStarterChoice" for="discoveryStarterChoice">Choose your first field assignment<select id="discoveryStarterChoice"${chapterBusy ? ' disabled' : ''}>${choices.map(row=>`<option value="${row.id}"${row.id===starterChoice ? ' selected' : ''}>${escapeHtml(row.label)}</option>`).join('')}</select></label>` : '';
-    elements.chapter.innerHTML = `<span class="discoveryChapterEyebrow">FROM THE HARBOR · OPENING CHAPTER</span><strong>First Bearings${phase === 'complete' ? ' · Complete' : ''}</strong>${chooser}<p>${escapeHtml(copy)}</p>${starter && starter.id !== 'general' ? `<small>Result: ${escapeHtml(starter.result)}</small>` : ''}${action ? `<button type="button" data-chapter-action="${action[0]}"${chapterBusy ? ' disabled' : ''}>${action[1]}</button>` : ''}<small>${durable ? 'Progress saved on this device' : 'Session only · export your Journal before leaving'}${chapterMessage ? ` · ${escapeHtml(chapterMessage)}` : ''}</small>`;
+    const chooser =
+      phase === 'available' && earth && choices.length
+        ? `<label class="discoveryStarterChoice" for="discoveryStarterChoice">Choose your first field assignment<select id="discoveryStarterChoice"${chapterBusy ? ' disabled' : ''}>${choices.map((row) => `<option value="${row.id}"${row.id === starterChoice ? ' selected' : ''}>${escapeHtml(row.label)}</option>`).join('')}</select></label>`
+        : '';
+    const chapterMarkup = `<span class="discoveryChapterEyebrow">FROM THE HARBOR · OPENING CHAPTER</span><strong>First Bearings${phase === 'complete' ? ' · Complete' : ''}</strong>${chooser}<p>${escapeHtml(copy)}</p>${starter && starter.id !== 'general' ? `<small>Result: ${escapeHtml(starter.result)}</small>` : ''}${action ? `<button type="button" data-chapter-action="${action[0]}"${chapterBusy ? ' disabled' : ''}>${action[1]}</button>` : ''}<small>${durable ? 'Progress saved on this device' : 'Session only · export your Journal before leaving'}${chapterMessage ? ` · ${escapeHtml(chapterMessage)}` : ''}</small>`;
+    const nextChapterMarkup = explorerCareer
+      ? explorerJourneyMarkup(
+          explorerView,
+          explorerView.next?.target === 'opening' ? chapterMarkup : ''
+        ) +
+        (explorerView.next?.target === 'opening'
+          ? ''
+          : `<details><summary>First Bearings · ${phase === 'complete' ? 'Saved' : 'Your opening'}</summary>${chapterMarkup}</details>`)
+      : chapterMarkup;
+    if (
+      nextChapterMarkup !== chapterRenderedMarkup ||
+      chapterFirstNode !== elements.chapter.firstChild
+    ) {
+      elements.chapter.innerHTML = nextChapterMarkup;
+      chapterRenderedMarkup = nextChapterMarkup;
+      chapterFirstNode = elements.chapter.firstChild;
+    }
+    for (const b of elements.chapter.querySelectorAll('[data-explorer-target]'))
+      b.disabled = explorerBusy;
+  }
+
+  async function revealExplorerRecord(eventId) {
+    explorerReviewedId = eventId;
+    if (elements.journalCategory) elements.journalCategory.value = 'all';
+    if (elements.journalRegion) elements.journalRegion.value = 'all';
+    setTab('journal');
+    await refreshData();
+    if (!journalRecords.some((e) => e.eventId === eventId)) {
+      const [saved] = await state.profileStore.getEventsById([eventId]);
+      if (saved) {
+        journalRecords.push(saved);
+        renderJournal();
+      }
+    }
+    const record = [...elements.journal.querySelectorAll('[data-journal-record]')].find(
+      (e) => e.dataset.journalRecord === eventId
+    );
+    if (!record)
+      throw Error(
+        'The referenced record is missing. Restore your complete Journal backup to continue.'
+      );
+    record.scrollIntoView({ block: 'center' });
+    (record.querySelector('[data-chapter-action=finish]') || record.querySelector('summary'))?.focus({
+      preventScroll: true,
+    });
+  }
+  async function explorerAction(target) {
+    const lease = explorerCareer;
+    if (!lease || explorerBusy) return;
+    explorerBusy = true;
+    renderOpeningChapter();
+    try {
+      if (target === 'home') {
+        explorerSection = 'home';
+        await state.personalHome?.refresh();
+        setTab('today');
+        renderOpeningChapter();
+      } else if (target.startsWith('record:')) await revealExplorerRecord(target.slice(7));
+      else if (!(await lease.onNavigate(target)))
+        throw Error(
+          'The chapter could not open. Your saved journey is kept. Reopen Activities to retry.'
+        );
+    } catch (error) {
+      state.appCtx.showToast?.(error.message);
+    } finally {
+      explorerBusy = false;
+      if (!disposed) renderOpeningChapter();
+    }
   }
 
   async function chapterAction(action) {
@@ -359,24 +471,39 @@ function createDiscoveryUi(state) {
       if (action === 'start') {
         const lead = chapterLeads()[0];
         if (!lead) throw new Error('No fresh field lead is ready here. Try another Earth location.');
-        const profile = await state.profileStore.startOpeningChapter({ regionId: state.worldIdentityId,
-          regionLabel: state.regionLabel, environment: state.appCtx.getEnv?.(), careerId: starterChoice });
+        const profile = await state.profileStore.startOpeningChapter({
+          regionId: state.worldIdentityId,
+          regionLabel: state.regionLabel,
+          environment: state.appCtx.getEnv?.(),
+          careerId: starterChoice,
+          locationSnapshot: {
+            lat: state.appCtx.LOC.lat,
+            lon: state.appCtx.LOC.lon,
+            name: state.regionLabel,
+          },
+        });
         if (disposed) return;
         openingChapter = normalizeOpeningChapter(profile.openingChapter);
         state.appCtx.restartTutorial?.('explore');
-        if (!await state.startFieldObjective?.(lead.id, {careerId:openingChapter.careerId})) {
-          throw Error('Your chapter is saved. This lead is no longer available; choose Go to the field lead to continue nearby.');
+        if (!(await state.startFieldObjective?.(lead.id, { careerId: openingChapter.careerId }))) {
+          throw Error(
+            'Your chapter is saved. This lead is no longer available; choose Go to the field lead to continue nearby.'
+          );
         }
         setOpen(false);
       } else if (action === 'leads') {
         const lead = chapterLeads()[0];
-        if (!lead || !await state.startFieldObjective?.(lead.id, {careerId:openingChapter.careerId})) throw Error('That field lead is unavailable. Your chapter is kept; try another nearby lead.');
+        if (
+          !lead ||
+          !(await state.startFieldObjective?.(lead.id, { careerId: openingChapter.careerId }))
+        )
+          throw Error(
+            'That field lead is unavailable. Your chapter is kept; try another nearby lead.'
+          );
       } else if (action === 'review') {
         if (elements.journalCategory) elements.journalCategory.value = 'all';
         if (elements.journalRegion) elements.journalRegion.value = 'all';
-        setTab('journal');
-        renderJournal();
-        await refreshData();
+        await revealExplorerRecord(openingChapter.eventId);
       } else if (action === 'finish') {
         await state.profileStore.completeOpeningChapter(openingChapter.eventId);
         if (disposed) return;
@@ -548,15 +675,17 @@ function createDiscoveryUi(state) {
       if (evidence) events.unshift(evidence);
       else chapterMessage = 'The referenced record is missing. Restore your complete Journal backup to continue.';
     }
-    const investigationEvents=await state.profileStore.getEventsById([...new Set([...harborJourneyEventIds,...lunarStudyEventIds,DOCUMENTARY_STORY.receiptId])]);
+    const investigationEvents=await state.profileStore.getEventsById([...new Set([...harborJourneyEventIds,...lunarStudyEventIds,DOCUMENTARY_STORY.receiptId,...(explorerReviewedId?[explorerReviewedId]:[])])]);
     if(request!==refreshSequence||elements.panel?.dataset.journeyJournalOwner)return;
     void state.appCtx.marineResearch?.investigation?.refresh();
+    explorerView=explorerCareerView(profile,investigationEvents);
     renderOpeningChapter();
     void state.harborRun?.refresh(profile);
     void state.threeViews?.refresh(profile);
     void state.personalHome?.refresh(profile);
     guideRecords = guide;
     journalRecords = mergeLunarJournalRecords(documentaryJournalRecords(events,investigationEvents),investigationEvents);
+    const reviewed=investigationEvents.find(e=>e.eventId===explorerReviewedId);if(reviewed&&!journalRecords.some(e=>e.eventId===reviewed.eventId))journalRecords.unshift(reviewed);
     projectDiscoveryItemsToBackpack(state.appCtx, items);
     if (elements.saveStatus) {
       const ownerUid = state.appCtx.getAccountUserId?.();
@@ -724,15 +853,18 @@ function createDiscoveryUi(state) {
       const badgeMarkup = badges.length
         ? badges.map((badge) => `<article class="discoveryProgressCard" data-explorer-badge="${escapeHtml(badge.id)}"><strong>◆</strong>${escapeHtml(badge.label)}<small>${escapeHtml(badge.detail || 'Explorer badge')}${badge.earnedAt ? ` · ${escapeHtml(new Date(badge.earnedAt).toLocaleDateString())}` : ''}</small></article>`).join('')
         : '<div class="discoveryEmpty">Badges appear as your Explorer story grows.</div>';
+      const nextProfileMarkup = `<details data-profile-group="specialties" class="discoveryProfileGroup" open><summary>Specialties <span>${specialties.length}</span></summary><div class="discoveryProfileGroupGrid">${specialtyMarkup}</div></details><details data-profile-group="paths" class="discoveryProfileGroup"><summary>Explorer paths <span>${paths.length}</span></summary><div class="discoveryProfileGroupGrid">${pathMarkup}</div></details><details data-profile-group="place" class="discoveryProfileGroup"><summary>Current place</summary><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article></details><details data-profile-group="badges" class="discoveryProfileGroup"><summary>Badges <span>${badges.length}</span></summary><div class="discoveryProfileGroupGrid">${badgeMarkup}</div></details>`;
+      if(nextProfileMarkup!==profileRenderedMarkup||profileFirstNode!==elements.progress.firstChild){
       const profilePane=elements.progress.closest('.discoveryPane'),paneScroll=profilePane?.scrollTop||0;
       const groupState=new Map([...elements.progress.querySelectorAll('details[data-profile-group]')].map(group=>[group.dataset.profileGroup,group.open]));
       const focusedGroup=elements.progress.contains(document.activeElement)?document.activeElement.closest('[data-profile-group]')?.dataset.profileGroup:null;
-      elements.progress.innerHTML = `<details data-profile-group="specialties" class="discoveryProfileGroup" open><summary>Specialties <span>${specialties.length}</span></summary><div class="discoveryProfileGroupGrid">${specialtyMarkup}</div></details><details data-profile-group="paths" class="discoveryProfileGroup"><summary>Explorer paths <span>${paths.length}</span></summary><div class="discoveryProfileGroupGrid">${pathMarkup}</div></details><details data-profile-group="place" class="discoveryProfileGroup"><summary>Current place</summary><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article></details><details data-profile-group="badges" class="discoveryProfileGroup"><summary>Badges <span>${badges.length}</span></summary><div class="discoveryProfileGroupGrid">${badgeMarkup}</div></details>`;
+      elements.progress.innerHTML=nextProfileMarkup;profileRenderedMarkup=nextProfileMarkup;profileFirstNode=elements.progress.firstChild;
       for(const group of elements.progress.querySelectorAll('details[data-profile-group]')){
         if(groupState.has(group.dataset.profileGroup))group.open=groupState.get(group.dataset.profileGroup);
         if(group.dataset.profileGroup===focusedGroup)group.querySelector('summary')?.focus({preventScroll:true});
       }
       if(profilePane)profilePane.scrollTop=paneScroll;
+      }
     }
   }
 
@@ -856,6 +988,7 @@ function createDiscoveryUi(state) {
     starterChoice = event.target.value; renderOpeningChapter();
   });
   listen(elements.chapter, 'click', (event) => {
+    const journey=event.target?.closest?.('[data-explorer-target]');if(journey){void explorerAction(journey.dataset.explorerTarget);return;}
     const button = event.target?.closest?.('[data-chapter-action]');
     if (button) void chapterAction(button.dataset.chapterAction);
   });
@@ -1111,7 +1244,33 @@ function createDiscoveryUi(state) {
   return Object.freeze({
     get activeTab() { return activeTab; }, get open() { return open; },
     ownsFieldPrompt: !!elements.quick,
-    dispose() { setCareerFocus(null); disposed = true; refreshSequence += 1; listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
+    dispose() { explorerCareer=null; setCareerFocus(null); disposed = true; refreshSequence += 1; listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
+    async startExplorerCareer(options) {
+      explorerCareer = options;
+      explorerSection = 'journey';
+      await refreshData();
+      if (disposed || explorerCareer !== options || !options.isActive()) return false;
+      setCareerFocus({ sectionId: 'discoveryOpeningChapter', title: 'Explorer' });
+      setTab('today');
+      setOpen(true);
+      renderOpeningChapter();
+      return true;
+    },
+    stopExplorerCareer(options) {
+      if (options && explorerCareer !== options) return;
+      explorerCareer = null;
+      explorerReviewedId = '';
+      setCareerFocus(null);
+      renderOpeningChapter();
+    },
+    async showExplorerJourney() {
+      if (!explorerCareer) return false;
+      explorerSection = 'journey';
+      setTab('today');
+      await refreshData();
+      return true;
+    },
+    explorerSnapshot:()=>({active:!!explorerCareer,section:explorerSection,openingBusy:chapterBusy,phase:explorerView.phase,nextId:explorerView.next?.id||null,completedMilestones:explorerView.completedMilestones,chapters:explorerView.chapters,openingChapter}),
     setCareerFocus, refreshData, render, setOpen, setTab, showResult, showSectionTutorial, showTutorial
   });
 }
