@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Delivery report component</title
+  ><link rel="icon" href="/favicon.svg" /><link
+    rel="stylesheet"
+    href="/app/styles/discovery.css"
+  /><style>
+    body {
+      background: #152d32;
+      color: #e2efea;
+      font: 14px system-ui;
+    }
+    main {
+      max-width: 600px;
+      margin: 20px;
+      padding: 16px;
+      background: #1b3031;
+    }
+  </style>
+  <main id="report"></main>
+  <script type="module">
+    import { pilotReportMarkup } from '/app/js/campaign/pilot-report.js';
+    const p = (lat, lon) => ({ lat, lon, y: 10 });
+    document.querySelector('#report').innerHTML = pilotReportMarkup({
+      schemaVersion: 1,
+      assignmentId: 'return-case',
+      delivery: {
+        phase: 'complete',
+        route: {
+          distanceUnits: 'm',
+          distance: 222,
+          points: [p(39.29, -76.61), p(39.291, -76.61), p(39.291, -76.611)],
+        },
+        handling: {
+          distance: 223,
+          seconds: 60,
+          maxSpeed: 8,
+          hardBrakes: 0,
+          sharpTurns: 0,
+          roadDepartures: 0,
+          complete: false,
+          speedUnits: 'm/s',
+        },
+      },
+    });
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Controlled report component; no source driving or world completion claim',
+        open: document.querySelector('details').open,
+        plot: !!document.querySelector('svg'),
+        invalidNumbers: /NaN|undefined|Infinity/.test(
+          document.querySelector('#report').textContent
+        ),
+      });
+    window.advanceTime = async () => {};
+  </script>
+</html>

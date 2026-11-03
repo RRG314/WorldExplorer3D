@@ -8,7 +8,7 @@ import {validateInvestigationBackup} from '../campaign/coastal-investigation.js'
 import {validateCoastalBackup} from '../campaign/coastal-departure.js';
 import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.js';
 import {HOME_ACHIEVEMENTS} from '../campaign/home-achievements.js';
-import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute } from '../campaign/harbor-run.js';
+import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute, validatePilotBackup } from '../campaign/harbor-run.js';
 import { validHandling, deliveryDistinction } from '../campaign/delivery-handling.js';
 import {validatePortalTrailEntry} from '../portal/trail-model.js';
 // Validate the entire file before opening a destructive replacement transaction.
@@ -71,6 +71,7 @@ export function validateJournalBackup(input) {
         || delivery.nextPoint !== delivery.route.points.length || !data.events.some(event => event.eventId === HARBOR_RUN.receiptId
         && event.metadata?.routeId === delivery.route.id && event.eventType === 'campaign-completed'))) fail();
   }
+  try{validatePilotBackup(delivery,data.events);}catch{fail();}
   if(data.albums==null)data.albums=[];
   if(!Array.isArray(data.albums)||data.albums.length>1||data.albums.some(a=>a?.id!==THREE_VIEWS.albumId))fail();
   try{validateThreeViewsBackup(data.profile.threeViews,data.albums[0],data.events);}catch{fail();}

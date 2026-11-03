@@ -24,7 +24,7 @@ import {
 } from './explorer-events.js?v=3';
 import { createDefaultCharacterState, normalizeCharacterState } from '../character/model.js?v=1';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
-import { normalizeHarborRun, transitionHarborRun, harborRunReceipt } from '../campaign/harbor-run.js';
+import { normalizeHarborRun, transitionHarborRun, harborRunCommandReceipts } from '../campaign/harbor-run.js';
 import { FIRST_BEARINGS, normalizeOpeningChapter, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
@@ -437,8 +437,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
       const harborRun = transitionHarborRun(current.harborRun, command, now);
       const profile = normalizeProfile({ ...current, harborRun });
-      if (harborRun.phase === 'complete') {
-        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
+      for (const receipt of harborRunCommandReceipts(current.harborRun, harborRun, command)) {
+        const event = createExplorerStoryEvent(receipt);
         transaction.objectStore('events').put(event);
         putJournalOrder(transaction, 'events', event);
       }
@@ -446,9 +446,15 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(transaction);
       return clone(harborRun);
     } catch (error) {
-      try { transaction?.abort(); } catch { /* Already ended. */ }
+      try {
+        transaction?.abort();
+      } catch {
+        /* Already ended. */
+      }
       throw error;
-    } finally { db.close(); }
+    } finally {
+      db.close();
+    }
   }
 
   async function recordHomeAchievement(kind,home) {
@@ -1308,12 +1314,14 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       return clone(result);
     },
     async updateHarborRun(command, now = Date.now()) {
-      const harborRun = transitionHarborRun(profile.harborRun, command, now);
-      profile = normalizeProfile({ ...profile, harborRun });
-      if (harborRun.phase === 'complete') {
-        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
-        events.set(event.eventId, event);
-      }
+      const priorHarborRun = profile.harborRun,
+        harborRun = transitionHarborRun(priorHarborRun, command, now);
+      const receipts = harborRunCommandReceipts(priorHarborRun, harborRun, command).map(
+          createExplorerStoryEvent
+        ),
+        next = normalizeProfile({ ...profile, harborRun });
+      profile = next;
+      for (const event of receipts) events.set(event.eventId, event);
       return clone(harborRun);
     },
     async getReceiptSyncStatus(ownerUid) { return summarizeReceiptState([...items.values()], [...outbox.values()], ownerUid); },

@@ -1,3 +1,5 @@
+import {canonicalFieldRecord} from './field-study-contract.js';
+import {transitionPilotContinuation,pilotReturnReceipt,pilotAssignment,pilotContinuations} from './pilot-assignments.js';
 // Personal, optional career state. The world runtime supplies physical-road
 // evidence; this model owns the durable cargo/route transitions, never money.
 import { deliveryDistinction, validHandling } from './delivery-handling.js';
@@ -31,6 +33,12 @@ function stoppedAt(state, evidence, target) {
     && finite(evidence.y) && Math.abs(evidence.y-target.y) < 2.5 && deliveryDistance(evidence, target) <= 8;
 }
 export function transitionHarborRun(input, command, now = Date.now()) {
+  const base = normalizeHarborRun(input);
+  return command.assignmentId
+    ? transitionPilotContinuation(base, command, now, transitionHarborRunCore)
+    : transitionHarborRunCore(base, command, now);
+}
+function transitionHarborRunCore(input, command, now = Date.now()) {
   const state = normalizeHarborRun(input);
   if (state.schemaVersion !== 1) throw Error('This delivery needs a newer version of World Explorer.');
   if (command.revision !== state.revision) throw Error('Delivery progress changed in another window. Reopen the Journal to continue.');
@@ -79,4 +87,83 @@ export function harborRunReceipt(state) {
     projections: { profile: false, place: false },
     metadata: { chapterId: HARBOR_RUN.id, routeId: state.route.id, distanceMeters: state.route.distance, cargo: 'delivered', reward: 'harbor-driver', finish: 'slate', distinction: state.distinction || null, handling: state.handling || null }
   };
+}
+
+export function harborRunCommandReceipts(previous, next, command) {
+  if (command.assignmentId)
+    return pilotAssignment(next, command.assignmentId).phase === 'complete' &&
+      pilotAssignment(previous, command.assignmentId).phase !== 'complete'
+      ? [pilotReturnReceipt(next)]
+      : [];
+  return next.phase === 'complete' ? [harborRunReceipt(next)] : [];
+}
+
+export function validatePilotBackup(base, events) {
+  if (!base?.continuations) {
+    if (events.some((e) => e.metadata?.pilotDeliveryReport))
+      throw Error('Keep the return report and its matching assignment.');
+    return;
+  }
+  if (base.schemaVersion !== 1) return;
+  const p = pilotContinuations(base);
+  if (p.schemaVersion !== 1) return;
+  for (const [id, job] of Object.entries(p.jobs)) {
+    if (
+      base.phase !== 'complete' ||
+      id !== 'return-case' ||
+      job?.schemaVersion !== 1 ||
+      !['pickup', 'driving', 'unload', 'complete'].includes(job.phase)
+    )
+      throw Error('Keep the original completed delivery with its supported continuation.');
+    const route = validateDeliveryRoute(job.route);
+    if (route.distanceUnits !== 'm')
+      throw Error('This return route needs its recorded metre reference.');
+    transitionPilotContinuation(
+      base,
+      { type: 'accept', assignmentId: id, revision: base.revision, route },
+      job.acceptedAt,
+      () => structuredClone(job)
+    );
+    if (
+      !Number.isFinite(job.acceptedAt) ||
+      job.acceptedAt < base.completedAt ||
+      !Number.isInteger(job.nextPoint) ||
+      job.nextPoint < 0 ||
+      job.nextPoint > route.points.length ||
+      !Number.isSafeInteger(job.revision)
+    )
+      throw Error('Keep the accepted case custody and ordered road gates.');
+    const loaded = ['driving', 'unload', 'complete'].includes(job.phase),
+      complete = job.phase === 'complete';
+    if (
+      job.revision !== (job.phase === 'pickup' ? 1 : 2 + job.nextPoint + (complete ? 1 : 0)) ||
+      job.cargo !==
+        (job.phase === 'pickup' ? 'at-pickup' : complete ? 'delivered' : 'in-vehicle') ||
+      (job.phase === 'pickup' && job.nextPoint !== 0) ||
+      (job.phase === 'driving' && job.nextPoint >= route.points.length) ||
+      (['unload', 'complete'].includes(job.phase) && job.nextPoint !== route.points.length) ||
+      (loaded && (!Number.isFinite(job.loadedAt) || job.loadedAt < job.acceptedAt)) ||
+      (complete && (!Number.isFinite(job.completedAt) || job.completedAt < job.loadedAt))
+    )
+      throw Error('This return record has inconsistent custody or gate order.');
+    if (job.handling != null && (!validHandling(job.handling) || job.handling.speedUnits !== 'm/s'))
+      throw Error('Keep the new review in its measured physical speed units.');
+    if (complete && job.distinction !== deliveryDistinction(job.handling, route.distance))
+      throw Error('The return distinction differs from its saved review.');
+    const event = events.find((e) => e.eventId === 'event:campaign:pilot-return-case:v1');
+    if (complete) {
+      const expected = pilotReturnReceipt(base);
+      if (
+        !event ||
+        event.eventType !== 'campaign-completed' ||
+        event.occurredAt !== job.completedAt ||
+        event.metadata?.parentReceiptId !== HARBOR_RUN.receiptId ||
+        canonicalFieldRecord(event.metadata?.pilotDeliveryReport) !==
+          canonicalFieldRecord(expected.metadata.pilotDeliveryReport)
+      )
+        throw Error('Keep the completed case return with its original report.');
+    } else if (event) throw Error('A return receipt requires its completed custody record.');
+  }
+  if (events.some((e) => e.metadata?.pilotDeliveryReport) && !p.jobs['return-case'])
+    throw Error('Keep the return report and its matching assignment.');
 }
