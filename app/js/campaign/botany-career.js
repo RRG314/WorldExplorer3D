@@ -599,4 +599,4 @@ export function botanyCareerBadge(value) {
     : null;
 }
 export const validateBotanyCareerBackup = (value, events, items) =>
-  validateFieldHistory('botany', value, events, items, transitionBotanyCareer);
+  validateFieldHistory('botany', value, events, items, transitionBotanyCareer, normalizeBotanyCareer);

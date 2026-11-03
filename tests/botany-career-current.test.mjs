@@ -161,3 +161,4 @@ test('moving an unfinished plot archives genuine prior records; stale presence a
     /newer version/
   );
 });
+test('an empty Botanist record added during old-profile normalization still survives a backup roundtrip',()=>{const state=normalizeBotanyCareer();assert.doesNotThrow(()=>validateBotanyCareerBackup(state,[],[]));assert.deepEqual(state.records,{});});

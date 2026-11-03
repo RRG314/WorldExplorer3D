@@ -82,7 +82,7 @@ export const canonicalFieldRecord = (value) =>
       : v
   );
 // Replay the saved domain commands, without creating any new rewards or writes.
-export function validateFieldHistory(id, value, events, items, transition) {
+export function validateFieldHistory(id, value, events, items, transition, normalize = normalizeFieldStudy) {
   if (!value || value.schemaVersion !== 1) return;
   const canonical = canonicalFieldRecord,
     fail = () => {
@@ -91,7 +91,7 @@ export function validateFieldHistory(id, value, events, items, transition) {
   const records = events
     .filter((row) => row.sourceSystem === 'research-careers' && row.metadata?.careerId === id)
     .sort((a, b) => Number(a.metadata.action?.revision) - Number(b.metadata.action?.revision));
-  let replay = normalizeFieldStudy();
+  let replay = normalize();
   for (const record of records) {
     const command = record.metadata.action;
     if (!command || command.revision !== replay.revision) fail();
@@ -116,5 +116,5 @@ export function validateFieldHistory(id, value, events, items, transition) {
     }
     replay = result.state;
   }
-  if (canonical(replay) !== canonical(normalizeFieldStudy(value))) fail();
+  if (canonical(replay) !== canonical(normalize(value))) fail();
 }
