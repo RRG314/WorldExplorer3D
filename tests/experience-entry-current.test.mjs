@@ -25,3 +25,13 @@ test('the adapter sees the actual loaded world and must accept before entry succ
  const entry=createExperienceEntry({resolveAdapter:()=>({start:({worldIdentity,isCurrent})=>{visited.push(worldIdentity);assert.equal(isCurrent(),true);return false;}}),launchPlace:async()=>{world='earth:chosen';return true;},readWorldIdentity:()=>world});
  assert.equal(await entry.start({experienceId:'career:racer',place:{lat:51,lon:-1}}),false);assert.deepEqual(visited,['earth:chosen']);
 });
+test('transport-aware entry delegates resume to the existing owner and observes the accepted voyage world',async()=>{
+ let world='earth:old',genericTravel=0,transportTravel=0,started=0;
+ const adapter={async travel({intent,isCurrent}){assert.equal(intent.experienceId,'career:oceanographer');assert.equal(isCurrent(),true);transportTravel++;world='ocean:saved-voyage';return true;},start({worldIdentity}){assert.equal(worldIdentity,'ocean:saved-voyage');started++;return true;}};
+ const entry=createExperienceEntry({resolveAdapter:()=>adapter,launchPlace:()=>{genericTravel++;},readWorldIdentity:()=>world});assert.equal(await entry.start({experienceId:'career:oceanographer'}),true);assert.equal(transportTravel,1);assert.equal(genericTravel,0);assert.equal(started,1);
+});
+test('a cancelled transport resume exposes cancellation before any late activity may start',async()=>{
+ let finish,guard,starts=0;
+ const entry=createExperienceEntry({resolveAdapter:()=>({travel:({isCurrent})=>{guard=isCurrent;return new Promise(resolve=>{finish=resolve;});},start:()=>{starts++;}}),readWorldIdentity:()=> 'earth:kept'});
+ const pending=entry.start({experienceId:'career:oceanographer'});assert.equal(guard(),true);entry.cancel();assert.equal(guard(),false);finish(true);assert.equal(await pending,false);assert.equal(starts,0);
+});

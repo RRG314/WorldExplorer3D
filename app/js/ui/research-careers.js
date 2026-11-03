@@ -1,3 +1,9 @@
+import {
+  oceanographyCareerSummary,
+  OCEANOGRAPHY_STATIONS
+} from '../campaign/oceanography-career.js';
+import { createOceanographyTravel } from '../campaign/oceanography-travel.js';
+import { ensureMarineResearch } from '../ocean/research-outing.js';
 import { botanyCareerSummary } from '../campaign/botany-career.js';
 import { wildlifeCareerSummary } from '../campaign/wildlife-career.js';
 import { palaeontologyCareerSummary } from '../campaign/palaeontology-career.js';
@@ -57,6 +63,40 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
       active = null;
     },
     save: () => active?.snapshot() || null
+  });
+  const marine = ensureMarineResearch(runtime), oceanography = marine.oceanography;
+  oceanography.setNavigation({
+    onJournal,
+    onNext: () => {
+      oceanography.pause();
+      void experiences.open({ experienceId: 'career:oceanographer' });
+    }
+  });
+  experiences.registerAdapter('oceanography', {
+    equipment: 'Your research vessel provides a chart table, physical training CTD, submarine and wet lab. Compare matched profiles, keep sonar uncertainty and return to the same vessel.',
+    places: () => [{ id: 'coral-shelf-research', environment: 'ocean', ...OCEANOGRAPHY_STATIONS[0] }],
+    offer: ({ profile, place }) =>
+      profile?.researchCareers?.oceanography?.schemaVersion &&
+      profile.researchCareers.oceanography.schemaVersion !== 1
+        ? {
+            state: 'unavailable', label: 'Update required',
+            reason: 'This saved ocean survey needs a newer version of World Explorer.', enabled: false
+          }
+        : {
+            state: place ? 'ready' : 'needs-place',
+            label: place ? 'Board research vessel' : 'Choose a survey vessel',
+            reason: 'Begin aboard the existing Coral Shelf research vessel. Authored water profiles and virtual features remain distinct from archived regional charts.',
+            enabled: !!place && !runtime.sharedMarine?.active
+          },
+    summary: ({ profile, variantId }) =>
+      oceanographyCareerSummary(profile?.researchCareers?.oceanography, { variantId }),
+    travel: createOceanographyTravel({
+      runtime,
+      readProfile: async () => (await experiences.getStore()).getProfile(),
+      travelToOcean: experiences.travelToOcean
+    }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? oceanography.choose(intent.variantId || 'campaign') : false
   });
   experiences.registerAdapter('geology', {
     equipment:

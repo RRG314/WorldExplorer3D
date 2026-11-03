@@ -1,4 +1,9 @@
 import {
+  normalizeOceanographyCareer,
+  transitionOceanographyCareer,
+  validateOceanographyCareerBackup
+} from './oceanography-career.js';
+import {
   normalizeBotanyCareer,
   transitionBotanyCareer,
   validateBotanyCareerBackup
@@ -26,6 +31,11 @@ import {
 
 // Pure domain contracts. IndexedDB, progression and custody retain one owner.
 const definitions = Object.freeze({
+  oceanography: {
+    normalize: normalizeOceanographyCareer,
+    transition: transitionOceanographyCareer,
+    validateBackup: validateOceanographyCareerBackup
+  },
   botany: {
     normalize: normalizeBotanyCareer,
     transition: transitionBotanyCareer,

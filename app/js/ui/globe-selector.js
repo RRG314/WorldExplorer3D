@@ -569,7 +569,7 @@ function createGlobeSelector(options = {}) {
     return launchCoordinator.startHere();
   }
 
-  function startSelectedOcean() {
+  function startSelectedOcean({isCurrent:entryCurrent=()=>true}={}) {
     if (coordinateInputsDirty && !applySelectionFromInputs()) {
       return Promise.resolve(false);
     }
@@ -584,14 +584,14 @@ function createGlobeSelector(options = {}) {
     const pendingResolution = selectionResolvePromise;
     return launchCoordinator.startEnvironment(async (isCurrent) => {
       await pendingResolution;
-      if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+      if (!isCurrent() || !entryCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
         throw new Error('The selected location changed. Check the current point and press Ocean again.');
       }
       // URL/saved initial selections have no reverse-lookup promise. Check
       // their depth on demand, and let an unknown/outage result be retried.
       if (!requestedSelection.surfaceEvidence || !Number.isFinite(requestedSelection.surfaceEvidence.elevationMeters)) {
         const evidence = await resolveCoordinateSurfaceEvidence(requestedSelection.lat, requestedSelection.lon);
-        if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+        if (!isCurrent() || !entryCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
           throw new Error('The selected location changed. Check the current point and press Ocean again.');
         }
         requestedSelection.surfaceEvidence = evidence;
@@ -603,7 +603,9 @@ function createGlobeSelector(options = {}) {
       recentPlaces = addRecentPlace(launchSelection, recentPlaces);
       favoriteRecentList = recentPlaces;
       syncLegacyCustomState(launchSelection);
-      return options.onOceanShortcut(launchSelection);
+      // Coordinate admission is complete. The title closes this selector as
+      // it takes ownership; only the caller's entry cancellation crosses that handoff.
+      return options.onOceanShortcut(launchSelection,{isCurrent:entryCurrent});
     }, 'Ocean');
   }
 
@@ -845,6 +847,7 @@ function createGlobeSelector(options = {}) {
     isOpen() { return openState; },
     open,
     startHere: triggerStartHere,
+    startOcean: startSelectedOcean,
     applySelectionAndResolve,
     setPanelMode,
     setBasemap: globeScene.setBasemap,

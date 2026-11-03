@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
+import {closeOwnedBrowser, withinDeadline} from './owned-browser.mjs';
 import {createHostResourceGuard} from './host-resource-guard.mjs';
 
 export async function createFieldworkQaSession({output, careerId, maximumDurationMs = 12 * 60 * 1000, walkLegMaximumDurationMs = 22000}) {
@@ -91,6 +92,6 @@ export async function createFieldworkQaSession({output, careerId, maximumDuratio
   return {page, report, snapshot, careerState, record, waitForCareer, walkTo, approach, submit,
     async succeed() {assert.deepEqual(report.errors, []); report.ok = true; await fs.writeFile(`${output}/receipt.json`, JSON.stringify(report, null, 2) + '\n'); console.log('PASS fieldwork source check: ' + output);},
     async fail(error) {report.ok = false; report.failure = error.stack; report.host = guard.snapshot(); try {report.last = await snapshot(); const failedBackup=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.discoveryProfileStore?.exportData?.();});if(failedBackup){report.failureBackup=`${output}/qa-fieldwork-failed-backup.json`;await fs.writeFile(report.failureBackup,JSON.stringify(failedBackup)+'\n',{mode:0o600});} await page.screenshot({path: `${output}/failed.png`});} catch {} await fs.writeFile(`${output}/failed.json`, JSON.stringify(report, null, 2) + '\n');},
-    async close() {guard.dispose(); await browser.close().catch(() => {}); await server.close().catch(() => {});}
+    async close() {guard.dispose(); if(server)await closeOwnedBrowser(server); if(browser)await withinDeadline(()=>browser.close(),3000,'Owned fieldwork connection close').catch(()=>{});}
   };
 }

@@ -9,11 +9,19 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
  function context(){const selection=getTitleUi()?.getGlobeSelector?.()?.getSelection?.(),location=runtime.gameStarted?runtime.LOC:selection;return {loaded:runtime.gameStarted===true&&!runtime.worldLoading,environment:String(runtime.getEnv?.()||'EARTH').toLowerCase(),offline:globalThis.navigator?.onLine===false,place:location&&Number.isFinite(location.lat)&&Number.isFinite(location.lon)?{id:'selected-place',name:location.name||selection?.name||'Selected place',lat:location.lat,lon:location.lon,environment:'earth'}:null};}
  const currentPlaces=()=>{const current=context();return current.place?[current.place]:[{id:'baltimore',name:'Baltimore',lat:39.2904,lon:-76.6122,environment:'earth'}];};
  const ready=({place},label='Begin')=>({state:place?'ready':'needs-place',label:place?label:'Choose a place',enabled:!!place});
+ async function travelToOcean(place,{isCurrent=()=>true}={}){
+  if(!isCurrent()||place?.environment!=='ocean'||!Number.isFinite(place.lat)||!Number.isFinite(place.lon))return false;
+  const title=getTitleUi(),globe=title?.getGlobeSelector?.();if(!globe?.startOcean)return false;
+  closeMenus();runtime.toggleWorldDiscoveryJournal?.(false);runtime.stopGameplayPlugin?.('experience-travel',{resumeFree:false});title.selectGameMode('free');
+  globe.open();globe.setSelection(place.lat,place.lon,{name:place.name,arrivalMode:'boat',focus:false});
+  return globe.startOcean({isCurrent});
+ }
  const entry=createExperienceEntry({
   resolveAdapter:(id,row)=>adapters.get(id)||adapters.get(row.id),
   readWorldIdentity:()=>runtime.gameStarted&&!runtime.worldLoading?`${runtime.getEnv?.()||'EARTH'}:${runtime._worldLoadSequence||0}`:null,
   launchPlace:async(place)=>{
    const current=context();if(current.loaded&&current.environment===place.environment&&current.place&&Math.abs(current.place.lat-place.lat)<.00001&&Math.abs(current.place.lon-place.lon)<.00001)return true;
+   if(place.environment==='ocean')return travelToOcean(place);
    const title=getTitleUi(),globe=title?.getGlobeSelector?.();if(!title||!globe)return false;
    closeMenus();runtime.toggleWorldDiscoveryJournal?.(false);runtime.stopGameplayPlugin?.('experience-travel',{resumeFree:false});title.selectGameMode('free');
    if(place.environment==='earth'){globe.setSelection(place.lat,place.lon,{name:place.name,arrivalMode:'walk',focus:false});return globe.startHere();}
@@ -43,5 +51,5 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
   onBegin:intent=>entry.start(intent),onEntered:requestWorldFocus,onJournal,
   onLayer:open=>{runtime.screenLayout?.setPanelLayer('experiences',open);runtime.setPauseReason?.('experience-browser',open&&runtime.gameStarted);if(open)closeMenus();}
  });
- return Object.freeze({...browser,registerAdapter(id,adapter){if(adapters.has(id))throw Error('Activity adapter already registered: '+id);adapters.set(id,adapter);return()=>adapters.delete(id);},getStore,cancelEntry:()=>entry.cancel(),context});
+ return Object.freeze({...browser,travelToOcean,registerAdapter(id,adapter){if(adapters.has(id))throw Error('Activity adapter already registered: '+id);adapters.set(id,adapter);return()=>adapters.delete(id);},getStore,cancelEntry:()=>entry.cancel(),context});
 }

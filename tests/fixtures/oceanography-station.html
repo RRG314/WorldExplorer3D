@@ -1,0 +1,184 @@
+<!doctype html><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><link
+  rel="icon"
+  href="/favicon.svg"
+/><title>Oceanographer station boundary</title
+><link rel="stylesheet" href="/app/styles/hud.css" /><link
+  rel="stylesheet"
+  href="/app/styles/experiences.css"
+/><style>
+  :root {
+    --wx-panel: #18302dee;
+    --wx-panel-solid: #18302d;
+    --wx-panel-soft: #24443d;
+    --wx-text: #eef7f3;
+    --wx-muted: #bfd0c8;
+    --wx-line: #66847c;
+    --wx-line-soft: #44645a;
+    --wx-radius: 7px;
+    --wx-type-meta: 13px;
+    --wx-type-control: 15px;
+    --wx-font-ui: system-ui;
+    --wx-action: #efd079;
+    --wx-focus: #efd079;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: #6d8a97;
+    color: #fff;
+    font: 15px system-ui;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  #hud {
+    display: grid;
+  }
+  #fixtureLabel {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    max-width: 45vw;
+  }
+</style>
+<p id="fixtureLabel">
+  Controlled presence and measurement fixtures · actual native forms and IndexedDB · no source
+  survey claim
+</p>
+<div id="hud">
+  <div id="hudUtilities">
+    <section id="deck" class="marine-panel session-hud-panel"></section>
+    <section id="ocean" class="marine-panel session-hud-panel" hidden></section>
+    <div class="hudUtilityActions">
+      <button>Light</button><button>Weather</button><button>Controls</button>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import { createOceanographyControls } from '/app/js/campaign/oceanography-ui.js';
+  import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js?v=5';
+  import { oceanographyHarness } from '/tests/helpers/oceanography-study.mjs';
+  const h = oceanographyHarness(undefined, 'campaign', 'ocean-ui-study-0001');
+  h.accept();
+  h.cast();
+  h.cast();
+  h.mapping();
+  h.inspect();
+  h.returned();
+  h.report();
+  const log = h.events,
+    store = createIndexedDbDiscoveryProfileStore();
+  let state = (await store.getProfile()).researchCareers.oceanography,
+    depths = null,
+    cast = null,
+    failNext = false,
+    error = '',
+    message = '';
+  const api = {
+    pause() {},
+    journal() {},
+    next() {},
+    snapshot() {
+      const a = state.active,
+        phase = a?.phase || 'planning';
+      return {
+        visible: true,
+        ready: true,
+        unsupported: false,
+        busy: false,
+        phase,
+        variantId: 'campaign',
+        study: h.study,
+        active: a,
+        depths: depths || a?.plan.stationDepths,
+        cast,
+        station:
+          phase === 'planning'
+            ? 'chart'
+            : phase === 'casts'
+              ? 'sub'
+              : phase === 'report'
+                ? 'lab'
+                : null,
+        stationDistance: 0.2,
+        nextStation:
+          phase === 'casts' ? { name: 'Controlled station', lat: -18.2861, lon: 147.7 } : null,
+        nextStationMeters: 0,
+        error,
+        message
+      };
+    },
+    async act(type, fields = {}) {
+      error = '';
+      if (type === 'check-plan') {
+        depths = log[0].metadata.action.stationDepths;
+        render();
+        return true;
+      }
+      if (type === 'start-cast') {
+        cast = {
+          ready: true,
+          interrupted: false,
+          measurementComplete: true,
+          activeSeconds: 7.8,
+          depthMeters: -1,
+          reason: 'Controlled recovered instrument result'
+        };
+        render();
+        return true;
+      }
+      try {
+        if (failNext) {
+          failNext = false;
+          throw Error('The survey record could not save. Retry the recovered cast.');
+        }
+        const entry = log.find((e) => e.metadata.action.revision === state.revision);
+        if (!entry || entry.metadata.action.type !== type)
+          throw Error('Fixture command does not match its declared prefix');
+        const action = { ...structuredClone(entry.metadata.action), ...fields };
+        if (type === 'inspect') action.observation.form = fields.form;
+        const result = await store.updateResearchCareer('oceanography', action, {
+          now: entry.occurredAt
+        });
+        state = result.state;
+        cast = null;
+        message = 'Saved to the fixture IndexedDB';
+        render();
+        return true;
+      } catch (e) {
+        error = e.message;
+        render();
+        return false;
+      }
+    }
+  };
+  const controls = ['deck', 'ocean'].map((id, i) => {
+    const c = createOceanographyControls({ api: () => api, prefix: 'controlled' + i });
+    document.querySelector('#' + id).append(c.node);
+    return c;
+  });
+  function render() {
+    for (const c of controls) c.render(api.snapshot());
+  }
+  render();
+  window.oceanUi = {
+    store,
+    get state() {
+      return state;
+    },
+    set failNextSave(v) {
+      failNext = v;
+    },
+    get cast() {
+      return cast;
+    }
+  };
+  window.render_game_to_text = () =>
+    JSON.stringify({
+      scope: 'Controlled measurement/presence fixtures, actual native forms/IDB; no source survey',
+      revision: state.revision,
+      phase: state.active?.phase || 'planning'
+    });
+</script>

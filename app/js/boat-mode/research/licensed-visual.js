@@ -1,3 +1,4 @@
+import {createResearchCtdInstrument} from './ctd-instrument.js';
 import {loadModelAsset} from '../../assets/model-asset-runtime.js?v=16';
 import {createShipMeshNavigation} from './mesh-navigation.js';
 import {RCRV_LAYOUT} from './layout.js';
@@ -8,9 +9,10 @@ export function createLicensedResearchVessel(THREE, entry, options = {}) {
   const root=new THREE.Group();root.name=entry.label;
   Object.assign(root.userData,{transportCatalogId:entry.id,transportDomain:'maritime',playable:true,enterable:true,researchVesselState:'loading',researchLayout:RCRV_LAYOUT,originalUnbrandedDesign:false});
   const controller=new AbortController(),leases=[],owned=[],paint=[];
-  let disposed=false,loading=false,content=null,navigation=null,sub=null,interior=null;
+  let disposed=false,loading=false,content=null,navigation=null,sub=null,interior=null,ctd=null;
   const detailed=options.state==='active';
   function cleanupContent(){
+    ctd?.dispose();ctd=null;delete root.userData.researchCtd;
     interior?.dispose();interior=null;delete root.userData.researchInterior;
     navigation?.dispose();navigation=null;delete root.userData.researchNavigation;
     sub?.userData.disposeCuratedMarineVisual?.();sub=null;
@@ -92,6 +94,7 @@ export function createLicensedResearchVessel(THREE, entry, options = {}) {
 
         // Query the admitted hull and actual equipment, not an independent set
         // of guessed invisible walls. The ship-local index lives with this lease.
+        ctd=createResearchCtdInstrument(THREE,root,{metersPerUnit:options.metersPerUnit||1});root.userData.researchCtd=ctd;
         navigation=createShipMeshNavigation(THREE,root);
         for(const station of RCRV_LAYOUT.stations){
           const support=navigation.support(station.x,station.z,station.y);

@@ -130,16 +130,31 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
     ctx.fillStyle='#ffdc91';ctx.fillRect(px-4,py-4,8,8);ctx.font='9px sans-serif';ctx.fillText('SHIP',Math.min(width-28,px+6),py+3);
   }
   const investigation=appCtx.marineResearch?.investigation?.snapshot();
-  const landmarks=investigation?.started&&!investigation.completed?[]:oceanMode.habitat?.plan.landmarks||[];
+  const survey=appCtx.marineResearch?.oceanography?.snapshot();
+  const annotations=survey?.visible?survey.annotations:investigation?.annotations||[];
+  const landmarks=survey?.visible||investigation?.started&&!investigation.completed?[]:oceanMode.habitat?.plan.landmarks||[];
   landmarks.forEach((landmark,index)=>{
     const px=width*(.5+(landmark.x-cached.data.centerX)/(halfExtent*2)),py=height*(.5+(landmark.z-cached.data.centerZ)/(halfExtent*2));
     if(px<8||px>width-16||py<40||py>height-38)return;
     ctx.fillStyle='#9be8bd';ctx.beginPath();ctx.arc(px,py,2.5,0,Math.PI*2);ctx.fill();ctx.font='bold 9px sans-serif';ctx.fillText(String.fromCharCode(65+index),px+5,py+3);
   });
-  for(const contact of investigation?.annotations||[]){
+  const contactLabels=[];
+  for(const contact of annotations){
     const px=width*(.5+(contact.x-cached.data.centerX)/(halfExtent*2)),py=height*(.5+(contact.z-cached.data.centerZ)/(halfExtent*2));
     if(px<8||px>width-20||py<40||py>height-38)continue;
-    ctx.strokeStyle=contact.selected?'#fff':'#ffc76b';ctx.lineWidth=contact.selected?2:1;ctx.strokeRect(px-4,py-4,8,8);ctx.fillStyle='#ffc76b';ctx.font='bold 9px sans-serif';ctx.fillText(contact.code,px+6,py+3);
+    ctx.strokeStyle=contact.selected?'#fff':'#ffc76b';ctx.lineWidth=contact.selected?2:1;ctx.strokeRect(px-4,py-4,8,8);
+    let lx=px+6,ly=py+3;
+    if(survey?.visible){
+      const labelWidth=18;
+      for(const [dx,dy] of [[7,-8],[-25,-8],[7,15],[-25,15],[7,-22],[-25,-22],[7,29],[-25,29]]){
+        const x=Math.max(3,Math.min(width-labelWidth-3,px+dx)),y=Math.max(44,Math.min(height-35,py+dy));
+        if(contactLabels.every(r=>x+labelWidth+3<r.x||x>r.x+labelWidth+3||y+3<r.y-11||y-11>r.y+3)){lx=x;ly=y;break;}
+      }
+      contactLabels.push({x:lx,y:ly});
+      ctx.lineWidth=.75;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(lx+6,ly-4);ctx.stroke();
+      ctx.fillStyle='#062631';ctx.fillRect(lx-1,ly-10,labelWidth,13);
+    }
+    ctx.fillStyle='#ffc76b';ctx.font='bold 9px sans-serif';ctx.fillText(contact.code,lx,ly);
   }
   const evidence = sample(x, z);
   const depthKnown = evidence.bathymetry.truthType !== 'unknown';
@@ -157,7 +172,7 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
   ctx.fillStyle = '#d3eef1'; ctx.font = '8px sans-serif'; ctx.fillText(scaleText, 7, height - 15);
   ctx.fillText(`${Math.round(heading) % 360}°`, width * .46, height - 15);
   const detail = `North-up gameplay seabed, ${cached.data.contourIntervalMeters} m contour interval. Heading ${Math.round(heading) % 360} degrees. ${sourceLabel}: ${modelDepth}. Geographic datum: ${evidence.bathymetry.verticalDatum || 'unknown'}; ≈MSL means assumed mean sea level. Hatched areas lack geographic depth data. ${oceanMode.depthProfile?.model===OCEAN_DEPTH_MODEL.GEOGRAPHIC?'Metre-scale seabed. Hatched areas extend nearby model depth for rendering only.':'Terrain is compressed for the authored study.'} Not a navigation chart. ${landmarks.map((l,i)=>`${String.fromCharCode(65+i)}: ${l.label} (authored)`).join('; ')}`;
-  const contactDetail=(investigation?.annotations||[]).map(c=>`${c.code}: ${c.label}`).join('; ');canvas.title = detail+' '+contactDetail; canvas.setAttribute('aria-label', detail+' '+contactDetail);
+  const contactDetail=annotations.map(c=>`${c.code}: ${c.label}`).join('; ');canvas.title = detail+' '+contactDetail; canvas.setAttribute('aria-label', detail+' '+contactDetail);
   oceanMode.navigationMapSnapshot = { headingDegrees: heading, halfExtentWorldUnits: halfExtent,
     widthMeters: halfExtent * 2 * units, contourIntervalMeters: 10,
     coverageFraction: cached.data.knownCount / cached.data.known.length,

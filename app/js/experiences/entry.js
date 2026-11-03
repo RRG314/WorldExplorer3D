@@ -33,10 +33,11 @@ export function createExperienceEntry({resolveAdapter,launchPlace,readWorldIdent
    const entry=experienceById(intent.experienceId),adapter=resolveAdapter(entry.adapterId,entry);
    if(!adapter||intent.recoveryAction&&!adapter.recoveryActions?.includes(intent.recoveryAction))return false;
    const before=readWorldIdentity();
-   if(intent.place){const started=await launchPlace(intent.place,intent);if(run!==generation||started===false)return false;}
+   const transportTravel=typeof adapter.travel==='function';
+   if(transportTravel||intent.place){const started=transportTravel?await adapter.travel({entry,intent,isCurrent:()=>run===generation}):await launchPlace(intent.place,intent);if(run!==generation||started===false)return false;}
    if(run!==generation)return false;
    const identity=readWorldIdentity();
-   if(!identity||(!intent.place&&before!==identity))return false;
+   if(!identity||(!intent.place&&!transportTravel&&before!==identity))return false;
    const accepted=await adapter.start({entry,intent,worldIdentity:identity,isCurrent:()=>run===generation&&readWorldIdentity()===identity});
    if(run!==generation||readWorldIdentity()!==identity)return false;
    pending=null;return accepted!==false;

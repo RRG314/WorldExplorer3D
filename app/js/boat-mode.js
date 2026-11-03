@@ -207,7 +207,7 @@ function createBoatMesh(catalogId = appCtx.boatMode?.transportCatalogId) {
   const currentId = String(appCtx.boatMode?.mesh?.userData?.transportCatalogId || '');
   if (_boatMeshReady && currentId === catalog.id) return appCtx.boatMode.mesh;
   if (typeof THREE === 'undefined' || !appCtx.scene) return null;
-  const group = createBoatModeMesh(catalog, { mobile: isTouchClient(), state: 'active' });
+  const group = createBoatModeMesh(catalog, { mobile: isTouchClient(), state: 'active', metersPerUnit: appCtx.METERS_PER_WORLD_UNIT || 1 });
   addBoatSwimLadder(THREE,group,catalog);
   group.visible = false;
   if (_boatMeshReady || appCtx.boatMode?.mesh) disposeBoatMesh();

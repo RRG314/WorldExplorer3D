@@ -94,3 +94,100 @@
 .wildlife-checklists {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:14px}.wildlife-checklists section{min-width:0;padding:12px;border:1px solid #63765b;border-radius:8px}.wildlife-checklists h3{margin-top:0}.research-station[data-career=wildlife] fieldset{display:grid;gap:14px;min-width:0;border:1px solid #63765b;padding:14px}
 .wildlife-instruments .research-primary{background:#efd079!important;color:#15251b!important}
 .botany-plate{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:12px}.botany-plate section{padding:12px;border:1px solid #678471;border-radius:8px;background:#132a22}.botany-plate h3{margin-top:0}.botany-plate p{line-height:1.5}.botany-table{overflow-x:auto;max-width:100%;margin:14px 0}.botany-table table{border-collapse:collapse;width:100%;text-align:left}.botany-table caption{text-align:left;margin-bottom:8px}.botany-table th,.botany-table td{padding:8px;border-bottom:1px solid #678471}.botany-season{padding:10px;border-left:3px solid #efd079}.botany-instruments .research-primary{background:#efd079!important;color:#15251b!important}
+.oceanography-career {
+  margin: 10px 0;
+  border-top: 1px solid #678481;
+  padding-top: 10px;
+}
+.oceanography-career h3 {
+  margin: 4px 0 10px;
+}
+.oceanography-career header > span {
+  color: #f1cd73;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.oceanography-career p {
+  line-height: 1.5;
+}
+.oceanography-career label {
+  display: block;
+  margin: 10px 0;
+}
+.oceanography-career select {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+}
+.oceanography-career .research-primary {
+  background: #efd079 !important;
+  color: #15251b !important;
+}
+.oceanography-career button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+}
+.oceanography-profiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 8px;
+}
+.ocean-profile-chart,
+.ocean-transect-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  background: #132b30;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+.ocean-profile-chart text,
+.ocean-transect-chart text {
+  fill: #eef8f3;
+  font: 12px system-ui;
+}
+.oceanography-table {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.oceanography-table table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+}
+.oceanography-table th,
+.oceanography-table td {
+  padding: 6px;
+  border-bottom: 1px solid #678481;
+}
+.oceanography-table caption {
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.oceanography-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+}
+.oceanography-legend span:first-child {
+  color: #f1cd73;
+}
+.oceanography-legend span + span {
+  color: #85dbdf;
+}
+
+.ocean-sonar-records > summary {
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.ocean-sonar-records li { margin: 8px 0; line-height: 1.5; }
+.ocean-transect-chart { max-height: min(280px, 45dvh); }
+
+.ocean-profile-chart text { font-size: 18px; }
+.ocean-transect-chart text { font-size: 20px; }

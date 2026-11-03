@@ -1,0 +1,150 @@
+<!doctype html><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><link
+  rel="icon"
+  href="/favicon.svg"
+/><title>Oceanographic instrument boundary</title
+><style>
+  body {
+    margin: 0;
+    color: #fff;
+    font: 14px system-ui;
+  }
+  canvas {
+    display: block;
+  }
+  p {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    background: #123342;
+    padding: 12px;
+    max-width: 70vw;
+  }
+</style>
+<p id="status">
+  Controlled vessel/instrument boundary · actual assets and normal frames · no field-course
+  completion or IndexedDB claim
+</p>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+  import { createLicensedResearchVessel } from '/app/js/boat-mode/research/licensed-visual.js';
+  import { getMaritimeCatalogEntry } from '/app/js/transport/maritime-catalog.js?v=1';
+  import { applyDisplayColorPolicy } from '/app/js/engine/display-color-policy.js';
+  import { createOceanographyCastRecorder } from '/app/js/campaign/oceanography-cast-recorder.js';
+  const T = THREE,
+    scene = new T.Scene(),
+    camera = new T.PerspectiveCamera(54, innerWidth / innerHeight, 0.05, 400),
+    renderer = new T.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  applyDisplayColorPolicy(renderer, T);
+  document.body.prepend(renderer.domElement);
+  scene.background = new T.Color('#a5bcc7');
+  scene.add(new T.HemisphereLight(0xffffff, 0x324958, 0.9));
+  const sun = new T.DirectionalLight(0xfff2dc, 1.5);
+  sun.position.set(-20, 45, -40);
+  scene.add(sun);
+  const water = new T.Mesh(
+    new T.PlaneGeometry(400, 400),
+    new T.MeshStandardMaterial({
+      color: 0x1e6477,
+      transparent: true,
+      opacity: 0.65,
+      roughness: 0.4
+    })
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.08;
+  scene.add(water);
+  const visual = createLicensedResearchVessel(T, getMaritimeCatalogEntry('ocean-research-vessel'), {
+    state: 'active',
+    metersPerUnit: 1.11
+  });
+  scene.add(visual.root);
+  visual.root.position.y = 0.08;
+  if (!(await visual.root.userData.visualReady))
+    throw Error('Actual vessel or its admitted equipment failed to load');
+  const instrument = visual.root.userData.researchCtd,
+    recorder = createOceanographyCastRecorder(),
+    runtime = {
+      METERS_PER_WORLD_UNIT: 1.11,
+      waterSurfaceYAt: () => 0.08,
+      boatMode: { currentWater: {} }
+    },
+    position = { lat: -18.2861, lon: 147.7 },
+    identity = {
+      runId: 'oceanography-visual-0001',
+      variantId: 'campaign',
+      stationId: 'shelf',
+      voyageId: 'visual-voyage1',
+      shipId: 'visual-ship1',
+      subId: 'visual-sub1'
+    };
+  let running = false,
+    paused = false,
+    frameId = 0,
+    previous = performance.now();
+  function start() {
+    recorder.start(identity, { position, ...instrument.read(runtime) });
+    running = true;
+  }
+  function loop(now) {
+    const dt = Math.min(0.05, (now - previous) / 1000);
+    previous = now;
+    if (running) {
+      const s = recorder.snapshot();
+      const reading = instrument.update(
+        paused ? 0 : dt,
+        s.measurementComplete ? null : s.targetDepthMeters,
+        runtime
+      );
+      recorder.tick(dt, {
+        ...identity,
+        ...reading,
+        position,
+        active: true,
+        moored: true,
+        atInstrument: true,
+        paused,
+        hidden: document.hidden
+      });
+      document.querySelector('#status').textContent =
+        `Controlled actual-vessel instrument · ${reading.depthMeters.toFixed(2)} m measured game depth · ${recorder.snapshot().activeSeconds.toFixed(1)} active s · ${recorder.snapshot().reason}`;
+    }
+    renderer.render(scene, camera);
+    frameId = requestAnimationFrame(loop);
+  }
+  camera.position.set(-18, 8, -45);
+  camera.lookAt(-5, 2, -31);
+  frameId = requestAnimationFrame(loop);
+  window.instrumentCheck = {
+    runtime,
+    visual,
+    instrument,
+    recorder,
+    start,
+    get paused() {
+      return paused;
+    },
+    set paused(v) {
+      paused = v;
+    },
+    camera,
+    dispose() {
+      cancelAnimationFrame(frameId);
+      recorder.dispose();
+      visual.dispose();
+      renderer.dispose();
+    }
+  };
+  window.render_game_to_text = () =>
+    JSON.stringify({
+      scope: 'Controlled physical CTD rig/recorder boundary only',
+      cast: recorder.snapshot(),
+      actualDepth: instrument.read(runtime).depthMeters
+    });
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+</script>
