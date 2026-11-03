@@ -1,4 +1,5 @@
 import {normalizeResearchCareers,researchCareerDefinition} from '../campaign/research-career-definitions.js';
+import {RESEARCH_MEDIA_BACKUP_VERSION,RESEARCH_MEDIA_PREFIX,prepareResearchPhoto,researchMediaProfileRows,validateTransitionMedia,verifyResearchMediaRecords} from '../campaign/research-media.js';
 import {normalizeSoloRacer,projectSoloRacer,soloRacerReceipt} from '../campaign/solo-racer.js';
 import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
 import { homeAchievementEvent } from '../campaign/home-achievements.js';
@@ -599,6 +600,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   async function updateResearchCareer(id,command,options={}) {
     const definition=researchCareerDefinition(id);
+    if(command?.capture)command=clone(command);
+    const prepared=command?.capture||options.photoAttachment?await prepareResearchPhoto(id,command?.capture,options.photoAttachment):null;
     const db=await open();let transaction,abort;
     try {
       await ensureCharacterMigration(db);
@@ -609,7 +612,14 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const current=normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
       if(options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
       const result=definition.transition(current.researchCareers[id],command,options.now??Date.now());
-      if(!result.event){await transactionPromise(transaction);return clone(result);}
+      if(!result.event){if(prepared)throw Error('This field step does not accept a photograph.');await transactionPromise(transaction);return clone(result);}
+      await validateTransitionMedia(id,result,prepared,key=>requestPromise(profiles.get(key)));
+      if(prepared){
+        if(await requestPromise(profiles.get(prepared.id)))throw Error('This field photograph has already been saved.');
+        const mediaCount=await requestPromise(profiles.count(IDBKeyRange.bound(RESEARCH_MEDIA_PREFIX,RESEARCH_MEDIA_PREFIX+'\uffff')));
+        if(mediaCount>=128)throw Error('Field photo storage is full. Export your Journal before freeing photo storage.');
+        profiles.put(prepared);
+      }
       for(const instanceId of result.requiredItems||[]){const item=await requestPromise(transaction.objectStore('items').get(instanceId));if(item?.researchLabel?.careerId!==id||item.researchLabel.runId!==result.state.active.runId)throw Error('A contextual find is missing from your saved collection.');}
       const event=createExplorerStoryEvent(result.event);
       const explorer=event.projections.profile?projectExplorerStoryProgress(current.explorerProgress,event):current.explorerProgress;
@@ -976,6 +986,11 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function getResearchPhoto(id) {
+    if(typeof id!=='string'||!id.startsWith(RESEARCH_MEDIA_PREFIX))return null;
+    const db=await open();try{const tx=db.transaction('profiles','readonly');const row=await requestPromise(tx.objectStore('profiles').get(id));await transactionPromise(tx);return row?clone(row):null;}finally{db.close();}
+  }
+
   async function exportData() {
     const db = await open();
     try {
@@ -984,7 +999,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const tx = db.transaction(names, 'readonly');
       const rows = await Promise.all(names.map(name => requestPromise(tx.objectStore(name).getAll())));
       await transactionPromise(tx);
-      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), portalTrail:portalTrailProfileRows(rows[0]), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
+      const media=researchMediaProfileRows(rows[0]);
+      return {schemaVersion:media.length?RESEARCH_MEDIA_BACKUP_VERSION:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), researchMedia:media, portalTrail:portalTrailProfileRows(rows[0]), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
     } finally { db.close(); }
   }
 
@@ -1011,6 +1027,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   async function importData(data = {}) {
     data = validateJournalBackup(data);
+    await verifyResearchMediaRecords(data.researchMedia);
     const db = await open();
     let transactionToAbort;
     try {
@@ -1048,6 +1065,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
           };
       profiles.put(importedProfile);
       for(const album of data.albums)profiles.put(clone(album));
+      for(const photo of data.researchMedia)profiles.put(clone(photo));
       for(const row of data.portalTrail??portalTrailProfileRows(previous.profiles))profiles.put(clone(row));
       const items = Array.isArray(data.items) ? data.items : [];
       const companions = Array.isArray(data.companions) ? data.companions : [];
@@ -1100,6 +1118,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     recordDiscovery,
     recordExplorerEvent,
     updateResearchCareer,
+    getResearchPhoto,
     recordObservation,
     startOpeningChapter,
     completeOpeningChapter,
@@ -1133,6 +1152,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       })
     });
   }
+  const researchMedia=new Map((seed.researchMedia||[]).map(row=>[row.id,clone(row)]));
   const outbox = new Map((seed.receiptOutbox || []).map(row => [row.id, clone(row)]));
   const items = new Map((seed.items || []).map((item) => [item.instanceId, clone(item)]));
   const claims = new Map((seed.claims || []).map((claim) => [claim.claimId, clone(claim)]));
@@ -1236,9 +1256,15 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     type: 'MemoryDiscoveryProfileStore',
     async updateResearchCareer(id,command,options={}) {
       const definition=researchCareerDefinition(id);
+      if(command?.capture)command=clone(command);
+      const prepared=command?.capture||options.photoAttachment?await prepareResearchPhoto(id,command?.capture,options.photoAttachment):null;
       if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
       const result=definition.transition(profile.researchCareers[id],command,options.now??Date.now());
-      if(!result.event)return clone(result);
+      if(!result.event){if(prepared)throw Error('This field step does not accept a photograph.');return clone(result);}
+      await validateTransitionMedia(id,result,prepared,key=>researchMedia.get(key));
+      if(definition.normalize(profile.researchCareers[id]).revision!==command.revision)throw Error('This study changed in another tab. Reopen it to continue.');
+      if(prepared&&(researchMedia.has(prepared.id)||researchMedia.size>=128))throw Error('This photograph is already saved or field photo storage is full.');
+      if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
       for(const instanceId of result.requiredItems||[]){const item=items.get(instanceId);if(item?.researchLabel?.careerId!==id||item.researchLabel.runId!==result.state.active.runId)throw Error('A contextual find is missing from your saved collection.');}
       for(const item of result.samples)if(claims.has(item.claimId))throw Error('That labeled sample has already been collected.');
       const event=createExplorerStoryEvent(result.event);
@@ -1246,6 +1272,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       const character=event.projections.profile?projectCharacterProgress(profile.characterState,event,{meaningful:true,explorerPointsBefore:profile.explorerProgress.points,explorerPointsAfter:explorer.points}).character:profile.characterState;
       profile=normalizeProfile({...profile,researchCareers:{...profile.researchCareers,[id]:result.state},collectionCount:profile.collectionCount+result.samples.length,explorerProgress:explorer,characterState:character});
       for(const item of result.samples){items.set(item.instanceId,clone(item));claims.set(item.claimId,{claimId:item.claimId,item,event});}
+      if(prepared)researchMedia.set(prepared.id,clone(prepared));
       events.set(event.eventId,event);return clone({...result,event,profile});
     },
     ...portalTrail,
@@ -1271,6 +1298,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       events.set(event.eventId, event);
       return { recorded: true, event: clone(event), profile: clone(profile) };
     },
+    async getResearchPhoto(id){const row=researchMedia.get(id);return row?clone(row):null;},
     async getThreeViewsAlbum(){return clone(photoAlbum);},
     async updateThreeViews(command,now=Date.now()){
       if(command.type==='accept'&&profile.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
@@ -1380,9 +1408,10 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async exportData() {
       return {
-        schemaVersion: DISCOVERY_DB_VERSION,
+        schemaVersion: researchMedia.size?RESEARCH_MEDIA_BACKUP_VERSION:DISCOVERY_DB_VERSION,
         profile: clone(profile),
         albums: photoAlbum.photos.length?[clone(photoAlbum)]:[],
+        researchMedia:[...researchMedia.values()].map(clone),
         portalTrail:[...portalRows.values()].map(clone),
         items: [...items.values()].map(clone),
         fieldGuide: [...guide.values()].map(clone),
@@ -1394,14 +1423,15 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       if (!beforeImport) return false;
       photoAlbum=clone(beforeImport.photoAlbum);
       profile = clone(beforeImport.profile); legacyProfileBackup = clone(beforeImport.legacyProfileBackup);
-      for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox,portalRows})) {
+      for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox,portalRows,researchMedia})) {
         map.clear(); for (const [id,row] of beforeImport[name]) map.set(id,clone(row));
       }
       beforeImport = null; return true;
     },
     async importData(data = {}) {
       data = validateJournalBackup(data);
-      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows]});
+      await verifyResearchMediaRecords(data.researchMedia);
+      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows],researchMedia:[...researchMedia]});
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
       for (const [id,row] of outbox) {
@@ -1420,6 +1450,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
             backupAvailable: true
           });
       profile = normalizeProfile({ ...data.profile, characterState: importedCharacter });
+      researchMedia.clear();for(const row of data.researchMedia)researchMedia.set(row.id,clone(row));
       photoAlbum=clone(data.albums.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
       if(data.portalTrail){portalRows.clear();for(const row of data.portalTrail)portalRows.set(row.id,clone(row));}
       items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();

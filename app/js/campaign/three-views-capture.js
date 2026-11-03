@@ -31,10 +31,10 @@ export function inspectPhotoSubject(ctx, identity, expectedId) {
     environment:'EARTH',travelMode:'walk',liveGps:false,visible:true}};
 }
 
-export function createWorldPhotoCapture(ctx) {
+export function createWorldPhotoCapture(ctx,{systemId='campaign.photo-shutter',owner='campaign-photo'}={}) {
   let pending=null,disposed=false;
   const cancel=()=>{if(pending){clearTimeout(pending.timer);pending.reject(Error('The scene changed before the photograph was ready. Try again.'));pending=null;}};
-  const unregister=ctx.registerRuntimeSystem?.({id:'campaign.photo-shutter',owner:'campaign-photo',phase:'render',priority:1000,critical:false,
+  const unregister=ctx.registerRuntimeSystem?.({id:systemId,owner,phase:'render',priority:1000,critical:false,
     enabled:frame=>!!pending&&frame.manualRender!==false&&!ctx.worldLoading&&!ctx.titleLaunchPending&&!ctx.hasPauseReason?.('manual_pause')&&!document.hidden,
     update(){
       if(!pending)return;

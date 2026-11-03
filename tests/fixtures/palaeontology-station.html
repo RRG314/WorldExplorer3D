@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><link
+    rel="icon"
+    href="data:,"
+  /><link rel="stylesheet" href="/app/styles/experiences.css" /><title>Fossil station check</title
+  ><style>
+    body {
+      background: #11241c;
+      color: #fff0d5;
+      font: 16px system-ui;
+      padding: 24px;
+    }
+    #open {
+      min-height: 44px;
+    }
+    #world {
+      display: block;
+      margin-top: 20px;
+    }</style
+  ><button id="open" disabled>Open station</button
+  ><canvas id="world" tabindex="0" width="320" height="180" aria-label="World focus check"></canvas>
+  <script type="module">
+    import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js';
+    import { createPalaeontologyUI } from '/app/js/campaign/palaeontology-ui.js';
+    import { palaeontologyTarget } from '/app/js/campaign/palaeontology-career.js';
+    import { fossilHarness, fossilSite } from '/tests/helpers/palaeontology-study.mjs';
+    import { fieldPhotoFixtures } from '/tests/helpers/field-photo-fixture.mjs';
+    const store = createIndexedDbDiscoveryProfileStore(),
+      site = fossilSite(),
+      params = new URLSearchParams(location.search),
+      photos = await fieldPhotoFixtures();
+    let state = (await store.getProfile()).researchCareers.palaeontology;
+    if (!state.active) {
+      const h = fossilHarness(
+        undefined,
+        'campaign',
+        'fossil-station-fixture',
+        Object.fromEntries(Object.entries(photos).map(([slot, row]) => [slot, row.capture]))
+      );
+      h.step('inspect', { form: h.study.form });
+      if (params.get('phase') !== 'photographs') h.photographs();
+      if (['comparison', 'interpretation', 'complete'].includes(params.get('phase'))) h.prepare();
+      if (['interpretation', 'complete'].includes(params.get('phase'))) h.compare();
+      if (params.get('phase') === 'complete') h.report();
+      for (const event of h.events)
+        state = (
+          await store.updateResearchCareer('palaeontology', event.metadata.action, {
+            now: event.occurredAt,
+            ...(event.metadata.action.type === 'photograph'
+              ? { photoAttachment: photos[event.metadata.action.slot].photo }
+              : {})
+          })
+        ).state;
+    }
+    const world = document.querySelector('#world'),
+      c = world.getContext('2d');
+    c.fillStyle = '#244438';
+    c.fillRect(0, 0, 320, 180);
+    c.fillStyle = '#e8ce94';
+    c.font = '18px system-ui';
+    c.fillText('World focus check', 24, 85);
+    const check = (window.fossilCheck = { store, failNextSave: false, globalEscapes: 0 });
+    addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') check.globalEscapes++;
+    });
+    const runtime = {
+      Walk: { state: { walker: { x: 0, z: 0 } } },
+      getEnv: () => 'EARTH',
+      screenLayout: { setPanelLayer() {} },
+      setPauseReason() {},
+      stopGameplayPlugin() {}
+    };
+    const ui = createPalaeontologyUI({
+      runtime,
+      getState: () => state,
+      near: (_id, distance) => (distance ? 1 : true),
+      requestWorldFocus: () => world.focus(),
+      save: async (command, options) => {
+        if (check.failNextSave) {
+          check.failNextSave = false;
+          throw Error(
+            'The field record could not save. Your previous photographs and preparation are kept. Try again.'
+          );
+        }
+        const now = Date.now(),
+          target = palaeontologyTarget(state.active);
+        state = (
+          await store.updateResearchCareer(
+            'palaeontology',
+            {
+              ...command,
+              revision: state.revision,
+              custody: state.active.specimen ? [state.active.specimen.instanceId] : [],
+              evidence: {
+                environment: 'EARTH',
+                travelMode: 'walk',
+                liveGps: false,
+                supported: true,
+                verticalDistance: 1.7,
+                siteId: site.id,
+                position: site.points[target],
+                at: now
+              }
+            },
+            { ...options, now }
+          )
+        ).state;
+      },
+      onJournal() {
+        check.journalOpened = true;
+      },
+      onNext() {
+        check.nextChosen = true;
+      }
+    });
+    document.querySelector('#open').disabled = false;
+    document.querySelector('#open').onclick = () => ui.open();
+    ui.update();
+    if (params.has('open')) ui.open();
+    window.advanceTime = async () => {};
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope:
+          'Actual native station UI and IndexedDB, controlled presence and encoded photo fixtures; separate world camera acceptance required',
+        phase: state.active.phase,
+        preparation: state.active.preparation,
+        support: state.active.support,
+        revision: state.revision,
+        captures: Object.keys(state.active.captures)
+      });
+  </script>
+</html>

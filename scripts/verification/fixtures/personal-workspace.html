@@ -22,7 +22,7 @@ const backpack=createLocalBackpackStore();await backpack.ready;const inventory=c
 const walker={x:0,y:1.732,z:-3.5,angle:0,pitch:0},housing=createHousingModel({backpackStore:backpack,inventory,getActorPosition:()=>walker,getActiveLocationId:()=> 'test'});
 if(!housing.snapshot().starterHomeId){const r=housing.claimStarter({id:'home:test:way:42',sourceBuildingId:'way:42',label:'Research workspace',locationId:'test',locationLabel:'Controlled room',x:0,z:0,mappedResidential:true,sharedEligible:true,price:100000});if(!r.ok)throw Error(r.reason);}
 const store=createIndexedDbDiscoveryProfileStore();let profile=await store.getProfile();
-if(globalThis.__fieldworkBackup&&!profile.researchCareers?.archaeology?.active){await store.importData(globalThis.__fieldworkBackup);profile=await store.getProfile();}
+if(globalThis.__fieldworkBackup&&!profile.researchCareers?.archaeology?.active&&!profile.researchCareers?.palaeontology?.active){await store.importData(globalThis.__fieldworkBackup);profile=await store.getProfile();}
 if(profile.openingChapter.phase!=='complete'){
  await store.startOpeningChapter({regionId:'test',regionLabel:'Controlled room',environment:'EARTH'},1000);
  const result=await store.recordObservation({claimId:'workspace:field',catalogId:'workspace:maple',family:'tree',activityId:'habitat-survey',name:'Maple canopy at the edge of the park',regionId:'test',regionLabel:'Controlled room',environment:'EARTH',collectedAt:2000});await store.completeOpeningChapter(result.event.eventId,3000);

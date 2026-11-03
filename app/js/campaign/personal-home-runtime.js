@@ -12,7 +12,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   const ctx=state.appCtx,store=state.profileStore,element=document.getElementById('discoveryPersonalHome');
   const abort=new AbortController(),housing=(dependencies.getHousing||getPersonalHousing)();
   let profile={},home=null,offers=[],record=null,visual=null,visualKey='',renderKey='',message='',busy=false,disposed=false,saveFailed=false,reviewing=false,loaded=false,elapsed=0,generation=0;
-  let coastalReport=null, lunarJourney=harborJourneyState(),archaeologyReports=[],selectedArchaeologyRecord='';
+  let coastalReport=null, lunarJourney=harborJourneyState(),exhibitionReports=[],selectedExhibitionRecord='';
   let selectedPurpose='journal';
   let storageOpen=false;
   let importedDesign=null;
@@ -38,7 +38,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     if(disposed||!element)return;
     const w=workspace(),v=housing.snapshot(),bag=ctx.playerBackpackInventory?.page?.({offset:0,limit:24})?.items||[];
     const supplies=bag.filter(item=>item.catalogId!=='hands'&&!item.equipped&&!item.verbs?.includes('equip')&&item.category!=='field-tool');
-    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,lunarJourney,archaeologyReports.map(row=>row.eventId),selectedArchaeologyRecord,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity])]);
+    const key=JSON.stringify([loaded,profile.openingChapter?.phase,profile.homeAchievements,w,home?.id,home?.journey,home?.storage,coastalReport?.eventId,lunarJourney,exhibitionReports.map(row=>row.eventId),selectedExhibitionRecord,record?.eventId,v.primaryHomeId,offers.map(o=>o.id),busy,insideHome(),message,reviewing,!!visual,saveFailed,supplies.map(i=>[i.instanceId,i.quantity])]);
     if(key===renderKey)return;renderKey=key;
     const button=(action,label,disabled=false)=>`<button type="button" data-home-action="${escape(action)}"${busy||disabled?' disabled':''}>${escape(label)}</button>`;
     let body='';
@@ -59,7 +59,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       const j=home.journey||{};
       body+=`<p>A Place to Return${profile.homeAchievements?.home?' · Complete':''}: ${j.entered?'entered':'enter your room'} · ${j.displayed?'record displayed':'use your desk'} · ${j.departed?'outing started':'leave for an outing'} · ${j.returned?'returned':'walk back and enter again'}.</p>`;
       if(insideHome()&&coastalReport&&w.pose)body+=button('coastal-display',w.recordId===coastalReport.eventId?'Coastal expedition displayed':'Display coastal expedition',w.recordId===coastalReport.eventId);
-      if(insideHome()&&w.pose&&archaeologyReports.length)body+=`<label class="home-archaeology-display">Archaeology exhibition<select data-home-archaeology-record>${archaeologyReports.map(row=>`<option value="${escape(row.eventId)}"${selectedArchaeologyRecord===row.eventId?' selected':''}>${escape(row.metadata.archaeologyReport.title)}</option>`).join('')}</select></label>`+button('archaeology-display',w.recordId===selectedArchaeologyRecord?'Archaeology plate displayed':'Display archaeology plate',w.recordId===selectedArchaeologyRecord);
+      if(insideHome()&&w.pose&&exhibitionReports.length)body+=`<label class="home-archaeology-display">Research exhibition<select data-home-archaeology-record>${exhibitionReports.map(row=>`<option value="${escape(row.eventId)}"${selectedExhibitionRecord===row.eventId?' selected':''}>${escape((row.metadata.archaeologyReport||row.metadata.palaeontologyReport).title)}</option>`).join('')}</select></label>`+button('archaeology-display',w.recordId===selectedExhibitionRecord?'Exhibition plate displayed':'Display exhibition plate',w.recordId===selectedExhibitionRecord);
       if(lunarJourney.report){
         if(insideHome()&&w.pose)body+=button('lunar-display',w.recordId===lunarJourney.report.eventId?'Lunar field book displayed':'Display lunar field book',w.recordId===lunarJourney.report.eventId);
         body+=`<details><summary>From the Harbor · your journey${lunarJourney.complete?' · complete':''}</summary><ol>${lunarJourney.steps.map(step=>`<li>${step.complete?'✓ ':''}<strong>${escape(step.label)}</strong><br><small>${escape(step.decision)}</small></li>`).join('')}</ol><p>Free roam remains open. Choose another research journey whenever you like.</p>${insideHome()&&w.recordId===lunarJourney.report.eventId?button('lunar-review','Review journey at the desk'):''}</details>`;
@@ -78,8 +78,8 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
       const investigationEvents=await store.getEventsById(harborJourneyEventIds);
       coastalReport=investigationState(investigationEvents).report||null;
       lunarJourney=harborJourneyState(profile,investigationEvents);
-      archaeologyReports=(await store.getEventsById(Object.values(profile.researchCareers?.archaeology?.completed||{}))).filter(row=>row.eventType==='campaign-completed'&&row.metadata?.careerId==='archaeology'&&row.metadata?.archaeologyReport);
-      if(!archaeologyReports.some(row=>row.eventId===selectedArchaeologyRecord))selectedArchaeologyRecord=archaeologyReports.find(row=>row.eventId===workspace().recordId)?.eventId||archaeologyReports[0]?.eventId||'';
+      exhibitionReports=(await store.getEventsById(['archaeology','palaeontology'].flatMap(id=>Object.values(profile.researchCareers?.[id]?.completed||{})))).filter(row=>row.eventType==='campaign-completed'&&['archaeology','palaeontology'].includes(row.metadata?.careerId)&&(row.metadata?.archaeologyReport||row.metadata?.palaeontologyReport));
+      if(!exhibitionReports.some(row=>row.eventId===selectedExhibitionRecord))selectedExhibitionRecord=exhibitionReports.find(row=>row.eventId===workspace().recordId)?.eventId||exhibitionReports[0]?.eventId||'';
       const recordId=workspace().recordId||profile.openingChapter?.eventId;
       const [evidence]=recordId?await store.getEventsById([recordId]):[];
       if(disposed)return;record=evidence||null;loaded=true;render();
@@ -162,12 +162,12 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
         if(!report||report.eventId!==investigationId('report'))throw Error('File a complete coastal report before displaying it.');
         check(housing.updateWorkspace(home.id,{type:'record',recordId:report.eventId,revision:workspace().revision}));record=report;coastalReport=report;await present();reviewing=true;message='Your coastal expedition is displayed on the desk. Open the field record to review its evidence.';
       }else if(action==='archaeology-display'){
-        if(!canUse())throw Error('Stand beside your desk to display the archaeology plate.');
-        const currentProfile=await store.getProfile(),ids=Object.values(currentProfile.researchCareers?.archaeology?.completed||{});
-        if(!ids.includes(selectedArchaeologyRecord))throw Error('Choose a completed contextual site report first.');
-        const [report]=await store.getEventsById([selectedArchaeologyRecord]);
-        if(report?.metadata?.careerId!=='archaeology'||!report.metadata.archaeologyReport||report.eventType!=='campaign-completed')throw Error('The contextual report could not load. Reopen your Journal to retry.');
-        check(housing.updateWorkspace(home.id,{type:'record',recordId:report.eventId,revision:workspace().revision}));record=report;await present();reviewing=true;message='Your contextual catalog and conservation plate are displayed on the desk.';
+        if(!canUse())throw Error('Stand beside your desk to display the exhibition plate.');
+        const currentProfile=await store.getProfile(),ids=['archaeology','palaeontology'].flatMap(id=>Object.values(currentProfile.researchCareers?.[id]?.completed||{}));
+        if(!ids.includes(selectedExhibitionRecord))throw Error('Choose a completed research report first.');
+        const [report]=await store.getEventsById([selectedExhibitionRecord]);
+        if(!['archaeology','palaeontology'].includes(report?.metadata?.careerId)||!(report.metadata.archaeologyReport||report.metadata.palaeontologyReport)||report.eventType!=='campaign-completed')throw Error('The research report could not load. Reopen your Journal to retry.');
+        check(housing.updateWorkspace(home.id,{type:'record',recordId:report.eventId,revision:workspace().revision}));record=report;await present();reviewing=true;message='Your research exhibition plate is displayed on the desk.';
       }else if(action==='lunar-display'||action==='lunar-review'){
         if(ctx.getEnv?.()!=='EARTH'||!canUse())throw Error('Stand beside your desk on Earth to review the lunar field book.');
         const rows=await store.getEventsById(harborJourneyEventIds),journey=harborJourneyState(await store.getProfile(),rows);
@@ -217,7 +217,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   element?.addEventListener('toggle',event=>{if(event.target.matches('[data-home-storage]'))storageOpen=event.target.open;},{capture:true,signal:abort.signal});
   element?.addEventListener('click',event=>{const b=event.target.closest('[data-home-action]');if(b)void act(b.dataset.homeAction);},{signal:abort.signal});
   element?.addEventListener('change',async event=>{
-    if(event.target.matches('[data-home-archaeology-record]')){selectedArchaeologyRecord=event.target.value;render();}
+    if(event.target.matches('[data-home-archaeology-record]')){selectedExhibitionRecord=event.target.value;render();}
     if(event.target.matches('[data-home-purpose]'))selectedPurpose=event.target.value;
     if(event.target.matches('[data-home-import]')){
       const file=event.target.files?.[0];if(!file)return;

@@ -83,3 +83,10 @@
 @media(max-width:600px) { .research-station-actions { padding-inline:18px; } }
 .archaeology-section,.archaeology-plate,.archaeology-artifact{display:block;width:100%;height:auto;max-width:720px;margin:12px auto;border:1px solid #52705d;border-radius:8px;object-fit:contain}.archaeology-reading{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}.archaeology-reading strong{font-size:1.7rem}.archaeology-artifact{max-width:360px}.archaeology-report dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.archaeology-report dt{font-weight:700}.archaeology-report dd{margin:4px 0 0}.archaeology-report article{padding:12px;border:1px solid #52705d;border-radius:8px}
 .research-station[data-career=archaeology] .research-evidence-grid,.archaeology-report .research-evidence-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px}.research-station[data-career=archaeology] .research-evidence{min-width:0;padding:16px;background:var(--experience-panel);border:1px solid var(--experience-line);border-radius:8px}
+
+/* Explicit shutter controls extend the existing objective panel. */
+.research-objective:has(.field-photo-toolbar:not([hidden])){max-height:calc(100dvh - 110px);overflow:auto}
+.field-photo-toolbar{position:static;width:auto;margin-top:10px;padding-top:10px;border-top:1px solid #63765b;color:inherit;font:inherit}
+.field-photo-toolbar[hidden]{display:none}.field-photo-toolbar>strong{display:none}.field-photo-toolbar p{margin:6px 0;font-size:12px}.field-photo-toolbar div{display:flex;gap:8px;flex-wrap:wrap}.field-photo-toolbar button{margin-top:4px}.field-photo-toolbar div button{flex:1}
+.fossil-specimen,.fossil-reference,.fossil-plate{display:block;width:100%;height:auto;border-radius:8px}.fossil-methods{padding:12px 0;display:flex;gap:8px;flex-wrap:wrap}.fossil-methods p{flex-basis:100%;margin:0}
+@media(max-height:500px){.research-objective:has(.field-photo-toolbar:not([hidden])){max-height:calc(100dvh - 24px)}}

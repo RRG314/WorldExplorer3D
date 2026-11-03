@@ -1,3 +1,4 @@
+import {drawFossilPlate} from '../campaign/palaeontology-illustration.js';
 import {workspaceCollisionProxies} from '../campaign/personal-workspace.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
@@ -30,10 +31,11 @@ export async function createWorkspaceVisual(ctx,active,geometry,record,options={
     for (const word of words){const next=line?`${line} ${word}`:word;if(c.measureText(next).width>448){c.fillText(line,28,106+row*28);row++;line=word;}else line=next;if(row>=5)break;}
     c.fillText(line,28,106+row*28,448);c.font='16px sans-serif';c.fillText(String(record?.regionLabel||'Personal research notes'),28,332,450);
     if(record?.metadata?.archaeologyReport)drawArchaeologyPlate(canvas,record.metadata.archaeologyReport);
+    if(record?.metadata?.palaeontologyReport)drawFossilPlate(canvas,record.metadata.palaeontologyReport);
     const texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;
     const material=new T.MeshStandardMaterial({map:texture,roughness:.95,metalness:0}),paperGeometry=new T.PlaneGeometry(.44,.44*canvas.height/canvas.width);
     resources.push(texture,material,paperGeometry);
-    const paper=new T.Mesh(paperGeometry,material);paper.rotation.x=-Math.PI/2;paper.rotation.z=record?.metadata?.archaeologyReport?geometry.yaw-Math.PI/2:-geometry.yaw;
+    const paper=new T.Mesh(paperGeometry,material);paper.rotation.x=-Math.PI/2;paper.rotation.z=(record?.metadata?.archaeologyReport||record?.metadata?.palaeontologyReport)?geometry.yaw-Math.PI/2:-geometry.yaw;
     paper.position.set(geometry.origin.x,geometry.origin.y+.803,geometry.origin.z);group.add(paper);
     if(options.isCurrent&&!options.isCurrent()){dispose();return null;}
     host.add(group);owner.push(...colliders);

@@ -1,3 +1,4 @@
+import {RESEARCH_MEDIA_BACKUP_VERSION,validateResearchMediaRecord,validateResearchMediaReferences} from '../campaign/research-media.js';
 import {validateResearchCareerBackups} from '../campaign/research-career-definitions.js';
 import {validateSoloRacerBackup} from '../campaign/solo-racer.js';
 import {validateLunarHomecomingBackup} from '../campaign/lunar-homecoming.js';
@@ -14,7 +15,7 @@ import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter } from '.
 export function validateJournalBackup(input) {
   const fail = () => { throw new TypeError('This Journal backup is incomplete, damaged, or from an unsupported version. Existing records have not been changed.'); };
   if (!input || typeof input !== 'object' || !input.profile || typeof input.profile !== 'object' || Array.isArray(input.profile)) fail();
-  if (input.schemaVersion != null && (!Number.isInteger(input.schemaVersion) || input.schemaVersion < 1 || input.schemaVersion > 5)) fail();
+  if (input.schemaVersion != null && (!Number.isInteger(input.schemaVersion) || input.schemaVersion < 1 || input.schemaVersion > RESEARCH_MEDIA_BACKUP_VERSION)) fail();
   if (input.profile.id != null && input.profile.id !== 'local-explorer') fail();
   const data = JSON.parse(JSON.stringify(input));
   if(Object.hasOwn(data,'portalTrail')) {
@@ -71,6 +72,9 @@ export function validateJournalBackup(input) {
   if(data.albums==null)data.albums=[];
   if(!Array.isArray(data.albums)||data.albums.length>1||data.albums.some(a=>a?.id!==THREE_VIEWS.albumId))fail();
   try{validateThreeViewsBackup(data.profile.threeViews,data.albums[0],data.events);}catch{fail();}
+  if(data.researchMedia==null)data.researchMedia=[];
+  if(!Array.isArray(data.researchMedia)||data.researchMedia.length>128||new Set(data.researchMedia.map(row=>row?.id)).size!==data.researchMedia.length)fail();
+  try{for(const row of data.researchMedia)validateResearchMediaRecord(row);validateResearchMediaReferences(data.profile.researchCareers,data.researchMedia,data.events);}catch{fail();}
   try{validateResearchCareerBackups(data.profile.researchCareers,data.events,data.items);}catch{fail();}
   try{validateSoloRacerBackup(data.profile.soloRacer,data.events);}catch{fail();}
   return data;

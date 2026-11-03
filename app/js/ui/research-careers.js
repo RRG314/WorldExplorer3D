@@ -1,3 +1,4 @@
+import {palaeontologyCareerSummary} from '../campaign/palaeontology-career.js';
 import {geologyCareerSummary} from '../campaign/geology-career.js';
 import {geologyStartingPlaces} from '../campaign/geology-places.js';
 import {archaeologyCareerSummary} from '../campaign/archaeology-career.js';
@@ -6,6 +7,7 @@ import {fieldResearchPlaces} from '../campaign/field-research-places.js';
 export function bindResearchCareers(runtime,experiences,{onJournal,requestWorldFocus}={}){
  let active=null,generation=0;
  const domains={
+  'career:palaeontologist':async()=> (await import('../campaign/palaeontology-runtime.js')).createPalaeontologyCareerRuntime,
   'career:geologist':async()=> (await import('../campaign/geology-runtime.js')).createGeologyCareerRuntime,
   'career:archaeologist':async()=> (await import('../campaign/archaeology-runtime.js')).createArchaeologyCareerRuntime
  };
@@ -21,6 +23,14 @@ export function bindResearchCareers(runtime,experiences,{onJournal,requestWorldF
   places:geologyStartingPlaces,
   offer:({place,profile})=>{const state=profile?.researchCareers?.geology;if(state?.schemaVersion&&state.schemaVersion!==1)return {state:'unavailable',label:'Update required',reason:'This saved field career needs a newer version of World Explorer.',enabled:false};return {state:place?'ready':'needs-place',label:place?'Begin field course':'Choose a field course',reason:'A clear, dry training area is checked after travel. The virtual exposures do not describe rocks at this real location.',enabled:!!place};},
   summary:({profile,variantId})=>geologyCareerSummary(profile?.researchCareers?.geology,{variantId}),
+  start:({intent,isCurrent})=>isCurrent()?runtime.startGameplayPlugin?.('research-career',{intent}):false
+ });
+ experiences.registerAdapter('palaeontology',{
+  recoveryActions:['relocate-course'],
+  equipment:'A freestanding invented fossil formation provides a north marker, scale, camera, bounded preparation tools, supports and comparison bench. Training casts stay in Backpack; photographs and records save in Journal.',
+  places:input=>fieldResearchPlaces('palaeontology',input),
+  offer:({place,profile})=>{const state=profile?.researchCareers?.palaeontology;if(state?.schemaVersion&&state.schemaVersion!==1)return {state:'unavailable',label:'Update required',reason:'This saved fossil career needs a newer version of World Explorer.',enabled:false};return {state:place?'ready':'needs-place',label:place?'Begin fossil case':'Choose a training site',reason:'A clear, dry area is checked after travel. The invented formation is not a fossil occurrence at this real location.',enabled:!!place};},
+  summary:({profile,variantId})=>palaeontologyCareerSummary(profile?.researchCareers?.palaeontology,{variantId}),
   start:({intent,isCurrent})=>isCurrent()?runtime.startGameplayPlugin?.('research-career',{intent}):false
  });
  experiences.registerAdapter('archaeology',{

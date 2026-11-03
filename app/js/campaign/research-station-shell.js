@@ -36,28 +36,28 @@ export function createResearchStationShell({runtime, careerId, label, getState, 
     if (dialog.open && !dialog.contains(document.activeElement)) heading.focus({preventScroll: true});
     cursor = nextCursor;
   }
-  async function perform(command) {
+  async function perform(command,saveOptions) {
     if (busy || disposed) return;
     if (!near(station)) {status.textContent = 'Return to this marked station before recording.'; return;}
     busy = true; status.textContent = 'Saving your field record…';
     const controls = [...dialog.querySelectorAll('button,input,select')].map(control => [control, control.disabled]);
     for (const [control] of controls) control.disabled = true;
     try {
-      const previous = station; await save(command); render();
+      const previous = station; await save(command,saveOptions); render();
       if (station !== previous) {busy = false; close();}
     } catch (error) {status.textContent = error?.message || 'The step could not save. Your previous records and finds are kept. Try again.';}
     finally {busy = false; for (const [control, disabled] of controls) if (control.isConnected) control.disabled = disabled; update();}
   }
   dialog.addEventListener('submit', event => {
     event.preventDefault(); const form = event.target;
-    if (form.matches('[data-research-form]') && !busy) onCommand(form.dataset.researchForm, Object.fromEntries(new FormData(form)), active(), {perform, render, body});
+    if (form.matches('[data-research-form]') && !busy) onCommand(form.dataset.researchForm, Object.fromEntries(new FormData(form)), active(), {perform, render, body, close});
   });
   dialog.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button || busy) return;
     if (button.hasAttribute('data-research-close')) close();
     else if (button.hasAttribute('data-research-journal')) {close({returnToWorld: false}); onJournal();}
     else if (button.hasAttribute('data-research-next')) {close({returnToWorld: false}); onNext();}
-    else if (button.dataset.researchAction) onCommand(button.dataset.researchAction, {...button.dataset}, active(), {perform, render, body});
+    else if (button.dataset.researchAction) onCommand(button.dataset.researchAction, {...button.dataset}, active(), {perform, render, body, close});
   });
   dialog.addEventListener('keydown', event => {if (event.key === 'Escape') event.stopPropagation();});
   dialog.addEventListener('cancel', event => {event.preventDefault(); close();});
@@ -78,5 +78,5 @@ export function createResearchStationShell({runtime, careerId, label, getState, 
   }
   pin.querySelector('[data-research-station]').onclick = open;
   pin.querySelector('[data-research-pause]').onclick = () => {if (close({returnToWorld: false})) runtime.stopGameplayPlugin?.('fieldwork-paused');};
-  return {open, update, refresh: render, dispose() {if (disposed) return; busy = false; close({returnToWorld: false}); disposed = true; pin.remove(); dialog.remove();}};
+  return {open, close, isOpen:()=>dialog.open, mountTools:element=>pin.append(element), update, refresh: render, dispose() {if (disposed) return; busy = false; close({returnToWorld: false}); disposed = true; pin.remove(); dialog.remove();}};
 }

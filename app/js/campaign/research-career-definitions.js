@@ -1,8 +1,10 @@
+import {normalizePalaeontologyCareer,transitionPalaeontologyCareer,validatePalaeontologyCareerBackup} from './palaeontology-career.js';
 import {normalizeGeologyCareer, transitionGeologyCareer, validateGeologyCareerBackup} from './geology-career.js';
 import {normalizeArchaeologyCareer, transitionArchaeologyCareer, validateArchaeologyCareerBackup} from './archaeology-career.js';
 
 // Pure domain contracts. IndexedDB, progression and custody retain one owner.
 const definitions = Object.freeze({
+  palaeontology:{normalize:normalizePalaeontologyCareer,transition:transitionPalaeontologyCareer,validateBackup:validatePalaeontologyCareerBackup},
   geology: {normalize: normalizeGeologyCareer, transition: transitionGeologyCareer, validateBackup: validateGeologyCareerBackup},
   archaeology: {normalize: normalizeArchaeologyCareer, transition: transitionArchaeologyCareer, validateBackup: validateArchaeologyCareerBackup}
 });
