@@ -68,3 +68,14 @@ test('an off-screen or hidden field subject cannot become a photo record', () =>
   c.camera.lookAt(0, 1.5, 10);
   assert.throws(() => inspectFieldPhoto(c.runtime, c.subject), /Aim/);
 });
+
+test('opaque world labels cannot certify a subject they obscure in the saved pixels', () => {
+  const c = course(),
+    label = new T.Sprite(new T.SpriteMaterial({ color: 0x17302a, depthTest: true }));
+  label.position.set(0, 1, 2);
+  label.scale.set(5, 4, 1);
+  c.scene.add(label);
+  assert.throws(() => inspectFieldPhoto(c.runtime, c.subject), /obscured/);
+  label.visible = false;
+  assert.equal(inspectFieldPhoto(c.runtime, c.subject).view.visible, true);
+});

@@ -1,43 +1,164 @@
-import {palaeontologyCareerSummary} from '../campaign/palaeontology-career.js';
-import {geologyCareerSummary} from '../campaign/geology-career.js';
-import {geologyStartingPlaces} from '../campaign/geology-places.js';
-import {archaeologyCareerSummary} from '../campaign/archaeology-career.js';
-import {fieldResearchPlaces} from '../campaign/field-research-places.js';
+import { wildlifeCareerSummary } from '../campaign/wildlife-career.js';
+import { palaeontologyCareerSummary } from '../campaign/palaeontology-career.js';
+import { geologyCareerSummary } from '../campaign/geology-career.js';
+import { geologyStartingPlaces } from '../campaign/geology-places.js';
+import { archaeologyCareerSummary } from '../campaign/archaeology-career.js';
+import { fieldResearchPlaces } from '../campaign/field-research-places.js';
 // Lazily mount the selected field domain through the existing single active gameplay owner.
-export function bindResearchCareers(runtime,experiences,{onJournal,requestWorldFocus}={}){
- let active=null,generation=0;
- const domains={
-  'career:palaeontologist':async()=> (await import('../campaign/palaeontology-runtime.js')).createPalaeontologyCareerRuntime,
-  'career:geologist':async()=> (await import('../campaign/geology-runtime.js')).createGeologyCareerRuntime,
-  'career:archaeologist':async()=> (await import('../campaign/archaeology-runtime.js')).createArchaeologyCareerRuntime
- };
- runtime.registerGameplayPlugin({id:'research-career',label:'Research fieldwork',category:'fieldwork',
-  async start({intent}){
-   const run=++generation,load=Object.hasOwn(domains,intent?.experienceId)?domains[intent.experienceId]:null;if(!load)return false;
-   const [createRuntime,store]=await Promise.all([load(),experiences.getStore()]);if(run!==generation)return false;
-   const next=await createRuntime({runtime,store,intent,onJournal,requestWorldFocus,isActive:()=>run===generation,onNext:()=>{runtime.stopGameplayPlugin?.('next-field-study');void experiences.open({experienceId:intent.experienceId});}});
-   if(run!==generation){next.dispose();return false;}active=next;return next.snapshot();
-  },update:dt=>active?.update(dt),stop(){generation++;active?.dispose();active=null;},save:()=>active?.snapshot()||null});
- experiences.registerAdapter('geology',{
-  equipment:'The virtual field course provides a hand lens, grain probe, sample labels and bench. Training specimens stay in your Backpack and Journal.',
-  places:geologyStartingPlaces,
-  offer:({place,profile})=>{const state=profile?.researchCareers?.geology;if(state?.schemaVersion&&state.schemaVersion!==1)return {state:'unavailable',label:'Update required',reason:'This saved field career needs a newer version of World Explorer.',enabled:false};return {state:place?'ready':'needs-place',label:place?'Begin field course':'Choose a field course',reason:'A clear, dry training area is checked after travel. The virtual exposures do not describe rocks at this real location.',enabled:!!place};},
-  summary:({profile,variantId})=>geologyCareerSummary(profile?.researchCareers?.geology,{variantId}),
-  start:({intent,isCurrent})=>isCurrent()?runtime.startGameplayPlugin?.('research-career',{intent}):false
- });
- experiences.registerAdapter('palaeontology',{
-  recoveryActions:['relocate-course'],
-  equipment:'A freestanding invented fossil formation provides a north marker, scale, camera, bounded preparation tools, supports and comparison bench. Training casts stay in Backpack; photographs and records save in Journal.',
-  places:input=>fieldResearchPlaces('palaeontology',input),
-  offer:({place,profile})=>{const state=profile?.researchCareers?.palaeontology;if(state?.schemaVersion&&state.schemaVersion!==1)return {state:'unavailable',label:'Update required',reason:'This saved fossil career needs a newer version of World Explorer.',enabled:false};return {state:place?'ready':'needs-place',label:place?'Begin fossil case':'Choose a training site',reason:'A clear, dry area is checked after travel. The invented formation is not a fossil occurrence at this real location.',enabled:!!place};},
-  summary:({profile,variantId})=>palaeontologyCareerSummary(profile?.researchCareers?.palaeontology,{variantId}),
-  start:({intent,isCurrent})=>isCurrent()?runtime.startGameplayPlugin?.('research-career',{intent}):false
- });
- experiences.registerAdapter('archaeology',{
-  equipment:'A freestanding fictional training trench provides a one-metre grid, tape, compass, trowel, brush, labelled packing and catalog bench. Real heritage sites remain observation-only.',
-  places:input=>fieldResearchPlaces('archaeology',input),
-  offer:({place,profile})=>{const state=profile?.researchCareers?.archaeology;if(state?.schemaVersion&&state.schemaVersion!==1)return {state:'unavailable',label:'Update required',reason:'This saved archaeology career needs a newer version of World Explorer.',enabled:false};return {state:place?'ready':'needs-place',label:place?'Begin training case':'Choose a training site',reason:'A clear, dry area is checked after travel. The fictional site does not alter the terrain or grant real excavation permission.',enabled:!!place};},
-  summary:({profile,variantId})=>archaeologyCareerSummary(profile?.researchCareers?.archaeology,{variantId}),
-  start:({intent,isCurrent})=>isCurrent()?runtime.startGameplayPlugin?.('research-career',{intent}):false
- });
+export function bindResearchCareers(runtime, experiences, { onJournal, requestWorldFocus } = {}) {
+  let active = null,
+    generation = 0;
+  const domains = {
+    'career:wildlife-ecologist': async () =>
+      (await import('../campaign/wildlife-career-runtime.js')).createWildlifeCareerRuntime,
+    'career:palaeontologist': async () =>
+      (await import('../campaign/palaeontology-runtime.js')).createPalaeontologyCareerRuntime,
+    'career:geologist': async () =>
+      (await import('../campaign/geology-runtime.js')).createGeologyCareerRuntime,
+    'career:archaeologist': async () =>
+      (await import('../campaign/archaeology-runtime.js')).createArchaeologyCareerRuntime
+  };
+  runtime.registerGameplayPlugin({
+    id: 'research-career',
+    label: 'Research fieldwork',
+    category: 'fieldwork',
+    async start({ intent }) {
+      const run = ++generation,
+        load = Object.hasOwn(domains, intent?.experienceId) ? domains[intent.experienceId] : null;
+      if (!load) return false;
+      const [createRuntime, store] = await Promise.all([load(), experiences.getStore()]);
+      if (run !== generation) return false;
+      const next = await createRuntime({
+        runtime,
+        store,
+        intent,
+        onJournal,
+        requestWorldFocus,
+        isActive: () => run === generation,
+        onNext: () => {
+          runtime.stopGameplayPlugin?.('next-field-study');
+          void experiences.open({ experienceId: intent.experienceId });
+        }
+      });
+      if (run !== generation) {
+        next.dispose();
+        return false;
+      }
+      active = next;
+      return next.snapshot();
+    },
+    update: (dt) => active?.update(dt),
+    stop() {
+      generation++;
+      active?.dispose();
+      active = null;
+    },
+    save: () => active?.snapshot() || null
+  });
+  experiences.registerAdapter('geology', {
+    equipment:
+      'The virtual field course provides a hand lens, grain probe, sample labels and bench. Training specimens stay in your Backpack and Journal.',
+    places: geologyStartingPlaces,
+    offer: ({ place, profile }) => {
+      const state = profile?.researchCareers?.geology;
+      if (state?.schemaVersion && state.schemaVersion !== 1)
+        return {
+          state: 'unavailable',
+          label: 'Update required',
+          reason: 'This saved field career needs a newer version of World Explorer.',
+          enabled: false
+        };
+      return {
+        state: place ? 'ready' : 'needs-place',
+        label: place ? 'Begin field course' : 'Choose a field course',
+        reason:
+          'A clear, dry training area is checked after travel. The virtual exposures do not describe rocks at this real location.',
+        enabled: !!place
+      };
+    },
+    summary: ({ profile, variantId }) =>
+      geologyCareerSummary(profile?.researchCareers?.geology, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+  });
+  experiences.registerAdapter('wildlife', {
+    recoveryActions: ['relocate-course'],
+    equipment:
+      'Two virtual habitat plots provide observation markers, transects, diagnostic training signs, the walking camera, mounted virtual motion sensors and a comparison bench. Checklists and photographs stay in Journal; no animals are collected.',
+    places: (input) => fieldResearchPlaces('wildlife', input),
+    offer: ({ place, profile }) => {
+      const state = profile?.researchCareers?.wildlife;
+      if (state?.schemaVersion && state.schemaVersion !== 1)
+        return {
+          state: 'unavailable',
+          label: 'Update required',
+          reason: 'This saved wildlife career needs a newer version of World Explorer.',
+          enabled: false
+        };
+      return {
+        state: place ? 'ready' : 'needs-place',
+        label: place ? 'Begin habitat study' : 'Choose a training site',
+        reason:
+          'A clear, dry area in a mapped park, woodland or field is checked after travel. Virtual habitat models do not establish real wildlife sightings.',
+        enabled: !!place
+      };
+    },
+    summary: ({ profile, variantId }) =>
+      wildlifeCareerSummary(profile?.researchCareers?.wildlife, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+  });
+  experiences.registerAdapter('palaeontology', {
+    recoveryActions: ['relocate-course'],
+    equipment:
+      'A freestanding invented fossil formation provides a north marker, scale, camera, bounded preparation tools, supports and comparison bench. Training casts stay in Backpack; photographs and records save in Journal.',
+    places: (input) => fieldResearchPlaces('palaeontology', input),
+    offer: ({ place, profile }) => {
+      const state = profile?.researchCareers?.palaeontology;
+      if (state?.schemaVersion && state.schemaVersion !== 1)
+        return {
+          state: 'unavailable',
+          label: 'Update required',
+          reason: 'This saved fossil career needs a newer version of World Explorer.',
+          enabled: false
+        };
+      return {
+        state: place ? 'ready' : 'needs-place',
+        label: place ? 'Begin fossil case' : 'Choose a training site',
+        reason:
+          'A clear, dry area is checked after travel. The invented formation is not a fossil occurrence at this real location.',
+        enabled: !!place
+      };
+    },
+    summary: ({ profile, variantId }) =>
+      palaeontologyCareerSummary(profile?.researchCareers?.palaeontology, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+  });
+  experiences.registerAdapter('archaeology', {
+    equipment:
+      'A freestanding fictional training trench provides a one-metre grid, tape, compass, trowel, brush, labelled packing and catalog bench. Real heritage sites remain observation-only.',
+    places: (input) => fieldResearchPlaces('archaeology', input),
+    offer: ({ place, profile }) => {
+      const state = profile?.researchCareers?.archaeology;
+      if (state?.schemaVersion && state.schemaVersion !== 1)
+        return {
+          state: 'unavailable',
+          label: 'Update required',
+          reason: 'This saved archaeology career needs a newer version of World Explorer.',
+          enabled: false
+        };
+      return {
+        state: place ? 'ready' : 'needs-place',
+        label: place ? 'Begin training case' : 'Choose a training site',
+        reason:
+          'A clear, dry area is checked after travel. The fictional site does not alter the terrain or grant real excavation permission.',
+        enabled: !!place
+      };
+    },
+    summary: ({ profile, variantId }) =>
+      archaeologyCareerSummary(profile?.researchCareers?.archaeology, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+  });
 }

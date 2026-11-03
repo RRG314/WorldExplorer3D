@@ -43,8 +43,8 @@ export function createFieldCourseScene(
     group.name = id + ' · ' + key;
     return group;
   }
-  function collider(key, hx, hz, height) {
-    const p = qualified.points[key],
+  function collider(key, hx, hz, height, point = qualified.points[key]) {
+    const p = point,
       row = {
         sourceBuildingId: `research-${id}:${key}`,
         buildingType: 'field_furniture',
@@ -89,13 +89,33 @@ export function createFieldCourseScene(
     parent.add(sprite);
     return sprite;
   }
-  async function table(key) {
-    const lease = await loadModelAsset(T, 'workspace-table', { signal });
-    leases.push(lease);
+  async function acquire(assetId) {
+    const lease = await loadModelAsset(T, assetId, { signal });
     if (disposed || !isCurrent()) {
-      dispose();
-      return null;
+      lease.dispose();
+      const error = Error('The field course changed before its model was ready.');
+      error.name = 'AbortError';
+      throw error;
     }
+    leases.push(lease);
+    return lease;
+  }
+  async function asset(assetId, point, heightMeters) {
+    const lease = await acquire(assetId);
+    const bounds = new T.Box3().setFromObject(lease.root),
+      size = bounds.getSize(new T.Vector3());
+    lease.root.scale.multiplyScalar(heightMeters / (Math.max(0.001, size.y) * u));
+    lease.root.updateMatrixWorld(true);
+    bounds.setFromObject(lease.root);
+    const center = bounds.getCenter(new T.Vector3());
+    lease.root.position.add(
+      new T.Vector3(point.x - center.x, point.y - bounds.min.y, point.z - center.z)
+    );
+    root.add(lease.root);
+    return lease.root;
+  }
+  async function table(key) {
+    const lease = await acquire('workspace-table');
     lease.root.scale.multiplyScalar(1 / u);
     const p = qualified.points[key],
       bounds = new T.Box3().setFromObject(lease.root);
@@ -129,6 +149,7 @@ export function createFieldCourseScene(
     collider,
     label,
     table,
+    asset,
     dispose,
     attach() {
       if (disposed || !isCurrent()) throw Error('The field course changed.');

@@ -72,7 +72,7 @@ export function createResearchStationShell({runtime, careerId, label, getState, 
     if (disposed || !active()) return;
     const value = active(), id = target(value), meters = near(id, true), done = value.phase === 'complete';
     pin.querySelector('strong').textContent = objective(value);
-    pin.querySelector('p').textContent = done ? 'Your report and exhibition plate are saved in Journal.' : Number.isFinite(meters) ? `${meters < 10 ? meters.toFixed(1) : Math.round(meters)} m to ${stationLabel(id)}` : 'Return to your training site.';
+    pin.querySelector('p').textContent = done ? 'Your report is saved in Journal.' : Number.isFinite(meters) ? `${meters < 10 ? meters.toFixed(1) : Math.round(meters)} m to ${stationLabel(id)}` : 'Return to your training site.';
     const button = pin.querySelector('[data-research-station]'); button.disabled = busy || !near(id); button.textContent = done ? 'Review site report' : 'Open station';
     pin.hidden = !runtime.Walk?.state?.walker || runtime.getEnv?.() !== 'EARTH';
   }

@@ -69,7 +69,6 @@ export function inspectFieldPhoto(runtime, subject) {
           .find(
             (row) =>
               visible(row.object) &&
-              !row.object.isSprite &&
               row.object.material?.depthTest !== false &&
               !(row.object.material?.transparent && row.object.material.opacity < 0.2)
           );
@@ -125,7 +124,14 @@ export function createFieldPhotoTool(
   runtime,
   qualified,
   presentation,
-  { careerId, getState, save, isCurrent }
+  {
+    careerId,
+    getState,
+    save,
+    isCurrent,
+    accepts = (active) => active.phase === 'photographs',
+    captureKind = (slot) => (slot === 'layer' ? 'context' : 'detail')
+  }
 ) {
   const shutter = createWorldPhotoCapture(runtime, {
     systemId: 'research.field-camera',
@@ -151,9 +157,9 @@ export function createFieldPhotoTool(
         enter(); // An explicit shutter action uses the existing eye-level view owner.
         const active = getState().active,
           subject = presentation.photoSubjects?.[slot];
-        if (active.phase !== 'photographs' || !subject)
+        if (!accepts(active, slot) || !subject)
           throw Error('This step does not request a photograph.');
-        const result = await shutter.capture(slot === 'layer' ? 'context' : 'detail', () =>
+        const result = await shutter.capture(captureKind(slot), () =>
           inspectFieldPhoto(runtime, subject)
         );
         if (disposed || !isCurrent() || getState().active.runId !== active.runId)
