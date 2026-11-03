@@ -4,12 +4,12 @@ import { createBuildingCollisionQuery } from '../../app/js/physics/building-coll
 export function planFieldworkWalk(
   runtime,
   destination,
-  { spacingMeters = 0.8, maximumCells = 10000 } = {}
+  { spacingMeters = 0.8, maximumCells = 10000, paddingMeters = 8, stepHeightMeters = 0 } = {}
 ) {
   const actor = runtime.Walk.state.walker,
     u = runtime.METERS_PER_WORLD_UNIT || 1.11,
     step = spacingMeters / u,
-    pad = 8 / u,
+    pad = paddingMeters / u,
     minX = Math.min(actor.x, destination.x) - pad,
     minZ = Math.min(actor.z, destination.z) - pad,
     cols = Math.ceil((Math.abs(destination.x - actor.x) + pad * 2) / step) + 1,
@@ -21,12 +21,14 @@ export function planFieldworkWalk(
     key = (x, z) => z * cols + x,
     point = (index) => ({
       x: minX + (index % cols) * step,
-      z: minZ + Math.floor(index / cols) * step
+      z: minZ + Math.floor(index / cols) * step,
     });
+  let sampledKind = null;
   const height = (p) => {
     const ground = runtime.SurfaceQuery.walkAt(p.x, p.z),
       y = ground?.position?.y,
       water = runtime.SurfaceQuery.waterAt?.(p.x, p.z);
+    sampledKind = ground?.kind;
     if (
       !Number.isFinite(y) ||
       (water?.feature && water.position.y > y - 0.1) ||
@@ -42,13 +44,22 @@ export function planFieldworkWalk(
   const clear = (a, b) => {
     const length = Math.hypot(b.x - a.x, b.z - a.z) * u,
       n = Math.max(1, Math.ceil(length / 0.25));
-    let prior = runtime.SurfaceQuery.walkAt(a.x, a.z)?.position?.y;
+    const first = runtime.SurfaceQuery.walkAt(a.x, a.z);
+    let prior = first?.position?.y,
+      priorKind = first?.kind;
     if (!Number.isFinite(prior)) return false;
     for (let i = 1; i <= n; i++) {
       const t = i / n,
         y = height({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
-      if (y === null || (Math.abs(y - prior) * u) / (length / n || 1) > 0.25) return false;
+      const stepAllowed =
+        ['road', 'path', 'sidewalk', 'pavement'].includes(priorKind) ||
+        ['road', 'path', 'sidewalk', 'pavement'].includes(sampledKind)
+          ? stepHeightMeters
+          : 0;
+      if (y === null || Math.abs(y - prior) * u > Math.max(stepAllowed, 0.25 * (length / n || 1)))
+        return false;
       prior = y;
+      priorKind = sampledKind;
     }
     return true;
   };
@@ -115,7 +126,7 @@ export function planFieldworkWalk(
       [1, 1],
       [-1, 1],
       [1, -1],
-      [-1, -1]
+      [-1, -1],
     ]) {
       const nx = x + dx,
         nz = z + dz;

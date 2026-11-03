@@ -288,3 +288,59 @@
 .astronomy-report { overflow-wrap:anywhere; }
 .astronomy-report summary { cursor:pointer; padding:10px 0; }
 .research-station[data-career='astronomy'] a,.astronomy-report a { color:#8cdde3; text-underline-offset:3px; }
+/* Quarry measurements and conserved material records. */
+.mining-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.mining-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.mining-table th,
+.mining-table td {
+  padding: 9px 7px;
+  border-bottom: 1px solid #67847a;
+  text-align: left;
+}
+.mining-assays th,
+.mining-assays td {
+  white-space: nowrap;
+}
+.mining-table caption {
+  margin: 10px 0;
+  text-align: left;
+  line-height: 1.45;
+}
+.mining-flow {
+  display: block;
+  width: 440px;
+  max-width: 100%;
+  height: auto;
+  margin: 14px 0;
+}
+.mining-selection {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #67847a;
+  border-radius: 8px;
+  padding: 12px;
+}
+.research-station-body .mining-selection label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 12px;
+}
+.mining-selection input {
+  width: 20px;
+  height: 20px;
+}
+.mining-report {
+  overflow-wrap: anywhere;
+}
+.mining-report summary {
+  cursor: pointer;
+  padding: 10px 0;
+}

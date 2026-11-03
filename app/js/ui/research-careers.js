@@ -1,3 +1,5 @@
+import { miningCareerSummary } from '../campaign/mining-career.js';
+import { miningPlaces } from '../campaign/mining-places.js';
 import { astronomyCareerSummary } from '../campaign/astronomy-career.js';
 import { cartographyCareerSummary } from '../campaign/cartography-career.js';
 import {bindPlanetaryCareer} from '../campaign/planetary-career-adapter.js';
@@ -28,6 +30,8 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   let active = null,
     generation = 0;
   const domains = {
+    'career:mining-engineer': async () =>
+      (await import('../campaign/mining-runtime.js')).createMiningCareerRuntime,
     'career:astronomer': async () => (await import('../campaign/astronomy-runtime.js')).createAstronomyCareerRuntime,
     'career:cartographer': async () =>
       (await import('../campaign/cartography-runtime.js')).createCartographyCareerRuntime,
@@ -203,6 +207,35 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
       cartographyCareerSummary(profile?.researchCareers?.cartography, { variantId }),
     start: ({ intent, isCurrent }) =>
       isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
+  });
+  experiences.registerAdapter("mining", {
+    recoveryActions: ["relocate-course"],
+    equipment:
+      "A fictional quarry exhibit, working sampling rail and cutter, supported hand carrier, receiving scale and processor are supplied. The conserved training lot makes a useful yard marker; no real ground or shared stock is extracted.",
+    places: miningPlaces,
+    offer: ({ place, profile }) =>
+      profile?.researchCareers?.mining?.schemaVersion &&
+      profile.researchCareers.mining.schemaVersion !== 1
+        ? {
+            state: "unavailable",
+            label: "Update required",
+            reason:
+              "This saved quarry ledger needs a newer World Explorer version.",
+            enabled: false,
+          }
+        : {
+            state: place ? "ready" : "needs-place",
+            label: place ? "Begin quarry job" : "Choose the training yard",
+            reason:
+              "Only the curated fictional exhibit is offered. Loaded support, solid clearance and mapped home/park exclusions are checked before instruments open.",
+            enabled: !!place,
+          },
+    summary: ({ profile, variantId }) =>
+      miningCareerSummary(profile?.researchCareers?.mining, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent()
+        ? runtime.startGameplayPlugin?.("research-career", { intent })
+        : false,
   });
   experiences.registerAdapter('astronomy', {
     recoveryActions: ['relocate-course'],

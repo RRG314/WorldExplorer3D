@@ -96,13 +96,15 @@ export function createFieldEffortRecorder({
       next = gates[r.routeGates.length];
     if (
       next &&
-      Math.hypot(p.x - next.x, p.z - next.z) * r.config.metersPerUnit <= (next.radiusMeters || 0.7)
+      Math.hypot(p.x - next.x, p.z - next.z) * r.config.metersPerUnit <=
+        (next.radiusMeters || 0.7) &&
+      (typeof next.accept !== 'function' || next.accept(sample) === true)
     )
       r.routeGates.push(next.id);
     r.sensor.aligned = sample.sensorAligned === true;
     if (r.config.sensor && !r.sensor.aligned) {
       r.excludedSeconds += seconds;
-      r.reason = 'Align the mounted camera with its marked detection path.';
+      r.reason = r.config.sensorMessage || 'Align the mounted camera with its marked detection path.';
       return;
     }
     r.activeSeconds += seconds;

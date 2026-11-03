@@ -70,7 +70,8 @@ export async function createFieldResearchRuntime({
         revision: state.revision,
         runId: crypto.randomUUID(),
         variantId,
-        site: qualified.site
+        site: qualified.site,
+        ...(domain.admission ? { admission: domain.admission(runtime, qualified) } : {})
       },
       { signal: abort.signal, isCurrent: current }
     );

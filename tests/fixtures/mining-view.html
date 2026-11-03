@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Native quarry instruments</title
+  ><link rel="icon" href="/favicon.svg" /><style>
+    body {
+      margin: 0;
+      background: #17282e;
+      color: #f0f3e7;
+      font: 15px system-ui;
+    }
+    canvas {
+      position: fixed;
+      inset: 0;
+      max-width: 100vw;
+    }
+    #miningViewScope {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      max-width: 430px;
+      padding: 12px;
+      background: #112c32;
+      border: 1px solid #90bdb2;
+      border-radius: 8px;
+    }
+    button {
+      font: inherit;
+      background: #efd079;
+      color: #183029;
+      padding: 8px;
+      border: 0;
+      border-radius: 4px;
+    }
+    pre {
+      white-space: pre-wrap;
+      font: 13px system-ui;
+    }
+  </style>
+  <aside id="miningViewScope">
+    <strong>Controlled native quarry exhibit</strong>
+    <p>
+      Actual geometry, probe contacts, weighed fragments and feet. No fieldwork or saved job claim.
+    </p>
+    <button id="probe">Read middle core</button><button id="cut">Cutter contact</button
+    ><button id="scale">Receiving pan</button>
+    <pre id="reading"></pre>
+  </aside>
+  <script src="/app/vendor/three/build/three.min.js"></script>
+  <script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+  <script type="module">
+    import { ctx } from '/app/js/shared-context.js?v=55';
+    import { createMiningPresentation } from '/app/js/campaign/mining-presentation.js';
+    import { MINING_JOBS, MINING_OFFSETS } from '/app/js/campaign/mining-formation.js';
+    import { applyDisplayColorPolicy } from '/app/js/engine/display-color-policy.js';
+    const T = THREE,
+      u = 1.11,
+      scene = new T.Scene(),
+      camera = new T.PerspectiveCamera(52, innerWidth / innerHeight, 0.04, 100),
+      renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(innerWidth, innerHeight);
+    applyDisplayColorPolicy(renderer, T);
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
+    scene.background = new T.Color('#283c42');
+    document.body.prepend(renderer.domElement);
+    scene.add(new T.HemisphereLight(0xf0f4ff, 0x777567, 0.9));
+    const sun = new T.DirectionalLight(0xfff2db, 1);
+    sun.position.set(-8, 18, 8);
+    scene.add(sun);
+    const ground = (x, z) => 0.018 * x + 0.012 * z,
+      geometry = new T.PlaneGeometry(34, 32, 1, 1);
+    geometry.rotateX(-Math.PI / 2);
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++)
+      positions.setY(i, ground(positions.getX(i), positions.getZ(i)));
+    geometry.computeVertexNormals();
+    scene.add(new T.Mesh(geometry, new T.MeshStandardMaterial({ color: 0x7e8775, roughness: 1 })));
+    const qualified = {
+      metersPerUnit: u,
+      site: { id: 'controlled-native-quarry' },
+      points: Object.fromEntries(
+        Object.entries(MINING_OFFSETS).map(([id, p]) => {
+          const x = p.x / u,
+            z = p.z / u;
+          return [id, { x, y: ground(x, z), z }];
+        })
+      ),
+    };
+    Object.assign(ctx, {
+      scene,
+      camera,
+      renderer,
+      dynamicBuildingColliders: [],
+      SurfaceQuery: {
+        walkAt: (x, z) => ({ position: { y: ground(x, z) } }),
+        driveAt: (x, z) => ({ position: { y: ground(x, z) } }),
+      },
+      Walk: { state: { walker: { x: 0, y: 1.7, z: 0 } } },
+    });
+    const presentation = await createMiningPresentation(ctx, qualified, MINING_JOBS.campaign);
+    let view = 'probe';
+    const blocker = new T.Mesh(
+      new T.BoxGeometry(0.15 / u, 0.15 / u, 0.008 / u),
+      new T.MeshStandardMaterial({ color: 0x8d3530 })
+    );
+    blocker.name = 'Controlled probe blocker';
+    blocker.visible = false;
+    scene.add(blocker);
+    function draw() {
+      const p = qualified.points[view === 'scale' ? 'bench' : 'b'];
+      camera.position.set(p.x + 2.1 / u, p.y + 1.9 / u, p.z + 3.5 / u);
+      camera.lookAt(p.x, p.y + 1 / u, p.z);
+      renderer.render(scene, camera);
+      document.getElementById('reading').textContent = JSON.stringify(
+        view === 'scale'
+          ? presentation.readScale()
+          : view === 'cut'
+            ? presentation.readCutter()
+            : presentation.readProbe(),
+        null,
+        2
+      );
+    }
+    function core() {
+      view = 'probe';
+      presentation.placeLine('b');
+      presentation.setProbe(2);
+      draw();
+    }
+    document.getElementById('probe').onclick = core;
+    document.getElementById('cut').onclick = () => {
+      view = 'cut';
+      presentation.beginCut(['b:1:1', 'b:1:2'], 4);
+      presentation.stepCut(0.8, 4);
+      draw();
+    };
+    document.getElementById('scale').onclick = () => {
+      view = 'scale';
+      presentation.loadCarrier(['b:1:1', 'b:1:2']);
+      presentation.cart.position.copy(presentation.scaleGroup.position);
+      presentation.alignCarrierOnPan();
+      draw();
+    };
+    window.miningView = {
+      ctx,
+      presentation,
+      qualified,
+      blocker,
+      core,
+      draw,
+      set view(v) {
+        view = v;
+      },
+      snapshot: () => ({
+        reading: presentation.readProbe(),
+        budget: presentation.budget(),
+        feet: presentation.feet.map((f) => new T.Box3().setFromObject(f.object).min.y - f.groundY),
+        proxies: ctx.dynamicBuildingColliders.length,
+      }),
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({ scope: 'Only controlled native quarry geometry', ...miningView.snapshot() });
+    window.advanceTime = async () => draw();
+    core();
+    if (new URLSearchParams(location.search).has('station')) {
+      const { mountMiningNativeUi } = await import('/tests/helpers/mining-native-ui.mjs');
+      await mountMiningNativeUi({ ctx, presentation, qualified, ground, draw, camera, u });
+    }
+    window.ready = true;
+  </script>
+</html>

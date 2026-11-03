@@ -158,7 +158,21 @@ function exposureValue(a, input, role, now) {
     shutter: plan.shutter,
     hotPixel: plan.hotPixel,
   });
-  if (canonicalFieldRecord(expected) !== canonicalFieldRecord(image))
+  // ECMAScript engines may differ in the last bits of trigonometric results.
+  // Retain the original subpixel coordinate; pixels and every source setting
+  // must still match exactly. The bound is a billionth of one detector pixel.
+  const sameProjection = ['x', 'y'].every(
+    (k) =>
+      Number.isFinite(image.targetPixel?.[k]) &&
+      Math.abs(expected.targetPixel[k] - image.targetPixel[k]) <= 1e-9
+  );
+  if (
+    !sameProjection ||
+    canonicalFieldRecord({
+      ...expected,
+      targetPixel: { x: image.targetPixel.x, y: image.targetPixel.y },
+    }) !== canonicalFieldRecord(image)
+  )
     throw Error('The saved pixels do not match their retained source, settings and noise seed.');
   apertureMeasurement(image);
   return raw;
