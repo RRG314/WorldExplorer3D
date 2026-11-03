@@ -4,6 +4,10 @@ export const CERN_SITE_REFERENCE = Object.freeze([
     id: 'cern-science-gateway',
     label: 'Science Gateway \u00b7 Meyrin',
     sourceBuildingId: 'way/1062199727',
+    // Reviewed against the loaded authoritative Overture polygon on 2026-11-03:
+    // bidirectional edge error 0.241 m, area ratio 1.0056. The normal exact-ID
+    // and <=2.5 m footprint admission checks still apply on every visit.
+    sourceAliases: ['overture:84e55483-0bbf-45b7-92e2-4d8d7b952048'],
     buildingLabel: 'CERN Reception (82)',
     sourceVersion: 6,
     footprint: [
@@ -98,6 +102,8 @@ export const CERN_SITE_REFERENCE = Object.freeze([
     id: 'cms-point-five',
     label: 'CMS Point 5 \u00b7 Cessy',
     sourceBuildingId: 'way/97132779',
+    // Reviewed loaded Overture alias: 0.295 m edge error, 1.0006 area ratio.
+    sourceAliases: ['overture:a50c684e-b954-470b-a365-71db93925c35'],
     buildingLabel: 'SX5 \u00b7 building 3585',
     sourceVersion: 7,
     footprint: [

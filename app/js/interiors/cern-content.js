@@ -19,7 +19,10 @@ export function resolveCernInterior(ctx, support, definition) {
     const association = matchMappedInteriorFootprint(
       {
         kind: 'interpretive',
-        association: { sourceIds: [site.sourceBuildingId], footprint: site.footprint },
+        association: {
+          sourceIds: [site.sourceBuildingId, ...(site.sourceAliases || [])],
+          footprint: site.footprint,
+        },
       },
       support,
       (lat, lon) => ctx.geoToWorld(lat, lon),

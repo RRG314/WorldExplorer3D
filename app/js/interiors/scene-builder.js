@@ -1,4 +1,5 @@
 import {addAquariumFixtures} from './aquarium-scene.js';
+import { buildCernInterior } from './cern-scene.js';
 import {addGalleryFixtures} from './gallery-scene.js';
 import {releaseGalleryTextures} from './gallery-finishes.js';
 import {isHarborWaypoint,dressHarborWaypoint} from './harbor-waypoint.js';
@@ -738,6 +739,7 @@ function floorDefinition(definition, level) {
 }
 
 export function buildInteriorScene(definition, options = {}) {
+  if (definition.cernContent) return buildCernInterior(THREE, appCtx, definition);
   if(definition.facilityContent?.id==='kennedy-vab')return buildKennedyInterior(THREE,appCtx,definition);
   if(definition.communityRealityCapture?.layout||definition.authoredLayout){
     const state=buildAuthoredHomeScene(definition,options);

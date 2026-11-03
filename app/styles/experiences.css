@@ -344,3 +344,74 @@
   cursor: pointer;
   padding: 10px 0;
 }
+
+/* Collision Lab uses the shared station chrome and bounded scientific plots. */
+.research-station[data-career="accelerator"] fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #63765b;
+}
+.research-station[data-career="accelerator"] label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.research-station[data-career="accelerator"] input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+}
+.research-station[data-career="accelerator"] input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  font: inherit;
+}
+.accelerator-hit-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.accelerator-report {
+  overflow-wrap: anywhere;
+}
+.accelerator-report svg,
+.research-station[data-career="accelerator"] svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 540px;
+  margin: 18px auto;
+}
+.accelerator-report table,
+.research-station[data-career="accelerator"] table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.accelerator-report th,
+.accelerator-report td,
+.research-station[data-career="accelerator"] th,
+.research-station[data-career="accelerator"] td {
+  padding: 8px 5px;
+  text-align: left;
+  border-bottom: 1px solid #63765b;
+}
+.accelerator-report section {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid #63765b;
+  border-radius: 8px;
+}
+@media (max-height: 500px) {
+  .accelerator-report svg,
+  .research-station[data-career="accelerator"] svg {
+    height: min(180px, calc(100dvh - 200px));
+    width: auto;
+    max-width: 100%;
+    margin: 10px auto;
+  }
+}

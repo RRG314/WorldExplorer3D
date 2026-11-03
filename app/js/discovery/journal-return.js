@@ -1,4 +1,5 @@
 import {isEarthWorldUsable} from '../earth-core/world-readiness.js';
+import { cernNotebookReturn } from '../campaign/cern-study-sites.js';
 import {captureEnvironmentSession} from '../session-coordinator.js?v=2';
 import {validateOceanVoyage} from '../ocean/voyage-store.js';
 
@@ -11,6 +12,8 @@ export function journalReturnDestination(event,locations={}) {
     return voyage?{kind:'ocean-voyage',voyage,label:'Return to research voyage'}:null;
   }
   if(environment!=='EARTH')return null;
+  const cern = cernNotebookReturn(event);
+  if (cern) return cern;
   const key=String(event.locationKey||''),location=event.locationSnapshot;
   if(key&&Object.hasOwn(locations,key))return {kind:'earth-preset',key,label:'Return to location'};
   if(!location||![location.lat,location.lon].every(Number.isFinite)||Math.abs(location.lat)>90||Math.abs(location.lon)>180)return null;

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Collision Lab worker boundary</title
+  ><style>
+    body {
+      max-width: 850px;
+      margin: 30px auto;
+      padding: 15px;
+      background: #17332e;
+      color: #f1f4df;
+      font: 16px system-ui;
+    }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+  <h1>Controlled scientific worker boundary</h1>
+  <p>
+    Actual dedicated worker and pinned recorded source. No field visit, instrument clock or saved
+    study is claimed.
+  </p>
+  <pre id="state">Ready for a bounded request.</pre>
+  <script type="module">
+    import { createAcceleratorExperimentClient } from '/app/js/campaign/accelerator-experiment-client.js';
+    import { compactAcceleratorExperiment } from '/app/js/campaign/accelerator-experiments.js';
+    const client = createAcceleratorExperimentClient();
+    let result = null;
+    window.acceleratorWorkerView = {
+      client,
+      async run(method, inputs, studyId = 'campaign') {
+        result = await client.run({ studyId, method, inputs, generation: 1, revision: 1 });
+        document.getElementById('state').textContent = JSON.stringify(
+          {
+            record: compactAcceleratorExperiment(result),
+            verified: result.dataVerification || null,
+          },
+          null,
+          2
+        );
+        return result;
+      },
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Actual scientific worker boundary only',
+        client: client.snapshot(),
+        result: result ? compactAcceleratorExperiment(result) : null,
+      });
+    window.advanceTime = async () => {};
+    window.ready = true;
+  </script>
+</html>

@@ -1,4 +1,9 @@
 import {normalizeMiningCareer,transitionMiningCareer,validateMiningCareerBackup} from './mining-career.js';
+import {
+  normalizeAcceleratorCareer,
+  transitionAcceleratorCareer,
+  validateAcceleratorCareerBackup,
+} from './accelerator-career.js';
 import {normalizeAstronomyCareer,transitionAstronomyCareer,validateAstronomyCareerBackup} from './astronomy-career.js';
 import {normalizeCartographyCareer,transitionCartographyCareer,validateCartographyCareerBackup} from './cartography-career.js';
 import {normalizeMeteorologyCareer,transitionMeteorologyCareer,validateMeteorologyCareerBackup} from './meteorology-career.js';
@@ -37,6 +42,11 @@ import {
 
 // Pure domain contracts. IndexedDB, progression and custody retain one owner.
 const definitions = Object.freeze({
+  accelerator: {
+    normalize: normalizeAcceleratorCareer,
+    transition: transitionAcceleratorCareer,
+    validateBackup: validateAcceleratorCareerBackup
+  },
   mining: {
     normalize: normalizeMiningCareer,
     transition: transitionMiningCareer,

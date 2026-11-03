@@ -67,3 +67,25 @@ test('CERN content preserves access-denied, recorded/mapped and already authored
     assert.equal(resolveCernInterior(ctx, support, retained), retained);
   }
 });
+
+test('reviewed Overture aliases still require the same physical source footprint and cannot admit a neighbouring wing', () => {
+  for (const site of CERN_SITE_REFERENCE) {
+    const { ctx, support, definition } = fixture(site),
+      id = site.sourceAliases[0],
+      alias = {
+        ...support,
+        key: id,
+        building: {
+          ...support.building,
+          sourceBuildingId: id,
+          pts: support.building.pts.map((p) => ({ ...p, x: p.x + 0.25 })),
+        },
+      };
+    assert.equal(resolveCernInterior(ctx, alias, definition).cernContent.siteId, site.id);
+    const wrong = {
+      ...alias,
+      building: { ...alias.building, pts: alias.building.pts.map((p) => ({ ...p, x: p.x + 3 })) },
+    };
+    assert.equal(resolveCernInterior(ctx, wrong, definition), definition);
+  }
+});

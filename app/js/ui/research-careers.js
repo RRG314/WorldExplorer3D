@@ -1,4 +1,10 @@
 import { miningCareerSummary } from '../campaign/mining-career.js';
+import {
+  acceleratorCareerSummary,
+  normalizeAcceleratorCareer,
+  acceleratorTarget,
+} from '../campaign/accelerator-career.js';
+import { CERN_ARRIVALS, acceleratorTargetSite } from '../campaign/cern-study-sites.js';
 import { miningPlaces } from '../campaign/mining-places.js';
 import { astronomyCareerSummary } from '../campaign/astronomy-career.js';
 import { cartographyCareerSummary } from '../campaign/cartography-career.js';
@@ -30,6 +36,8 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   let active = null,
     generation = 0;
   const domains = {
+    'career:accelerator-scientist': async () =>
+      (await import('../campaign/accelerator-runtime.js')).createAcceleratorCareerRuntime,
     'career:mining-engineer': async () =>
       (await import('../campaign/mining-runtime.js')).createMiningCareerRuntime,
     'career:astronomer': async () => (await import('../campaign/astronomy-runtime.js')).createAstronomyCareerRuntime,
@@ -205,6 +213,35 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
           },
     summary: ({ profile, variantId }) =>
       cartographyCareerSummary(profile?.researchCareers?.cartography, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
+  });
+  experiences.registerAdapter('accelerator', {
+    equipment:
+      'Meyrin provides the beam, RF and focusing instruments. Continue by normal Travel to CMS Point 5, use the visitor lift and analyze recorded events at its guarded detector route. Rooms are interpretive; real-site access is separate.',
+    places: ({ profile, variantId = 'campaign' } = {}) => {
+      const s = normalizeAcceleratorCareer(profile?.researchCareers?.accelerator),
+        a = s.active && s.active.phase !== 'complete' ? s.active : s.records?.[variantId];
+      return [CERN_ARRIVALS[acceleratorTargetSite(a ? acceleratorTarget(a) : 'orientation')]];
+    },
+    offer: ({ profile, place }) =>
+      profile?.researchCareers?.accelerator?.schemaVersion &&
+      profile.researchCareers.accelerator.schemaVersion !== 1
+        ? {
+            state: 'unavailable',
+            label: 'Update required',
+            reason: 'This Collision Lab notebook needs a newer World Explorer version.',
+            enabled: false,
+          }
+        : {
+            state: place ? 'ready' : 'needs-place',
+            label: place ? 'Begin CERN study' : 'Choose the CERN visit',
+            reason:
+              'The mapped building and existing access rules are checked at entry. The study supplies its virtual instruments and bundled recorded data.',
+            enabled: !!place,
+          },
+    summary: ({ profile, variantId }) =>
+      acceleratorCareerSummary(profile?.researchCareers?.accelerator, { variantId }),
     start: ({ intent, isCurrent }) =>
       isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
