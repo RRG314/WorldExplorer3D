@@ -1,3 +1,4 @@
+import { meteorologyCareerSummary } from '../campaign/meteorology-career.js';
 import { hydrologyCareerSummary } from '../campaign/hydrology-career.js';
 import { createMarineCareerTravel } from '../campaign/marine-career-travel.js';
 import {
@@ -23,6 +24,8 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   let active = null,
     generation = 0;
   const domains = {
+    'career:meteorologist': async () =>
+      (await import('../campaign/meteorology-runtime.js')).createMeteorologyCareerRuntime,
     'career:hydrologist': async () =>
       (await import('../campaign/hydrology-runtime.js')).createHydrologyCareerRuntime,
     'career:botanist': async () =>
@@ -159,6 +162,38 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
     }),
     start: ({ intent, isCurrent }) =>
       marine.chooseCareer('marine-biology', intent.variantId || 'campaign', { isCurrent }),
+  });
+  experiences.registerAdapter('meteorology', {
+    recoveryActions: ['relocate-course'],
+    equipment:
+      'Two supported working cup/vane instruments, miniature replay sky displays, an illustrative shelter screen and forecast bench are supplied. Existing public weather metadata remains separate from the training replay.',
+    places: (input = {}) =>
+      fieldResearchPlaces('meteorology', {
+        ...input,
+        completedRecord:
+          input.profile?.researchCareers?.meteorology?.records?.[input.variantId || 'campaign'],
+        defaultDestination: { name: 'Druid Hill Park · park lawns', lat: 39.3173, lon: -76.64044 },
+      }),
+    offer: ({ place, profile }) =>
+      profile?.researchCareers?.meteorology?.schemaVersion &&
+      profile.researchCareers.meteorology.schemaVersion !== 1
+        ? {
+            state: 'unavailable',
+            label: 'Update required',
+            reason: 'This saved weather study needs a newer World Explorer version.',
+            enabled: false,
+          }
+        : {
+            state: place ? 'ready' : 'needs-place',
+            label: place ? 'Begin weather study' : 'Choose a training site',
+            reason:
+              'Clear dry support is checked for both instrument footprints. Identify the existing source, measure the replay and save a forecast before its comparison period.',
+            enabled: !!place,
+          },
+    summary: ({ profile, variantId }) =>
+      meteorologyCareerSummary(profile?.researchCareers?.meteorology, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
   experiences.registerAdapter('hydrology', {
     recoveryActions: ['relocate-course'],

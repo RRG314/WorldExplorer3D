@@ -4,6 +4,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ## Unreleased
 
+- Meteorologist studies add working virtual wind and sky instruments, paired
+  stations, forecasts saved before replay comparison, retained errors and the
+  Weather Observer badge. Source age and unavailable data remain explicit.
+
 - Hydrologist studies add matched upstream/downstream virtual instruments,
   declared return conditions, saved watershed plates and the Water Watch badge.
 - Historical USGS river records retain source, dates and units separately from

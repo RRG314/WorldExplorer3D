@@ -204,40 +204,49 @@
   word-break: normal;
 }
 
-.hydrology-table {
+.hydrology-table,
+.meteorology-table {
   max-width: 100%;
   overflow-x: auto;
   margin: 12px 0;
 }
-.hydrology-table table {
+.hydrology-table table,
+.meteorology-table table {
   border-collapse: collapse;
   width: 100%;
   text-align: left;
   overflow-wrap: normal;
   word-break: normal;
 }
-.hydrology-table caption {
+.hydrology-table caption,
+.meteorology-table caption {
   text-align: left;
   line-height: 1.5;
   margin-bottom: 8px;
 }
 .hydrology-table th,
-.hydrology-table td {
+.hydrology-table td,
+.meteorology-table th,
+.meteorology-table td {
   padding: 8px;
   border-bottom: 1px solid #678481;
   overflow-wrap: normal;
   word-break: normal;
 }
-.hydrology-reference {
+.hydrology-reference,
+.meteorology-reference,
+.meteorology-forecast {
   padding: 12px;
   background: #132b30;
   border-left: 3px solid #efd079;
 }
-.hydrology-instruments .research-primary {
+.hydrology-instruments .research-primary,
+.meteorology-instruments .research-primary {
   background: #efd079 !important;
   color: #15251b !important;
 }
-.hydrology-chart {
+.hydrology-chart,
+.meteorology-chart {
   display: block;
   width: 100%;
   height: auto;
@@ -246,7 +255,19 @@
   border-radius: 6px;
   margin: 12px 0;
 }
-.hydrology-chart text {
+.hydrology-chart text,
+.meteorology-chart text {
   fill: #eef7f2;
   font: 20px system-ui;
+}
+
+.meteorology-reference a,
+.meteorology-report a {
+  color: var(--experience-accent, #efd079);
+  text-underline-offset: 3px;
+}
+.meteorology-reference a:focus-visible,
+.meteorology-report a:focus-visible {
+  outline: 2px solid var(--experience-accent, #efd079);
+  outline-offset: 3px;
 }

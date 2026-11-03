@@ -1,3 +1,4 @@
+import {normalizeMeteorologyCareer,transitionMeteorologyCareer,validateMeteorologyCareerBackup} from './meteorology-career.js';
 import {normalizeHydrologyCareer,transitionHydrologyCareer,validateHydrologyCareerBackup} from './hydrology-career.js';
 import { normalizeMarineBiologyCareer, transitionMarineBiologyCareer, validateMarineBiologyCareerBackup } from './marine-biology-career.js';
 import {
@@ -33,6 +34,7 @@ import {
 
 // Pure domain contracts. IndexedDB, progression and custody retain one owner.
 const definitions = Object.freeze({
+  meteorology:{normalize:normalizeMeteorologyCareer,transition:transitionMeteorologyCareer,validateBackup:validateMeteorologyCareerBackup},
   hydrology:{normalize:normalizeHydrologyCareer,transition:transitionHydrologyCareer,validateBackup:validateHydrologyCareerBackup},
   'marine-biology': {normalize:normalizeMarineBiologyCareer,transition:transitionMarineBiologyCareer,validateBackup:validateMarineBiologyCareerBackup},
   oceanography: {

@@ -205,6 +205,21 @@ versioned reference module. Historical observations at that other river and time
 cannot identify the cause of a virtual training change. The career does not make
 new player-time requests to the USGS service.
 
+## Meteorology study replay
+
+The Meteorologist reads the existing weather service without making new provider
+requests. MET Norway data is numerical forecast guidance; issue, valid and fetch
+times remain separate. Missing issue times and unavailable data stay unknown.
+[Provider format and time definitions](https://docs.api.met.no/doc/ForecastJSON.html).
+
+The portable training masts, cup calibration, miniature sky grid, shelter screen
+and fictional replay dates are authored simulations. Their saved forecasts are
+compared with later virtual instrument readings, including misses, and do not
+validate public forecast accuracy. The low training sensors are distinct from
+standard open 10 m wind products; see the
+[NWS siting reference](https://www.weather.gov/media/epz/mesonet/CWOP-Siting.pdf).
+Neither global weather settings nor the player's clock is changed by a replay.
+
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.
