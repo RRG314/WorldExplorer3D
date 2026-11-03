@@ -220,6 +220,24 @@ standard open 10 m wind products; see the
 [NWS siting reference](https://www.weather.gov/media/epz/mesonet/CWOP-Siting.pdf).
 Neither global weather settings nor the player's clock is changed by a replay.
 
+## Cartography route studies
+
+The Cartographer surveys the existing compiled walking network and loaded Earth
+surfaces. Mapped horizontal geometry and inferred facade entrances retain their
+source references. The walking recorder stores actual supported virtual
+positions, local surface heights and active effort; its bearing is referenced to
+local true north, not a device magnetic compass. A reverse survey retains the
+original controls, while a corner survey distinguishes connected distance from
+the straight chord.
+
+[Ordnance Survey distance methods](https://www.ordnancesurvey.co.uk/mapzone/map-skills/measuring-distance)
+and [bearing methods](https://www.ordnancesurvey.co.uk/mapzone/map-skills/compass-bearings/page-three)
+inform the exercise. No Ordnance Survey map or media is bundled. Agreement
+between mapped and rendered geometry is not an independent accuracy check.
+Loaded support and virtual entrance availability do not establish real public
+access, opening hours, crossing safety or step-free travel; these personal route
+sheets are not offered as Live GPS itineraries.
+
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.

@@ -55,10 +55,12 @@ export async function createFieldResearchRuntime({
       throw Error('This field course cannot move at the current step.');
     if (continuing && state.active.variantId !== variantId)
       throw Error('Continue your current training case first.');
-    qualified = qualifyResearchSite(runtime, {
+    qualified = (domain.qualifySite || qualifyResearchSite)(runtime, {
       ...domain.siteDescriptor(intent.place),
       offsets: domain.offsets,
       eligibility: domain.eligibility,
+      variantId,
+      studyState: state,
       existingSite: continuing && !relocating ? state.active.site : domain.completedSite?.(state, variantId) || null
     });
     const accepted = await store.updateResearchCareer(

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Saved survey presentation boundary</title
+  ><link rel="icon" href="/favicon.svg" /><link
+    rel="stylesheet"
+    href="/app/styles/experiences.css"
+  /><style>
+    body {
+      margin: 0;
+      background: #8caaa0;
+      color: #f3f5ed;
+      font: 15px system-ui;
+    }
+    #scope {
+      position: fixed;
+      top: 5px;
+      left: 10px;
+      max-width: 60vw;
+    }
+    #worldFocusTarget {
+      position: fixed;
+      inset: 0;
+      outline: none;
+    }
+    #reviewJournal {
+      position: fixed;
+      inset: 20px;
+      background: #102f29;
+      padding: 24px;
+      overflow: auto;
+      border: 1px solid #86b3a4;
+      border-radius: 16px;
+    }
+    #reviewJournal h2 {
+      margin-top: 0;
+    }
+  </style>
+  <div id="worldFocusTarget" tabindex="0"></div>
+  <p id="scope">
+    Actual saved source reports in native UI and IndexedDB; controlled presence only. No field
+    procedure or movement claim.
+  </p>
+  <section id="reviewJournal" hidden></section>
+  <script type="module">
+    import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js?v=5';
+    import { createCartographyUI } from '/app/js/campaign/cartography-ui.js';
+    import { cartographyReportMarkup } from '/app/js/campaign/cartography-report.js';
+    const store = createIndexedDbDiscoveryProfileStore(),
+      journal = document.getElementById('reviewJournal');
+    let ui, state;
+    async function show() {
+      state = (await store.getProfile()).researchCareers.cartography;
+      if (!state?.records?.campaign) return;
+      state = { ...state, active: state.records.campaign };
+      ui?.dispose();
+      ui = createCartographyUI({
+        runtime: {
+          Walk: { state: { walker: {} } },
+          getEnv: () => 'EARTH',
+          screenLayout: { setPanelLayer() {} },
+          setPauseReason() {},
+          stopGameplayPlugin() {},
+        },
+        getState: () => state,
+        store,
+        tools: { snapshot: () => ({ window: null }), guide() {} },
+        near: (id, asDistance) => (asDistance ? 0 : true),
+        save: () => {
+          throw Error('Read-only saved report boundary');
+        },
+        requestWorldFocus: () => document.getElementById('worldFocusTarget').focus(),
+        onJournal: async () => {
+          const events = await store.listEvents(300);
+          journal.innerHTML =
+            '<h2>Saved route sheets</h2>' +
+            events
+              .filter((e) => e.metadata?.cartographyReport)
+              .map((e) =>
+                cartographyReportMarkup(e.metadata.cartographyReport).replace(
+                  'class="cartography-report"',
+                  'class="cartography-report" open'
+                )
+              )
+              .join('');
+          journal.hidden = false;
+        },
+        onNext() {},
+      });
+      ui.update();
+      ui.open();
+    }
+    window.cartographyReview = {
+      async import(data) {
+        await store.importData(data);
+        await show();
+      },
+      store,
+      async current(reading) {
+        state = (await store.getProfile()).researchCareers.cartography;
+        const record = Object.values(state.records).find((a) => a.runId === reading.runId);
+        if (!record) throw Error('Use an actual saved route reading');
+        state = { ...state, active: { ...record, phase: 'access' } };
+        ui?.dispose();
+        ui = createCartographyUI({
+          runtime: {
+            Walk: { state: { walker: {} } },
+            getEnv: () => 'EARTH',
+            screenLayout: { setPanelLayer() {} },
+            setPauseReason() {},
+            stopGameplayPlugin() {},
+          },
+          getState: () => state,
+          store,
+          tools: { snapshot: () => ({ window: null }), inspection: () => reading, guide() {} },
+          near: (id, distance) => (distance ? 0 : true),
+          save: () => {
+            throw Error('Read-only current access projection');
+          },
+          requestWorldFocus() {},
+          onJournal() {},
+          onNext() {},
+        });
+        ui.update();
+        ui.open();
+      },
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope:
+          new URLSearchParams(location.search).get('example') === 'route-sheet'
+            ? 'Controlled model example; native UI/IndexedDB only'
+            : 'Actual saved source reports; controlled native UI only',
+        revision: state?.revision,
+        phase: state?.active?.phase,
+        reports: Object.keys(state?.records || {}).length,
+        journal: !journal.hidden,
+      });
+    window.advanceTime = async () => {};
+    if (new URLSearchParams(location.search).get('example') === 'route-sheet') {
+      document.getElementById('scope').textContent =
+        'Controlled model example in native UI/IndexedDB. No source-world or field claim.';
+      const { cartographyHarness } = await import('/tests/helpers/cartography-study.mjs');
+      let prior;
+      for (const id of ['campaign', 'reciprocal', 'dogleg']) {
+        const h = cartographyHarness(prior, id);
+        h.accept();
+        h.controls();
+        h.measure();
+        h.measure();
+        h.access();
+        h.reconcile();
+        h.publish();
+        prior = h.state;
+        for (const event of h.events)
+          await store.updateResearchCareer('cartography', event.metadata.action, {
+            now: event.occurredAt,
+          });
+      }
+    }
+    await show();
+    window.ready = true;
+  </script>
+</html>

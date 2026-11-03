@@ -4,6 +4,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ## Unreleased
 
+- Cartographer studies add supported walking measurements, original reciprocal
+  controls, a connected corner route, access notes, reusable route sheets and the
+  Route Survey badge. Real public access remains unverified.
+
 - Meteorologist studies add working virtual wind and sky instruments, paired
   stations, forecasts saved before replay comparison, retained errors and the
   Weather Observer badge. Source age and unavailable data remain explicit.

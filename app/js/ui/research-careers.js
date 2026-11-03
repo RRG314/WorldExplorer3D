@@ -1,3 +1,4 @@
+import { cartographyCareerSummary } from '../campaign/cartography-career.js';
 import { meteorologyCareerSummary } from '../campaign/meteorology-career.js';
 import { hydrologyCareerSummary } from '../campaign/hydrology-career.js';
 import { createMarineCareerTravel } from '../campaign/marine-career-travel.js';
@@ -24,6 +25,8 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   let active = null,
     generation = 0;
   const domains = {
+    'career:cartographer': async () =>
+      (await import('../campaign/cartography-runtime.js')).createCartographyCareerRuntime,
     'career:meteorologist': async () =>
       (await import('../campaign/meteorology-runtime.js')).createMeteorologyCareerRuntime,
     'career:hydrologist': async () =>
@@ -162,6 +165,40 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
     }),
     start: ({ intent, isCurrent }) =>
       marine.chooseCareer('marine-biology', intent.variantId || 'campaign', { isCurrent }),
+  });
+  experiences.registerAdapter('cartography', {
+    equipment:
+      'Virtual control markers, a walking survey recorder and a north-up route sheet are supplied. Existing streets, collision, entrances and navigation retain their normal behavior.',
+    places: (input = {}) =>
+      fieldResearchPlaces('cartography', {
+        ...input,
+        completedRecord:
+          input.profile?.researchCareers?.cartography?.records?.[input.variantId || 'campaign'] ||
+          (input.variantId === 'reciprocal'
+            ? input.profile?.researchCareers?.cartography?.records?.campaign
+            : null),
+        defaultDestination: {
+          name: 'Baltimore · East Lexington Street', lat: 39.29095, lon: -76.61085,
+        },
+      }),
+    offer: ({ place, profile }) =>
+      profile?.researchCareers?.cartography?.schemaVersion &&
+      profile.researchCareers.cartography.schemaVersion !== 1
+        ? {
+            state: 'unavailable', label: 'Update required',
+            reason: 'This saved route survey needs a newer World Explorer version.', enabled: false,
+          }
+        : {
+            state: place ? 'ready' : 'needs-place',
+            label: place ? 'Begin route survey' : 'Choose a place',
+            reason:
+              'Admission checks connected walking legs, loaded support, visible controls and an entrance approach. Real public access remains unverified.',
+            enabled: !!place,
+          },
+    summary: ({ profile, variantId }) =>
+      cartographyCareerSummary(profile?.researchCareers?.cartography, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
   experiences.registerAdapter('meteorology', {
     recoveryActions: ['relocate-course'],

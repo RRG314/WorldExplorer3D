@@ -1,5 +1,9 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/cartography-career-current.test.mjs',
+  'tests/cartography-recorder-current.test.mjs',
+  'tests/cartography-site-current.test.mjs',
+  'tests/cartography-access-current.test.mjs',
   'tests/experience-entry-current.test.mjs',
   'tests/solo-racer-current.test.mjs',
   'tests/geology-career-current.test.mjs',

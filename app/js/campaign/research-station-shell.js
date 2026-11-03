@@ -2,14 +2,16 @@ const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&am
 
 // Native station chrome owns focus and pause only. Domain views own their
 // instruments and commands; the profile store owns every durable result.
-export function createResearchStationShell({runtime, careerId, label, getState, target, objective, stationLabel, near, view, save, onCommand, afterRender, onJournal, onNext, requestWorldFocus}) {
+export function createResearchStationShell({runtime, careerId, label, siteLabel=null, getState, target, objective, stationLabel, near, view, save, onCommand, afterRender, onJournal, onNext, requestWorldFocus}) {
   const pin = document.createElement('aside');
   pin.className = 'research-objective'; pin.setAttribute('aria-label', label + ' objective');
   pin.innerHTML = `<span>${escape(label)} · Fictional training site</span><strong></strong><p></p><div><button type="button" data-research-station>Open station</button><button type="button" data-research-pause>Pause fieldwork</button></div>`;
+  if(siteLabel)pin.querySelector('span').textContent=label+' · '+siteLabel;
   const dialog = document.createElement('dialog'), titleId = careerId + 'StationTitle';
   dialog.className = 'experience-browser research-station'; dialog.dataset.career = careerId;
   dialog.setAttribute('aria-labelledby', titleId);
   dialog.innerHTML = `<header class="experience-header"><div><span class="experience-eyebrow">${escape(label)} · Training site</span><h2 id="${titleId}" tabindex="-1"></h2></div><button type="button" data-research-close aria-label="Close station">×</button></header><div class="research-station-body"></div><footer class="research-station-actions"></footer><p class="research-station-status" role="status" aria-live="polite"></p>`;
+  if(siteLabel)dialog.querySelector('.experience-eyebrow').textContent=label+' · '+siteLabel;
   document.body.append(pin, dialog);
   const body = dialog.querySelector('.research-station-body'), actions = dialog.querySelector('footer'), status = dialog.querySelector('[role=status]'), heading = dialog.querySelector('h2');
   let busy = false, disposed = false, origin = null, station = null, cursor = null;
