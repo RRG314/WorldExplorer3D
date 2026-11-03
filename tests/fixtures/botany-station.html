@@ -1,0 +1,150 @@
+<!doctype html><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><link
+  rel="icon"
+  href="/favicon.svg"
+/><title>Plant station save boundary</title
+><link rel="stylesheet" href="/app/styles/experiences.css" /><style>
+  body {
+    margin: 0;
+    background: #1c372b;
+    color: #eee;
+    font: 16px system-ui;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  #world {
+    width: 100vw;
+    height: 100vh;
+    border: 0;
+    background: linear-gradient(#8ca7a1, #3a5841);
+  }</style
+><button id="world">Controlled field surface</button>
+<script type="module">
+  import { createBotanyUI } from '/app/js/campaign/botany-ui.js';
+  import { BOTANY_PLANTS, botanyTarget } from '/app/js/campaign/botany-career.js';
+  import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js?v=5';
+  const store = createIndexedDbDiscoveryProfileStore();
+  let state,
+    ui,
+    failNext = false,
+    pending = null,
+    globalEscapes = 0;
+  const runtime = {
+    Walk: { state: { walker: {} } },
+    getEnv: () => 'EARTH',
+    screenLayout: { setPanelLayer() {} },
+    setPauseReason(k, v) {
+      runtime.paused = v;
+    }
+  };
+  function reading() {
+    const a = state.active,
+      id = ['a', 'b', 'c'][a.plantIndex],
+      p = BOTANY_PLANTS[id];
+    pending = {
+      plantId: id,
+      runId: a.runId,
+      siteId: a.site.id,
+      truthType: 'authored-virtual-bed',
+      method: 'paired-training-sensors',
+      depthCm: 5,
+      light: p.light,
+      moisture: p.moisture,
+      units: { light: 'relative-index', moisture: 'relative-index' },
+      supported: true,
+      at: Date.now()
+    };
+    return pending;
+  }
+  const tools = {
+    get busy() {
+      return false;
+    },
+    snapshot: () => ({ reading: pending }),
+    enter() {},
+    read: reading,
+    prepare: (command) =>
+      command.type === 'measure-plant' ? { ...command, reading: reading() } : command
+  };
+  async function mount(data, previewState) {
+    if (data) await store.importData(data);
+    state = previewState || (await store.getProfile()).researchCareers.botany;
+    if (!state.active) return;
+    ui?.dispose();
+    ui = createBotanyUI({
+      runtime,
+      store,
+      tools,
+      getState: () => state,
+      near: (id, d) => (d ? 1 : true),
+      async save(command) {
+        if (failNext) {
+          failNext = false;
+          throw Error('The field record could not save. Try again.');
+        }
+        const a = state.active,
+          now = Date.now(),
+          result = await store.updateResearchCareer(
+            'botany',
+            {
+              ...command,
+              revision: state.revision,
+              evidence: {
+                environment: 'EARTH',
+                travelMode: 'walk',
+                liveGps: false,
+                supported: true,
+                verticalDistance: 1.7,
+                siteId: a.site.id,
+                position: a.site.points[botanyTarget(a)],
+                at: now
+              }
+            },
+            { now }
+          );
+        state = result.state;
+      },
+      onJournal() {},
+      onNext() {},
+      requestWorldFocus: () => document.querySelector('#world').focus()
+    });
+    ui.update();
+    window.botanyCheck.ready = true;
+  }
+  window.botanyCheck = {
+    ready: false,
+    initialize: mount,
+    store,
+    get state() {
+      return state;
+    },
+    set failNextSave(v) {
+      failNext = v;
+    },
+    get globalEscapes() {
+      return globalEscapes;
+    }
+  };
+  if (new URLSearchParams(location.search).has('preview')) {
+    const { botanyHarness } = await import('/tests/helpers/botany-study.mjs'),
+      h = botanyHarness();
+    h.photograph('a');
+    await mount(null, h.state);
+    ui.open();
+  } else await mount();
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') globalEscapes++;
+  });
+  function loop() {
+    ui?.update();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  window.render_game_to_text = () =>
+    JSON.stringify({
+      evidence:
+        new URLSearchParams(location.search).has('preview') ? 'Controlled model preview only; no field observation or IndexedDB result is claimed' : 'Controlled sensors/presence, actual saved photo prefix and actual IndexedDB; UI save boundary only',
+      revision: state?.revision,
+      phase: state?.active?.phase
+    });
+</script>

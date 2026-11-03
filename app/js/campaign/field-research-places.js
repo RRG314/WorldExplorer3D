@@ -4,27 +4,35 @@ const supported = (place) =>
   Math.abs(place.lat) <= 90 &&
   Number.isFinite(place.lon) &&
   Math.abs(place.lon) <= 180;
-export function fieldResearchPlaces(careerId, { profile, context = {} } = {}) {
-  const active = profile?.researchCareers?.[careerId]?.active;
-  if (active && active.phase !== 'complete') {
-    const destination = active.site?.locationContext || active.site?.location;
+export function fieldResearchPlaces(
+  careerId,
+  { profile, context = {}, variantId = 'campaign' } = {}
+) {
+  const state = profile?.researchCareers?.[careerId],
+    active = state?.active;
+  const saved =
+    careerId === 'botany' && (!active || active.phase === 'complete')
+      ? state?.records?.[variantId]
+      : null;
+  if (saved || (active && active.phase !== 'complete')) {
+    const site = (saved || active).site,
+      destination = site?.locationContext || site?.location;
     return supported(destination)
       ? [
           {
             id: 'saved-' + careerId + '-course',
             environment: 'earth',
             ...destination,
-            name: destination.name || active.site.name
+            name: destination.name || site.name
           }
         ]
       : [];
   }
   // Wildlife needs an admitted park cell: the older field-course arrival is
   // beside the reservoir. Other careers and all saved destinations retain it.
-  const destination =
-    careerId === 'wildlife'
-      ? { name: 'Druid Hill Park · park lawns', lat: 39.3173, lon: -76.64044 }
-      : { name: 'Druid Hill Park', lat: 39.3189, lon: -76.6363 };
+  const destination = ['wildlife', 'botany'].includes(careerId)
+    ? { name: 'Druid Hill Park · park lawns', lat: 39.3173, lon: -76.64044 }
+    : { name: 'Druid Hill Park', lat: 39.3189, lon: -76.6363 };
   const places = [{ id: careerId + '-druid-hill', ...destination, environment: 'earth' }];
   const selected = context.place;
   if (

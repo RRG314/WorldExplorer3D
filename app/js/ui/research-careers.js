@@ -1,3 +1,4 @@
+import { botanyCareerSummary } from '../campaign/botany-career.js';
 import { wildlifeCareerSummary } from '../campaign/wildlife-career.js';
 import { palaeontologyCareerSummary } from '../campaign/palaeontology-career.js';
 import { geologyCareerSummary } from '../campaign/geology-career.js';
@@ -9,6 +10,8 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   let active = null,
     generation = 0;
   const domains = {
+    'career:botanist': async () =>
+      (await import('../campaign/botany-runtime.js')).createBotanyCareerRuntime,
     'career:wildlife-ecologist': async () =>
       (await import('../campaign/wildlife-career-runtime.js')).createWildlifeCareerRuntime,
     'career:palaeontologist': async () =>
@@ -78,6 +81,33 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
     },
     summary: ({ profile, variantId }) =>
       geologyCareerSummary(profile?.researchCareers?.geology, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+  });
+  experiences.registerAdapter('botany', {
+    recoveryActions: ['relocate-course'],
+    equipment:
+      'Three training plant beds provide diagnostic structures and paired light/moisture instruments. A marked treatment and untreated plot use the same sixteen sampling points through explicitly virtual seasons. Plant plates and restoration records stay in Journal.',
+    places: (input) => fieldResearchPlaces('botany', input),
+    offer: ({ place, profile }) => {
+      const state = profile?.researchCareers?.botany;
+      if (state?.schemaVersion && state.schemaVersion !== 1)
+        return {
+          state: 'unavailable',
+          label: 'Update required',
+          reason: 'This saved plant study needs a newer version of World Explorer.',
+          enabled: false
+        };
+      return {
+        state: place ? 'ready' : 'needs-place',
+        label: place ? 'Begin plant study' : 'Choose a training site',
+        reason:
+          'A clear, dry area in a mapped park, woodland or field is checked after travel. Authored varieties and virtual seasons do not describe plants or conditions at this real place.',
+        enabled: !!place
+      };
+    },
+    summary: ({ profile, variantId }) =>
+      botanyCareerSummary(profile?.researchCareers?.botany, { variantId }),
     start: ({ intent, isCurrent }) =>
       isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
   });

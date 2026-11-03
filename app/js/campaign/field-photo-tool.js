@@ -1,6 +1,10 @@
 import { createWorldPhotoCapture } from './three-views-capture.js';
 import { researchPhotoId } from './research-media.js';
-export function inspectFieldPhoto(runtime, subject) {
+export function inspectFieldPhoto(
+  runtime,
+  subject,
+  { acceptIntersection = () => true, sampleSurfacePoints = null } = {}
+) {
   if (
     runtime.getEnv?.() !== 'EARTH' ||
     runtime.getCurrentTravelMode?.() !== 'walk' ||
@@ -70,7 +74,8 @@ export function inspectFieldPhoto(runtime, subject) {
             (row) =>
               visible(row.object) &&
               row.object.material?.depthTest !== false &&
-              !(row.object.material?.transparent && row.object.material.opacity < 0.2)
+              !(row.object.material?.transparent && row.object.material.opacity < 0.2) &&
+              acceptIntersection(row)
           );
         samples.push({
           target: object.name,
@@ -91,11 +96,43 @@ export function inspectFieldPhoto(runtime, subject) {
             }
         }
       }
+    if (!clear && sampleSurfacePoints) {
+      for (const point of sampleSurfacePoints(object)) {
+        const projected = point.clone().project(camera);
+        if (
+          projected.z < -1 ||
+          projected.z > 1 ||
+          Math.abs(projected.x) > 0.85 ||
+          Math.abs(projected.y) > 0.85
+        )
+          continue;
+        ray.setFromCamera(new T.Vector2(projected.x, projected.y), camera);
+        ray.near = 0.02;
+        ray.far = from.distanceTo(point) + 0.2;
+        const hit = ray
+          .intersectObjects(runtime.scene.children, true)
+          .find(
+            (row) =>
+              visible(row.object) &&
+              row.object.material?.depthTest !== false &&
+              !(row.object.material?.transparent && row.object.material.opacity < 0.2) &&
+              acceptIntersection(row)
+          );
+        if (hit) {
+          for (let p = hit.object; p; p = p.parent)
+            if (p === object) {
+              clear = true;
+              break;
+            }
+        }
+        if (clear) break;
+      }
+    }
     if (clear) clearCount++;
   }
   if (!clearCount || (subject.requireAll && clearCount !== subject.objects.length)) {
     const error = Error(
-      'The subject or its north marker is obscured. Move for a clear view before taking the photograph.'
+      'Required field details are obscured. Move for a clear view before taking the photograph.'
     );
     error.fieldPhotoDiagnostics = {
       subjectId: subject.id,
@@ -130,7 +167,8 @@ export function createFieldPhotoTool(
     save,
     isCurrent,
     accepts = (active) => active.phase === 'photographs',
-    captureKind = (slot) => (slot === 'layer' ? 'context' : 'detail')
+    captureKind = (slot) => (slot === 'layer' ? 'context' : 'detail'),
+    inspect = inspectFieldPhoto
   }
 ) {
   const shutter = createWorldPhotoCapture(runtime, {
@@ -159,9 +197,7 @@ export function createFieldPhotoTool(
           subject = presentation.photoSubjects?.[slot];
         if (!accepts(active, slot) || !subject)
           throw Error('This step does not request a photograph.');
-        const result = await shutter.capture(captureKind(slot), () =>
-          inspectFieldPhoto(runtime, subject)
-        );
+        const result = await shutter.capture(captureKind(slot), () => inspect(runtime, subject));
         if (disposed || !isCurrent() || getState().active.runId !== active.runId)
           throw Error('The field course changed. Take the photograph again.');
         const capture = {

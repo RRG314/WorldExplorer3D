@@ -1,3 +1,4 @@
+import { createFieldOpacitySampler } from '../app/js/campaign/field-opacity-sampler.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -78,4 +79,22 @@ test('opaque world labels cannot certify a subject they obscure in the saved pix
   assert.throws(() => inspectFieldPhoto(c.runtime, c.subject), /obscured/);
   label.visible = false;
   assert.equal(inspectFieldPhoto(c.runtime, c.subject).view.visible, true);
+});
+
+test('a domain may sample cutout alpha without certifying a visibly opaque obstruction', () => {
+  const c = course(),
+    map = new T.DataTexture(new Uint8Array(16), 2, 2, T.RGBAFormat),
+    wall = new T.Mesh(
+      new T.BoxGeometry(3, 3, 0.1),
+      new T.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.5 })
+    );
+  wall.position.set(0, 1, 1.6);
+  c.scene.add(wall);
+  const sampler = createFieldOpacitySampler();
+  assert.throws(() => inspectFieldPhoto(c.runtime, c.subject), /obscured/);
+  assert.equal(
+    inspectFieldPhoto(c.runtime, c.subject, { acceptIntersection: sampler.accepts }).view.visible,
+    true
+  );
+  sampler.dispose();
 });

@@ -43,21 +43,22 @@ export function createResearchStationShell({runtime, careerId, label, getState, 
     const controls = [...dialog.querySelectorAll('button,input,select')].map(control => [control, control.disabled]);
     for (const [control] of controls) control.disabled = true;
     try {
-      const previous = station; await save(command,saveOptions); render();
+      const previous = station; await save(typeof command === 'function' ? await command() : command,saveOptions); render();
       if (station !== previous) {busy = false; close();}
     } catch (error) {status.textContent = error?.message || 'The step could not save. Your previous records and finds are kept. Try again.';}
     finally {busy = false; for (const [control, disabled] of controls) if (control.isConnected) control.disabled = disabled; update();}
   }
+  const feedback = text => {status.textContent = text;};
   dialog.addEventListener('submit', event => {
     event.preventDefault(); const form = event.target;
-    if (form.matches('[data-research-form]') && !busy) onCommand(form.dataset.researchForm, Object.fromEntries(new FormData(form)), active(), {perform, render, body, close});
+    if (form.matches('[data-research-form]') && !busy) onCommand(form.dataset.researchForm, Object.fromEntries(new FormData(form)), active(), {perform, render, body, close, feedback});
   });
   dialog.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button || busy) return;
     if (button.hasAttribute('data-research-close')) close();
     else if (button.hasAttribute('data-research-journal')) {close({returnToWorld: false}); onJournal();}
     else if (button.hasAttribute('data-research-next')) {close({returnToWorld: false}); onNext();}
-    else if (button.dataset.researchAction) onCommand(button.dataset.researchAction, {...button.dataset}, active(), {perform, render, body, close});
+    else if (button.dataset.researchAction) onCommand(button.dataset.researchAction, {...button.dataset}, active(), {perform, render, body, close, feedback});
   });
   dialog.addEventListener('keydown', event => {if (event.key === 'Escape') event.stopPropagation();});
   dialog.addEventListener('cancel', event => {event.preventDefault(); close();});

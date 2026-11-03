@@ -1,4 +1,3 @@
-import { validateResearchMediaRecord } from './research-media.js';
 const escape = (value) =>
   String(value ?? '').replace(
     /[&<>"']/g,
@@ -24,31 +23,4 @@ export function palaeontologyArchiveMarkup(record) {
   return `<details class="fossil-archive"><summary>Earlier training attempt · records retained</summary><p>This attempt ended before its fossil report was complete. Its original location, observations and images are retained separately from the moved course.</p><p>${escape(record.site.name)}<br>Observed form: ${words(record.observation?.form)}<br>Layer: ${words(record.orientation?.layer)} · Axis: ${words(record.orientation?.axis)}</p><p>Preparation: ${(record.preparation || []).map((row) => words(row.zone) + ' · ' + words(row.tool)).join('; ') || 'Not started'}<br>Support: ${words(record.support?.method)}</p>${record.specimen ? '<p>The labelled specimen from this attempt remains in your collection.</p>' : ''}${fieldPhotoFigures(record.captures)}</details>`;
 }
 
-export async function showResearchPhoto(button, store) {
-  const host = button.closest('.field-photo-record'),
-    status = host?.querySelector('[role=status]');
-  if (!host || !status || button.disabled) return;
-  button.disabled = true;
-  status.textContent = 'Loading photograph…';
-  try {
-    const row = await store.getResearchPhoto(button.dataset.researchPhoto);
-    validateResearchMediaRecord(row);
-    if (row.schemaVersion !== 1)
-      throw Error('This photograph needs a newer version of World Explorer.');
-    if (!button.isConnected) return;
-    const image = document.createElement('img');
-    image.src = row.photo.dataUrl;
-    image.alt = 'Saved in-game ' + row.slot + ' field photograph';
-    image.width = row.photo.width;
-    image.height = row.photo.height;
-    image.style.cssText = 'display:block;max-width:100%;height:auto';
-    host.insertBefore(image, host.firstChild);
-    button.hidden = true;
-    status.textContent = 'Photograph restored from this device’s Journal.';
-  } catch (error) {
-    if (status.isConnected)
-      status.textContent = error.message || 'The photograph could not load. Try again.';
-  } finally {
-    button.disabled = false;
-  }
-}
+export { showResearchPhoto } from './research-photo-viewer.js';

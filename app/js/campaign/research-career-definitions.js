@@ -1,4 +1,9 @@
 import {
+  normalizeBotanyCareer,
+  transitionBotanyCareer,
+  validateBotanyCareerBackup
+} from './botany-career.js';
+import {
   normalizeWildlifeCareer,
   transitionWildlifeCareer,
   validateWildlifeCareerBackup
@@ -21,6 +26,11 @@ import {
 
 // Pure domain contracts. IndexedDB, progression and custody retain one owner.
 const definitions = Object.freeze({
+  botany: {
+    normalize: normalizeBotanyCareer,
+    transition: transitionBotanyCareer,
+    validateBackup: validateBotanyCareerBackup
+  },
   wildlife: {
     normalize: normalizeWildlifeCareer,
     transition: transitionWildlifeCareer,

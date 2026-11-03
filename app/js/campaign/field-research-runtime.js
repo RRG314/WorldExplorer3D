@@ -59,7 +59,7 @@ export async function createFieldResearchRuntime({
       ...domain.siteDescriptor(intent.place),
       offsets: domain.offsets,
       eligibility: domain.eligibility,
-      existingSite: continuing && !relocating ? state.active.site : null
+      existingSite: continuing && !relocating ? state.active.site : domain.completedSite?.(state, variantId) || null
     });
     const accepted = await store.updateResearchCareer(
       domain.id,
