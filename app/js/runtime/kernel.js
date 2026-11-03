@@ -177,7 +177,9 @@ function createRuntimeKernel(options = {}) {
 
     const simulationPaused=isSimulationPaused(sharedContext);
     if(simulationPaused)accumulator=0;
-    const dt = simulationPaused?0:acceptedSimulationDelta(rawDelta,Math.min(maxDelta,fixedDelta*maxFixedSteps),accumulator);
+    const dt = simulationPaused
+      ? 0
+      : acceptedSimulationDelta(rawDelta, Math.min(maxDelta, fixedDelta * maxFixedSteps));
     frameNumber++;
     const frame = {
       ...sharedContext,

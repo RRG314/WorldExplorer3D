@@ -44,3 +44,38 @@ test('pause, unavailable collision and resume do not accumulate replayable simul
  blocked=false;kernel.runFrame(20034);assert.ok(player-prior<.018);assert.ok(population-prior<.018);kernel.dispose();
  for(const interval of [.1,.25,1])assert.equal(acceptedSimulationDelta(interval),1/30);
 });
+test('mixed normal display intervals retain elapsed movement time and bounded fixed work', () => {
+  const kernel = createRuntimeKernel({ fixedDelta: 1 / 60, maxFixedSteps: 2, maxDelta: 0.1 });
+  let player = 0,
+    population = 0,
+    steps = 0;
+  kernel.registerSystem({
+    id: 'population',
+    fixedUpdate(frame) {
+      population += frame.dt;
+      steps++;
+    },
+  });
+  kernel.registerSystem({
+    id: 'held-driver',
+    update(frame) {
+      player += frame.dt;
+    },
+  });
+  let time = 0;
+  kernel.runFrame(time);
+  // The real city trace alternated these normal intervals. A fractional fixed
+  // remainder must not turn an ordinary 33.3 ms frame into a 16.7 ms frame.
+  for (let i = 0; i < 120; i++)
+    for (const seconds of [0.0166, 0.0333, 0.0167, 0.03333333333333333]) {
+      const prior = player;
+      steps = 0;
+      time += seconds * 1000;
+      kernel.runFrame(time);
+      assert.ok(Math.abs(player - prior - seconds) < 1e-10);
+      assert.ok(steps <= 2);
+      assert.ok(Math.abs(player - population) < 1 / 60 + 1e-9);
+    }
+  assert.ok(Math.abs(player - time / 1000) < 1e-9);
+  kernel.dispose();
+});
