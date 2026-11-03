@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    CMS native source geometry</title
+  ><link rel="icon" href="/favicon.svg" /><style>
+    body {
+      margin: 0;
+      background: #172b33;
+      color: #f0f4e8;
+      font: 16px system-ui;
+    }
+    canvas {
+      display: block;
+    }
+    aside {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      max-width: 330px;
+      padding: 12px;
+      background: #11272ee8;
+      border: 1px solid #8bbab1;
+      border-radius: 8px;
+    }
+    button {
+      font: inherit;
+      padding: 8px;
+      margin: 3px;
+      background: #efd079;
+      color: #17312d;
+      border: 0;
+      border-radius: 4px;
+    }
+    pre {
+      white-space: pre-wrap;
+      font: 12px system-ui;
+    }
+  </style>
+  <aside>
+    <strong>CMS source-geometry view</strong>
+    <p>
+      Controlled camera and lighting. This checks pinned display components, layer selection and
+      leases; no facility traversal or completed experiment.
+    </p>
+    <div id="layers"></div>
+    <pre id="state">Loading source components…</pre>
+  </aside>
+  <script src="/app/vendor/three/build/three.min.js"></script>
+  <script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+  <script type="module">
+    import { createCmsDetectorExhibit } from '/app/js/interiors/cms-detector-exhibit.js';
+    import { applyDisplayColorPolicy } from '/app/js/engine/display-color-policy.js';
+    import { modelAssetCacheSnapshot } from '/app/js/assets/model-asset-runtime.js?v=16';
+    const T = THREE,
+      scene = new T.Scene(),
+      camera = new T.PerspectiveCamera(52, innerWidth / innerHeight, 0.04, 150),
+      renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(innerWidth, innerHeight);
+    applyDisplayColorPolicy(renderer, T);
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
+    scene.background = new T.Color(0x172b33);
+    document.body.prepend(renderer.domElement);
+    scene.add(new T.HemisphereLight(0xffffff, 0x596467, 1));
+    const light = new T.DirectionalLight(0xfff3df, 1.2);
+    light.position.set(-15, 25, 18);
+    scene.add(light);
+    const parent = new T.Group();
+    scene.add(parent);
+    const detector = await createCmsDetectorExhibit(T, parent);
+    function draw() {
+      camera.position.set(19, 12, 24);
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+      document.getElementById('state').textContent = JSON.stringify(
+        { ...detector.snapshot(), draw: renderer.info.render },
+        null,
+        2
+      );
+    }
+    for (const id of ['all', 'tracking', 'ecal', 'hcal', 'muon']) {
+      const b = document.createElement('button');
+      b.textContent = id;
+      b.onclick = () => {
+        detector.setLayer(id);
+        draw();
+      };
+      document.getElementById('layers').append(b);
+    }
+    window.cmsView = {
+      detector,
+      renderer,
+      scene,
+      draw,
+      cache: modelAssetCacheSnapshot,
+      snapshot: () => ({
+        exhibit: detector.snapshot(),
+        bounds: new T.Box3().setFromObject(detector.root),
+        draw: renderer.info.render,
+      }),
+    };
+    window.render_game_to_text = () => JSON.stringify(cmsView.snapshot());
+    window.advanceTime = async () => draw();
+    draw();
+    window.ready = true;
+  </script>
+</html>

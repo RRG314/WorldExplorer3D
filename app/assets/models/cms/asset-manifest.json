@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "sourceSchema": "cms-display-geometry-v1",
+  "repository": "https://github.com/cms-outreach/ispy-webgl",
+  "sourceCommit": "7a900709f0e189104df99e77fb855e778b8b3b9f",
+  "license": "MIT",
+  "licenseFile": "ISPY-LICENSE.txt",
+  "coordinates": "Unscaled source coordinates; x/y transverse, z beam; metre-scale bounds checked against detector dimensions. No fitted alignment constants.",
+  "limits": "CMS event-display meshes, not engineering CAD or simulation geometry. V1 pixel selected to avoid the explicitly phase-1 V2 upgrade; exact 2010 alignment and completeness unverified. Colours, clipping and exploded poses are educational presentation. Coil envelope is separately labelled schematic.",
+  "assets": [
+    {
+      "id": "PixelBarrel3D_V1",
+      "assetId": "cms-pixelbarrel3d-v1",
+      "group": "tracking",
+      "file": "PixelBarrel3D_V1.glb",
+      "bytes": 76852,
+      "sha256": "474e5e7e794c4672bb09629d15b27e40c496fcb185464b7e0a1cd7cc2e18132f",
+      "triangles": 0,
+      "lineVertices": 6144,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/PixelBarrel3D_V1.glb"
+    },
+    {
+      "id": "PixelEndcapPlus3D_V1",
+      "assetId": "cms-pixelendcapplus3d-v1",
+      "group": "tracking",
+      "file": "PixelEndcapPlus3D_V1.glb",
+      "bytes": 34092,
+      "sha256": "05196dba73100553c9cef39b613ea657712e69c5fdfe4cf65f6a9c6f08c7fe26",
+      "triangles": 0,
+      "lineVertices": 2688,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/PixelEndcapPlus3D_V1.glb"
+    },
+    {
+      "id": "PixelEndcapMinus3D_V1",
+      "assetId": "cms-pixelendcapminus3d-v1",
+      "group": "tracking",
+      "file": "PixelEndcapMinus3D_V1.glb",
+      "bytes": 34092,
+      "sha256": "74cc253db548f86d8e8eaa61404fecd0ead3e3568a3920698e9fa0d5c02c7a80",
+      "triangles": 0,
+      "lineVertices": 2688,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/PixelEndcapMinus3D_V1.glb"
+    },
+    {
+      "id": "SiStripTIB3D_V1",
+      "assetId": "cms-sistriptib3d-v1",
+      "group": "tracking",
+      "file": "SiStripTIB3D_V1.glb",
+      "bytes": 346524,
+      "sha256": "cdf5f2f8e9aebb015b411ed9f8ca01e5e533983ff526c47c5c895c2fe8e3c450",
+      "triangles": 0,
+      "lineVertices": 27936,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/SiStripTIB3D_V1.glb"
+    },
+    {
+      "id": "SiStripTOB3D_V1",
+      "assetId": "cms-sistriptob3d-v1",
+      "group": "tracking",
+      "file": "SiStripTOB3D_V1.glb",
+      "bytes": 623328,
+      "sha256": "fcda8a4cbf07160df19fa56ae2389ae9ea69c227279fa973398b016cddb3ea36",
+      "triangles": 0,
+      "lineVertices": 50304,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/SiStripTOB3D_V1.glb"
+    },
+    {
+      "id": "SiStripTECPlus3D_V1",
+      "assetId": "cms-sistriptecplus3d-v1",
+      "group": "tracking",
+      "file": "SiStripTECPlus3D_V1.glb",
+      "bytes": 374648,
+      "sha256": "00733aa0ad9ca44bd16bc6cebe85a39ce614a441eab7fa5f3ba4f22004583f4b",
+      "triangles": 0,
+      "lineVertices": 30208,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/SiStripTECPlus3D_V1.glb"
+    },
+    {
+      "id": "SiStripTECMinus3D_V1",
+      "assetId": "cms-sistriptecminus3d-v1",
+      "group": "tracking",
+      "file": "SiStripTECMinus3D_V1.glb",
+      "bytes": 374652,
+      "sha256": "18007e88cb9ca6436193cf0cb678362100bcf9e12e741919412fe3c5d02e3540",
+      "triangles": 0,
+      "lineVertices": 30208,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/SiStripTECMinus3D_V1.glb"
+    },
+    {
+      "id": "SiStripTIDPlus3D_V1",
+      "assetId": "cms-sistriptidplus3d-v1",
+      "group": "tracking",
+      "file": "SiStripTIDPlus3D_V1.glb",
+      "bytes": 55468,
+      "sha256": "cab86ef89bc1ed48f2098f975bface19612e0ade6e43254f9c16523ab8ba1973",
+      "triangles": 0,
+      "lineVertices": 4416,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/SiStripTIDPlus3D_V1.glb"
+    },
+    {
+      "id": "SiStripTIDMinus3D_V1",
+      "assetId": "cms-sistriptidminus3d-v1",
+      "group": "tracking",
+      "file": "SiStripTIDMinus3D_V1.glb",
+      "bytes": 55472,
+      "sha256": "cbd54365addcbd001760c56b636a7f7c30e43f924409ce2df81ea9bafc28beb7",
+      "triangles": 0,
+      "lineVertices": 4416,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/SiStripTIDMinus3D_V1.glb"
+    },
+    {
+      "id": "EcalBarrel3D_V2",
+      "assetId": "cms-ecalbarrel3d-v2",
+      "group": "ecal",
+      "file": "EcalBarrel3D_V2.glb",
+      "bytes": 1915192,
+      "sha256": "d139a349f0dcc4fab3514a6250aa85ffa524ea44d391617d846c07691fbfdec9",
+      "triangles": 11520,
+      "lineVertices": 10800,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/EcalBarrel3D_V2.glb"
+    },
+    {
+      "id": "EcalEndcapPlus3D_V1",
+      "assetId": "cms-ecalendcapplus3d-v1",
+      "group": "ecal",
+      "file": "EcalEndcapPlus3D_V1.glb",
+      "bytes": 2132116,
+      "sha256": "824606b518d9503077902c75a7ee36244fe9c840c21d41a6e1d3b5d74f7fe42e",
+      "triangles": 0,
+      "lineVertices": 175776,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/EcalEndcapPlus3D_V1.glb"
+    },
+    {
+      "id": "EcalEndcapMinus3D_V1",
+      "assetId": "cms-ecalendcapminus3d-v1",
+      "group": "ecal",
+      "file": "EcalEndcapMinus3D_V1.glb",
+      "bytes": 2132120,
+      "sha256": "585c4a83c0ac7007bd35f58dc1683bb5954aa8132fd683099cd9506687fbd1e5",
+      "triangles": 0,
+      "lineVertices": 175776,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/EcalEndcapMinus3D_V1.glb"
+    },
+    {
+      "id": "HcalBarrel3D_V1",
+      "assetId": "cms-hcalbarrel3d-v1",
+      "group": "hcal",
+      "file": "HcalBarrel3D_V1.glb",
+      "bytes": 1883244,
+      "sha256": "4ce4d7d71c77837effc606fcae294a280701a3b6bf388d8b67b942383515c98c",
+      "triangles": 31104,
+      "lineVertices": 62208,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/HcalBarrel3D_V1.glb"
+    },
+    {
+      "id": "HcalEndcapPlus3D_V1",
+      "assetId": "cms-hcalendcapplus3d-v1",
+      "group": "hcal",
+      "file": "HcalEndcapPlus3D_V1.glb",
+      "bytes": 942352,
+      "sha256": "3d6234d87e25fd8c1d3d46a72b3004120e37b6fef31c46e9f799147e1336d58f",
+      "triangles": 15552,
+      "lineVertices": 31104,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/HcalEndcapPlus3D_V1.glb"
+    },
+    {
+      "id": "HcalEndcapMinus3D_V1",
+      "assetId": "cms-hcalendcapminus3d-v1",
+      "group": "hcal",
+      "file": "HcalEndcapMinus3D_V1.glb",
+      "bytes": 942356,
+      "sha256": "b50b4caa81e7ca2cca9fbadd90d60814dbcbf5c4b88a61a6c20bc4f7b7fde61f",
+      "triangles": 15552,
+      "lineVertices": 31104,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/HcalEndcapMinus3D_V1.glb"
+    },
+    {
+      "id": "DTs3D_V1",
+      "assetId": "cms-dts3d-v1",
+      "group": "muon",
+      "file": "DTs3D_V1.glb",
+      "bytes": 182964,
+      "sha256": "f27ea107092f29befcab16c10296a319edc21c6afdbbf909c87dbc190dcb0416",
+      "triangles": 3000,
+      "lineVertices": 6000,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/DTs3D_V1.glb"
+    },
+    {
+      "id": "CSCPlus3D_V1",
+      "assetId": "cms-cscplus3d-v1",
+      "group": "muon",
+      "file": "CSCPlus3D_V1.glb",
+      "bytes": 354272,
+      "sha256": "c55c68e82df11a29d0352b75a42e4e3624426ec0506c897b84350ade43c03b41",
+      "triangles": 3672,
+      "lineVertices": 7344,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/CSCPlus3D_V1.glb"
+    },
+    {
+      "id": "CSCMinus3D_V1",
+      "assetId": "cms-cscminus3d-v1",
+      "group": "muon",
+      "file": "CSCMinus3D_V1.glb",
+      "bytes": 354280,
+      "sha256": "c31d7e7cfd64fe278ebc0bca00f7716c56a19921b3ef32818ba31fab7a9dfc41",
+      "triangles": 3672,
+      "lineVertices": 7344,
+      "sourceUrl": "https://raw.githubusercontent.com/cms-outreach/ispy-webgl/7a900709f0e189104df99e77fb855e778b8b3b9f/geometry/gltf/CSCMinus3D_V1.glb"
+    }
+  ]
+}

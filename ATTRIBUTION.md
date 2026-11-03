@@ -113,3 +113,7 @@ The shared 1K maps retain physical scale. Conversion details and hashes are in
 `app/assets/textures/facades/TIMBER_PROVENANCE.json`.
 
 - Wave fallback: NOAA / NCEP WAVEWATCH III via [NSF Unidata THREDDS](https://tds.scigw.unidata.ucar.edu/thredds/catalog/grib/NCEP/WW3/Global/catalog.html). [NOAA public-domain data](https://www.weather.gov/disclaimer), not an official NOAA product or endorsement. Separate swell partitions remain unavailable on this fallback.
+
+## CMS training reference assets
+
+CMS iSpy WebGL event-display components use the MIT license and pinned original metre coordinates. Per-file source, revision, digest and full notice: [CMS model credits](app/assets/models/cms/ATTRIBUTION.md). The recorded100000-row CMS2010B dimuon bundle is CC0, Thomas McCauley/CMS, [CERN Open Data record700](https://opendata.cern.ch/record/700), DOI10.7483/OPENDATA.CMS.CB8H.MFFA; [data provenance](app/assets/data/cms/ATTRIBUTION.md). These reference assets do not imply CERN/CMS endorsement, engineering CAD, exact2010 alignment or live measurements. The separate Collision Lab original application code is not included by these asset notices.

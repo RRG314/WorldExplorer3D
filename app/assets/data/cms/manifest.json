@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "cms-mu-run2010b-100000",
+  "file": "dimuon-2010b.json",
+  "bytes": 10279577,
+  "sha256": "9b75ec65e71f48b36837ce8153197f6690a5b8ef26af1c27f1afa4f2a2700e5c",
+  "rows": 100000,
+  "category": "REAL_RECORDED_DATA",
+  "license": "CC0-1.0",
+  "source": "https://opendata.cern.ch/record/700",
+  "doi": "10.7483/OPENDATA.CMS.CB8H.MFFA",
+  "conversion": "Original accepted Collision Lab bundle, unchanged numeric components; not a live feed or new detector simulation."
+}

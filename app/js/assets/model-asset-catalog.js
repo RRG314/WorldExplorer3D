@@ -1,9 +1,11 @@
+import { CMS_DETECTOR_ASSETS } from './cms-detector-assets.js';
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 import {EXPLORER_FLEET_ASSETS} from './explorer-fleet-assets.js';
 import {RACING_FLEET_ASSETS} from './racing-fleet-assets.js';
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...CMS_DETECTOR_ASSETS,
   ...EXPLORER_FLEET_ASSETS,
   ...RACING_FLEET_ASSETS,
   ...[
