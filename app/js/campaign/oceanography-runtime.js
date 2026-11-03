@@ -136,13 +136,14 @@ export function createOceanographyRuntime(ctx, { store, now = Date.now } = {}) {
       return false;
     }
   }
-  async function save(command, stationId = null) {
+  async function save(command, stationId = null, isCurrent = () => true) {
     const run = epoch,
       e = evidence(stationId),
       ids = [e.voyage?.id, e.voyage?.ship.transportEntityId, e.voyage?.subId].join(':'),
       current = () =>
         !disposed &&
         enabled &&
+        isCurrent() &&
         run === epoch &&
         supported() &&
         [voyage()?.id, voyage()?.ship.transportEntityId, voyage()?.subId].join(':') === ids &&
@@ -180,9 +181,11 @@ export function createOceanographyRuntime(ctx, { store, now = Date.now } = {}) {
       runId: a?.runId,
     };
   }
-  async function choose(selected) {
+  async function choose(selected, { isCurrent = () => true } = {}) {
+    if (!isCurrent()) return false;
     if (!OCEANOGRAPHY_STUDIES[selected]) throw Error('Choose a supported ocean survey.');
     if (!(await refresh())) throw Error(error);
+    if (!isCurrent()) return false;
     if (state.schemaVersion !== 1) throw Error('This saved ocean survey needs a newer version.');
     if (state.active && state.active.phase !== 'complete' && state.active.variantId !== selected)
       throw Error('Continue the current vessel survey first.');
@@ -193,7 +196,7 @@ export function createOceanographyRuntime(ctx, { store, now = Date.now } = {}) {
     error = message = '';
     recorder.reset();
     if (state.records[selected] && state.active?.variantId !== selected)
-      await save({ type: 'accept', variantId: selected, runId: crypto.randomUUID() });
+      return save({ type: 'accept', variantId: selected, runId: crypto.randomUUID() }, null, isCurrent);
     return true;
   }
   async function act(type, fields = {}) {

@@ -1,6 +1,12 @@
+import { createMarineCareerTravel } from '../campaign/marine-career-travel.js';
+import {
+  normalizeMarineBiologyCareer,
+  marineBiologyCareerSummary,
+  MARINE_BIOLOGY_STUDIES,
+} from '../campaign/marine-biology-career.js';
 import {
   oceanographyCareerSummary,
-  OCEANOGRAPHY_STATIONS
+  OCEANOGRAPHY_STATIONS,
 } from '../campaign/oceanography-career.js';
 import { createOceanographyTravel } from '../campaign/oceanography-travel.js';
 import { ensureMarineResearch } from '../ocean/research-outing.js';
@@ -25,7 +31,7 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
     'career:geologist': async () =>
       (await import('../campaign/geology-runtime.js')).createGeologyCareerRuntime,
     'career:archaeologist': async () =>
-      (await import('../campaign/archaeology-runtime.js')).createArchaeologyCareerRuntime
+      (await import('../campaign/archaeology-runtime.js')).createArchaeologyCareerRuntime,
   };
   runtime.registerGameplayPlugin({
     id: 'research-career',
@@ -47,7 +53,7 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
         onNext: () => {
           runtime.stopGameplayPlugin?.('next-field-study');
           void experiences.open({ experienceId: intent.experienceId });
-        }
+        },
       });
       if (run !== generation) {
         next.dispose();
@@ -62,41 +68,94 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
       active?.dispose();
       active = null;
     },
-    save: () => active?.snapshot() || null
+    save: () => active?.snapshot() || null,
   });
-  const marine = ensureMarineResearch(runtime), oceanography = marine.oceanography;
+  const marine = ensureMarineResearch(runtime),
+    oceanography = marine.oceanography;
   oceanography.setNavigation({
     onJournal,
     onNext: () => {
-      oceanography.pause();
+      marine.pauseCareer();
       void experiences.open({ experienceId: 'career:oceanographer' });
-    }
+    },
   });
   experiences.registerAdapter('oceanography', {
-    equipment: 'Your research vessel provides a chart table, physical training CTD, submarine and wet lab. Compare matched profiles, keep sonar uncertainty and return to the same vessel.',
-    places: () => [{ id: 'coral-shelf-research', environment: 'ocean', ...OCEANOGRAPHY_STATIONS[0] }],
+    equipment:
+      'Your research vessel provides a chart table, physical training CTD, submarine and wet lab. Compare matched profiles, keep sonar uncertainty and return to the same vessel.',
+    places: () => [
+      { id: 'coral-shelf-research', environment: 'ocean', ...OCEANOGRAPHY_STATIONS[0] },
+    ],
     offer: ({ profile, place }) =>
       profile?.researchCareers?.oceanography?.schemaVersion &&
       profile.researchCareers.oceanography.schemaVersion !== 1
         ? {
-            state: 'unavailable', label: 'Update required',
-            reason: 'This saved ocean survey needs a newer version of World Explorer.', enabled: false
+            state: 'unavailable',
+            label: 'Update required',
+            reason: 'This saved ocean survey needs a newer version of World Explorer.',
+            enabled: false,
           }
         : {
             state: place ? 'ready' : 'needs-place',
             label: place ? 'Board research vessel' : 'Choose a survey vessel',
-            reason: 'Begin aboard the existing Coral Shelf research vessel. Authored water profiles and virtual features remain distinct from archived regional charts.',
-            enabled: !!place && !runtime.sharedMarine?.active
+            reason:
+              'Begin aboard the existing Coral Shelf research vessel. Authored water profiles and virtual features remain distinct from archived regional charts.',
+            enabled: !!place && !runtime.sharedMarine?.active,
           },
     summary: ({ profile, variantId }) =>
       oceanographyCareerSummary(profile?.researchCareers?.oceanography, { variantId }),
     travel: createOceanographyTravel({
       runtime,
       readProfile: async () => (await experiences.getStore()).getProfile(),
-      travelToOcean: experiences.travelToOcean
+      travelToOcean: experiences.travelToOcean,
     }),
     start: ({ intent, isCurrent }) =>
-      isCurrent() ? oceanography.choose(intent.variantId || 'campaign') : false
+      marine.chooseCareer('oceanography', intent.variantId || 'campaign', { isCurrent }),
+  });
+  const marineBiology = marine.marineBiology;
+  marineBiology.setNavigation({
+    onJournal,
+    requestWorldFocus,
+    onNext: () => {
+      marine.pauseCareer();
+      void experiences.open({ experienceId: 'career:marine-biologist' });
+    },
+  });
+  experiences.registerAdapter('marine-biology', {
+    equipment:
+      'The research vessel supplies its submarine camera and wet lab. Compare marked water habitats, retain viewing distance and keep each observation with its method.',
+    places: ({ variantId = 'campaign' } = {}) => {
+      const study = MARINE_BIOLOGY_STUDIES[variantId];
+      return study ? [{ id: 'offshore-marine-study', environment: 'ocean', ...study.site }] : [];
+    },
+    offer: ({ profile, place }) =>
+      profile?.researchCareers?.['marine-biology']?.schemaVersion &&
+      profile.researchCareers['marine-biology'].schemaVersion !== 1
+        ? {
+            state: 'unavailable',
+            label: 'Update required',
+            reason: 'This saved marine study needs a newer World Explorer version.',
+            enabled: false,
+          }
+        : {
+            state: place ? 'ready' : 'needs-place',
+            label: place ? 'Board research vessel' : 'Choose an observation vessel',
+            reason:
+              'A reviewed offshore game habitat with licensed virtual dolphins. Individual sightings remain separate from population estimates.',
+            enabled: !!place && !runtime.sharedMarine?.active,
+          },
+    summary: ({ profile, variantId }) =>
+      marineBiologyCareerSummary(profile?.researchCareers?.['marine-biology'], { variantId }),
+    travel: createMarineCareerTravel({
+      domainId: 'marine-biology',
+      normalize: normalizeMarineBiologyCareer,
+      sitesForVariant: (id) =>
+        MARINE_BIOLOGY_STUDIES[id] ? [MARINE_BIOLOGY_STUDIES[id].site] : [],
+      runtime,
+      readProfile: async () => (await experiences.getStore()).getProfile(),
+      travelToOcean: experiences.travelToOcean,
+    }),
+    start: ({ intent, isCurrent }) =>
+      marine.chooseCareer('marine-biology', intent.variantId || 'campaign', { isCurrent }),
   });
   experiences.registerAdapter('geology', {
     equipment:
@@ -109,20 +168,20 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
           state: 'unavailable',
           label: 'Update required',
           reason: 'This saved field career needs a newer version of World Explorer.',
-          enabled: false
+          enabled: false,
         };
       return {
         state: place ? 'ready' : 'needs-place',
         label: place ? 'Begin field course' : 'Choose a field course',
         reason:
           'A clear, dry training area is checked after travel. The virtual exposures do not describe rocks at this real location.',
-        enabled: !!place
+        enabled: !!place,
       };
     },
     summary: ({ profile, variantId }) =>
       geologyCareerSummary(profile?.researchCareers?.geology, { variantId }),
     start: ({ intent, isCurrent }) =>
-      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
   experiences.registerAdapter('botany', {
     recoveryActions: ['relocate-course'],
@@ -136,20 +195,20 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
           state: 'unavailable',
           label: 'Update required',
           reason: 'This saved plant study needs a newer version of World Explorer.',
-          enabled: false
+          enabled: false,
         };
       return {
         state: place ? 'ready' : 'needs-place',
         label: place ? 'Begin plant study' : 'Choose a training site',
         reason:
           'A clear, dry area in a mapped park, woodland or field is checked after travel. Authored varieties and virtual seasons do not describe plants or conditions at this real place.',
-        enabled: !!place
+        enabled: !!place,
       };
     },
     summary: ({ profile, variantId }) =>
       botanyCareerSummary(profile?.researchCareers?.botany, { variantId }),
     start: ({ intent, isCurrent }) =>
-      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
   experiences.registerAdapter('wildlife', {
     recoveryActions: ['relocate-course'],
@@ -163,20 +222,20 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
           state: 'unavailable',
           label: 'Update required',
           reason: 'This saved wildlife career needs a newer version of World Explorer.',
-          enabled: false
+          enabled: false,
         };
       return {
         state: place ? 'ready' : 'needs-place',
         label: place ? 'Begin habitat study' : 'Choose a training site',
         reason:
           'A clear, dry area in a mapped park, woodland or field is checked after travel. Virtual habitat models do not establish real wildlife sightings.',
-        enabled: !!place
+        enabled: !!place,
       };
     },
     summary: ({ profile, variantId }) =>
       wildlifeCareerSummary(profile?.researchCareers?.wildlife, { variantId }),
     start: ({ intent, isCurrent }) =>
-      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
   experiences.registerAdapter('palaeontology', {
     recoveryActions: ['relocate-course'],
@@ -190,20 +249,20 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
           state: 'unavailable',
           label: 'Update required',
           reason: 'This saved fossil career needs a newer version of World Explorer.',
-          enabled: false
+          enabled: false,
         };
       return {
         state: place ? 'ready' : 'needs-place',
         label: place ? 'Begin fossil case' : 'Choose a training site',
         reason:
           'A clear, dry area is checked after travel. The invented formation is not a fossil occurrence at this real location.',
-        enabled: !!place
+        enabled: !!place,
       };
     },
     summary: ({ profile, variantId }) =>
       palaeontologyCareerSummary(profile?.researchCareers?.palaeontology, { variantId }),
     start: ({ intent, isCurrent }) =>
-      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
   experiences.registerAdapter('archaeology', {
     equipment:
@@ -216,19 +275,19 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
           state: 'unavailable',
           label: 'Update required',
           reason: 'This saved archaeology career needs a newer version of World Explorer.',
-          enabled: false
+          enabled: false,
         };
       return {
         state: place ? 'ready' : 'needs-place',
         label: place ? 'Begin training case' : 'Choose a training site',
         reason:
           'A clear, dry area is checked after travel. The fictional site does not alter the terrain or grant real excavation permission.',
-        enabled: !!place
+        enabled: !!place,
       };
     },
     summary: ({ profile, variantId }) =>
       archaeologyCareerSummary(profile?.researchCareers?.archaeology, { variantId }),
     start: ({ intent, isCurrent }) =>
-      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
 }

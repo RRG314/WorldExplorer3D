@@ -104,3 +104,11 @@ test('the real sonar action saves geometry and geographic evidence, retries fail
   assert.equal(api.snapshot().visible, false);
   api.dispose();
 });
+
+test('a cancelled marine entry cannot activate after the profile read completes', async () => {
+ let resolve,current=true;
+ const profile=new Promise(r=>resolve=r),ctx={oceanVoyage:{current:{id:'pending'}},boatMode:{active:true}};
+ const api=createOceanographyRuntime(ctx,{store:()=>({getProfile:()=>profile})});
+ const pending=api.choose('campaign',{isCurrent:()=>current});current=false;resolve({researchCareers:{}});
+ assert.equal(await pending,false);assert.equal(api.snapshot().visible,false);api.dispose();
+});

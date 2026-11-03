@@ -130,8 +130,8 @@ export function drawOceanNavigationMap(appCtx, oceanMode, sample) {
     ctx.fillStyle='#ffdc91';ctx.fillRect(px-4,py-4,8,8);ctx.font='9px sans-serif';ctx.fillText('SHIP',Math.min(width-28,px+6),py+3);
   }
   const investigation=appCtx.marineResearch?.investigation?.snapshot();
-  const survey=appCtx.marineResearch?.oceanography?.snapshot();
-  const annotations=survey?.visible?survey.annotations:investigation?.annotations||[];
+  const survey=appCtx.marineResearch?.careerSnapshot?.()||appCtx.marineResearch?.oceanography?.snapshot();
+  const annotations=survey?.visible?survey.annotations||[]:investigation?.annotations||[];
   const landmarks=survey?.visible||investigation?.started&&!investigation.completed?[]:oceanMode.habitat?.plan.landmarks||[];
   landmarks.forEach((landmark,index)=>{
     const px=width*(.5+(landmark.x-cached.data.centerX)/(halfExtent*2)),py=height*(.5+(landmark.z-cached.data.centerZ)/(halfExtent*2));

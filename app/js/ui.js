@@ -306,6 +306,7 @@ function setupUI() {
     pendingExplorerSection = null;
     appCtx.openWorldDiscoverySection(section);
   });
+  document.getElementById('fActivities')?.addEventListener('click', () => { void experiences.open(); });
   document.getElementById('fWorldDiscovery')?.addEventListener('click', () => openExplorerSection('today'));
   document.querySelectorAll('[data-pack-record]').forEach(button => button.addEventListener('click', () => {
     appCtx.toggleUrbanEquipment?.(false);

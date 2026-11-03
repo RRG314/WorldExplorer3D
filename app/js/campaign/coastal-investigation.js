@@ -1,3 +1,4 @@
+import {marineGeometryLineClear} from '../ocean/geometry-line-of-sight.js';
 // Personal gameplay evidence. Sonar samples authored geometry, not live sonar
 // or a scientific identification. The Journal remains the only save authority.
 import {validateOceanVoyage} from '../ocean/voyage-store.js';
@@ -67,12 +68,6 @@ export function contactAdmission({actor,target,units=1,range=80,diver=false,paus
  return {allowed:true,distance,reason:diver?'Clear view. Record what you can see.':'Return in the sonar cone. Ready to chart.'};
 }
 export function contactLineClear(plan,sample,from,target){
- if(!point(from)||!validTarget(target)||typeof sample!=='function')return false;
- const d=Math.hypot(target.x-from.x,target.y-from.y,target.z-from.z),steps=Math.max(1,Math.ceil(d/1.5));
- for(let i=1;i<steps;i++){const t=i/steps,p={x:from.x+(target.x-from.x)*t,y:from.y+(target.y-from.y)*t,z:from.z+(target.z-from.z)*t};
-  if(Math.hypot(p.x-target.x,p.y-target.y,p.z-target.z)<=target.radius+.5)break;
-  const bottom=sample(p.x,p.z);if(!Number.isFinite(bottom)||p.y<bottom+.1)return false;
-  for(const r of plan?.rocks||[])if(((p.x-r.x)/r.rx)**2+((p.y-r.y)/r.ry)**2+((p.z-r.z)/r.rz)**2<1)return false;
- }
- return true;
+ if(!validTarget(target))return false;
+ return marineGeometryLineClear(plan,sample,from,target);
 }

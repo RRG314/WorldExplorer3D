@@ -1,9 +1,6 @@
+import {researchText} from '../ui/research-markup.js';
 import { earthCoordinateFrame } from '../earth-core/coordinate-frame.js?v=1';
-export const oceanographyText = (value) =>
-  String(value ?? '').replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-  );
+export const oceanographyText = researchText;
 const esc = oceanographyText,
   words = (value) => esc(String(value || 'Not recorded').replaceAll('-', ' '));
 function profiles(casts) {

@@ -1,3 +1,4 @@
+import {marineIndividualId} from './observation-identity.js';
 import {COMMON_DOLPHIN,commonDolphinEligibility,dolphinWaterEnvelope,dolphinTargetDepth} from './cetacean-rules.js';
 import {loadDolphinVisual} from './cetacean-visual.js';
 
@@ -33,7 +34,7 @@ export function createCetaceanLife({THREE,oceanMode,sampleWater,isBlocked,loadVi
       const mesh=new THREE.Group();mesh.name=`Ocean wildlife · ${COMMON_DOLPHIN.label}`;
       mesh.userData={speciesId:COMMON_DOLPHIN.speciesId,livePresenceClaim:false,catchable:false};mesh.visible=false;
       mesh.position.set(point.x,point.y,point.z);mesh.rotation.y=-i*.2;mesh.scale.setScalar(length/COMMON_DOLPHIN.lengthMeters/units);scene.add(mesh);
-      const animal={mesh,radius,units,phase:i*2,orbitPhase:i*.2,visual:null,visualState:'loading',speedMeters:2.5+i*.07};oceanMode.cetaceans.push(animal);
+      const animal={individualId:marineIndividualId(context?.contextId,COMMON_DOLPHIN.speciesId,i),speciesId:COMMON_DOLPHIN.speciesId,speciesLabel:COMMON_DOLPHIN.label,assetId:COMMON_DOLPHIN.assetId,mesh,radius,units,phase:i*2,orbitPhase:i*.2,visual:null,visualState:'loading',speedMeters:2.5+i*.07};oceanMode.cetaceans.push(animal);
       pending.push(loadVisual(THREE,{signal,phase:i*.7}).then(visual=>{
         if(signal.aborted||current!==generation){visual.dispose();return;}
         animal.visual=visual;animal.visualState='licensed';mesh.add(visual.root);

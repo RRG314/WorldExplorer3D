@@ -5,7 +5,7 @@ import {
   fieldDistance,
   validateFieldHistory,
 } from './field-study-contract.js';
-import { validateOceanVoyage } from '../ocean/voyage-store.js';
+import { requireMarineVoyage as voyageValue, requireMarinePresence as presence } from './marine-study-contract.js';
 import { COASTAL_SITES } from './coastal-departure.js';
 export const OCEANOGRAPHY_PROTOCOL = Object.freeze({
   id: 'virtual-ctd-three-depths-v1',
@@ -84,44 +84,6 @@ export function virtualWaterColumnReading(variantId, stationId, depthMeters) {
 }
 const point = (p) => p && ['x', 'y', 'z'].every((key) => Number.isFinite(p[key]));
 const eventId = (run, revision) => `event:research:oceanography:${run}:${revision}`;
-function voyageValue(value) {
-  const v = validateOceanVoyage(value);
-  if (!v || v.ship.transportCatalogId !== 'ocean-research-vessel')
-    throw Error('Use a supported research vessel and its own submarine.');
-  return v;
-}
-function presence(active, e, now, { station = null, underwater = false } = {}) {
-  const v = voyageValue(e?.voyage);
-  if (
-    v.id !== active.voyage.id ||
-    v.ship.transportEntityId !== active.voyage.ship.transportEntityId ||
-    v.subId !== active.voyage.subId ||
-    e.shared === true ||
-    e.liveGps === true ||
-    e.paused !== false ||
-    !Number.isFinite(e.at) ||
-    e.at <= 0 ||
-    Math.abs(e.at - now) > 2000 ||
-    !fieldCoordinate(e.position) ||
-    !point(e.localPosition) ||
-    e.environment !== (underwater ? 'OCEAN' : 'EARTH') ||
-    e.mode !== (underwater ? 'submarine' : 'research-deck') ||
-    v.stage !== (underwater ? 'underwater' : 'aboard')
-  )
-    throw Error('Continue this survey on its original active vessel and submarine.');
-  if (
-    station &&
-    (e.stationId !== station ||
-      !Number.isFinite(e.stationDistanceMeters) ||
-      e.stationDistanceMeters > 2.4 ||
-      e.stationDistanceMeters < 0 ||
-      e.moored !== true ||
-      !Number.isFinite(e.speedMetersPerSecond) ||
-      Math.abs(e.speedMetersPerSecond) > 0.5)
-  )
-    throw Error('Stop and moor the vessel, then walk to the named research station.');
-  return v;
-}
 function castValue(active, c, e, now) {
   const protocol = OCEANOGRAPHY_PROTOCOL,
     station = COASTAL_SITES[active.stationIndex];

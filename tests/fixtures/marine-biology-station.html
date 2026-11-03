@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Marine biologist station boundary</title
+  ><link rel="icon" href="/favicon.svg" /><link rel="stylesheet" href="/app/styles/hud.css" /><link
+    rel="stylesheet"
+    href="/app/styles/experiences.css"
+  /><style>
+    :root {
+      --wx-panel: #18302dee;
+      --wx-panel-solid: #18302d;
+      --wx-panel-soft: #24443d;
+      --wx-text: #eef7f3;
+      --wx-muted: #bfd0c8;
+      --wx-line: #66847c;
+      --wx-line-soft: #44645a;
+      --wx-radius: 7px;
+      --wx-type-meta: 13px;
+      --wx-type-control: 15px;
+      --wx-font-ui: system-ui;
+      --wx-action: #efd079;
+      --wx-focus: #efd079;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #6d8a97;
+      color: white;
+      font: 15px system-ui;
+    }
+    [hidden] {
+      display: none !important;
+    }
+    #hud {
+      display: grid;
+    }
+    #scope {
+      position: fixed;
+      left: 12px;
+      top: 12px;
+      max-width: 45vw;
+    }
+  </style>
+  <p id="scope">
+    Controlled clock, observer and animal poses · actual runtime/domain/native forms and IndexedDB ·
+    no field-survey claim
+  </p>
+  <div id="fixtureWorld" tabindex="0" aria-label="Controlled world focus target"></div>
+  <div id="hud">
+    <div id="hudUtilities">
+      <section id="deck" class="marine-panel session-hud-panel"></section>
+      <section id="ocean" class="marine-panel session-hud-panel" hidden></section>
+      <div class="hudUtilityActions">
+        <button>Light</button><button>Weather</button><button>Controls</button>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js?v=5';
+    import { prepareSurfaceVoyage } from '/app/js/ocean/voyage.js';
+    import { createMarineBiologyRuntime } from '/app/js/campaign/marine-biology-runtime.js';
+    import { createMarineObservationRecorder } from '/app/js/campaign/marine-observation-recorder.js';
+    import { createMarineBiologyControls } from '/app/js/campaign/marine-biology-ui.js';
+    import { MARINE_BIOLOGY_STUDIES } from '/app/js/campaign/marine-biology-career.js';
+    const backing = createIndexedDbDiscoveryProfileStore(),
+      profile = await backing.getProfile(),
+      saved = profile.researchCareers['marine-biology']?.active,
+      site = MARINE_BIOLOGY_STUDIES.campaign.site;
+    let clock = 0,
+      wall = Date.now(),
+      fail = false,
+      api,
+      worldFocus = 0;
+    const voyage = saved?.voyage
+      ? structuredClone(saved.voyage)
+      : prepareSurfaceVoyage(
+          site,
+          { x: 0, z: 0 },
+          { model: 'geographic-metres-v1', entryDepthMeters: 500, origin: site }
+        );
+    const onDeck = !!saved && ['comparison', 'report', 'complete'].includes(saved.phase);
+    voyage.stage = onDeck ? 'aboard' : 'underwater';
+    const subject = {
+        individualId: 'virtual:short_beaked_common_dolphin:controlled:0',
+        speciesId: 'short_beaked_common_dolphin',
+        speciesLabel: 'Common dolphin',
+        assetId: 'marine-common-dolphin',
+        radius: 1.2,
+        visualState: 'licensed',
+        mesh: { visible: true, position: { x: 0, y: -3, z: 70 } },
+      },
+      mode = {
+        active: !onDeck,
+        scene: { uuid: 'native-controlled-scene:' + Date.now() },
+        launchSite: site,
+        depthProfile: { model: 'geographic-metres-v1' },
+        cetaceanPlan: { allowed: true },
+        cetaceans: [subject],
+        fishEntities: [],
+        submarine: {
+          position: { x: 0, y: -2.5, z: 0 },
+          speed: 0,
+          verticalSpeed: 0,
+          transportEntityId: voyage.subId,
+        },
+        ambientLight: { intensity: 0.5 },
+        keyLight: { intensity: 1 },
+        habitat: { plan: { rocks: [] }, sampleSeabedHeight: () => -500 },
+        waterSurface: { sample: () => ({ surfaceY: 0, volume: { surfaceY: 0, bottomY: -500 } }) },
+      },
+      ctx = {
+        gameStarted: true,
+        worldLoading: false,
+        paused: false,
+        LOC: site,
+        SCALE: 111000,
+        METERS_PER_WORLD_UNIT: 1,
+        oceanMode: mode,
+        oceanVoyage: { current: voyage },
+        boat: { x: 0, y: 3, z: 0, speed: 0 },
+        boatMode: {
+          active: onDeck,
+          moored: true,
+          transportCatalogId: 'ocean-research-vessel',
+          transportEntityId: voyage.ship.transportEntityId,
+        },
+        boatDeck: { active: onDeck, stationDistance: (id) => (id === 'lab' ? 1 : 999) },
+      },
+      proxy = {
+        ...backing,
+        async updateResearchCareer(...args) {
+          if (fail) {
+            fail = false;
+            throw Error('Controlled save failure; result kept for retry');
+          }
+          return backing.updateResearchCareer(...args);
+        },
+      };
+    function readView() {
+      const p = mode.submarine.position,
+        q = subject.mesh.position;
+      return [
+        {
+          truthType: 'simulated-licensed-animal',
+          visible: true,
+          lineClear: true,
+          individualId: subject.individualId,
+          speciesId: subject.speciesId,
+          speciesLabel: subject.speciesLabel,
+          assetId: subject.assetId,
+          kind: 'dolphin',
+          position: { ...q },
+          observerPosition: { ...p },
+          waterSurfaceY: 0,
+          depthMeters: Math.max(0, -q.y),
+          distanceMeters: Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z),
+          minimumDistanceMeters: 50,
+          diameterPixels: 20,
+          observedAt: wall,
+        },
+      ];
+    }
+    api = createMarineBiologyRuntime(ctx, {
+      store: () => proxy,
+      now: () => wall,
+      createRecorder: () =>
+        createMarineObservationRecorder({ clock: () => clock, wallClock: () => wall }),
+      createView: () => ({ read: readView, clear() {} }),
+    });
+    api.setNavigation({
+      requestWorldFocus: () => {
+        worldFocus++;
+        document.querySelector('#fixtureWorld').focus();
+      },
+    });
+    await api.choose('campaign');
+    const controls = ['deck', 'ocean'].map((id, i) => {
+      const c = createMarineBiologyControls({ api: () => api, prefix: 'controlledMarine' + i });
+      document.getElementById(id).append(c.node);
+      return c;
+    });
+    function render() {
+      for (const c of controls) c.render(api.snapshot());
+    }
+    render();
+    window.marineUi = {
+      api,
+      ctx,
+      store: backing,
+      get state() {
+        return api.snapshot();
+      },
+      get focusCount() {
+        return worldFocus;
+      },
+      set failNextSave(v) {
+        fail = v;
+      },
+      target() {
+        const s = api.snapshot();
+        if (s.target && s.phase !== 'follow') {
+          mode.submarine.position = { x: s.target.x, y: s.target.y, z: s.target.z };
+        }
+        const d = s.phase === 'habitat' ? (s.target.depthBand[0] + s.target.depthBand[1]) / 2 : 8;
+        subject.mesh.position = {
+          x: mode.submarine.position.x + 2,
+          y: -d,
+          z: mode.submarine.position.z + 70,
+        };
+        api.tick(0);
+        render();
+      },
+      boardLab() {
+        mode.active = false;
+        ctx.boatMode.active = true;
+        ctx.boatDeck.active = true;
+        voyage.stage = 'aboard';
+        render();
+      },
+    };
+    window.advanceTime = async (ms) => {
+      for (let left = ms; left > 0; left -= 100) {
+        const dt = Math.min(100, left);
+        clock += dt;
+        wall += dt;
+        subject.mesh.position.x += dt / 1000;
+        api.tick(dt / 1000);
+      }
+      render();
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Controlled native runtime/domain/IDB, no field-survey claim',
+        phase: api.snapshot().phase,
+        runId: api.snapshot().active?.runId,
+        window: api.snapshot().window?.ready,
+      });
+    window.ready = true;
+  </script>
+</html>

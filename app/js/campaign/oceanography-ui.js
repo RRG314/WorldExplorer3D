@@ -1,3 +1,4 @@
+import {researchSelect as select,researchButton} from '../ui/research-markup.js';
 import {
   oceanographyText as esc,
   waterColumnMarkup,
@@ -6,17 +7,10 @@ import {
   sonarReturnsMarkup,
 } from './oceanography-report.js';
 import { OCEANOGRAPHY_PROTOCOL as P, oceanographyComparison } from './oceanography-career.js';
-const select = (name, label, choices) =>
-  `<label>${esc(label)}<select name="${name}" required><option value="">Choose…</option>${Object.entries(
-    choices
-  )
-    .map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`)
-    .join('')}</select></label>`;
-const button = (action, label, disabled = false, primary = false) =>
-  `<button type="button"${primary ? ' class="research-primary"' : ''} data-ocean-action="${action}"${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
+const button=(action,label,disabled=false,primary=false)=>researchButton(action,label,disabled,primary,'data-ocean-action');
 export function createOceanographyControls({ api, prefix }) {
   const node = document.createElement('section');
-  node.className = 'oceanography-career';
+  node.className = 'marine-career oceanography-career';
   node.setAttribute('aria-label', 'Oceanographer survey');
   node.innerHTML =
     '<header><span>Oceanographer</span><h3></h3></header><p data-ocean-guidance></p><div data-ocean-body></div><div data-ocean-actions></div><p data-ocean-progress></p><p data-ocean-status role="status" aria-live="polite"></p><footer></footer>';

@@ -1,3 +1,4 @@
+import {marineIndividualId} from './observation-identity.js';
 import {loadFishVisual} from './fish-visual.js';
 import {fitFishToWater,fishSeededRandom} from './fish-water-envelope.js';
 import { createUnderwaterSchoolPlan } from '../fishing/population-authority.js?v=2';
@@ -83,7 +84,7 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D, sampleWater
       for(let i=0;i<school.count;i++){
         // Use the catalogue's centimetre range in this world's metres/units.
         const length=(school.lengthCm[0]+random()*(school.lengthCm[1]-school.lengthCm[0])*.55)/100/metersPerUnit;
-        const fish={schoolIndex,speciesId:school.speciesId,populationContextId:populationContext.contextId,livePresenceClaim:false,
+        const fish={schoolIndex,speciesId:school.speciesId,populationContextId:populationContext.contextId,livePresenceClaim:false,individualId:marineIndividualId(populationContext.contextId,school.speciesId,schoolIndex*128+i),speciesLabel:school.species,assetId:school.visual?.assetId||null,
           radius:Math.max(.18,length*.55),phase:random()*Math.PI*2,orbitScale:.7+random()*.5,
           drift:(random()-.5)*1.5,tailPhase:random()*Math.PI*2,tailSpeed:6+random()*3,tailAmp:.25,
           moveSpeed:(.8+random()*.65)/metersPerUnit};
