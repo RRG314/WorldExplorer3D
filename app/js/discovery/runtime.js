@@ -1,4 +1,6 @@
 import {cartographyCareerBadge} from '../campaign/cartography-career.js';
+import {lunarStudyEventIds,mergeLunarJournalRecords} from '../planetary/lunar-study-records.js';
+import {planetaryReportMarkup} from '../campaign/planetary-report.js';
 import {cartographyReportMarkup} from '../campaign/cartography-report.js';
 import {meteorologyCareerBadge} from '../campaign/meteorology-career.js';
 import {meteorologyReportMarkup} from '../campaign/meteorology-report.js';
@@ -499,7 +501,7 @@ function createDiscoveryUi(state) {
       const eventPath = event.pathId || 'field';
       const chapterFinish = openingChapter.schemaVersion === 1 && openingChapter.phase === 'review' && event.eventId === openingChapter.eventId
         ? `<button class="discoveryChapterFinish" type="button" data-chapter-action="finish"${chapterBusy ? ' disabled' : ''}>Finish First Bearings · earn your badge</button>` : '';
-      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.metadata?.oceanographyReport ? oceanographyConclusion(event.metadata.oceanographyReport) : event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${archaeologyReportMarkup(event.metadata?.archaeologyReport)}${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${botanyReportMarkup(event.metadata?.botanyReport)}${botanyArchiveMarkup(event.metadata?.botanyArchive)}${wildlifeReportMarkup(event.metadata?.wildlifeReport)}${wildlifeArchiveMarkup(event.metadata?.wildlifeArchive)}${palaeontologyReportMarkup(event.metadata?.palaeontologyReport)}${palaeontologyArchiveMarkup(event.metadata?.palaeontologyArchive)}${returnButton}${chapterFinish}</article>`;
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.metadata?.oceanographyReport ? oceanographyConclusion(event.metadata.oceanographyReport) : event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${archaeologyReportMarkup(event.metadata?.archaeologyReport)}${oceanographyReportMarkup(event.metadata?.oceanographyReport)}${marineBiologyReportMarkup(event.metadata?.marineBiologyReport)}${hydrologyReportMarkup(event.metadata?.hydrologyReport)}${meteorologyReportMarkup(event.metadata?.meteorologyReport)}${cartographyReportMarkup(event.metadata?.cartographyReport)}${planetaryReportMarkup(event)}${botanyReportMarkup(event.metadata?.botanyReport)}${botanyArchiveMarkup(event.metadata?.botanyArchive)}${wildlifeReportMarkup(event.metadata?.wildlifeReport)}${wildlifeArchiveMarkup(event.metadata?.wildlifeArchive)}${palaeontologyReportMarkup(event.metadata?.palaeontologyReport)}${palaeontologyArchiveMarkup(event.metadata?.palaeontologyArchive)}${returnButton}${chapterFinish}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
     if (open && activeTab === 'journal') globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-records-visible', { detail: { eventIds: filtered.map((event) => event.eventId) } }));
   }
@@ -521,7 +523,7 @@ function createDiscoveryUi(state) {
       if (evidence) events.unshift(evidence);
       else chapterMessage = 'The referenced record is missing. Restore your complete Journal backup to continue.';
     }
-    const investigationEvents=await state.profileStore.getEventsById(harborJourneyEventIds);
+    const investigationEvents=await state.profileStore.getEventsById([...new Set([...harborJourneyEventIds,...lunarStudyEventIds])]);
     if(request!==refreshSequence||elements.panel?.dataset.journeyJournalOwner)return;
     void state.appCtx.marineResearch?.investigation?.refresh();
     renderOpeningChapter();
@@ -529,7 +531,7 @@ function createDiscoveryUi(state) {
     void state.threeViews?.refresh(profile);
     void state.personalHome?.refresh(profile);
     guideRecords = guide;
-    journalRecords = events;
+    journalRecords = mergeLunarJournalRecords(events,investigationEvents);
     projectDiscoveryItemsToBackpack(state.appCtx, items);
     if (elements.saveStatus) {
       const ownerUid = state.appCtx.getAccountUserId?.();

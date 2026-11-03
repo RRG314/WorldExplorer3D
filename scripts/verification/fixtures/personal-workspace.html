@@ -1,5 +1,6 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="/favicon.svg"><title>Personal workspace component verification</title>
 <link rel="stylesheet" href="/app/styles/discovery.css">
+<link rel="stylesheet" href="/app/styles/experiences.css">
 <style>body{margin:0;background:#101d24;color:#e1ebef;font:14px sans-serif}canvas{display:block}aside{position:absolute;right:12px;top:12px;width:min(365px,calc(100vw - 44px));max-height:92vh;overflow:auto;padding:10px;background:#0b171e}#hint{position:absolute;left:12px;bottom:12px;background:#0b171e;padding:10px}button{margin:3px}input{max-width:100%;box-sizing:border-box}</style>
 <aside><section id="discoveryPersonalHome" class="discoveryOpeningChapter"></section></aside><div id="hint">Controlled room · E to open the desk · arrows to walk · J to show the Journal</div>
 <script src="/app/vendor/three/build/three.min.js"></script><script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
@@ -23,7 +24,7 @@ const walker={x:0,y:1.732,z:-3.5,angle:0,pitch:0},housing=createHousingModel({ba
 if(!housing.snapshot().starterHomeId){const r=housing.claimStarter({id:'home:test:way:42',sourceBuildingId:'way:42',label:'Research workspace',locationId:'test',locationLabel:'Controlled room',x:0,z:0,mappedResidential:true,sharedEligible:true,price:100000});if(!r.ok)throw Error(r.reason);}
 const store=createIndexedDbDiscoveryProfileStore();let profile=await store.getProfile();
 if(globalThis.__fieldworkBackup&&!profile.researchCareers?.archaeology?.active&&!profile.researchCareers?.palaeontology?.active){await store.importData(globalThis.__fieldworkBackup);profile=await store.getProfile();}
-if(profile.openingChapter.phase!=='complete'){
+if(profile.openingChapter.phase!=='complete'&&!globalThis.__skipOpeningChapterFixture){
  await store.startOpeningChapter({regionId:'test',regionLabel:'Controlled room',environment:'EARTH'},1000);
  const result=await store.recordObservation({claimId:'workspace:field',catalogId:'workspace:maple',family:'tree',activityId:'habitat-survey',name:'Maple canopy at the edge of the park',regionId:'test',regionLabel:'Controlled room',environment:'EARTH',collectedAt:2000});await store.completeOpeningChapter(result.event.eventId,3000);
 }
@@ -32,7 +33,7 @@ const active={group:room,ownedHome:housing.snapshot().homes[0],center:{x:0,z:0},
 const ctx=Object.assign(sharedCtx,{scene,camera,renderer,activeInterior:active,dynamicBuildingColliders:[],playerBackpackInventory:inventory,playerBackpackStore:backpack,Walk:{state:{walker},CFG:{eyeHeight:1.7}},getEnv:()=> 'EARTH',getCurrentTravelMode:()=> 'walk',getLiveGpsSnapshot:()=>({active:false}),showToast(t){document.querySelector('#hint').textContent=t;},openWorldDiscoverySection(){state.ui.setOpen(true);}});
 const state={appCtx:ctx,profileStore:store,worldIdentityId:'test',regionLabel:'Controlled room',ui:{get open(){return open;},setOpen(v){open=v;document.querySelector('aside').hidden=!v;},refreshData:()=>runtime.refresh()}};
 const runtime=createPersonalHomeRuntime(state,{getHousing:()=>housing});
-function draw(){camera.position.set(walker.x,walker.y,walker.z);camera.lookAt(0,.7,0);runtime.update(.016);renderer.render(scene,camera);}
+function draw(){camera.position.set(walker.x,walker.y,walker.z);camera.lookAt(...(window.__qaCameraLookTarget||[0,.7,0]));runtime.update(.016);renderer.render(scene,camera);}
 function loop(){draw();requestAnimationFrame(loop);}requestAnimationFrame(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 window.addEventListener('keydown',e=>{if(e.key==='e')void handleInteriorAction({});if(e.key==='j')state.ui.setOpen(true);if(e.key==='ArrowLeft')walker.x-=.12;if(e.key==='ArrowRight')walker.x+=.12;if(e.key==='ArrowUp')walker.z+=.12;if(e.key==='ArrowDown')walker.z-=.12;});

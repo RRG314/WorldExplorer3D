@@ -1,4 +1,5 @@
 import { cartographyCareerSummary } from '../campaign/cartography-career.js';
+import {bindPlanetaryCareer} from '../campaign/planetary-career-adapter.js';
 import { meteorologyCareerSummary } from '../campaign/meteorology-career.js';
 import { hydrologyCareerSummary } from '../campaign/hydrology-career.js';
 import { createMarineCareerTravel } from '../campaign/marine-career-travel.js';
@@ -22,6 +23,7 @@ import { archaeologyCareerSummary } from '../campaign/archaeology-career.js';
 import { fieldResearchPlaces } from '../campaign/field-research-places.js';
 // Lazily mount the selected field domain through the existing single active gameplay owner.
 export function bindResearchCareers(runtime, experiences, { onJournal, requestWorldFocus } = {}) {
+  bindPlanetaryCareer(runtime,experiences);
   let active = null,
     generation = 0;
   const domains = {

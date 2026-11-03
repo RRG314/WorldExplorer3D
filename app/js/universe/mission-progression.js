@@ -1,9 +1,11 @@
 import { getDestinationMission } from './mission-catalog.js?v=3';
 import { localMoonOuting } from './mission-navigation.js';
 import { lunarSamplesAboard } from '../planetary/lunar-samples.js';
+import {lunarStudyReport} from '../planetary/lunar-study-records.js';
 
 export function planetarySurveyEquipment(ledger) {
   const earned = Object.values(ledger?.missions || {}).some(state => {
+    if(state.destinationId==='moon'&&state.phase==='complete'&&lunarStudyReport(state.restoredReport)?.eventId==='event:destination-mission:moon')return true;
     const definition = getDestinationMission(state.destinationId);
     return state.phase === 'complete' && ['planet', 'solar-body'].includes(definition?.scope) && definition.operation.includes('surface')
       && new Set((state.evidence || []).filter(id => !id.startsWith('analysis:'))).size >= 3 && state.history?.some(entry => entry.event === 'complete_analysis');
@@ -15,7 +17,10 @@ export function canAnalyzeDestination(ctx, mission) {
   const ship = ctx?.getShipInteriorSnapshot?.();
   if (!ship?.active || ship.shipId !== 'solis-reach' || ship.deckId !== 'command' || !ctx.activeShipInterior) return false;
   const expedition = ctx.getInterstellarExpeditionSnapshot?.();
-  if (mission?.destinationId === 'moon' && (mission.preparation || (ctx.getDestinationMissionSnapshot?.()?.destinationId === 'moon' ? ctx.getDestinationMissionSnapshot().preparation : null))?.strategy !== 'observe' && !lunarSamplesAboard(ctx)) return false;
+  if (mission?.destinationId === 'moon') {
+    const snapshot=mission.preparation?mission:ctx.getDestinationMissionSnapshot?.(),preparation=snapshot?.preparation,missionId=mission.surveyMissionId||snapshot?.activeMissionId||'mission:moon';
+    if(preparation?.strategy!=='observe'&&!lunarSamplesAboard(ctx,missionId))return false;
+  }
   if (!localMoonOuting(ctx, mission, expedition) && (expedition?.destinationId !== mission?.systemId || !['arrived','completed'].includes(expedition?.state))) return false;
   if (expedition?.podJourney && expedition.podJourney.phase !== 'recovered') return false;
   if (mission?.operation?.includes('surface') && (expedition?.podJourney?.bodyId !== mission.destinationId || expedition.podJourney.expeditionId !== expedition.id || expedition.podJourney.returnFrameId !== mission.systemId)) return false;

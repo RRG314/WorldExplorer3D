@@ -2,6 +2,7 @@ import {RESEARCH_MEDIA_BACKUP_VERSION,validateResearchMediaRecord,validateResear
 import {validateResearchCareerBackups} from '../campaign/research-career-definitions.js';
 import {validateSoloRacerBackup} from '../campaign/solo-racer.js';
 import {validateLunarHomecomingBackup} from '../campaign/lunar-homecoming.js';
+import {validateLunarStudyBackups} from '../planetary/lunar-study-records.js';
 import {validateInvestigationBackup} from '../campaign/coastal-investigation.js';
 import {validateCoastalBackup} from '../campaign/coastal-departure.js';
 import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.js';
@@ -41,7 +42,7 @@ export function validateJournalBackup(input) {
     const claims = new Set();
     for (const row of rows) if (row.claimId) { if (claims.has(row.claimId)) fail(); claims.add(row.claimId); }
   }
-  try{validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);}catch{fail();}
+  try{validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);validateLunarStudyBackups(data.events);}catch{fail();}
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
   for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
     const definition=HOME_ACHIEVEMENTS[kind],receipt=data.events.find(event=>event.eventId===entry?.eventId);

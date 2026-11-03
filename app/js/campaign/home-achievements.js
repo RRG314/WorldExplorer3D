@@ -4,7 +4,7 @@ export const HOME_ACHIEVEMENTS=Object.freeze({
 });
 export function homeAchievementEvent(kind,home,profile) {
   const definition=HOME_ACHIEVEMENTS[kind];
-  if (!definition || !home?.id || profile?.openingChapter?.phase!=='complete') throw Error('Finish First Bearings before completing this chapter.');
+  if (!definition || !home?.id) throw Error('Choose your personal workspace before completing this chapter.');
   const workspace=home.workspace,journey=home.journey||{};
   const complete=kind==='maker'?workspace?.schemaVersion===1&&workspace.pose&&workspace.rotated&&workspace.undone&&workspace.usedAt>0
     :['entered','displayed','departed','returned'].every(key=>journey[key]>0)&&!!(profile.harborRun?.phase==='complete'||profile.threeViews?.phase==='complete'||profile.homeAchievements?.maker);

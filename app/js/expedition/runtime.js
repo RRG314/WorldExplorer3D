@@ -1,4 +1,4 @@
-import { LUNAR_STRATEGIES, atLunarPreparationStation } from '../planetary/lunar-survey.js';
+import { LUNAR_STRATEGIES, LUNAR_STUDIES, atLunarPreparationStation } from '../planetary/lunar-survey.js';
 import { createLunarFieldPower, createLunarPowerController } from '../planetary/lunar-field-power.js';
 import { getDestinationMission } from '../universe/mission-catalog.js?v=3';
 import { createDestinationMissionStore } from '../universe/mission-authority.js?v=3';
@@ -19,7 +19,7 @@ import { getUniverseDestinations, resolveUniverseAddress } from '../universe/cat
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
-import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
+import { completeDirectEarthShuttleReturn, createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=6';
 import { consumeStagedEarthPod, getStagedSurfacePod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=11';
@@ -381,7 +381,30 @@ async function stageEarthPathfinder(appContext) {
   return true;
 }
 
-async function boardSolisReachDirect(appContext) {
+// Rehydrate the existing saved pod owner without boarding, creating a plan or
+// advancing a journey. Activities uses this before loading a saved surface.
+function resumeSavedExpedition(appContext) {
+  bindRuntimeContext(appContext);
+  store ||= createExpeditionStore();
+  activeExpedition = store.load();
+  activePodJourney =
+    activeExpedition?.podJourney?.type === 'ExpeditionPodJourney'
+      ? Object.freeze({ ...activeExpedition.podJourney })
+      : null;
+  syncExpeditionContacts(activeExpedition);
+  if (
+    activePodJourney &&
+    ![POD_PHASE.ABOARD, POD_PHASE.RECOVERED, POD_PHASE.FAILED].includes(activePodJourney.phase)
+  ) {
+    syncSpaceSessionToPodJourney(activePodJourney);
+    if (activeContext?.spaceFlight?.active)
+      activeContext.setExpeditionPodFlightPresentation?.(true);
+  }
+  return getExpeditionSnapshot();
+}
+
+async function boardSolisReachDirect(appContext,{isCurrent=()=>true}={}) {
+  if(!isCurrent())return false;
   bindRuntimeContext(appContext);
   const expedition = ensureTransitExpedition();
   if (!activeContext || !expedition) return false;
@@ -389,13 +412,13 @@ async function boardSolisReachDirect(appContext) {
   if (activeContext.spaceFlight?.active) {
     activeContext.ensureSolisReachDockTarget?.();
     activeContext.setExpeditionPodFlightPresentation?.(false);
-    return enterActiveShip();
+    return enterActiveShip({isCurrent,directEarthReturn:true});
   }
   if (activeContext.getEnv?.() !== activeContext.ENV?.EARTH) return false;
   return (await activeContext.startSpaceFlightToSolisReach?.({
     pathfinder: false,
     onReady: () => {
-      void enterActiveShip();
+      if(isCurrent())void enterActiveShip({isCurrent,directEarthReturn:true});
     }
   })) === true;
 }
@@ -1670,7 +1693,7 @@ function renderShipStationPanel(interaction) {
     <p>${view.summary}</p>
     ${voyageEventMarkup}
     ${lunarBrief ? '<section class="ship-station-actions"><button type="button" data-lunar-brief>Plan a Moon field survey</button><small>Two comparison sites on the LROC terrain. Launch Pathfinder from the Pod Bay; return in the same craft to review the field record here aboard Solis Reach.</small></section>' : ''}
-    ${lunarPrep ? `<section class="ship-station-actions ship-station-lunar"><strong>Prepare the lunar field kit</strong><p>Both routes compare two sites. Choose a method, then calibrate its instruments. Your choice is saved before departure. The instrument kit has 20 minutes of field power. Keep the marked return reserve; recover to the ship for a fresh charge. This is game instrument power, separate from life support.</p>${LUNAR_STRATEGIES.map(strategy => `<button type="button" data-lunar-prepare="${strategy.id}">${strategy.label}</button><small>${strategy.description}</small>`).join('')}<p>Return plan: use E at the surface pod, ascend to Solis Reach and dock. Review the records here at Analysis. To reach Earth, use Launch for Earth in the Pod Bay; your saved Earth location is retained.</p>${lunarMission.preparation ? `<small>Prepared: ${LUNAR_STRATEGIES.find(entry => entry.id === lunarMission.preparation.strategy)?.label || 'field kit'}. Continue to the Pod Bay.</small>` : ''}</section>` : ''}
+    ${lunarPrep ? `<section class="ship-station-actions ship-station-lunar"><strong>Prepare the lunar field kit</strong>${lunarMission.surveyVariantId?`<p>${LUNAR_STUDIES[lunarMission.surveyVariantId]?.label||'Lunar study'}: ${LUNAR_STUDIES[lunarMission.surveyVariantId]?.description||''}</p>`:''}<p>Both routes compare two sites. Choose a method, then calibrate its instruments. Your choice is saved before departure. The instrument kit has 20 minutes of field power. Keep the marked return reserve; recover to the ship for a fresh charge. This is game instrument power, separate from life support.</p>${LUNAR_STRATEGIES.filter(strategy=>!lunarMission.requiredStrategy||strategy.id===lunarMission.requiredStrategy).map(strategy => `<button type="button" data-lunar-prepare="${strategy.id}">${strategy.label}</button><small>${strategy.description}</small>`).join('')}<p>Return plan: use E at the surface pod, ascend to Solis Reach and dock. Review the records here at Analysis. To reach Earth, use Launch for Earth in the Pod Bay; your saved Earth location is retained.</p>${lunarMission.preparation ? `<small>Prepared: ${LUNAR_STRATEGIES.find(entry => entry.id === lunarMission.preparation.strategy)?.label || 'field kit'}. Continue to the Pod Bay.</small>` : ''}</section>` : ''}
     <div class="ship-station-metrics">${view.metrics.map((metric) => `<div><span>${metric.label}</span><strong>${metric.value}</strong></div>`).join('')}</div>
     ${view.actions.length ? `<div class="ship-station-actions">${view.actions.map((action) => `<button type="button" data-ship-action="${action.id}" ${action.enabled ? '' : 'disabled'}>${action.label}</button>${action.reason ? `<small>${action.reason}</small>` : ''}`).join('')}</div>` : '<small class="ship-station-readonly">This station is informational during the current voyage state.</small>'}
   </div>`;
@@ -1843,13 +1866,24 @@ async function handleShipInteraction(interaction) {
   }
   if (interaction?.id === 'craft-bay-status') return renderPodLaunchPanel(interaction);
   if (interaction?.id === 'analysis-review' && ['analysis','complete'].includes(activeContext?.getDestinationMissionSnapshot?.()?.phase)) {
+    const mission=activeContext.getDestinationMissionSnapshot(),context=activeContext,interior=activeContext.activeInterior;
+    if(mission.destinationId==='moon'&&mission.phase==='analysis'&&mission.fieldMethod==='samples'){
+      ensurePlayerBackpackInventory(context);
+      if(!await context.playerBackpackSessionReady){context.showToast?.('Your Backpack could not be opened. The specimens are kept; close the other tab or reload to retry.');return false;}
+      if(activeContext!==context||context.activeInterior!==interior||!context.activeShipInterior)return false;
+    }
     return renderDestinationMissionAnalysisPanel(interaction);
   }
   return renderShipStationPanel(interaction);
 }
 
-async function enterActiveShip() {
+async function enterActiveShip({isCurrent=()=>true,directEarthReturn=false}={}) {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
+  const boardingContext=activeContext,worldSequence=activeContext._worldLoadSequence,frameId=activeContext.universeRuntime?.current?.id;
+  if(!isCurrent())return false;
+  ensureStylesheet();
+  const ship = await import('./ship-interior.js?v=28');
+  if(!isCurrent()||activeContext!==boardingContext||activeContext._worldLoadSequence!==worldSequence||activeContext.universeRuntime?.current?.id!==frameId||!activeContext.spaceFlight?.active)return false;
   activeContext?.setSolisReachFlightPresentation?.(true);
   activeContext?.updateSpaceTravelSession?.({
     activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
@@ -1857,8 +1891,6 @@ async function enterActiveShip() {
     phase: SPACE_TRAVEL_PHASE.INTERIOR,
     reason: 'solis-reach-interior-entered'
   });
-  ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=28');
   closeExpeditionPlanner();
   const entered = ship.enterSolisReachInterior({
     expedition: activeExpedition,
@@ -1872,6 +1904,14 @@ async function enterActiveShip() {
       }
     }
   });
+  if(entered&&directEarthReturn&&earthShuttleJourney()?.phase===POD_PHASE.SURFACE){
+    const recovered=completeDirectEarthShuttleReturn(activePodJourney,{shipEntered:activeContext.getShipInteriorSnapshot?.()?.active===true,frameId,atMs:Date.now()});
+    if(recovered.accepted){
+      try{setPodJourney(recovered.journey);}
+      catch(error){activeContext.exitExpeditionShipInterior?.();activeContext.showToast?.('The return transfer could not save. Your pod and specimens are kept; retry boarding Solis Reach.');return false;}
+    }
+  }
+  if(entered)activeContext.updateDestinationMissionRuntime?.();
   if (!entered) {
     openExpeditionPlanner(activeContext);
     activeContext?.showSpaceFlightMessage?.(`The ${STARSHIP_NAME} interior is unavailable right now.`, '#f59e0b');
@@ -1922,6 +1962,7 @@ function getExpeditionSnapshot() {
 }
 
 export {
+  resumeSavedExpedition,
   boardSolisReachDirect,
   closeExpeditionPlanner,
   getExpeditionSnapshot,

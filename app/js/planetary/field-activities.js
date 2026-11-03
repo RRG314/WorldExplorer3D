@@ -8,6 +8,7 @@ import { createDestinationMissionStore } from '../universe/mission-authority.js?
 import { planetarySurveyEquipment } from '../universe/mission-progression.js?v=1';
 
 const INTERACTION_RADIUS = 18;
+const FIELD_SITE_LIFT = 0.08;
 const ACTIVITY_OFFSETS = Object.freeze([
   Object.freeze({ x: 12, z: -8 }),
   Object.freeze({ x: -44, z: 18 }),
@@ -170,30 +171,134 @@ function addPhotographySite(group, materials) {
   sweep.rotation.z = -Math.PI * 0.77;
 }
 
-function addGeologySite(group, materials, collect = true) {
-  const rockMaterial = fieldMaterial(0x695246, { metalness: 0.04, roughness: 0.96 });
-  const mineralMaterial = fieldMaterial(0xb8834d, { metalness: 0.18, roughness: 0.7 });
+function addGeologySite(group, materials, collect = true, lunarAnalog = null) {
+  const rockMaterial = fieldMaterial(
+    lunarAnalog === 'basalt' ? 0x363d40 : lunarAnalog === 'breccia' ? 0x67645e : 0x695246,
+    { metalness: 0.04, roughness: 0.96 },
+  );
+  const mineralMaterial = fieldMaterial(lunarAnalog ? 0xc3c3b5 : 0xb8834d, {
+    metalness: 0.18,
+    roughness: 0.7,
+  });
   const rockLayout = [
-    [-1.1, 0.34, -0.15, 0.62, 0.38], [-0.55, 0.48, -0.35, 0.82, -0.22], [0.12, 0.55, -0.28, 0.92, 0.17],
-    [0.78, 0.42, -0.18, 0.7, -0.3], [1.18, 0.25, 0.02, 0.48, 0.12], [-0.28, 0.27, 0.32, 0.5, 0.44]
+    [-1.1, 0.34, -0.15, 0.62, 0.38],
+    [-0.55, 0.48, -0.35, 0.82, -0.22],
+    [0.12, 0.55, -0.28, 0.92, 0.17],
+    [0.78, 0.42, -0.18, 0.7, -0.3],
+    [1.18, 0.25, 0.02, 0.48, 0.12],
+    [-0.28, 0.27, 0.32, 0.5, 0.44],
   ];
-  rockLayout.forEach(([x, y, z, scale, turn], index) => {
-    const rock = addFieldMesh(group, new THREE.DodecahedronGeometry(0.72, 1), index === 2 ? mineralMaterial : rockMaterial, `geology-outcrop-${index + 1}`, [x, y, z], [0.12 * index, turn, -0.08 * index]);
-    rock.scale.set(scale * 1.3, scale * 0.72, scale);
-  });
+  if (lunarAnalog) {
+    group.userData.lunarAnalog = lunarAnalog;
+    const host = addFieldMesh(
+      group,
+      new THREE.DodecahedronGeometry(0.72, 1),
+      rockMaterial,
+      'lunar-' + lunarAnalog + '-matrix',
+      [0, 0, 0],
+      [0.08, 0.17, 0.04],
+    );
+    host.scale.set(1.55, 0.66, 1.02);
+    host.updateMatrixWorld(true);
+    host.position.y -= new THREE.Box3().setFromObject(host).min.y + FIELD_SITE_LIFT;
+    host.updateMatrixWorld(true);
+    const count = lunarAnalog === 'basalt' ? 32 : 16,
+      grainGeometry = new THREE.OctahedronGeometry(1),
+      ray = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+    for (let i = 0; i < count; i++) {
+      const x = (((i * 37) % 97) / 96 - 0.5) * 1.4,
+        z = (((i * 23) % 83) / 82 - 0.5) * 0.8;
+      ray.ray.origin.set(x, 4, z);
+      const hit = ray.intersectObject(host, false)[0];
+      if (!hit) continue;
+      const radius = lunarAnalog === 'basalt' ? 0.012 + 0.002 * (i % 3) : 0.08 + 0.025 * (i % 4),
+        grain = addFieldMesh(
+          group,
+          grainGeometry,
+          mineralMaterial,
+          lunarAnalog === 'basalt' ? 'lunar-fine-grain' : 'lunar-embedded-fragment',
+          [x, hit.point.y - radius * 0.38, z],
+          [i * 0.23, i * 0.41, i * 0.17],
+        );
+      grain.scale.set(radius * (1 + (i % 3) * 0.2), radius, radius * 0.8);
+    }
+  } else
+    rockLayout.forEach(([x, y, z, scale, turn], index) => {
+      const rock = addFieldMesh(
+        group,
+        new THREE.DodecahedronGeometry(0.72, 1),
+        index === 2 ? mineralMaterial : rockMaterial,
+        `geology-outcrop-${index + 1}`,
+        [x, y, z],
+        [0.12 * index, turn, -0.08 * index],
+      );
+      rock.scale.set(scale * 1.3, scale * 0.72, scale);
+    });
   if (collect) {
-  addFieldMesh(group, new THREE.BoxGeometry(1.7, 0.16, 1.05), materials.dark, 'sample-case-base', [0.45, 0.13, 1.45]);
-  const lid = addFieldMesh(group, new THREE.BoxGeometry(1.7, 0.12, 1.05), materials.shell, 'sample-case-lid', [0.45, 0.82, 1.88], [-0.82, 0, 0]);
-  lid.userData.fieldActionPart = 'sample-case-lid';
-  [-0.08, 0.36, 0.8].forEach((x, index) => {
-    addFieldMesh(group, new THREE.CylinderGeometry(0.16, 0.16, 0.12, 16), index === 1 ? mineralMaterial : rockMaterial, `sealed-sample-slot-${index + 1}`, [x, 0.28, 1.42]);
-  });
+    addFieldMesh(
+      group,
+      new THREE.BoxGeometry(1.7, 0.16, 1.05),
+      materials.dark,
+      'sample-case-base',
+      [0.45, 0.13, 1.45],
+    );
+    const lid = addFieldMesh(
+      group,
+      new THREE.BoxGeometry(1.7, 0.12, 1.05),
+      materials.shell,
+      'sample-case-lid',
+      [0.45, 0.82, 1.88],
+      [-0.82, 0, 0],
+    );
+    lid.userData.fieldActionPart = 'sample-case-lid';
+    [-0.08, 0.36, 0.8].forEach((x, index) => {
+      addFieldMesh(
+        group,
+        new THREE.CylinderGeometry(0.16, 0.16, 0.12, 16),
+        index === 1 ? mineralMaterial : rockMaterial,
+        `sealed-sample-slot-${index + 1}`,
+        [x, 0.28, 1.42],
+      );
+    });
   }
-  addFieldBrace(group, new THREE.Vector3(-1.55, 0.05, 1.22), new THREE.Vector3(-1.25, 1.42, 0.94), 0.06, materials.frame, 'sample-scanner-support-port');
-  addFieldBrace(group, new THREE.Vector3(1.55, 0.05, 1.22), new THREE.Vector3(1.25, 1.42, 0.94), 0.06, materials.frame, 'sample-scanner-support-starboard');
-  addFieldBrace(group, new THREE.Vector3(-1.25, 1.42, 0.94), new THREE.Vector3(1.25, 1.42, 0.94), 0.08, materials.frame, 'sample-scanner-crossbar');
-  addFieldMesh(group, new THREE.BoxGeometry(0.62, 0.24, 0.38), materials.shell, 'sample-scanner-head', [0, 1.34, 0.94]);
-  addFieldMesh(group, new THREE.CylinderGeometry(0.06, 0.23, 1.28, 18, 1, true), materials.beam, 'sample-scanner-field', [0, 0.72, 0.78]);
+  addFieldBrace(
+    group,
+    new THREE.Vector3(-1.55, 0.05, 1.22),
+    new THREE.Vector3(-1.25, 1.42, 0.94),
+    0.06,
+    materials.frame,
+    'sample-scanner-support-port',
+  );
+  addFieldBrace(
+    group,
+    new THREE.Vector3(1.55, 0.05, 1.22),
+    new THREE.Vector3(1.25, 1.42, 0.94),
+    0.06,
+    materials.frame,
+    'sample-scanner-support-starboard',
+  );
+  addFieldBrace(
+    group,
+    new THREE.Vector3(-1.25, 1.42, 0.94),
+    new THREE.Vector3(1.25, 1.42, 0.94),
+    0.08,
+    materials.frame,
+    'sample-scanner-crossbar',
+  );
+  addFieldMesh(
+    group,
+    new THREE.BoxGeometry(0.62, 0.24, 0.38),
+    materials.shell,
+    'sample-scanner-head',
+    [0, 1.34, 0.94],
+  );
+  addFieldMesh(
+    group,
+    new THREE.CylinderGeometry(0.06, 0.23, 1.28, 18, 1, true),
+    materials.beam,
+    'sample-scanner-field',
+    [0, 0.72, 0.78],
+  );
 }
 
 function addHabitatSite(group, materials) {
@@ -241,9 +346,9 @@ function markerFor(activity) {
   addFieldMesh(group, new THREE.CylinderGeometry(0.34, 0.42, 0.18, 18), materials.frame, `${activity.activityId}-status-base`, [-2.15, 0.09, 1.85]);
   addFieldMesh(group, new THREE.CylinderGeometry(0.12, 0.18, 0.18, 18), materials.screen, `${activity.activityId}-status-light`, [-2.15, 0.28, 1.85]);
   if (activity.activityId === 'photograph') addPhotographySite(group, materials);
-  else if (activity.activityId.startsWith('geology-')) addGeologySite(group, materials, activity.activityId === 'geology-inspect');
+  else if (activity.activityId.startsWith('geology-')) addGeologySite(group, materials, activity.activityId === 'geology-inspect',activity.bodyId==='moon'?(activity.evidenceId?.startsWith('mare-')?'basalt':activity.evidenceId?.startsWith('fragment-')?'breccia':null):null);
   else addHabitatSite(group, materials);
-  group.position.set(activity.x, activity.y + 0.08, activity.z);
+  group.position.set(activity.x, activity.y + FIELD_SITE_LIFT, activity.z);
   group.userData.truthClass = 'generated_game_detail';
   group.userData.planetaryFieldActivityId = activity.id;
   group.userData.activityStep = 0;
@@ -301,7 +406,8 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
       const z = pack.spawn.z + offset.z;
       const y = pack.manifest.renderPlacement.y + sampleHeight(x, z);
       const activity = Object.freeze({
-        id: `${pack.bodyId}:${pack.manifest.regionId}:${evidenceId || activityId}`,
+        id: `${pack.bodyId}:${pack.manifest.regionId}:${pack.surveyMissionId?pack.surveyMissionId+':':''}${evidenceId || activityId}`,
+        ...(pack.surveyMissionId?{surveyMissionId:pack.surveyMissionId}:{}),
         evidenceId,
         terrainTruth: pack.manifest.truthClass || 'modeled',
         bodyId: pack.bodyId,
@@ -330,6 +436,7 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
     activities: world.fieldActivities,
     sites: world.fieldActivitySites || new Map()
   });
+  for(const activity of active.activities)if(pack.completedEvidence?.includes(activity.evidenceId))updateFieldSitePresentation(activity,FIELD_PROCEDURES[activity.activityId].length);
   return Object.freeze([...world.fieldActivities]);
 }
 
@@ -457,6 +564,7 @@ async function persistActivity(activity) {
 }
 
 async function advanceActivity(activity) {
+  if(activity.bodyId==='moon'&&appCtx.canRecordLunarFieldActivity?.(activity)===false)return false;
   const power = activity.bodyId === 'moon' ? appCtx.getLunarFieldPower?.() : null;
   if (power && !power.canSurvey) {
     appCtx.showToast?.(power.saveBlocked ? 'Battery progress could not be saved. Retry in the Lunar Field Book, or return to the pod.' : 'Keep the remaining power for your return. Recover to Solis Reach and relaunch with a charged kit; your records are kept.');

@@ -16,17 +16,18 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
   globe.open();globe.setSelection(place.lat,place.lon,{name:place.name,arrivalMode:'boat',focus:false});
   return globe.startOcean({isCurrent});
  }
- const entry=createExperienceEntry({
-  resolveAdapter:(id,row)=>adapters.get(id)||adapters.get(row.id),
-  readWorldIdentity:()=>runtime.gameStarted&&!runtime.worldLoading?`${runtime.getEnv?.()||'EARTH'}:${runtime._worldLoadSequence||0}`:null,
-  launchPlace:async(place)=>{
+ async function travelToPlace(place){
    const current=context();if(current.loaded&&current.environment===place.environment&&current.place&&Math.abs(current.place.lat-place.lat)<.00001&&Math.abs(current.place.lon-place.lon)<.00001)return true;
    if(place.environment==='ocean')return travelToOcean(place);
    const title=getTitleUi(),globe=title?.getGlobeSelector?.();if(!title||!globe)return false;
    closeMenus();runtime.toggleWorldDiscoveryJournal?.(false);runtime.stopGameplayPlugin?.('experience-travel',{resumeFree:false});title.selectGameMode('free');
    if(place.environment==='earth'){globe.setSelection(place.lat,place.lon,{name:place.name,arrivalMode:'walk',focus:false});return globe.startHere();}
    title.setTitleLaunchMode(place.environment);return runtime.triggerTitleStart?.({bypassCustomGate:true,launchMode:place.environment});
-  }
+ }
+ const entry=createExperienceEntry({
+  resolveAdapter:(id,row)=>adapters.get(id)||adapters.get(row.id),
+  readWorldIdentity:()=>runtime.gameStarted&&!runtime.worldLoading?`${runtime.getEnv?.()||'EARTH'}:${runtime._worldLoadSequence||0}`:null,
+  launchPlace:travelToPlace
  });
  adapters.set('game',{
   equipment:'Check your vehicle in the Garage for driving games. Other games provide instructions when they open.',places:currentPlaces,
@@ -51,5 +52,5 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
   onBegin:intent=>entry.start(intent),onEntered:requestWorldFocus,onJournal,
   onLayer:open=>{runtime.screenLayout?.setPanelLayer('experiences',open);runtime.setPauseReason?.('experience-browser',open&&runtime.gameStarted);if(open)closeMenus();}
  });
- return Object.freeze({...browser,travelToOcean,registerAdapter(id,adapter){if(adapters.has(id))throw Error('Activity adapter already registered: '+id);adapters.set(id,adapter);return()=>adapters.delete(id);},getStore,cancelEntry:()=>entry.cancel(),context});
+ return Object.freeze({...browser,travelToOcean,travelToPlace,registerAdapter(id,adapter){if(adapters.has(id))throw Error('Activity adapter already registered: '+id);adapters.set(id,adapter);return()=>adapters.delete(id);},getStore,cancelEntry:()=>entry.cancel(),context});
 }

@@ -4,7 +4,7 @@ import { resolveUniverseAddress } from './catalog.js?v=11';
 import { DEFAULT_CREW } from '../expedition/catalog.js?v=2';
 import { createExpeditionStore } from '../expedition/store.js?v=12';
 import { missionSurfaceBody, missionNavigationTarget, setMissionCourse } from './mission-navigation.js';
-import { lunarFieldPlan, lunarPreparationReady, atLunarPreparationStation } from '../planetary/lunar-survey.js';
+import { lunarFieldPlan, lunarPreparationReady, atLunarPreparationStation, LUNAR_STUDIES, lunarStudyMissionId, lunarStudyReportId } from '../planetary/lunar-survey.js';
 import { normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 
 import { canAnalyzeDestination, canResumeDestinationSurvey, planetarySurveyEquipment } from './mission-progression.js?v=1';
@@ -23,6 +23,7 @@ let scanTimer = 0;
 let pendingScan = null;
 let failedArrivalState = null;
 let fieldEvidenceBound = false;
+let failedLunarRecoveryPod = null;
 
 const SURFACE_EVIDENCE = Object.freeze(['photograph', 'geology-inspect', 'habitat-survey']);
 const THERMAL_ORBIT_EVIDENCE = Object.freeze(['dayside', 'terminator', 'nightside']);
@@ -44,7 +45,7 @@ const SURFACE_MISSION_PLANS = Object.freeze({
 });
 
 function surfaceEvidencePlan(mission) {
-  if (mission?.destinationId === 'moon') return lunarFieldPlan(missionStore?.get(mission)?.preparation?.strategy);
+  if (mission?.destinationId === 'moon') {const state=missionStore?.get(mission);return lunarFieldPlan(state?.preparation?.strategy||state?.restoredReport?.metadata?.strategy);}
   const authored = SURFACE_MISSION_PLANS[mission?.destinationId];
   if (authored) return authored;
   return Object.freeze(SURFACE_EVIDENCE.map((activityId) => Object.freeze({
@@ -61,8 +62,8 @@ function surfaceEvidencePlan(mission) {
 }
 
 function currentDefinition() {
-  const missionId = missionStore?.load?.().activeMissionId;
-  const destinationId = missionId?.startsWith('mission:') ? missionId.slice(8) : '';
+  const ledger=missionStore?.load?.(),missionId = ledger?.activeMissionId;
+  const destinationId = ledger?.missions?.[missionId]?.destinationId || (missionId?.startsWith('mission:') ? missionId.slice(8) : '');
   return getDestinationMission(destinationId);
 }
 
@@ -109,6 +110,7 @@ function analysisOutcomeOptions(mission, state = missionStore?.get?.(mission)) {
   const evidenceComplete = required.every((id) => state?.evidence?.includes(id));
   return ANALYSIS_OUTCOMES.map((outcome) => Object.freeze({
     ...outcome,
+    ...(state?.surveyVariantId?{points:0}:{}),
     available: evidenceComplete && (!outcome.requiresScienceLead || scienceLead != null),
     crewLeadId: outcome.requiresScienceLead ? scienceLead?.id || null : scienceLead?.id || null,
     crewLeadName: scienceLead?.name || null,
@@ -127,6 +129,10 @@ async function recordDestinationExplorerEvent(record) {
 }
 
 function phaseObjective(mission, state) {
+  if(state.surveyVariantId==='planned-return'&&state.phase===DESTINATION_MISSION_PHASE.FIELDWORK&&!state.siteARecovery){
+    const plan=lunarFieldPlan(state.preparation?.strategy);
+    if(plan.filter(e=>e.evidenceId.startsWith('mare-')).every(e=>state.evidence.includes(e.evidenceId)))return 'Site A is recorded. Return in this pod to Solis Reach, recharge the kit, then relaunch for Site B.';
+  }
   if (mission?.destinationId === 'moon' && state.phase === DESTINATION_MISSION_PHASE.APPROACH) {
     return lunarPreparationReady(state.preparation, activeContext?.getInterstellarExpeditionSnapshot?.()?.id)
       ? 'Field kit prepared. Go to the Pod Bay, launch for the Moon and land at the marked site.'
@@ -258,8 +264,10 @@ function isDestinationMissionSurfaceTarget(destinationId) {
 function ensurePanel() {
   let panel = document.getElementById('destinationMissionPanel');
   if (panel) return panel;
-  panel = document.createElement('section');
+  panel = document.createElement('dialog');
+  panel.addEventListener('cancel', event => { event.preventDefault(); closeDestinationMission(); });
   panel.id = 'destinationMissionPanel';
+  panel.setAttribute('aria-labelledby', 'destinationMissionTitle');
   panel.className = 'destination-mission-panel';
   panel.hidden = true;
   document.body.appendChild(panel);
@@ -269,15 +277,19 @@ function ensurePanel() {
 function closeDestinationMission() {
   const panel = document.getElementById('destinationMissionPanel');
   if (panel?.contains?.(document.activeElement)) document.activeElement?.blur?.();
+  if (panel?.open) panel.close();
   if (panel) panel.hidden = true;
+  activeContext?.screenLayout?.setPanelLayer?.('destination-mission', false);
 }
+
 
 function missionAtDestination(mission) {
   const universe = activeContext?.universeRuntime;
-  if (!mission || !universe || universe.transition) return false;
+  if (!mission || universe?.transition) return false;
   const environment=activeContext?.getEnv?.();
   if (!['SPACE_FLIGHT','MOON','MARS','PLANETARY'].includes(environment)) return false;
   if (environment!=='SPACE_FLIGHT') return missionSurfaceBody(activeContext)===mission.destinationId;
+  if (!universe) return false;
   if (canResumeDestinationSurvey(activeContext, mission)) return true;
   if (mission.scope === 'system') return universe.current?.id === mission.destinationId;
   if (mission.scope === 'solar-body') {
@@ -357,7 +369,7 @@ function renderDestinationMission(destinationId = '') {
     action = '<button type="button" class="universe-action" disabled>Mission recorded in the Captain’s Log</button>';
   }
   if(![DESTINATION_MISSION_PHASE.AVAILABLE,DESTINATION_MISSION_PHASE.COMPLETE].includes(state.phase)
-    &&missionStore.load().activeMissionId!==mission.id){
+    &&missionStore.load().activeMissionId!==state.missionId){
     action='<button type="button" class="universe-action primary" data-mission-resume>Resume this mission</button>';
   }
   const storageNotice=missionStore.status==='protected'
@@ -365,17 +377,20 @@ function renderDestinationMission(destinationId = '') {
     : missionStore.status==='conflict'?'Another tab changed your mission progress. Reload to continue with that saved progress.'
       : missionStore.status==='unavailable'?'Browser saving is unavailable. Missions need storage to keep your progress. Free exploration remains available.':'';
   if(storageNotice)action='<button type="button" class="universe-action" disabled>Saved progress needs attention</button>';
+  if(failedLunarRecoveryPod&&state.surveyVariantId==='planned-return')action+='<button type="button" class="universe-action primary" data-lunar-recovery-retry>Retry return record</button>';
   const completion = state.phase === DESTINATION_MISSION_PHASE.COMPLETE && state.returnConsequence
     ? `<div class="destination-mission-current"><span>RETURN CONSEQUENCE</span><strong>${state.returnConsequence}</strong>${requiresSurfaceMission(mission) ? '<small>Field Link II installed on this device · remote stations: 30 m · samples: 18 m.</small>' : ''}${state.crewLeadId ? `<small>Analysis led by ${crewNameForId(state.crewLeadId) || 'the Solis Reach science team'}</small>` : ''}</div>`
     : '';
-  panel.innerHTML = `<article class="destination-mission-card" role="dialog" aria-modal="true" aria-labelledby="destinationMissionTitle">
-    <header><div><span>DESTINATION MISSION · ${mission.destinationName}</span><h2 id="destinationMissionTitle">${mission.title}</h2></div><button type="button" class="universe-icon-button" data-mission-close aria-label="Close mission">×</button></header>
+  panel.innerHTML = `<article class="destination-mission-card">
+    <header><div><span>DESTINATION MISSION · ${mission.destinationName}</span><h2 id="destinationMissionTitle">${state.surveyVariantId?LUNAR_STUDIES[state.surveyVariantId].label:mission.title}</h2></div><button type="button" class="universe-icon-button" data-mission-close aria-label="Close mission">×</button></header>
     <p>${mission.premise}</p>${requiresSurfaceMission(mission) ? '<p>Complete the fieldwork, return in the same pod, and publish at the Analysis Lab. Your first completed surface report installs Field Link II: operate photo and environment stations within 30 m instead of 18 m on future worlds. Local device progress.</p>' : ''}${evidence}
     <div class="destination-mission-current"><span>CURRENT OBJECTIVE</span><strong>${phaseObjective(mission, state)}</strong></div>${completion}
     <ol>${stageRows}</ol>
     ${storageNotice?`<p role="status">${storageNotice}</p>`:''}<div class="destination-mission-actions">${action}</div>
   </article>`;
   panel.hidden = false;
+  activeContext?.screenLayout?.setPanelLayer?.('destination-mission', true);
+  if (!panel.open) panel.showModal?.();
   panel.querySelector('[data-mission-close]')?.addEventListener('click', closeDestinationMission);
   panel.querySelector('[data-mission-close-guide]')?.addEventListener('click', closeDestinationMission);
   panel.querySelector('[data-mission-resume]')?.addEventListener('click',()=>{
@@ -404,6 +419,7 @@ function renderDestinationMission(destinationId = '') {
     else activeContext?.showSpaceFlightMessage?.('Finish the current flight transition before setting this mission course.', '#f59e0b');
   });
   panel.querySelector('[data-mission-field]')?.addEventListener('click', () => performDestinationMissionFieldwork());
+  panel.querySelector('[data-lunar-recovery-retry]')?.addEventListener('click',()=>{failedLunarRecoveryPod=null;syncLunarRecovery();renderDestinationMission(mission.destinationId);});
   panel.querySelector('[data-mission-local-course]')?.addEventListener('click', () => {
     const targetId = nextOrbitalEvidence(mission, missionStore.get(mission));
     const accepted = activeContext?.travelToUniverseDestination?.(targetId, {
@@ -420,12 +436,14 @@ function recordSurfaceMissionEvidence(event) {
   const mission = currentDefinition();
   if (!activity || !requiresSurfaceMission(mission) || activity.bodyId !== mission.destinationId) return false;
   const state = missionStore.get(mission);
+  if(mission.destinationId==='moon'&&(activity.surveyMissionId||'mission:moon')!==state.missionId)return false;
   const evidencePlan = surfaceEvidencePlan(mission);
   const objective = evidencePlan.find((entry) => entry.activityId === activity.activityId
     && (mission.destinationId !== 'moon' || activity.evidenceId === entry.evidenceId));
   if (state.phase !== DESTINATION_MISSION_PHASE.FIELDWORK || !objective) return false;
   try{
-  missionStore.recordEvidence(mission, objective.evidenceId, { evidenceId: activity.id });
+  const recorded=missionStore.recordEvidence(mission, objective.evidenceId, { evidenceId: activity.id,podId:activeContext?.getInterstellarExpeditionSnapshot?.()?.podJourney?.id });
+  if(!recorded.accepted)return false;
   const updated = missionStore.get(mission);
   const secured = evidencePlan.filter((entry) => updated.evidence.includes(entry.evidenceId));
   if (secured.length < evidencePlan.length) {
@@ -440,6 +458,67 @@ function recordSurfaceMissionEvidence(event) {
 
 function openDestinationMission(destinationId) {
   return renderDestinationMission(destinationId);
+}
+function selectLunarStudy(variantId = 'campaign') {
+  if (
+    !missionStore ||
+    !Object.hasOwn(LUNAR_STUDIES, variantId) ||
+    activeContext?.universeRuntime?.transition
+  )
+    return false;
+  if (missionSurfaceBody(activeContext) === 'moon') {
+    if (missionStore.load().activeMissionId !== lunarStudyMissionId(variantId)) return false;
+  } else if (activeContext?.universeRuntime?.current?.id !== 'sol') return false;
+  const mission = getDestinationMission('moon');
+  try {
+    missionStore.activate(mission, { variantId });
+    failedLunarRecoveryPod = null;
+    return true;
+  } catch (error) {
+    activeContext?.showToast?.(error.message);
+    return false;
+  }
+}
+function restoreLunarStudyFromJournal(report) {
+  if (!missionStore) return false;
+  return missionStore.restoreOriginalLunarReport(getDestinationMission('moon'), report);
+}
+function canRecordLunarFieldActivity(activity) {
+  if (activity?.bodyId !== 'moon') return true;
+  const mission = currentDefinition();
+  if (mission?.destinationId !== 'moon') return !activity.surveyMissionId;
+  const state = missionStore.get(mission);
+  if ((activity.surveyMissionId || 'mission:moon') !== state.missionId) return false;
+  const allowed = missionStore.canRecordFieldEvidence(mission, activity.evidenceId);
+  if (!allowed)
+    activeContext?.showToast?.(
+      'Finish Site A and recover to Solis Reach before continuing at Site B.',
+    );
+  return allowed;
+}
+function syncLunarRecovery(mission = currentDefinition()) {
+  if (mission?.destinationId !== 'moon') return;
+  const state = missionStore.get(mission);
+  if (
+    state.surveyVariantId !== 'planned-return' ||
+    state.siteARecovery ||
+    !state.siteACompletedPodId ||
+    state.phase !== DESTINATION_MISSION_PHASE.FIELDWORK ||
+    !activeContext?.activeShipInterior ||
+    failedLunarRecoveryPod
+  )
+    return;
+  const ship = activeContext.getShipInteriorSnapshot?.(),
+    journey = activeContext.getInterstellarExpeditionSnapshot?.()?.podJourney;
+  if (!ship?.active || ship.shipId !== 'solis-reach' || journey?.phase !== 'recovered') return;
+  try {
+    missionStore.recordLunarRecovery(mission, journey);
+  } catch {
+    failedLunarRecoveryPod = journey.id;
+    activeContext?.showToast?.(
+      'The return record could not save. Retry in the Moon mission panel; your field records are kept.',
+    );
+  }
 }
 
 function markMissionArrived(mission) {
@@ -468,6 +547,7 @@ function updateDestinationMissionRuntime() {
   if(pendingScan&&!scanStillEligible(pendingScan))cancelMissionScan();
   const mission = currentDefinition();
   if (!mission || !missionStore) return;
+  syncLunarRecovery(mission);
   if (missionStore.get(mission).phase === DESTINATION_MISSION_PHASE.APPROACH && missionAtDestination(mission)) {
     markMissionArrived(mission);
   }
@@ -477,7 +557,7 @@ function scanStillEligible(scan) {
   const {mission,context,store,evidence}=scan;
   if(context!==activeContext||store!==missionStore||context.paused||context.getEnv?.()!=='SPACE_FLIGHT'
     ||!context.spaceFlight?.active||context.activeShipInterior||requiresSurfaceMission(mission)
-    ||store.load().activeMissionId!==mission.id||store.get(mission).phase!==DESTINATION_MISSION_PHASE.FIELDWORK
+    ||store.load().activeMissionId!==store.get(mission).missionId||store.get(mission).phase!==DESTINATION_MISSION_PHASE.FIELDWORK
     ||!missionAtDestination(mission)||nextOrbitalEvidence(mission,store.get(mission))!==evidence)return false;
   if(mission.operation==='thermal-orbital-survey'&&(!evidence||thermalObservationZone(mission)!==evidence))return false;
   if(mission.operation==='transit-network-survey'&&(!evidence||!transitObservationReady(mission,evidence)))return false;
@@ -543,26 +623,28 @@ async function completeDestinationMissionAnalysis(outcomeId = 'cautious-baseline
 async function commitDestinationMissionAnalysis(outcomeId) {
   const mission = currentDefinition();
   if (!mission || !missionStore || missionStore.get(mission).phase !== DESTINATION_MISSION_PHASE.ANALYSIS || !canAnalyzeDestination(activeContext, mission)) return false;
+  const study=missionStore.get(mission),repeat=mission.destinationId==='moon'&&study.surveyVariantId;
+  if(study.surveyVariantId==='planned-return'&&study.siteARecovery?.podId===activeContext?.getInterstellarExpeditionSnapshot?.()?.podJourney?.id)return false;
   const pendingOutcome = missionStore.get(mission).evidence.find(id => id.startsWith('analysis:'))?.slice(9);
   const outcome = analysisOutcomeOptions(mission).find((entry) => entry.id === String(pendingOutcome || outcomeId || ''));
   if (!outcome?.available) return false;
   missionStore.recordEvidence(mission, `analysis:${outcome.id}`, { evidenceId: `${mission.id}:analysis:${outcome.id}` });
   const saved = await recordDestinationExplorerEvent({
-    eventId: `event:destination-mission:${mission.destinationId}`,
+    eventId: mission.destinationId==='moon'?lunarStudyReportId(study.surveyVariantId||'campaign'):`event:destination-mission:${mission.destinationId}`,
     eventType: 'destination-mission-complete',
     sourceSystem: 'destination-missions',
     sourceId: mission.id,
     pathId: 'space-science',
-    name: mission.title,
+    name: repeat?LUNAR_STUDIES[study.surveyVariantId].label:mission.title,
     detail: `${mission.destinationName}: ${outcome.consequence}${outcome.crewLeadName ? ` Science lead: ${outcome.crewLeadName}.` : ''}`,
     regionId: mission.systemId,
     regionLabel: mission.destinationName,
     worldIdentity: mission.destinationId,
     environment: 'SPACE_FLIGHT',
     points: outcome.points,
-    firstCompletion: true,
+    firstCompletion: !repeat,
     projections: { journal: true, profile: true, place: false, fieldGuide: true },
-    metadata: { missionId: mission.id, outcomeId: outcome.id, truthType: 'authored', ...(mission.destinationId === 'moon' ? { lunarVersion: 1, strategy: missionStore.get(mission).preparation?.strategy || 'samples', fieldEvidence: surfaceEvidencePlan(mission).map(entry => entry.evidenceId), expeditionId: activeContext.getInterstellarExpeditionSnapshot?.()?.id, podId: activeContext.getInterstellarExpeditionSnapshot?.()?.podJourney?.id, prepared: lunarPreparationReady(missionStore.get(mission).preparation, activeContext.getInterstellarExpeditionSnapshot?.()?.id) } : {}) }
+    metadata: { missionId: study.missionId, outcomeId: outcome.id, truthType: 'authored', ...(repeat?{definitionId:mission.id,surveyVariantId:study.surveyVariantId,...(study.siteARecovery?{siteARecovery:study.siteARecovery}:{})}:{}), ...(mission.destinationId === 'moon' ? { lunarVersion: 1, strategy: study.preparation?.strategy || 'samples', fieldEvidence: surfaceEvidencePlan(mission).map(entry => entry.evidenceId), expeditionId: activeContext.getInterstellarExpeditionSnapshot?.()?.id, podId: activeContext.getInterstellarExpeditionSnapshot?.()?.podJourney?.id, prepared: lunarPreparationReady(study.preparation, activeContext.getInterstellarExpeditionSnapshot?.()?.id) } : {}) }
   });
   const confirmed = saved?.event?.sourceSystem === 'destination-missions' && saved.event.eventType === 'destination-mission-complete'
     && (saved.recorded === true || saved.reason === 'already-recorded')
@@ -597,10 +679,11 @@ function destinationMissionSnapshot() {
   if (!mission) return { activeMissionId: null, coverage: null };
   const state = missionStore.get(mission);
   return {
-    activeMissionId: mission.id,
+    activeMissionId: state.missionId,
+    ...(state.surveyVariantId?{surveyVariantId:state.surveyVariantId,siteARecovery:state.siteARecovery||null,requiredStrategy:state.surveyVariantId==='alternate-method'?((missionStore.get(mission,{variantId:'campaign'}).preparation?.strategy||missionStore.get(mission,{variantId:'campaign'}).restoredReport?.metadata?.strategy)==='observe'?'samples':'observe'):null}:{}),
     destinationId: mission.destinationId,
     systemId: mission.systemId,
-    title: mission.title,
+    title: state.surveyVariantId?LUNAR_STUDIES[state.surveyVariantId].label:mission.title,
     phase: state.phase,
     currentObjective: phaseObjective(mission, state),
     atDestination: missionAtDestination(mission),
@@ -612,6 +695,7 @@ function destinationMissionSnapshot() {
     } : null,
     evidence: [...state.evidence],
     preparation: state.preparation || null,
+    ...(mission.destinationId==='moon'?{fieldMethod:state.preparation?.strategy||state.restoredReport?.metadata?.strategy||'samples'}:{}),
     equipment: surveyEquipment(),
     fieldRecords: requiresSurfaceMission(mission) ? surfaceEvidencePlan(mission).filter(entry => state.evidence.includes(entry.evidenceId)).map(entry => ({ label:entry.label, description:entry.description })) : [],
     outcomeId: state.outcomeId,
@@ -639,6 +723,9 @@ function initDestinationMissionRuntime(appContext) {
     getPlanetarySurveyEquipment: surveyEquipment,
     isDestinationMissionSurfaceTarget,
     openDestinationMission,
+    selectLunarStudy,
+    restoreLunarStudyFromJournal,
+    canRecordLunarFieldActivity,
     prepareDestinationMissionSurface,
     performDestinationMissionFieldwork,
     updateDestinationMissionRuntime
@@ -648,6 +735,8 @@ function initDestinationMissionRuntime(appContext) {
 }
 
 export {
+  selectLunarStudy,
+  restoreLunarStudyFromJournal,
   prepareLunarMission,
   closeDestinationMission,
   completeDestinationMissionAnalysis,
