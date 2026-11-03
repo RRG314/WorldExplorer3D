@@ -1,5 +1,8 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/astronomy-instrument-current.test.mjs',
+  'tests/astronomy-career-current.test.mjs',
+  'tests/astronomy-storage-projection-current.test.mjs',
   'tests/lunar-repeat-authority-current.test.mjs',
   'tests/lunar-repeat-custody-current.test.mjs',
   'tests/lunar-repeat-runtime-current.test.mjs',

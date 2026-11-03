@@ -1,3 +1,4 @@
+import {normalizeAstronomyCareer,transitionAstronomyCareer,validateAstronomyCareerBackup} from './astronomy-career.js';
 import {normalizeCartographyCareer,transitionCartographyCareer,validateCartographyCareerBackup} from './cartography-career.js';
 import {normalizeMeteorologyCareer,transitionMeteorologyCareer,validateMeteorologyCareerBackup} from './meteorology-career.js';
 import {normalizeHydrologyCareer,transitionHydrologyCareer,validateHydrologyCareerBackup} from './hydrology-career.js';
@@ -35,6 +36,7 @@ import {
 
 // Pure domain contracts. IndexedDB, progression and custody retain one owner.
 const definitions = Object.freeze({
+  astronomy:{normalize:normalizeAstronomyCareer,transition:transitionAstronomyCareer,validateBackup:validateAstronomyCareerBackup},
   cartography:{normalize:normalizeCartographyCareer,transition:transitionCartographyCareer,validateBackup:validateCartographyCareerBackup},
   meteorology:{normalize:normalizeMeteorologyCareer,transition:transitionMeteorologyCareer,validateBackup:validateMeteorologyCareerBackup},
   hydrology:{normalize:normalizeHydrologyCareer,transition:transitionHydrologyCareer,validateBackup:validateHydrologyCareerBackup},

@@ -1,3 +1,4 @@
+import { astronomyCareerSummary } from '../campaign/astronomy-career.js';
 import { cartographyCareerSummary } from '../campaign/cartography-career.js';
 import {bindPlanetaryCareer} from '../campaign/planetary-career-adapter.js';
 import { meteorologyCareerSummary } from '../campaign/meteorology-career.js';
@@ -27,6 +28,7 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   let active = null,
     generation = 0;
   const domains = {
+    'career:astronomer': async () => (await import('../campaign/astronomy-runtime.js')).createAstronomyCareerRuntime,
     'career:cartographer': async () =>
       (await import('../campaign/cartography-runtime.js')).createCartographyCareerRuntime,
     'career:meteorologist': async () =>
@@ -199,6 +201,38 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
           },
     summary: ({ profile, variantId }) =>
       cartographyCareerSummary(profile?.researchCareers?.cartography, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
+  });
+  experiences.registerAdapter('astronomy', {
+    recoveryActions: ['relocate-course'],
+    equipment:
+      'A supported working telescope, detector console and observing-log bench are supplied. Catalog positions and reproducible synthetic pixels stay clearly identified.',
+    places: (input = {}) =>
+      fieldResearchPlaces('astronomy', {
+        ...input,
+        completedRecord:
+          input.profile?.researchCareers?.astronomy?.records?.[input.variantId || 'campaign'],
+        defaultDestination: { name: 'Druid Hill Park · park lawns', lat: 39.3173, lon: -76.64044 },
+      }),
+    offer: ({ place, profile }) =>
+      profile?.researchCareers?.astronomy?.schemaVersion &&
+      profile.researchCareers.astronomy.schemaVersion !== 1
+        ? {
+            state: 'unavailable',
+            label: 'Update required',
+            reason: 'This saved observing study needs a newer World Explorer version.',
+            enabled: false,
+          }
+        : {
+            state: place ? 'ready' : 'needs-place',
+            label: place ? 'Begin observing study' : 'Choose a training site',
+            reason:
+              'Clear dry support is checked for the telescope and detector benches. Align the physical mount, compare exposures and retain a covered-detector control.',
+            enabled: !!place,
+          },
+    summary: ({ profile, variantId }) =>
+      astronomyCareerSummary(profile?.researchCareers?.astronomy, { variantId }),
     start: ({ intent, isCurrent }) =>
       isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
