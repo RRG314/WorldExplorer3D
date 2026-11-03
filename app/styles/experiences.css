@@ -203,3 +203,50 @@
   overflow-wrap: normal;
   word-break: normal;
 }
+
+.hydrology-table {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.hydrology-table table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.hydrology-table caption {
+  text-align: left;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.hydrology-table th,
+.hydrology-table td {
+  padding: 8px;
+  border-bottom: 1px solid #678481;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.hydrology-reference {
+  padding: 12px;
+  background: #132b30;
+  border-left: 3px solid #efd079;
+}
+.hydrology-instruments .research-primary {
+  background: #efd079 !important;
+  color: #15251b !important;
+}
+.hydrology-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(300px, 50dvh);
+  background: #132b30;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+.hydrology-chart text {
+  fill: #eef7f2;
+  font: 20px system-ui;
+}

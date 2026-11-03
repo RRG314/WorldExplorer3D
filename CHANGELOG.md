@@ -2,6 +2,13 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## Unreleased
+
+- Hydrologist studies add matched upstream/downstream virtual instruments,
+  declared return conditions, saved watershed plates and the Water Watch badge.
+- Historical USGS river records retain source, dates and units separately from
+  simulated flow and optical readings; reports preserve uncertainty and limits.
+
 ## Racing and track creation — deployed 2026-10-31
 
 - Added complete Silverstone GP and pit access, full Nordschleife T13, and

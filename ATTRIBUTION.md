@@ -33,6 +33,7 @@ This is the concise public attribution index. Asset-level details are in `app/as
 ## Operational Feeds
 
 - CelesTrak GP orbital elements. <https://celestrak.org/>
+- U.S. Geological Survey [Water Data API](https://api.waterdata.usgs.gov/), historical daily mean discharge for USGS-01589300, January 1–3, 2024; raw response and provenance retained in `app/data/hydrology/`.
 - USGS Earthquake Hazards Program feeds. <https://earthquake.usgs.gov/earthquakes/feed/>
 - ADSB.lol community aircraft observations, available under ODbL 1.0. <https://www.adsb.lol/>
 - Weather: [MET Norway Locationforecast](https://api.met.no/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Coordinates rounded, wind converted from m/s to km/h, and symbols mapped to WMO categories. Unprovided fields are not estimated.

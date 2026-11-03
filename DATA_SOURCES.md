@@ -190,6 +190,21 @@ Provider references: [MET Norway terms](https://api.met.no/doc/TermsOfService),
 [PacIOOS WAVEWATCH III](https://pae-paha.pacioos.hawaii.edu/erddap/info/ww3_global/index.html),
 and [HYCOM/FNMOC catalogue](https://tds.hycom.org/thredds/catalogs/GLBy0.08/latest.html?dataset=GLBy0.08-latest).
 
+## Hydrology study context
+
+The Hydrologist studies use a visible virtual training flume. Float transit,
+channel dimensions and nine optical paths produce the in-game readings. Beam
+obstruction is a clarity proxy, not calibrated turbidity in NTU. Declared return
+conditions are simulations; they are not live rainfall or river measurements.
+
+The separate [USGS Water Data API](https://api.waterdata.usgs.gov/) reference
+retains approved daily mean discharge for station USGS-01589300, Gwynns Falls at
+Villa Nova, Maryland, January 1–3, 2024, in ft³/s. The bundled raw response,
+retrieval date and SHA-256 are retained under `app/data/hydrology/` and the
+versioned reference module. Historical observations at that other river and time
+cannot identify the cause of a virtual training change. The career does not make
+new player-time requests to the USGS service.
+
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.

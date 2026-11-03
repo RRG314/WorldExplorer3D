@@ -1,7 +1,7 @@
 import {BANKED_ROAD_MODEL,BANKED_ROAD_MAXIMUM_ROLL}from'../physics/road-plane-dynamics.js';
 import {prepareVehicleDriveFrame,stepVehiclePlanarDrive,integrateVehiclePlanarPosition}from'../physics/vehicle-planar-dynamics.js';
 import {ROAD_CAR_CONFIG}from'../physics/vehicle-config.js?v=1';
-import {carSpeedToMph,mphToCarSpeed,carSpeedToWorldUnitsPerSecond}from'../physics/vehicle-speed-units.js';
+import {carSpeedToMph,mphToCarSpeed,carSpeedToWorldUnitsPerSecond}from'../physics/vehicle-speed-units.js?v=2';
 import {VEHICLE_CATALOG,vehicleHandlingProfile,vehicleConditionDynamics,VEHICLE_ROOT_TO_GROUND_METERS}from'../engine/vehicle-catalog.js?v=6';
 import {resolveVehicleRoadContactPose,measureVehicleRoadWheelClearance}from'../engine/vehicle-road-attitude.js?v=3';
 import {vehicleUpgradeDynamics}from'../transport/vehicle-upgrades.js?v=1';

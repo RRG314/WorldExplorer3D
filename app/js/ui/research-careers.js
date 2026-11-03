@@ -1,3 +1,4 @@
+import { hydrologyCareerSummary } from '../campaign/hydrology-career.js';
 import { createMarineCareerTravel } from '../campaign/marine-career-travel.js';
 import {
   normalizeMarineBiologyCareer,
@@ -22,6 +23,8 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   let active = null,
     generation = 0;
   const domains = {
+    'career:hydrologist': async () =>
+      (await import('../campaign/hydrology-runtime.js')).createHydrologyCareerRuntime,
     'career:botanist': async () =>
       (await import('../campaign/botany-runtime.js')).createBotanyCareerRuntime,
     'career:wildlife-ecologist': async () =>
@@ -156,6 +159,38 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
     }),
     start: ({ intent, isCurrent }) =>
       marine.chooseCareer('marine-biology', intent.variantId || 'campaign', { isCurrent }),
+  });
+  experiences.registerAdapter('hydrology', {
+    recoveryActions: ['relocate-course'],
+    equipment:
+      'A supported virtual stream, metre gates, three floats, nine-path clarity instrument and catchment bench are supplied. Archived USGS records remain separate from the training readings.',
+    places: (input = {}) =>
+      fieldResearchPlaces('hydrology', {
+        ...input,
+        completedRecord:
+          input.profile?.researchCareers?.hydrology?.records?.[input.variantId || 'campaign'],
+        defaultDestination: { name: 'Druid Hill Park · park lawns', lat: 39.3173, lon: -76.64044 },
+      }),
+    offer: ({ place, profile }) =>
+      profile?.researchCareers?.hydrology?.schemaVersion &&
+      profile.researchCareers.hydrology.schemaVersion !== 1
+        ? {
+            state: 'unavailable',
+            label: 'Update required',
+            reason: 'This saved water study needs a newer World Explorer version.',
+            enabled: false,
+          }
+        : {
+            state: place ? 'ready' : 'needs-place',
+            label: place ? 'Begin water study' : 'Choose a training site',
+            reason:
+              'A clear dry area and the full supported stream footprint are checked after travel. These are virtual instrument readings, not local river data.',
+            enabled: !!place,
+          },
+    summary: ({ profile, variantId }) =>
+      hydrologyCareerSummary(profile?.researchCareers?.hydrology, { variantId }),
+    start: ({ intent, isCurrent }) =>
+      isCurrent() ? runtime.startGameplayPlugin?.('research-career', { intent }) : false,
   });
   experiences.registerAdapter('geology', {
     equipment:
