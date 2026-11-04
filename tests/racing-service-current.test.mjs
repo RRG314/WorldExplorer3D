@@ -11,7 +11,28 @@ import {raceOnlineMetadata} from '../app/js/racing/driver-progress.js';
 import {vrRaceStatus} from '../app/js/vr/race-status.js';
 import {withinDeadline} from '../scripts/verification/owned-browser.mjs';
 import {createRequire} from 'node:module';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 const require=createRequire(new URL('../services/racing/package.json',import.meta.url)),WebSocket=require('ws');
+test('the racing SDK cleanup dependency retains its async directory API after security repair', async () => {
+  const apiRequire = createRequire(require.resolve('@google-cloud/firestore-api'));
+  const gaxRequire = createRequire(apiRequire.resolve('google-gax'));
+  const { rimraf } = gaxRequire('rimraf');
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'we3d-sdk-cleanup-'));
+  try {
+    const child = path.join(temporary, 'owned-child'),
+      sentinel = path.join(temporary, 'keep.txt');
+    await fs.mkdir(child);
+    await fs.writeFile(path.join(child, 'generated.txt'), 'temporary');
+    await fs.writeFile(sentinel, 'keep');
+    assert.equal(await rimraf(child), true);
+    await assert.rejects(fs.stat(child), { code: 'ENOENT' });
+    assert.equal(await fs.readFile(sentinel, 'utf8'), 'keep');
+  } finally {
+    await fs.rm(temporary, { recursive: true, force: true });
+  }
+});
 const course=createRaceCourse(buildRaceRoadGraph([{sourceId:'controlled-road',a:{x:0,y:0,z:0},b:{x:0,y:0,z:250},widthMeters:8,driveable:true,supported:true}]),['controlled-road:forward'],{locationId:'controlled',locationLabel:'Controlled road',anchor:{lat:43,lon:7},participants:4});
 const courseId=await raceCourseKey(course),profile=createRaceVehicleProfile('bmw_e34');
 const turn=()=>new Promise(resolve=>setImmediate(resolve));

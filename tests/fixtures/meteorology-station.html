@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Native weather station boundary</title
+  ><link rel="icon" href="/favicon.svg" /><link
+    rel="stylesheet"
+    href="/app/styles/experiences.css"
+  /><style>
+    body {
+      margin: 0;
+      background: #9baea3;
+      color: #f0f4ed;
+      font: 15px system-ui;
+    }
+    [hidden] {
+      display: none !important;
+    }
+    #scope {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      max-width: 45vw;
+    }
+    #worldFocusTarget {
+      position: fixed;
+      inset: 0;
+      outline: none;
+    }
+    .field-photo-toolbar {
+      background: #16352c;
+      z-index: 175;
+    }
+  </style>
+  <div id="worldFocusTarget" tabindex="0"></div>
+  <p id="scope">
+    Actual native UI/tools/recorder/profile transaction/IndexedDB · controlled sensor geometry and
+    presence · no source field claim
+  </p>
+  <script type="module">
+    import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js?v=5';
+    import { createMeteorologyUI } from '/app/js/campaign/meteorology-ui.js';
+    import { createMeteorologyTools } from '/app/js/campaign/meteorology-tools.js';
+    import { meteorologyHarness } from '/tests/helpers/meteorology-study.mjs';
+    import {
+      meteorologyTarget,
+      meteorologyReading,
+      METEOROLOGY_CALIBRATION,
+    } from '/app/js/campaign/meteorology-career.js';
+    const store = createIndexedDbDiscoveryProfileStore(),
+      local = { a: { x: -6, z: 0 }, b: { x: 6, z: 0 }, bench: { x: 0, z: 8 } };
+    let state = (await store.getProfile()).researchCareers.meteorology,
+      fail = false,
+      motion = 0,
+      ui,
+      last = performance.now();
+    const h = () =>
+      meteorologyHarness(
+        state,
+        state.active?.variantId || 'campaign',
+        state.active?.runId || 'weather-ui-case-0001',
+        Date.now()
+      );
+    if (!state.active) {
+      const q = h();
+      q.accept();
+      state = (
+        await store.updateResearchCareer('meteorology', q.events[0].metadata.action, {
+          now: q.events[0].occurredAt,
+        })
+      ).state;
+    }
+    const now = Date.now(),
+      runtime = {
+        scene: { uuid: 'weather-ui-scene' },
+        Walk: { state: { view: 'first', walker: { x: 0, y: 1.7, z: 8 } } },
+        paused: false,
+        weatherMode: 'live',
+        liveWeatherState: {
+          source: 'live',
+          sourceId: 'met-norway',
+          issuedAt: new Date(now - 7200000).toISOString(),
+          localTimeIso: new Date(now - 3600000).toISOString(),
+          fetchedAtMs: now - 5000,
+          windKph: 14.4,
+          windDirectionDeg: 270,
+          cloudCover: 30,
+          lat: 39.32,
+          lon: -76.64,
+        },
+        getEnv: () => 'EARTH',
+        getCurrentTravelMode: () => 'walk',
+        SurfaceQuery: { walkAt: () => ({ position: { y: 0 } }) },
+        screenLayout: { setPanelLayer() {} },
+        setPauseReason: (_, value) => (runtime.paused = value),
+        stopGameplayPlugin() {},
+      };
+    const presentation = {
+      begin() {
+        motion = 0;
+      },
+      stepInstrument(seconds) {
+        motion += seconds;
+      },
+      read() {
+        const r = h().reading(),
+          sample = structuredClone(r.samples[0]),
+          value = meteorologyReading(r);
+        delete sample.activeSeconds;
+        sample.rotorAngle = ((motion * value.speed) / METEOROLOGY_CALIBRATION) * 2 * Math.PI;
+        return {
+          sensorPosition: r.sensorPosition,
+          groundPosition: r.groundPosition,
+          heightMeters: r.heightMeters,
+          sample,
+        };
+      },
+    };
+    const tools = createMeteorologyTools(
+      runtime,
+      { metersPerUnit: 1, points: local },
+      presentation,
+      { getState: () => ({ active: state.active }), isCurrent: () => true }
+    );
+    async function save(command) {
+      if (fail) {
+        fail = false;
+        throw Error('Controlled save failure; the measured reading is kept.');
+      }
+      const target = meteorologyTarget(state.active),
+        evidence = {
+          supported: true,
+          verticalDistance: 0,
+          environment: 'EARTH',
+          travelMode: 'walk',
+          liveGps: false,
+          siteId: state.active.site.id,
+          position: state.active.site.points[target],
+          at: Date.now(),
+          localPosition: { x: runtime.Walk.state.walker.x, y: 1.7, z: runtime.Walk.state.walker.z },
+        };
+      state = (
+        await store.updateResearchCareer(
+          'meteorology',
+          { ...command, revision: state.revision, evidence },
+          { now: evidence.at }
+        )
+      ).state;
+    }
+    const near = (id, distance = false) => {
+      const p = local[id],
+        w = runtime.Walk.state.walker,
+        meters = Math.hypot(w.x - p.x, w.z - p.z);
+      return distance ? meters : meters <= 3;
+    };
+    ui = createMeteorologyUI({
+      runtime,
+      store,
+      tools,
+      getState: () => state,
+      near,
+      save,
+      onJournal() {},
+      onNext() {},
+      requestWorldFocus: () =>
+        document.getElementById('worldFocusTarget').focus({ preventScroll: true }),
+    });
+    function arrive() {
+      const p = local[meteorologyTarget(state.active)];
+      runtime.Walk.state.walker.x = p.x;
+      runtime.Walk.state.walker.z = p.z + 1.6;
+      ui.update();
+    }
+    function tick(now) {
+      const dt = (now - last) / 1000;
+      last = now;
+      tools.tick(dt);
+      ui.update();
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+    arrive();
+    ui.open();
+    window.weatherUi = {
+      store,
+      tools,
+      get state() {
+        return state;
+      },
+      set failNext(value) {
+        fail = value;
+      },
+      arrive,
+      open: () => ui.open(),
+      async review(data) {
+        await store.importData(data);
+        state = (await store.getProfile()).researchCareers.meteorology;
+        arrive();
+        ui.open();
+      },
+      snapshot: () => ({
+        phase: state.active.phase,
+        revision: state.revision,
+        paused: runtime.paused,
+        windowReady: !!tools.snapshot().window?.ready,
+        recordedForecast: state.active.forecast,
+      }),
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Controlled geometry/presence; actual native UI/tools/clock/IndexedDB',
+        ...weatherUi.snapshot(),
+      });
+    window.advanceTime = async (ms) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      ui.update();
+    };
+    window.ready = true;
+  </script>
+</html>

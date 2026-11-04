@@ -4,7 +4,7 @@ export function mountCapabilityGuide(host = document.getElementById('tab-control
   if (!host || host.querySelector('#capabilityGuide')) return;
   const guide = document.createElement('details'); guide.id = 'capabilityGuide'; guide.className = 'capabilityGuide';
   const summary = document.createElement('summary'); summary.textContent = 'What can I do in World Explorer?';
-  const intro = document.createElement('p'); intro.textContent = 'Available means you can use it now. Limited features have the boundaries described below. Experimental features are still being developed. Planned features are not available yet.';
+  const intro = document.createElement('p'); intro.textContent = 'Choose a feature to see where it works and how your progress is saved. Some features require a supported place or an internet connection.';
   const filters = document.createElement('div'); filters.className = 'capabilityFilters';
   const search = document.createElement('input'); search.type = 'search'; search.placeholder = 'Find a feature, such as swimming'; search.setAttribute('aria-label', 'Search game capabilities');
   const group = document.createElement('select'); group.setAttribute('aria-label', 'Feature category');

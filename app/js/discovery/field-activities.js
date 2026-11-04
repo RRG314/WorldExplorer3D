@@ -137,6 +137,7 @@ function entryEvidence(discovery, temporal = {}, regionalPack = null) {
 function createFieldActivitySession(options = {}) {
   const plan = options.plan;
   if (plan?.type !== 'FieldActivityPlan') throw new TypeError('Field activity session requires a FieldActivityPlan.');
+  const metersPerWorldUnit = Number(options.metersPerWorldUnit) > 0 ? Number(options.metersPerWorldUnit) : 1;
   const claimedIds = options.claimedIds instanceof Set ? options.claimedIds : new Set(options.claimedIds || []);
   const observedCatalogIds = options.observedCatalogIds instanceof Set ? options.observedCatalogIds : new Set(options.observedCatalogIds || []);
   let progress = options.progress || fieldProgress({ collectionCount: options.collectionCount || 0 });
@@ -174,7 +175,7 @@ function createFieldActivitySession(options = {}) {
   }
   let state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null, characterTuning: null };
 
-  const distanceToSlot = (position, slot) => slot ? Math.hypot(Number(position?.x || 0) - slot.position.x, Number(position?.z || 0) - slot.position.z) : null;
+  const distanceToSlot = (position, slot) => slot ? Math.hypot(Number(position?.x || 0) - slot.position.x, Number(position?.z || 0) - slot.position.z) * metersPerWorldUnit : null;
   const bearingToSlot = (position, slot) => slot ? (Math.atan2(slot.position.x - Number(position?.x || 0), slot.position.z - Number(position?.z || 0)) * 180 / Math.PI + 360) % 360 : null;
 
   function authorityFor(slot, context = {}) {

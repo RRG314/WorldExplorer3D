@@ -1,3 +1,5 @@
+import {voyageHudLocation} from './hud/location-label.js';
+import {setWalkingNearClip} from './walking/near-camera.js';
 import {resolveControlState} from './transport/control-state.js';
 import {renderHudCondition} from './hud/condition-view.js';
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from './ui/dom-state.js?v=1';
@@ -129,13 +131,17 @@ function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targ
 }
 
 function locationName() {
+  const voyageLabel = voyageHudLocation(appCtx);
+  if (voyageLabel) return voyageLabel;
   if (appCtx.onMars) return 'Olympus Mons, Mars';
   if (appCtx.onMoon) return 'Mare Tranquillitatis, Moon';
   if (typeof appCtx.getHudLocationLabel === 'function') {
     const detailed = String(appCtx.getHudLocationLabel() || '').trim();
     if (detailed) return detailed;
   }
-  return appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
+  return appCtx.selLoc === 'custom'
+    ? appCtx.customLoc?.name || 'Custom'
+    : appCtx.LOCS[appCtx.selLoc].name;
 }
 
 function clampText(value, maxLen = 64) {
@@ -382,6 +388,7 @@ function updateSkyPositions() {
 
 function updateCamera(dt = 1 / 60) {
   const owner = resolveControlState(appCtx).camera;
+  if (owner !== 'walk') setWalkingNearClip(appCtx.camera, false);
   if (owner === 'space' || owner === 'ocean') return;
   beginCameraFollowFrame(appCtx.camera);
   if (owner !== 'drive') setCabinNearClip(appCtx.camera, false);
@@ -640,6 +647,9 @@ function updateCamera(dt = 1 / 60) {
 }
 
 function updateHUD() {
+  const walking = !appCtx.boatMode?.active && !appCtx.planeMode?.active && !appCtx.droneMode && appCtx.Walk?.state.mode === 'walk';
+  setDomHidden(document.getElementById('indBrake'), walking);
+  setDomHidden(document.getElementById('indBoost'), walking);
   if (appCtx.boatMode?.active) {
     const knots = Math.max(0, Math.round(Math.abs(worldUnitsPerSecondToKnots(
       appCtx.boat.forwardSpeed ?? appCtx.boat.speed,
@@ -719,7 +729,7 @@ function updateHUD() {
 
   // Walking mode HUD - uses Walk module data
   if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
-    const mph = Math.abs(Math.round(appCtx.Walk.state.walker.speedMph));
+    const metersPerSecond = Math.abs(Number(appCtx.Walk.state.walker.speedMph) || 0) * 0.44704;
     const locName = locationName();
     const running = appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight;
     const activeInterior = appCtx.activeInterior || null;
@@ -753,10 +763,10 @@ function updateHUD() {
       }
     }
 
-    setHudUnitLabels('MPH', 'LIMIT');
-    setDomText(document.getElementById('speed'), mph);
+    setHudUnitLabels('m/s', running ? 'RUNNING' : 'WALKING');
+    setDomText(document.getElementById('speed'), metersPerSecond.toFixed(1));
     setDomClass(document.getElementById('speed'), 'fast', false);
-    setDomText(document.getElementById('limit'), activeInterior ? '' : (walkSurface?.limit ? walkSurface.limit || 25 : ''));
+    setDomText(document.getElementById('limit'), '');
     const planetaryWalkLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
     const walkLabel = planetaryWalkLabel || (
       walkSurface && typeof appCtx.surfaceDisplayName === 'function'

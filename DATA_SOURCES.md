@@ -190,6 +190,54 @@ Provider references: [MET Norway terms](https://api.met.no/doc/TermsOfService),
 [PacIOOS WAVEWATCH III](https://pae-paha.pacioos.hawaii.edu/erddap/info/ww3_global/index.html),
 and [HYCOM/FNMOC catalogue](https://tds.hycom.org/thredds/catalogs/GLBy0.08/latest.html?dataset=GLBy0.08-latest).
 
+## Hydrology study context
+
+The Hydrologist studies use a visible virtual training flume. Float transit,
+channel dimensions and nine optical paths produce the in-game readings. Beam
+obstruction is a clarity proxy, not calibrated turbidity in NTU. Declared return
+conditions are simulations; they are not live rainfall or river measurements.
+
+The separate [USGS Water Data API](https://api.waterdata.usgs.gov/) reference
+retains approved daily mean discharge for station USGS-01589300, Gwynns Falls at
+Villa Nova, Maryland, January 1–3, 2024, in ft³/s. The bundled raw response,
+retrieval date and SHA-256 are retained under `app/data/hydrology/` and the
+versioned reference module. Historical observations at that other river and time
+cannot identify the cause of a virtual training change. The career does not make
+new player-time requests to the USGS service.
+
+## Meteorology study replay
+
+The Meteorologist reads the existing weather service without making new provider
+requests. MET Norway data is numerical forecast guidance; issue, valid and fetch
+times remain separate. Missing issue times and unavailable data stay unknown.
+[Provider format and time definitions](https://docs.api.met.no/doc/ForecastJSON.html).
+
+The portable training masts, cup calibration, miniature sky grid, shelter screen
+and fictional replay dates are authored simulations. Their saved forecasts are
+compared with later virtual instrument readings, including misses, and do not
+validate public forecast accuracy. The low training sensors are distinct from
+standard open 10 m wind products; see the
+[NWS siting reference](https://www.weather.gov/media/epz/mesonet/CWOP-Siting.pdf).
+Neither global weather settings nor the player's clock is changed by a replay.
+
+## Cartography route studies
+
+The Cartographer surveys the existing compiled walking network and loaded Earth
+surfaces. Mapped horizontal geometry and inferred facade entrances retain their
+source references. The walking recorder stores actual supported virtual
+positions, local surface heights and active effort; its bearing is referenced to
+local true north, not a device magnetic compass. A reverse survey retains the
+original controls, while a corner survey distinguishes connected distance from
+the straight chord.
+
+[Ordnance Survey distance methods](https://www.ordnancesurvey.co.uk/mapzone/map-skills/measuring-distance)
+and [bearing methods](https://www.ordnancesurvey.co.uk/mapzone/map-skills/compass-bearings/page-three)
+inform the exercise. No Ordnance Survey map or media is bundled. Agreement
+between mapped and rendered geometry is not an independent accuracy check.
+Loaded support and virtual entrance availability do not establish real public
+access, opening hours, crossing safety or step-free travel; these personal route
+sheets are not offered as Live GPS itineraries.
+
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.

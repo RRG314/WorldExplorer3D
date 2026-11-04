@@ -3,7 +3,10 @@
 export function mountHudPanel(panel) {
   panel.removeAttribute('style');
   panel.classList.add('session-hud-panel');
-  const host = document.getElementById('hudUtilities') || document.body;
+  const host =
+    document.getElementById('hudStatusPanels') ||
+    document.getElementById('hudUtilities') ||
+    document.body;
   const footer = host.querySelector('.hudUtilityActions');
   host.insertBefore(panel, footer?.parentNode === host ? footer : null);
   return panel;

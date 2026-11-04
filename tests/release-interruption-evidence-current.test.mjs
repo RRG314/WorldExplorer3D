@@ -1,3 +1,4 @@
+import { isolateGitFixture } from './helpers/isolated-git-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
@@ -9,6 +10,7 @@ import { createHash } from 'node:crypto';
 
 test('a requested gate in another scope fails instead of silently running a subset', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-scope-selection-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, 'config'));
   writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '5.3.0' }));
@@ -29,6 +31,7 @@ test('a requested gate in another scope fails instead of silently running a subs
 
 test('matrix reuses documentation-only receipts but rejects changed code, executor configuration and artifact bytes', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-reuse-evidence-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const write = (file, value) => { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), value); };
   const git = args => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
@@ -56,6 +59,7 @@ test('matrix reuses documentation-only receipts but rejects changed code, execut
 
 test('interrupting a fresh gate cannot leave an earlier success as current evidence', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-interrupted-evidence-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, 'config'));
   const output = path.join(root, 'output/release-evidence/current');
@@ -91,6 +95,7 @@ test('interrupting a fresh gate cannot leave an earlier success as current evide
 
 test('continue-on-failure gathers later gate evidence without converting a failed run to success', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-continued-evidence-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, 'config'));
   writeFileSync(path.join(root, '.gitignore'), 'output/\n');

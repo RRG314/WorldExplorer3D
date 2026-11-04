@@ -38,6 +38,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=40">
 <link rel="stylesheet" href="styles/start-hub.css?v=24">
+<link rel="stylesheet" href="styles/experiences.css?v=1">
 <link rel="stylesheet" href="styles/navigation.css?v=3">
 <link rel="stylesheet" href="styles/discovery.css?v=21">
 <link rel="stylesheet" href="styles/backpack.css?v=1">
@@ -250,26 +251,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
-<div class="tab-content" id="tab-games">
-<div style="padding:8px 0">
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-🎮 Game Mode
-</div>
-<div class="mode-grid">
-<div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
-<div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="racing"><div class="mode-icon">🏁</div><div><div class="mode-name">Road Racing</div><div class="mode-desc">Race rivals on qualified real roads. Choose a city, keep your cars, or create your own route.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Drive through the gold destination ring before time runs out. Pause stops the timer.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Drive through every pink road marker, in any order. Free Roam ends the run.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Flower Sprint</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
-<div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Cycle through walking, the BMW, the plane, and the drone with <b>F</b>, or choose a mode directly from Travel</div>
-</div>
-</div>
-</div>
-</div>
+<div class="tab-content" id="tab-games"><button type="button" data-globe-destination="games">Browse Activities</button></div>
 <div class="tab-content" id="tab-multiplayer">
 <div class="mp-card">
 <header class="mp-heading"><div><span class="mp-eyebrow">SHARED EXPLORATION</span><h2 class="mp-title">Explore together</h2></div><button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button></header>
@@ -640,30 +622,14 @@ Continue ocean exploration beyond the dive site
   </div>
 </aside>
 <div id="globeSelectorScreen" aria-hidden="true">
-<aside id="testerInvitation" class="tester-invitation" hidden aria-labelledby="testerInvitationTitle">
-  <button id="testerInvitationClose" class="tester-invitation-close" type="button" aria-label="Dismiss tester invitation">×</button>
-  <p class="tester-invitation-label">HELP SHAPE WHAT’S NEXT</p>
-  <h2 id="testerInvitationTitle">Want to be an early tester?</h2>
-  <p>We’re developing a new World Explorer app. Interested in trying an early version and sharing feedback?</p>
-  <button id="testerInvitationOpen" class="tester-invitation-email" type="button" aria-expanded="false" aria-controls="testerInvitationForm">I’m interested</button>
-  <form id="testerInvitationForm" hidden>
-    <label for="testerInvitationAddress">Email address</label>
-    <input id="testerInvitationAddress" type="email" autocomplete="email" maxlength="254" required>
-    <label class="tester-invitation-consent"><input id="testerInvitationConsent" type="checkbox" required> Email me about testing the new World Explorer app.</label>
-    <button id="testerInvitationSubmit" class="tester-invitation-email" type="submit">Send confirmation email</button>
-  </form>
-  <p id="testerInvitationStatus" role="status" aria-live="polite" hidden></p>
-  <small>Confirm your email to register interest. Invitations depend on availability. No newsletter signup. <a href="../legal/privacy#app-testing" target="_blank" rel="noopener">Privacy</a></small>
-</aside>
+
 <div class="globe-selector-shell">
 <div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
 <nav class="globe-app-rail" aria-label="Main sections">
   <button class="active" type="button" data-globe-destination="location"><span>◎</span>Explore</button>
   <button type="button" data-globe-destination="games"><span>⌖</span>Activities</button>
-  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Multiplayer</button>
-  <button type="button" data-globe-destination="live-earth"><span>⌁</span>Live Data</button>
-  <button type="button" data-globe-destination="library"><span>▥</span>My Places</button>
-  <button type="button" data-globe-destination="controls"><span>⌨</span>Quick Start</button>
+  <button type="button" data-globe-destination="journal"><span>▤</span>Journal</button>
+  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Community</button>
 </nav>
 <div class="globe-selector-top">
 <div class="globe-hub-search">
@@ -681,6 +647,19 @@ Continue ocean exploration beyond the dive site
 </div>
 </div>
 <div class="globe-selector-side">
+<section class="globe-launch-summary" aria-label="Selected place">
+<div class="globe-selector-stat">
+<div class="globe-selector-stat-label">Selected place</div>
+<div id="globeSelectorPlace" class="globe-selector-stat-value">Choose a place on the globe.</div>
+<div id="globeSelectorLatLon" class="globe-selector-stat-label">No point selected</div>
+<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
+</div>
+<div class="globe-selector-actions">
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
+<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
+</div>
+</section>
+<nav class="globe-explore-tools" aria-label="Explore tools"><button type="button" data-globe-destination="library">My Places</button><button type="button" data-globe-destination="live-earth">Live Data</button><button type="button" data-globe-destination="controls">Quick Start</button></nav>
 <div class="globe-location-entry-pair" aria-label="Choose how to use your location">
   <button id="globeSelectorLocateBtn" class="globe-location-entry-card globe-location-current" type="button">
     <span class="location-entry-icon" aria-hidden="true">◎</span>
@@ -699,21 +678,27 @@ Continue ocean exploration beyond the dive site
 <div id="globeLocationSearchStatus" role="status" aria-live="polite" style="font-size:12px;min-height:16px;color:#64748b">Search for a place or choose one from the globe.</div>
 <div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 </div>
-<div class="globe-selector-stat">
-<div class="globe-selector-stat-label">Selected Coordinates</div>
-<div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
-<div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
-<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
-</div>
-<div class="globe-selector-actions">
-<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
-<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
-</div>
 <section class="globe-first-journey" aria-label="Start or return">
   <button id="globeGuidedStartBtn" type="button"><strong>Start a guided walk</strong><small>Baltimore · move, try an activity, keep a discovery</small></button>
   <button id="globeReturnPlaceBtn" type="button" hidden><strong id="globeReturnPlaceLabel">Return to your last place</strong><small>Start at its arrival point · Journal saved on this device</small></button>
+  <button id="coralResearchStart" type="button"><strong>Start a coastal voyage</strong><small>Coral Shelf · research vessel and submarine</small></button>
   <span id="globeJourneyStatus" role="status" aria-live="polite"></span>
 </section>
+<aside id="testerInvitation" class="tester-invitation" hidden aria-labelledby="testerInvitationTitle">
+  <button id="testerInvitationClose" class="tester-invitation-close" type="button" aria-label="Dismiss tester invitation">×</button>
+  <p class="tester-invitation-label">HELP SHAPE WHAT’S NEXT</p>
+  <h2 id="testerInvitationTitle">Want to be an early tester?</h2>
+  <p>We’re developing a new World Explorer app. Interested in trying an early version and sharing feedback?</p>
+  <button id="testerInvitationOpen" class="tester-invitation-email" type="button" aria-expanded="false" aria-controls="testerInvitationForm">I’m interested</button>
+  <form id="testerInvitationForm" hidden>
+    <label for="testerInvitationAddress">Email address</label>
+    <input id="testerInvitationAddress" type="email" autocomplete="email" maxlength="254" required>
+    <label class="tester-invitation-consent"><input id="testerInvitationConsent" type="checkbox" required> Email me about testing the new World Explorer app.</label>
+    <button id="testerInvitationSubmit" class="tester-invitation-email" type="submit">Send confirmation email</button>
+  </form>
+  <p id="testerInvitationStatus" role="status" aria-live="polite" hidden></p>
+  <small>Confirm your email to register interest. Invitations depend on availability. No newsletter signup. <a href="../legal/privacy#app-testing" target="_blank" rel="noopener">Privacy</a></small>
+</aside>
 <div class="globe-selector-mode-tabs" role="tablist" aria-label="Globe selector mode">
 <button id="globeSelectorExploreModeBtn" class="globe-selector-mode-tab active" type="button">Choose Location</button>
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
@@ -825,9 +810,11 @@ Continue ocean exploration beyond the dive site
   <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
 </div>
 </div>
+<button id="hudMapOpenBtn" type="button" aria-label="Open map" hidden>Map</button>
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a><a id="terrainImageryCredit" hidden href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer" title="Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community">© Esri</a></div>
 </div>
 <div id="hudUtilities">
+<div id="hudStatusPanels">
 <div id="boatPrompt" aria-live="polite"></div>
 <section id="liveGpsHud" aria-label="Live GPS status">
   <div class="liveGpsHudTop"><strong aria-label="Live GPS">GPS</strong><button id="liveGpsStopBtn" type="button">Stop</button><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
@@ -853,6 +840,7 @@ Continue ocean exploration beyond the dive site
     <div id="urbanCivicStatusDetail">Local civic response</div>
   </div>
 </aside>
+</div>
 <div class="hudUtilityActions">
 <div id="worldQuickControls" aria-label="Quick world controls">
 <button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
@@ -882,7 +870,7 @@ Continue ocean exploration beyond the dive site
 <aside id="discoveryPanel" role="dialog" aria-modal="true" aria-labelledby="discoveryPanelTitle" aria-hidden="true" tabindex="-1">
   <header class="discoveryHead">
     <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">WORLD EXPLORER</span><h2 id="discoveryPanelTitle">Today</h2></div></div>
-    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
+    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Loading profile…</span><b id="discoveryProfilePoints">—</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
     <nav class="discoveryTabs" aria-label="Explorer fieldwork sections">
@@ -957,8 +945,8 @@ Continue ocean exploration beyond the dive site
         <div id="discoveryProfileHero" class="discoveryProfileHero"></div>
         <section id="discoveryJourneyOverview" class="discoveryJourneyOverview" aria-label="Ways to explore"></section>
         <div id="discoveryProgress" class="discoveryProgressGrid"></div>
-        <section class="discoveryCompanionSection"><div class="discoverySectionHead"><span>COMPANIONS</span><small>ANIMALS YOU KNOW</small></div><p>Wild species belong in the Guide. Individual animals you befriend and care for live here.</p><div id="discoveryCompanionList" class="discoveryList"></div></section>
-        <details class="discoveryOnlineService"><summary>Data and backup</summary><p id="discoverySaveStatus" role="status" aria-live="polite">Checking local save status…</p><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><button id="discoveryUndoImportBtn" type="button">Undo last restore</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
+        <section id="discoveryCompanionSection" class="discoveryCompanionSection"><div class="discoverySectionHead"><span>COMPANIONS</span><small>ANIMALS YOU KNOW</small></div><p>Wild species belong in the Guide. Individual animals you befriend and care for live here.</p><div id="discoveryCompanionList" class="discoveryList"></div></section>
+        <details class="discoveryOnlineService"><summary>Data and backup</summary><p id="discoverySaveStatus" role="status" aria-live="polite">Checking local save status…</p><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><p>The Journal backup includes saved field photographs and albums. Finish or retry unsaved work before leaving. Vehicles, homes and settings save separately on this device.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download Journal backup</button><button id="discoveryStorageBtn" type="button">Check storage</button><button id="discoveryImportBtn" type="button">Restore backup</button><button id="discoveryUndoImportBtn" type="button">Undo last restore</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
         <div class="discoveryLegacyEquipmentData" hidden><div id="discoveryEquippedSummary"></div><button id="discoveryOpenBackpackBtn" type="button">Open Backpack</button><div id="discoveryToolList"></div></div>
       </section>
     </div>
@@ -1374,6 +1362,7 @@ Continue ocean exploration beyond the dive site
 <div class="floatItem" id="fWorldDiscovery">⌖ Today &amp; Nearby</div>
 <div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
 <div class="floatItemSection" role="separator">ACTIVITIES</div>
+<button class="floatItem" id="fActivities" type="button">⌖ Careers &amp; quick play</button>
 <div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
 <div class="floatItem" id="fFlowerChallenge">🔴 Flower Sprint</div>
 <div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>

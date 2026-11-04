@@ -1,3 +1,4 @@
+import {exteriorApproach} from '../interiors/exterior-approach.js';
 import {resolveControlState} from '../transport/control-state.js';
 import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -71,7 +72,7 @@ function resolveDestinationEntrySupport(destination) {
 
 export function getNavigationTargetForDestination(destination) {
   const support = resolveDestinationEntrySupport(destination);
-  const entrance=support?.exteriorEntrance||support?.entryAnchor;
+  const entrance=exteriorApproach(support,appCtx.Walk?.state?.walker||activeActorPose()?.position||{x:0,z:0},appCtx.METERS_PER_WORLD_UNIT);
   if (support?.enterable && entrance) {
     return {
       x: toFiniteNumber(entrance.x, toFiniteNumber(destination?.x, 0)),

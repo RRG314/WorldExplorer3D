@@ -1,3 +1,4 @@
+import {setWalkingNearClip} from './near-camera.js';
 import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -87,6 +88,7 @@ function createWalkingRuntimeHelpers({
       return;
     }
 
+    setWalkingNearClip(camera, false);
     deactivateWater?.();
     const wasWalk = state.mode === "walk";
     state.mode = "drive";
@@ -156,30 +158,36 @@ function createWalkingRuntimeHelpers({
   }
 
   function updateWalkCamera() {
-    if (state.mode !== "walk") {
+    if (state.mode !== 'walk') {
+      setWalkingNearClip(camera, false);
       return false;
     }
 
-    const walker = appCtx.presentationPose?.mode === 'walk'
-      ? appCtx.presentationPose.walk
-      : state.walker;
+    const walker =
+      appCtx.presentationPose?.mode === 'walk' ? appCtx.presentationPose.walk : state.walker;
     const cameraYaw = walker.yaw + (Number(walker.lookYawOffset) || 0);
-    const groundSample = !appCtx.activeInterior && !appCtx.activePlanetaryBodyId &&
+    const groundSample =
+      !appCtx.activeInterior &&
+      !appCtx.activePlanetaryBodyId &&
       appCtx.SurfaceQuery?.walkAt?.(walker.x, walker.z, { currentY: walker.y - CFG.eyeHeight });
     const tunnelRoad = groundSample?.feature || null;
     const tunnelEnvelope = resolveTunnelCameraEnvelope(tunnelRoad, walker.x, walker.z, walker.y);
 
     // Reading keeps the walking pose intact. The existing camera owner frames
     // the actual display, then resumes normal mouse look when the panel closes.
-    const galleryTarget=appCtx.activeInterior?.gallery?.panel?.viewTarget||appCtx.activeInterior?.aquarium?.panel?.viewTarget;
-    if(galleryTarget){
-      camera.position.set(walker.x,walker.y,walker.z);
-      const narrow=typeof window!=='undefined'&&window.innerWidth<=600;
-      camera.lookAt(galleryTarget.x,galleryTarget.y-(narrow?1.0:0),galleryTarget.z);
+    const galleryTarget =
+      appCtx.activeInterior?.gallery?.panel?.viewTarget ||
+      appCtx.activeInterior?.aquarium?.panel?.viewTarget;
+    setWalkingNearClip(camera, state.view === 'first' || !!galleryTarget);
+    if (state.characterMesh) state.characterMesh.visible = state.view !== 'first' && !galleryTarget;
+    if (galleryTarget) {
+      camera.position.set(walker.x, walker.y, walker.z);
+      const narrow = typeof window !== 'undefined' && window.innerWidth <= 600;
+      camera.lookAt(galleryTarget.x, galleryTarget.y - (narrow ? 1.0 : 0), galleryTarget.z);
       return true;
     }
 
-    if (state.view === "first") {
+    if (state.view === 'first') {
       const y = walker.y;
       camera.position.set(walker.x, y, walker.z);
 
@@ -192,10 +200,12 @@ function createWalkingRuntimeHelpers({
       return true;
     }
 
-    if (state.view === "overhead" && !tunnelEnvelope.inside) {
+    if (state.view === 'overhead' && !tunnelEnvelope.inside) {
       const terrainY = getWalkGroundY(walker.x, walker.z, 0);
       const ship = appCtx.activeInterior?.environmentKind === 'expedition-ship';
-      const height = ship ? Math.max(2.8,Number(appCtx.activeInterior.ceilingY || 3.6)-terrainY-.24) : 45;
+      const height = ship
+        ? Math.max(2.8, Number(appCtx.activeInterior.ceilingY || 3.6) - terrainY - 0.24)
+        : 45;
       const offsetBack = ship ? 0 : 8;
 
       camera.position.set(
@@ -204,7 +214,7 @@ function createWalkingRuntimeHelpers({
         walker.z - Math.cos(cameraYaw) * offsetBack
       );
 
-      const lookAhead = ship ? .35 : 15;
+      const lookAhead = ship ? 0.35 : 15;
       camera.lookAt(
         walker.x + Math.sin(cameraYaw) * lookAhead,
         terrainY,
@@ -214,16 +224,24 @@ function createWalkingRuntimeHelpers({
     }
 
     const activeInterior = appCtx.activeInterior || null;
-    const interiorFootprint = Array.isArray(activeInterior?.usableFootprint) ? activeInterior.usableFootprint : null;
+    const interiorFootprint = Array.isArray(activeInterior?.usableFootprint)
+      ? activeInterior.usableFootprint
+      : null;
     const interiorCamera = !!(activeInterior && interiorFootprint && interiorFootprint.length >= 3);
     const baseY = walker.y;
-    const back = interiorCamera ? Math.min(2.6, Math.max(1.8, CFG.thirdPersonDist * 0.55)) : CFG.thirdPersonDist;
-    const up = interiorCamera ? Math.min(1.45, Math.max(1.05, CFG.thirdPersonHeight * 0.52)) : CFG.thirdPersonHeight;
+    const back = interiorCamera
+      ? Math.min(2.6, Math.max(1.8, CFG.thirdPersonDist * 0.55))
+      : CFG.thirdPersonDist;
+    const up = interiorCamera
+      ? Math.min(1.45, Math.max(1.05, CFG.thirdPersonHeight * 0.52))
+      : CFG.thirdPersonHeight;
     const pitchBackScale = Math.max(0.46, Math.cos(walker.pitch));
     const camX = walker.x - Math.sin(cameraYaw) * pitchBackScale * back;
     const camZ = walker.z - Math.cos(cameraYaw) * pitchBackScale * back;
     const swim = state.walker.swimming;
-    const camY = swim?.submerged ? Math.min(swim.surfaceY-.25,baseY+.65) : baseY + up - Math.sin(walker.pitch) * back * 0.42;
+    const camY = swim?.submerged
+      ? Math.min(swim.surfaceY - 0.25, baseY + 0.65)
+      : baseY + up - Math.sin(walker.pitch) * back * 0.42;
 
     let resolvedCamX = camX;
     let resolvedCamZ = camZ;
@@ -233,38 +251,60 @@ function createWalkingRuntimeHelpers({
       resolvedCamZ = clamped.z;
     }
 
-    const cameraAnchor = { x: walker.x, y: tunnelEnvelope.inside || swim?.submerged ? baseY : baseY + 1.35, z: walker.z };
+    const cameraAnchor = {
+      x: walker.x,
+      y: tunnelEnvelope.inside || swim?.submerged ? baseY : baseY + 1.35,
+      z: walker.z,
+    };
     let collisionSafeCamera = resolveThirdPersonCameraCollision({
       anchor: cameraAnchor,
       target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
-      checkBuildingCollision: appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId
-        ? (x,z,radius,vertical) => queryPlanetaryObstacle(x,z,radius,appCtx.activePlanetaryBodyId || (appCtx.onMoon?'moon':'mars'),
-          {minY:vertical.actorBaseY,maxY:vertical.actorBaseY+vertical.actorHeight})
-        : appCtx.checkBuildingCollision,
+      checkBuildingCollision:
+        appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId
+          ? (x, z, radius, vertical) =>
+              queryPlanetaryObstacle(
+                x,
+                z,
+                radius,
+                appCtx.activePlanetaryBodyId || (appCtx.onMoon ? 'moon' : 'mars'),
+                { minY: vertical.actorBaseY, maxY: vertical.actorBaseY + vertical.actorHeight }
+              )
+          : appCtx.checkBuildingCollision,
       probeSpacing: interiorCamera ? 0.24 : 0.45,
-      clearance: interiorCamera ? 0.22 : 0.32
+      clearance: interiorCamera ? 0.22 : 0.32,
     });
-    collisionSafeCamera=appCtx.boatSwimming?.cameraPose(cameraAnchor,collisionSafeCamera)||collisionSafeCamera;
+    collisionSafeCamera =
+      appCtx.boatSwimming?.cameraPose(cameraAnchor, collisionSafeCamera) || collisionSafeCamera;
     if (tunnelEnvelope.inside) {
-      collisionSafeCamera = { ...collisionSafeCamera,
-        ...resolveTunnelCameraBoom(tunnelRoad, cameraAnchor, collisionSafeCamera) };
+      collisionSafeCamera = {
+        ...collisionSafeCamera,
+        ...resolveTunnelCameraBoom(tunnelRoad, cameraAnchor, collisionSafeCamera),
+      };
     } else if (!activeInterior && !appCtx.activePlanetaryBodyId && !appCtx.onMoon && !appCtx.onMars) {
-      collisionSafeCamera = { ...collisionSafeCamera,
-        ...resolveChaseCameraTerrainCollision(cameraAnchor, collisionSafeCamera,
-          (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y) };
+      collisionSafeCamera = {
+        ...collisionSafeCamera,
+        ...resolveChaseCameraTerrainCollision(
+          cameraAnchor,
+          collisionSafeCamera,
+          (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
+        ),
+      };
     }
     resolvedCamX = collisionSafeCamera.x;
     resolvedCamZ = collisionSafeCamera.z;
     camera.position.set(resolvedCamX, collisionSafeCamera.y, resolvedCamZ);
 
-    if (state.characterMesh && state.view === "third") {
+    if (state.characterMesh && state.view === 'third') {
       // When a tight corridor forces the camera almost onto the avatar, hide
       // the avatar instead of letting either model or camera clip through a
       // pressure wall.
-      state.characterMesh.visible = walker.pitch < 0.98 && (!interiorCamera || collisionSafeCamera.ratio > 0.22);
+      state.characterMesh.visible =
+        walker.pitch < 0.98 && (!interiorCamera || collisionSafeCamera.ratio > 0.22);
     }
 
-    const lookAhead = interiorCamera ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24) : CFG.thirdPersonLookAhead;
+    const lookAhead = interiorCamera
+      ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24)
+      : CFG.thirdPersonLookAhead;
     const lookX = walker.x + Math.sin(cameraYaw) * Math.cos(walker.pitch) * lookAhead;
     const lookY = baseY - CFG.eyeHeight + 1.2 + Math.sin(walker.pitch) * lookAhead * 0.5;
     const lookZ = walker.z + Math.cos(cameraYaw) * Math.cos(walker.pitch) * lookAhead;

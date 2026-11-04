@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Working weather instrument boundary</title
+  ><link rel="icon" href="/favicon.svg" /><style>
+    body {
+      margin: 0;
+    }
+    canvas {
+      display: block;
+    }
+    p {
+      position: fixed;
+      top: 10px;
+      left: 12px;
+      color: #fff8e8;
+      background: #16372e;
+      padding: 8px;
+      font: 14px system-ui;
+      max-width: 620px;
+    }
+  </style>
+  <p>
+    Controlled working weather rig · actual rotor/vane/sky/shelter geometry on a slope · no source
+    field claim
+  </p>
+  <script src="/app/vendor/three/build/three.min.js"></script>
+  <script type="module">
+    import { createMeteorologyPresentation } from '/app/js/campaign/meteorology-presentation.js';
+    import { METEOROLOGY_STUDIES } from '/app/js/campaign/meteorology-career.js';
+    import { applyDisplayColorPolicy } from '/app/js/engine/display-color-policy.js';
+    const T = THREE,
+      u = 1.11,
+      scene = new T.Scene(),
+      camera = new T.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 100),
+      renderer = new T.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    applyDisplayColorPolicy(renderer, T);
+    document.body.prepend(renderer.domElement);
+    scene.background = new T.Color('#c8dbd9');
+    scene.add(new T.HemisphereLight(0xffffff, 0x667258, 0.9));
+    const light = new T.DirectionalLight(0xffefdc, 1.3);
+    light.position.set(-7, 15, 5);
+    scene.add(light);
+    const heightAt = (x, z) => 0.025 * x + 0.012 * z,
+      ground = new T.Mesh(
+        new T.PlaneGeometry(100, 100),
+        new T.MeshStandardMaterial({ color: 0x7b886b, roughness: 1 })
+      );
+    ground.material.color.convertSRGBToLinear();
+    ground.geometry.rotateX(-Math.PI / 2);
+    const v = ground.geometry.attributes.position;
+    for (let i = 0; i < v.count; i++) v.setY(i, heightAt(v.getX(i), v.getZ(i)));
+    ground.geometry.computeVertexNormals();
+    scene.add(ground);
+    const runtime = {
+        scene,
+        camera,
+        renderer,
+        METERS_PER_WORLD_UNIT: u,
+        dynamicBuildingColliders: [],
+        SurfaceQuery: {
+          driveAt: (x, z) => ({ kind: 'terrain', position: { x, y: heightAt(x, z), z } }),
+        },
+      },
+      qualified = {
+        metersPerUnit: u,
+        points: Object.fromEntries(
+          Object.entries({
+            a: { x: -6 / u, z: 0 },
+            b: { x: 6 / u, z: 0 },
+            bench: { x: 0, z: 8 / u },
+          }).map(([id, p]) => [id, { ...p, y: heightAt(p.x, p.z) }])
+        ),
+      };
+    let presentation, active;
+    async function setup(id = 'campaign') {
+      presentation?.dispose();
+      active = { runId: 'weather-presentation-case', variantId: id, forecast: null };
+      presentation = await createMeteorologyPresentation(
+        runtime,
+        qualified,
+        METEOROLOGY_STUDIES[id],
+        { isCurrent: () => true }
+      );
+      presentation.update(active);
+      face();
+      return presentation.budget;
+    }
+    function face() {
+      camera.position.set(-11, 6, 14);
+      camera.lookAt(0, 1, 1);
+      camera.updateMatrixWorld(true);
+    }
+    function render() {
+      renderer.render(scene, camera);
+    }
+    await setup();
+    window.weatherVisual = {
+      runtime,
+      qualified,
+      heightAt,
+      get presentation() {
+        return presentation;
+      },
+      setup,
+      face,
+      render,
+      condition(after) {
+        active.forecast = after ? { recordedAt: 1 } : null;
+        presentation.update(active);
+      },
+      start(id = 'a') {
+        presentation.begin(id);
+        render();
+        return presentation.read();
+      },
+      step(seconds) {
+        for (let t = 0; t < seconds; t += 0.05)
+          presentation.stepInstrument(Math.min(0.05, seconds - t));
+        render();
+        return presentation.read();
+      },
+      feet() {
+        return presentation.footings.map((f) => ({
+          actualY: new T.Box3().setFromObject(f.object).min.y,
+          groundY: heightAt(f.x, f.z),
+        }));
+      },
+      dispose() {
+        presentation.dispose();
+        return {
+          attached: !!presentation.root.parent,
+          colliders: runtime.dynamicBuildingColliders.length,
+        };
+      },
+    };
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      render();
+    });
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Controlled actual instrument geometry only',
+        budget: presentation.budget,
+      });
+    window.advanceTime = async (ms) => weatherVisual.step(ms / 1000);
+    render();
+    window.ready = true;
+  </script>
+</html>

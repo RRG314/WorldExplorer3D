@@ -7,27 +7,108 @@ export const FIRST_BEARINGS = Object.freeze({
 
 const text = (value, limit = 160) => String(value || '').trim().slice(0, limit);
 const time = value => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+export function validateOpeningLocation(value) {
+  if (
+    !value ||
+    ![value.lat, value.lon].every(Number.isFinite) ||
+    Math.abs(value.lat) > 90 ||
+    Math.abs(value.lon) > 180 ||
+    typeof value.name !== 'string' ||
+    !value.name.trim() ||
+    value.name.length > 120
+  )
+    throw Error('Choose a valid starting place for First Bearings.');
+  return { lat: value.lat, lon: value.lon, name: value.name };
+}
 export function normalizeOpeningChapter(input = {}) {
   // Preserve newer saves. This client may read their presence, but cannot edit them.
   if (input?.schemaVersion != null && input.schemaVersion !== 1) return { ...input };
-  const acceptedAt = time(input?.acceptedAt), completedAt = time(input?.completedAt);
-  const regionId = text(input?.regionId), eventId = text(input?.eventId, 260);
-  const phase = !acceptedAt || !regionId ? 'available' : !eventId ? 'active' : completedAt ? 'complete' : 'review';
-  return { schemaVersion: 1, phase, acceptedAt, regionId, careerId: text(input?.careerId, 60) || 'general',
-    regionLabel: text(input?.regionLabel, 120), environment: 'EARTH',
-    eventId, resultName: text(input?.resultName), completedAt: phase === 'complete' ? completedAt : 0 };
+  const acceptedAt = time(input?.acceptedAt),
+    completedAt = time(input?.completedAt);
+  const regionId = text(input?.regionId),
+    eventId = text(input?.eventId, 260);
+  const phase =
+    !acceptedAt || !regionId
+      ? 'available'
+      : !eventId
+        ? 'active'
+        : completedAt
+          ? 'complete'
+          : 'review';
+  return {
+    schemaVersion: 1,
+    phase,
+    acceptedAt,
+    regionId,
+    careerId: text(input?.careerId, 60) || 'general',
+    regionLabel: text(input?.regionLabel, 120),
+    environment: 'EARTH',
+    eventId,
+    resultName: text(input?.resultName),
+    completedAt: phase === 'complete' ? completedAt : 0,
+    ...(input?.locationSnapshot ? { locationSnapshot: { ...input.locationSnapshot } } : {}),
+  };
+}
+
+// Older readers retain unknown profile fields, but their chapter normalizer
+// predates locationSnapshot. This backup restores only the same accepted
+// chapter's optional location; it cannot create progress or a completion.
+export function preserveOpeningLocation(input, backup) {
+  let chapter = normalizeOpeningChapter(input);
+  if (chapter.schemaVersion !== 1) return { chapter, backup };
+  const matches =
+    backup?.schemaVersion === 1 &&
+    chapter.acceptedAt > 0 &&
+    backup.acceptedAt === chapter.acceptedAt &&
+    backup.regionId === chapter.regionId &&
+    backup.careerId === chapter.careerId;
+  if (!chapter.locationSnapshot && matches) {
+    try {
+      chapter = { ...chapter, locationSnapshot: validateOpeningLocation(backup.locationSnapshot) };
+    } catch {
+      /* Unreadable metadata cannot invent a starting place. */
+    }
+  }
+  if (
+    chapter.acceptedAt > 0 &&
+    chapter.locationSnapshot &&
+    (backup == null || backup.schemaVersion === 1)
+  ) {
+    try {
+      backup = {
+        schemaVersion: 1,
+        acceptedAt: chapter.acceptedAt,
+        regionId: chapter.regionId,
+        careerId: chapter.careerId,
+        locationSnapshot: validateOpeningLocation(chapter.locationSnapshot),
+      };
+    } catch {
+      /* Preserve the original value for validation/recovery. */
+    }
+  }
+  return { chapter, backup };
 }
 
 export function beginOpeningChapter(input, location, now = Date.now()) {
   const chapter = normalizeOpeningChapter(input);
-  if (chapter.schemaVersion !== 1) throw new Error('This chapter was saved by a newer version of World Explorer.');
+  if (chapter.schemaVersion !== 1)
+    throw new Error('This chapter was saved by a newer version of World Explorer.');
   if (chapter.phase !== 'available') return chapter;
   if (location?.environment !== 'EARTH' || !text(location?.regionId) || !time(now)) {
     throw new Error('Start First Bearings in a loaded Earth location.');
   }
-  const careerId = text(location.careerId,60) || 'general';
-  if (!researchStarter(careerId)) throw Error('This field assignment needs a newer version of World Explorer.');
-  return normalizeOpeningChapter({ acceptedAt: now, regionId: location.regionId, regionLabel: location.regionLabel, careerId });
+  const careerId = text(location.careerId, 60) || 'general';
+  if (!researchStarter(careerId))
+    throw Error('This field assignment needs a newer version of World Explorer.');
+  return normalizeOpeningChapter({
+    acceptedAt: now,
+    regionId: location.regionId,
+    regionLabel: location.regionLabel,
+    careerId,
+    ...(location.locationSnapshot
+      ? { locationSnapshot: validateOpeningLocation(location.locationSnapshot) }
+      : {}),
+  });
 }
 
 function eligibleEvidence(chapter, event) {

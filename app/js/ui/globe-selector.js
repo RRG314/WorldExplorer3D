@@ -569,7 +569,7 @@ function createGlobeSelector(options = {}) {
     return launchCoordinator.startHere();
   }
 
-  function startSelectedOcean() {
+  function startSelectedOcean({isCurrent:entryCurrent=()=>true}={}) {
     if (coordinateInputsDirty && !applySelectionFromInputs()) {
       return Promise.resolve(false);
     }
@@ -584,14 +584,14 @@ function createGlobeSelector(options = {}) {
     const pendingResolution = selectionResolvePromise;
     return launchCoordinator.startEnvironment(async (isCurrent) => {
       await pendingResolution;
-      if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+      if (!isCurrent() || !entryCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
         throw new Error('The selected location changed. Check the current point and press Ocean again.');
       }
       // URL/saved initial selections have no reverse-lookup promise. Check
       // their depth on demand, and let an unknown/outage result be retried.
       if (!requestedSelection.surfaceEvidence || !Number.isFinite(requestedSelection.surfaceEvidence.elevationMeters)) {
         const evidence = await resolveCoordinateSurfaceEvidence(requestedSelection.lat, requestedSelection.lon);
-        if (!isCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
+        if (!isCurrent() || !entryCurrent() || !openState || selected !== requestedSelection || coordinateInputsDirty) {
           throw new Error('The selected location changed. Check the current point and press Ocean again.');
         }
         requestedSelection.surfaceEvidence = evidence;
@@ -603,7 +603,9 @@ function createGlobeSelector(options = {}) {
       recentPlaces = addRecentPlace(launchSelection, recentPlaces);
       favoriteRecentList = recentPlaces;
       syncLegacyCustomState(launchSelection);
-      return options.onOceanShortcut(launchSelection);
+      // Coordinate admission is complete. The title closes this selector as
+      // it takes ownership; only the caller's entry cancellation crosses that handoff.
+      return options.onOceanShortcut(launchSelection,{isCurrent:entryCurrent});
     }, 'Ocean');
   }
 
@@ -743,15 +745,30 @@ function createGlobeSelector(options = {}) {
   moonBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
   spaceBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
   oceanBtn?.addEventListener('click', () => void startSelectedOcean());
-  if(startBtn&&!document.getElementById('coralResearchStart')){
-    const researchButton=document.createElement('button');researchButton.id='coralResearchStart';researchButton.type='button';researchButton.textContent='Coral Shelf · first research outing';researchButton.style.cssText='margin-top:8px;width:100%;min-height:44px;font:600 12px system-ui;background:#112b3a;color:#e8f6ff;border:1px solid #5689a3;border-radius:4px;padding:10px';startBtn.after(researchButton);
-    researchButton.onclick=async()=>{
-      if(researchButton.disabled)return;researchButton.disabled=true;
-      try{setSelection(CORAL_SHELF_SITE.lat,CORAL_SHELF_SITE.lon,{name:'Coral Shelf research outing',focus:true});
-        beginReverseLookup(CORAL_SHELF_SITE.lat,CORAL_SHELF_SITE.lon);
-        if(await startSelectedOcean()&&appCtx.oceanMode?.active){if(await appCtx.transferSubmarineToBoat?.({source:'research-outing'})){appCtx.boatDeck?.enter();appCtx.boatDeck?.select('lab');}}
-      }catch{if(searchStatus)searchStatus.textContent='The research outing could not start. Your saved voyage is retained; try again.';}
-      finally{researchButton.disabled=false;}
+  const researchButton = document.getElementById('coralResearchStart');
+  if (researchButton) {
+    researchButton.onclick = async () => {
+      if (researchButton.disabled) return;
+      researchButton.disabled = true;
+      try {
+        setSelection(CORAL_SHELF_SITE.lat, CORAL_SHELF_SITE.lon, {
+          name: 'Coral Shelf research outing',
+          focus: true,
+        });
+        beginReverseLookup(CORAL_SHELF_SITE.lat, CORAL_SHELF_SITE.lon);
+        if ((await startSelectedOcean()) && appCtx.oceanMode?.active) {
+          if (await appCtx.transferSubmarineToBoat?.({ source: 'research-outing' })) {
+            appCtx.boatDeck?.enter();
+            appCtx.boatDeck?.select('lab');
+          }
+        }
+      } catch {
+        if (searchStatus)
+          searchStatus.textContent =
+            'The research outing could not start. Your saved voyage is retained; try again.';
+      } finally {
+        researchButton.disabled = false;
+      }
     };
   }
 
@@ -845,6 +862,7 @@ function createGlobeSelector(options = {}) {
     isOpen() { return openState; },
     open,
     startHere: triggerStartHere,
+    startOcean: startSelectedOcean,
     applySelectionAndResolve,
     setPanelMode,
     setBasemap: globeScene.setBasemap,

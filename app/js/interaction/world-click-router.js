@@ -75,7 +75,7 @@ function showWorldSelectionNotice(title, detail = '', action = null) {
     card.setAttribute('aria-live', 'polite');
     card.innerHTML = '<div><strong></strong><span></span></div><div class="worldSelectionActions"><button type="button" data-world-selection-action hidden></button><button type="button" data-world-selection-dismiss aria-label="Dismiss selection">×</button></div>';
     card.querySelector('[data-world-selection-dismiss]')?.addEventListener('click', () => { card.hidden = true; });
-    const lane = document.getElementById('hudUtilities');
+    const lane = document.getElementById('hudStatusPanels') || document.getElementById('hudUtilities');
     if (lane) lane.insertBefore(card, lane.querySelector('.hudUtilityActions'));
     else document.body.appendChild(card);
   }

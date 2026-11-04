@@ -61,7 +61,7 @@ function cloneModelGraph(source, policy = {}) {
     cloneToSource.set(cloneNode, sourceNode);
   });
   clone.traverse((object) => {
-    if (!object?.isMesh) return;
+    if (!object?.isMesh && !object?.isLine) return;
     if (policy.geometry === 'clone') {
       object.geometry = object.geometry?.clone?.() || object.geometry;
     }
@@ -102,7 +102,7 @@ function disposeModelInstance(root, policy = {}) {
   root?.parent?.remove(root);
   const skeletons = new Set();
   root?.traverse?.((object) => {
-    if (!object?.isMesh) return;
+    if (!object?.isMesh && !object?.isLine) return;
     if (object.isSkinnedMesh && object.skeleton) skeletons.add(object.skeleton);
     if (policy.geometry === 'clone') object.geometry?.dispose?.();
     if (policy.materials !== 'clone') return;

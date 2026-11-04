@@ -33,6 +33,7 @@ This is the concise public attribution index. Asset-level details are in `app/as
 ## Operational Feeds
 
 - CelesTrak GP orbital elements. <https://celestrak.org/>
+- U.S. Geological Survey [Water Data API](https://api.waterdata.usgs.gov/), historical daily mean discharge for USGS-01589300, January 1–3, 2024; raw response and provenance retained in `app/data/hydrology/`.
 - USGS Earthquake Hazards Program feeds. <https://earthquake.usgs.gov/earthquakes/feed/>
 - ADSB.lol community aircraft observations, available under ODbL 1.0. <https://www.adsb.lol/>
 - Weather: [MET Norway Locationforecast](https://api.met.no/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Coordinates rounded, wind converted from m/s to km/h, and symbols mapped to WMO categories. Unprovided fields are not estimated.
@@ -112,3 +113,7 @@ The shared 1K maps retain physical scale. Conversion details and hashes are in
 `app/assets/textures/facades/TIMBER_PROVENANCE.json`.
 
 - Wave fallback: NOAA / NCEP WAVEWATCH III via [NSF Unidata THREDDS](https://tds.scigw.unidata.ucar.edu/thredds/catalog/grib/NCEP/WW3/Global/catalog.html). [NOAA public-domain data](https://www.weather.gov/disclaimer), not an official NOAA product or endorsement. Separate swell partitions remain unavailable on this fallback.
+
+## CMS training reference assets
+
+CMS iSpy WebGL event-display components use the MIT license and pinned original metre coordinates. Per-file source, revision, digest and full notice: [CMS model credits](app/assets/models/cms/ATTRIBUTION.md). The recorded100000-row CMS2010B dimuon bundle is CC0, Thomas McCauley/CMS, [CERN Open Data record700](https://opendata.cern.ch/record/700), DOI10.7483/OPENDATA.CMS.CB8H.MFFA; [data provenance](app/assets/data/cms/ATTRIBUTION.md). These reference assets do not imply CERN/CMS endorsement, engineering CAD, exact2010 alignment or live measurements. The separate Collision Lab original application code is not included by these asset notices.

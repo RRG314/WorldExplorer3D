@@ -62,34 +62,30 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 
 #globeSelectorScreen { color: var(--hub-text); background: var(--hub-bg); }
 .tester-invitation {
-  position: fixed; right: max(24px, env(safe-area-inset-right)); bottom: max(24px, env(safe-area-inset-bottom));
-  z-index: 12; box-sizing: border-box; width: 332px; max-width: calc(100vw - 24px);
-  padding: 20px; border: 1px solid var(--hub-line-strong); border-radius: 14px;
-  background: var(--hub-panel); color: var(--hub-text); box-shadow: 0 12px 40px #0005;
-  font: 14px/1.5 Inter, system-ui, sans-serif;
+  position: relative; box-sizing: border-box; width: 100%; min-width: 0;
+  padding: 16px; border: 1px solid var(--hub-line-strong); border-radius: 2px;
+  background: var(--hub-panel); color: var(--hub-text);
+  font: .875em/1.5 Inter, system-ui, sans-serif;
 }
 .tester-invitation[hidden],
 #analyticsConsentBanner:not([hidden]) ~ #globeSelectorScreen .tester-invitation { display: none; }
-.tester-invitation .tester-invitation-label { margin: 0 35px 8px 0; font-size: 10px; font-weight: 700; letter-spacing: .1em; color: var(--hub-muted); }
-.tester-invitation h2 { margin: 0 24px 8px 0; font: 700 19px/1.3 Inter, system-ui, sans-serif; }
+.tester-invitation .tester-invitation-label { margin: 0 35px 8px 0; font-size: .714286em; font-weight: 700; letter-spacing: .1em; color: var(--hub-muted); }
+.tester-invitation h2 { margin: 0 24px 8px 0; font: 700 1.357143em/1.3 Inter, system-ui, sans-serif; }
 .tester-invitation p { margin: 0 0 14px; }
 .tester-invitation-close {
   position: absolute; top: 4px; right: 4px; width: 44px; height: 44px;
   border: 0; border-radius: 9px; background: transparent; color: inherit; font: 26px/1 system-ui; cursor: pointer;
 }
 .tester-invitation-email { display: block; padding: 11px 12px; border-radius: 8px; background: var(--hub-blue); color: var(--hub-action-text); text-align: center; font-weight: 600; text-decoration: none; }
-.tester-invitation small { display: block; margin-top: 10px; color: var(--hub-muted); font-size: 11px; line-height: 1.5; }
+.tester-invitation small { display: block; margin-top: 10px; color: var(--hub-muted); font-size: .785714em; line-height: 1.5; }
 .tester-invitation :focus-visible { outline: 3px solid var(--hub-blue); outline-offset: 3px; }
 .tester-invitation button.tester-invitation-email { width: 100%; border: 0; cursor: pointer; font: inherit; font-weight: 600; }
 .tester-invitation button:disabled { opacity: .6; cursor: wait; }
 .tester-invitation form[hidden], .tester-invitation [hidden] { display: none; }
 .tester-invitation input[type="email"] { box-sizing: border-box; width: 100%; min-height: 44px; margin: 5px 0 12px; padding: 8px; border-radius: 6px; border: 1px solid var(--hub-line-strong); background: var(--hub-bg); color: var(--hub-text); font: inherit; }
-.tester-invitation-consent { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; font-size: 12px; }
+.tester-invitation-consent { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; font-size: .857143em; }
 .tester-invitation-consent input { flex: 0 0 auto; margin-top: 4px; }
 .tester-invitation small a { color: inherit; text-decoration: underline; }
-@media (max-width: 760px) {
-  .tester-invitation { top: max(76px, calc(env(safe-area-inset-top) + 68px)); right: 12px; bottom: auto; max-height: calc(100dvh - 100px); overflow-y: auto; padding: 17px; }
-}
 #globeSelectorScreen {
   --wx-bg: var(--hub-bg);
   --wx-panel: color-mix(in srgb, var(--hub-panel) 94%, transparent);
@@ -103,6 +99,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   --wx-green: var(--hub-green);
 }
 #globeSelectorScreen .globe-selector-shell {
+  display: grid;
   grid-template-columns: 160px minmax(0, 1fr) 332px;
   grid-template-rows: 76px minmax(0, 1fr) 110px;
 }
@@ -284,7 +281,12 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-side {
   padding: 18px 16px 16px;
   gap: 11px;
+  min-height: 0;
+  overflow-y: auto;
 }
+.globe-selector-side > * { flex-shrink: 0; }
+.globe-launch-summary { display: grid; gap: 8px; }
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-launch-summary { display: none; }
 .globe-selector-stat {
   position: relative;
   padding: 14px 12px;
@@ -312,12 +314,14 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-stat-value { margin-top: 7px; font: 700 17px/1.2 Inter, sans-serif; }
 .globe-selector-actions { position: static; display: block; padding: 0; background: transparent; border: 0; }
 .globe-first-journey { display: grid; gap: 6px; }
-.globe-first-journey button { display: grid; gap: 5px; width: 100%; min-height: 48px; padding: 10px; text-align: left; color: var(--hub-text); background: var(--hub-panel-2); border: 1px solid var(--hub-line); border-radius: 2px; cursor: pointer; font: 12px/1.4 Inter, sans-serif; }
+.globe-first-journey button { display: grid; gap: 5px; width: 100%; min-height: 48px; padding: 10px; text-align: left; color: var(--hub-text); background: var(--hub-panel-2); border: 1px solid var(--hub-line); border-radius: 2px; cursor: pointer; font: .75em/1.4 Inter, sans-serif; }
 .globe-first-journey button:hover { border-color: var(--hub-blue); background: var(--hub-hover); }
 .globe-first-journey button:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: 2px; }
 .globe-first-journey button:disabled { opacity: .65; cursor: wait; }
 .globe-first-journey button[hidden] { display: none; }
-.globe-first-journey small, #globeJourneyStatus { color: var(--hub-muted); font-size: 11px; }
+.globe-first-journey small, #globeJourneyStatus { color: var(--hub-muted); }
+.globe-first-journey small { font-size: .916667em; }
+#globeJourneyStatus { font-size: .6875em; }
 #globeJourneyStatus:empty { display: none; }
 .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-first-journey { display: none; }
 #globeSelectorBackBtn { display: none; }
@@ -713,7 +717,7 @@ body.start-hub-open #flowerChallengePanel {
   padding: 10px 14px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px), (pointer: coarse) {
   .deflock-live-detail .globe-selector-live-detail-actions {
     position: sticky;
     bottom: 0;
@@ -727,9 +731,11 @@ body.start-hub-open #flowerChallengePanel {
   body.start-hub-open #authFloatPanel { top: 106px; max-height: calc(100dvh - 118px); overflow-y: auto; }
   #globeSelectorScreen .globe-selector-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: 62px minmax(250px, 43vh) minmax(230px, 1fr) 86px 68px;
+    grid-template-rows: 62px minmax(250px, 43vh) minmax(230px, 1fr) 86px;
+    height: calc(100dvh - 68px - env(safe-area-inset-bottom));
+    min-height: 0;
     overflow: auto;
-    padding-bottom: 68px;
+    padding-bottom: 0;
   }
   .globe-selector-brand { grid-column: 1; grid-row: 1; padding-right: 55%; border-right: 0; }
   .globe-brand-mark { width: 22px; height: 22px; flex-basis: 22px; font-size: 15px; }
@@ -749,11 +755,7 @@ body.start-hub-open #flowerChallengePanel {
   .globe-selector-stage { grid-column: 1; grid-row: 2; min-height: 250px; }
   .globe-selector-side { grid-column: 1; grid-row: 3; border-left: 0; border-top: 1px solid var(--hub-line); }
   .globe-selector-side::before {
-    content: 'SEARCH LOCATION';
-    display: block;
-    margin-bottom: 2px;
-    color: var(--hub-muted);
-    font: 600 9px/1 Inter, sans-serif;
+    display: none;
   }
   .globe-selector-side::after { display: none; }
   .globe-mobile-search {
@@ -792,12 +794,32 @@ body.start-hub-open #flowerChallengePanel {
   .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-actions {
     display: none;
   }
-  .globe-app-rail { grid-column: 1; grid-row: 5; position: fixed; }
+  .globe-app-rail { position: fixed; z-index: 8; inset: auto 0 0; height: calc(68px + env(safe-area-inset-bottom)); padding: 0 0 env(safe-area-inset-bottom); flex-direction: row; border-right: 0; border-top: 1px solid var(--hub-line); }
+  .globe-app-rail button { flex: 1; min-width: 0; min-height: 68px; padding: 5px 1px; gap: 4px; border-left: 0; border-bottom: 0; border-top: 3px solid transparent; font-size: .5625em; }
+  .globe-app-rail button span { font-size: 19px; }
+  .globe-app-rail button.active { border-left-color: transparent; border-top-color: var(--hub-blue); }
   .globe-hub-panel-host { padding: 14px; }
   .globe-hub-panel-host .loc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .globe-hub-footer-host .title-footer { grid-template-columns: 1fr; }
   .globe-hub-footer-host .title-share-row { display: none; }
   .globe-hub-footer-host .title-license { display: flex; font-size: 9px; }
+}
+
+/* Short landscape keeps the place and launch controls beside the globe.
+   Both panes scroll within the area above the original navigation owner. */
+@media (min-width: 621px) and (max-width: 900px) and (max-height: 520px),
+       (min-width: 621px) and (pointer: coarse) and (max-height: 520px) {
+  #globeSelectorScreen .globe-selector-shell {
+    grid-template-columns: minmax(220px, .9fr) minmax(320px, 1.1fr);
+    grid-template-rows: 62px minmax(0, 1fr);
+  }
+  .globe-selector-brand { grid-column: 1; grid-row: 1; padding-right: 0; }
+  .globe-selector-top { grid-column: 2; grid-row: 1; }
+  .globe-selector-stage { grid-column: 1; grid-row: 2; min-height: 0; }
+  .globe-selector-side { grid-column: 2; grid-row: 2; min-height: 0; overflow-y: auto; padding: 10px; gap: 8px; border-top: 0; border-left: 1px solid var(--hub-line); }
+  .globe-selector-side::before, .globe-mobile-search { display: none; }
+  .globe-destination-bar { grid-column: 1; grid-row: 2; align-self: end; z-index: 4; background: var(--hub-bar); }
+  .globe-selector-zoom-controls { top: 8px; transform: none; }
 }
 
 @media (max-width: 620px) {
@@ -815,8 +837,7 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-panel-host .loc-grid { grid-template-columns: 1fr; }
 }
 
-/* The earlier shell switches to flex for every coarse pointer, including
-   wide tablets. Its dialog must not depend on grid placement at those sizes. */
+/* The overlay keeps its viewport bounds across responsive grids and touch. */
 @media (max-width: 900px), (pointer: coarse) {
   .globe-hub-overlay {
     position: fixed;

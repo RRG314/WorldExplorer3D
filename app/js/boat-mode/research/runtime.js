@@ -14,7 +14,7 @@ import {createIndexedDbDiscoveryProfileStore} from '../../discovery/profile-stor
 
 export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityChanged=()=>{},hudFactory=createResearchDeckHud}) {
  const research=ensureMarineResearch(ctx);
- let disposed=false,active=false,host=null,parent=null,hud=null,targetId='lab',busy=false,epoch=0,jumpHeld=false;
+ let careerGoal='',disposed=false,active=false,host=null,parent=null,hud=null,targetId='lab',busy=false,epoch=0,jumpHeld=false;
  let pose={...RCRV_LAYOUT.spawn},route=[],routeAge=Infinity,wayfinding=null,mapOpen=false;
  let world={x:0,y:0,z:0},origin='',closeCamera=false,motor=null,viewY=null,clearCameraTime=0,cameraStep=0,viewDistance=3.5;
  const supported=()=>!disposed&&ctx.boatMode?.active&&ctx.boatMode.transportCatalogId==='ocean-research-vessel';
@@ -113,7 +113,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
   if(disposed)return false;
   if(active&&(!ready()||!supported()||origin!==`${ctx.LOC?.lat}:${ctx.LOC?.lon}`||ctx.getEnv?.()&&ctx.getEnv()!=='EARTH'))release();
   if(!supported()){hud?.hide();return false;}
-  hud ||= hudFactory({enter:()=>enter(),helm:()=>select('helm'),mapChanged:open=>{mapOpen=open;ctx.clearControlInputState?.('research-map');},moor,act:()=>void act(),select,retry:()=>void ctx.boatMode?.mesh?.userData.retryResearchVisual?.(),coastalApi:()=>research.coastal,investigationApi:()=>research.investigation,researchAct:()=>void research.labAction(),sharedAct:()=>void import('../../ocean/shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>hud?.message(e.message))});
+  hud ||= hudFactory({enter:()=>enter(),helm:()=>select('helm'),mapChanged:open=>{mapOpen=open;ctx.clearControlInputState?.('research-map');},moor,act:()=>void act(),select,retry:()=>void ctx.boatMode?.mesh?.userData.retryResearchVisual?.(),coastalApi:()=>research.coastal,investigationApi:()=>research.investigation,researchAct:()=>void research.labAction(),oceanographyApi:()=>research.oceanography,marineBiologyApi:()=>research.marineBiology,sharedAct:()=>void import('../../ocean/shared-marine-runtime.js').then(m=>m.openSharedMarine(ctx)).catch(e=>hud?.message(e.message))});
   if(active){
    updateVessel(ctx.paused?0:dt);
    const actions=ctx.paused||ctx.showLargeMap||mapOpen?{}:ctx.readControlActions?.('walk')||{};
@@ -128,6 +128,7 @@ export function createResearchDeck({ctx,resetDynamics,updateVessel,onActivityCha
    routeAge+=dt;if(routeAge>=.65){route=wayfinding?.route(pose,targetId)||[];routeAge=0;}
    syncWorldPose();
   }
+  const career=research.careerSnapshot?.()||research.oceanography?.snapshot(),goal=career?.visible&&career.station?`${career.phase}:${career.active?.runId||''}:${career.active?.stationIndex??''}`:'';if(goal&&goal!==careerGoal)select(career.station);careerGoal=goal;
   const target=stations().find(s=>s.id===targetId),distance=stationDistance(targetId);
   const next=route.find(p=>Math.hypot(p.x-pose.x,p.z-pose.z)>.65)||target;
   const bearing=Math.atan2(next.x-pose.x,next.z-pose.z)-pose.yaw;

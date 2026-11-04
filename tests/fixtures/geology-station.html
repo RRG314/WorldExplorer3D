@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="data:,"><title>Geology station presentation check</title><link rel="stylesheet" href="/app/styles/experiences.css"><style>body{background:#101e1a;color:#f3f0e4;font:16px system-ui;padding:24px}#open{min-height:44px;padding:10px 20px}</style><button id="open" disabled>Open station</button><script type="module">
+import {createIndexedDbDiscoveryProfileStore} from '/app/js/discovery/profile-store.js';
+import {createGeologyUI,geologyTarget} from '/app/js/campaign/geology-ui.js';
+const site={id:'virtual-geology:fixture',name:'Virtual geology field course',truthType:'virtual-training-site',location:{lat:39.3189,lon:-76.6363},points:{a:{lat:39.3189,lon:-76.6363},b:{lat:39.3189,lon:-76.6361},bench:{lat:39.319,lon:-76.6362}}};
+const store=createIndexedDbDiscoveryProfileStore();let state=(await store.getProfile()).researchCareers?.geology;
+if(!state?.active)state=(await store.updateResearchCareer('geology',{type:'accept',revision:state?.revision||0,variantId:'campaign',runId:'station-fixture',site})).state;
+window.geologyCheck={failNextSave:false,map:null};
+const runtime={Walk:{state:{walker:{x:0,z:0}}},getEnv:()=> 'EARTH',screenLayout:{setPanelLayer(){}},setPauseReason(){}};
+const ui=createGeologyUI({runtime,getState:()=>state,getMap:()=>window.geologyCheck.map||({status:'unavailable',checkedAt:Date.now()}),near:(_id,distance)=>distance?1:true,save:async command=>{if(window.geologyCheck.failNextSave){window.geologyCheck.failNextSave=false;throw Error('The record could not save. Your observations are kept. Try again.');}const now=Date.now(),target=geologyTarget(state.active);const result=await store.updateResearchCareer('geology',{...command,revision:state.revision,custody:Object.values(state.active.samples).map(s=>s.instanceId),evidence:{environment:'EARTH',travelMode:'walk',supported:true,verticalDistance:0,liveGps:false,siteId:site.id,position:site.points[target],at:now}},{now});state=result.state;},onJournal(){},onNext(){}});
+document.querySelector('#open').disabled=false;document.querySelector('#open').onclick=()=>ui.open();ui.update();
+window.advanceTime=async()=>{};
+window.render_game_to_text=()=>JSON.stringify({scope:'actual station UI/model with controlled position; no physical gameplay claim',phase:state.active.phase,revision:state.revision,samples:Object.keys(state.active.samples),tests:Object.keys(state.active.tests)});
+</script></html>

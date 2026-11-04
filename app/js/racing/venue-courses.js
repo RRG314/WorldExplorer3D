@@ -68,5 +68,5 @@ export function buildVenueRaceCourses(district,venue){
   ...(venue.presentationStatus==='under-construction'?{description:'Venue detail is in progress. Private practice uses a game timing line; times are separate from official venue records.'}:{})};
  const course=createRaceCourse(graph,path,{...settings,laps:1,name:`${venue.name} · ${label} · 1 lap`});
  if(Math.abs(course.lengthMeters-venue.mappedLengthMeters)/venue.mappedLengthMeters>.01)throw Error('race_venue_surface_incomplete');
- return {graph,events:[course,createRaceCourse(graph,path,{...settings,laps:2,name:`${venue.name} · ${label} · 2 laps`})],diagnostics};
+ return {graph,events:[course,createRaceCourse(graph,path,{...settings,laps:2,name:`${venue.name} · ${label} · 2 laps`}),createRaceCourse(graph,path,{...settings,laps:3,name:`${venue.name} · ${label} · 3 laps`})],diagnostics};
 }

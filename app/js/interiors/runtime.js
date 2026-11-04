@@ -530,7 +530,8 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
-  if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent && !definition.facilityContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent && !definition.facilityContent && !definition.cernContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachCern?.(appCtx.activeInterior);
   void deps.attachKennedy?.(appCtx.activeInterior);
   void deps.attachGallery?.(appCtx.activeInterior);
   void deps.attachAquarium?.(appCtx.activeInterior);
@@ -596,6 +597,7 @@ export function clearActiveInterior(options = {}, deps) {
   deps.disposeGallery?.(active);
   deps.disposeAquarium?.(active);
   deps.disposeKennedy?.(active);
+  deps.disposeCern?.(active);
   disposeThreeViewsHome(active);
   deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);

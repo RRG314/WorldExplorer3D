@@ -16,6 +16,21 @@ export const LUNAR_STRATEGIES = Object.freeze([
   Object.freeze({ id: 'samples', label: 'Return two samples', description: 'Photograph both sites, seal a basalt and a breccia analog, then compare them in the ship lab.' }),
   Object.freeze({ id: 'observe', label: 'Leave the sites untouched', description: 'Photograph both sites and record their grain and fragment structure with the optical scanner. No material enters your Backpack.' })
 ]);
+// Three bounded studies share the existing mission, field and pod owners.
+// The original mission/report IDs remain the Harbor campaign's evidence.
+export const LUNAR_STUDIES=Object.freeze({
+  campaign:Object.freeze({label:'Two Sides of the Moon',description:'Choose a field method, compare both lunar sites and bring the report home.'}),
+  'alternate-method':Object.freeze({label:'Another Way to Read the Surface',description:'Compare the same sites using the other field method; keep the original record.'}),
+  'planned-return':Object.freeze({label:'A Planned Return',description:'Complete Site A, recover to Solis Reach and recharge, then return for Site B.'})
+});
+export function lunarStudyMissionId(variantId='campaign'){
+  if(!Object.hasOwn(LUNAR_STUDIES,variantId))throw Error('Choose a supported lunar study.');
+  return variantId==='campaign'?'mission:moon':'mission:moon:'+variantId;
+}
+export function lunarStudyReportId(variantId='campaign'){
+  lunarStudyMissionId(variantId);
+  return variantId==='campaign'?'event:destination-mission:moon':'event:destination-mission:moon:'+variantId;
+}
 const observationPlan = Object.freeze(LUNAR_FIELD_PLAN.map(entry => entry.activityId !== 'geology-inspect' ? entry : Object.freeze({
   ...entry, evidenceId: entry.evidenceId.replace('-sample', '-observation'), activityId: 'geology-observe',
   label: entry.evidenceId === 'mare-sample' ? 'Site A · examine the fine-grained analog' : 'Site B · examine the fragment-rich analog',

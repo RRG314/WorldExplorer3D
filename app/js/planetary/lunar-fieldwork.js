@@ -32,11 +32,12 @@ export function activateLunarFieldwork(ctx) {
   if (!ctx.onMoon || ctx.moonSurface?.userData.ready !== true) return false;
   const spawn = { x: 200, z: -950 };
   const mission = ctx.getDestinationMissionSnapshot?.();
-  const strategy = mission?.destinationId === 'moon' ? mission.preparation?.strategy || 'samples' : 'samples';
+  const strategy = mission?.destinationId === 'moon' ? mission.preparation?.strategy || mission.fieldMethod || 'samples' : 'samples';
+  const surveyMissionId=mission?.destinationId==='moon'&&mission.surveyVariantId?mission.activeMissionId:null;
   const plan = lunarFieldPlan(strategy);
   const heights = plan.map(entry => planetarySurfaceYAtRenderXZ(ctx, spawn.x + entry.offset.x, spawn.z + entry.offset.z, { bodyId: 'moon' }));
   if (!heights.every(Number.isFinite)) return false;
-  if (fieldWorld && fieldWorld.strategy !== strategy) {
+  if (fieldWorld && (fieldWorld.strategy !== strategy||fieldWorld.surveyMissionId!==surveyMissionId)) {
     const geometries = new Set(), materials = new Set();
     for (const object of fieldWorld.objects) {
       object.parent?.remove(object);
@@ -46,9 +47,9 @@ export function activateLunarFieldwork(ctx) {
     for (const material of materials) material.dispose();
     fieldWorld = null;
   }
-  fieldWorld ||= { objects: [], strategy };
+  fieldWorld ||= { objects: [], strategy, surveyMissionId };
   for (const object of fieldWorld.objects) { object.visible = true; ctx.scene.add(object); }
-  const pack = { bodyId: 'moon', bodyName: 'Moon', spawn, manifest: APOLLO11_SURFACE_REGION, fieldNotes: plan };
+  const pack = { bodyId: 'moon', bodyName: 'Moon', spawn, manifest: APOLLO11_SURFACE_REGION, fieldNotes: plan, surveyMissionId, completedEvidence:mission?.destinationId==='moon'?mission.evidence:[] };
   ctx.markExpeditionPodLanded?.('moon');
   ctx.updateDestinationMissionRuntime?.();
   const pod = stageSurfacePod(ctx, { bodyId: 'moon', onBoard: boardingPod => {

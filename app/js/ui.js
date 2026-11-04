@@ -1,3 +1,5 @@
+import {bindResearchCareers} from './ui/research-careers.js';
+import {createExperienceController} from './experiences/runtime.js';
 import {bindRacingUI} from './ui/racing.js';
 import {bindVehicleGarage,vehicleGarageMessage} from './ui/vehicle-garage.js';
 import { mountCapabilityGuide } from './product/capability-guide.js?v=1';
@@ -142,7 +144,12 @@ function setupUI() {
     updateControlsModeUI
   } = initMobileControls();
   let shareUi = null;
-  const titleUi = initTitleScreenUi({
+  let titleUi;
+  const experiences=createExperienceController({runtime:appCtx,getTitleUi:()=>titleUi,onJournal:()=>openExplorerSection('journal'),closeMenus:closeAllFloatMenus,requestWorldFocus:()=>worldFocus.requestWorldFocus()});
+  bindResearchCareers(appCtx,experiences,{onJournal:()=>openExplorerSection('journal'),requestWorldFocus:()=>worldFocus.requestWorldFocus()});
+  titleUi = initTitleScreenUi({
+    openActivities:()=>experiences.open(),
+    openJournal:()=>openExplorerSection('journal'),
     lastLocationStorageKey: LAST_LOCATION_STORAGE_KEY,
     shareExperienceStatus,
     perfSettingsStatus,
@@ -176,7 +183,7 @@ function setupUI() {
     }
   }
   const worldFocus = bindWorldFocusControls(appCtx, closeAllFloatMenus);
-  bindRacingUI({closeMenus:closeAllFloatMenus,requestWorldFocus:worldFocus.requestWorldFocus,chooseDestination:()=>{goToMainMenu();titleUi.selectGameMode('racing');}});
+  bindRacingUI({openCareerJourney:()=>experiences.open({experienceId:'career:racer'}),closeMenus:closeAllFloatMenus,requestWorldFocus:worldFocus.requestWorldFocus,chooseDestination:()=>{goToMainMenu();titleUi.selectGameMode('racing');}});
   bindControlPanel(appCtx, {updateMode: updateControlsModeUI, clearHeld: clearVirtualHeldInputs, requestWorldFocus: worldFocus.requestWorldFocus});
   appCtx.screenLayout.bindHudLayout();
   function goToMainMenu() {
@@ -299,6 +306,7 @@ function setupUI() {
     pendingExplorerSection = null;
     appCtx.openWorldDiscoverySection(section);
   });
+  document.getElementById('fActivities')?.addEventListener('click', () => { void experiences.open(); });
   document.getElementById('fWorldDiscovery')?.addEventListener('click', () => openExplorerSection('today'));
   document.querySelectorAll('[data-pack-record]').forEach(button => button.addEventListener('click', () => {
     appCtx.toggleUrbanEquipment?.(false);
@@ -306,7 +314,7 @@ function setupUI() {
   }));
   document.getElementById('sandboxNearbyActivities')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);
-    appCtx.openActivityBrowser?.();
+    void experiences.open({view:'quick'});
   });
   document.getElementById('sandboxHomes')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "project": "Collision Lab",
+  "version": "0.7.0",
+  "originalCodeReuse": "Copyright-owner authorization,2026-11-03; World Explorer3D project license. Third-party terms unchanged.",
+  "modules": [
+    {
+      "file": "models.mjs",
+      "sourceFile": "src/models.mjs",
+      "bytes": 5906,
+      "sha256": "d3182f444320f5818b35f2497621dcadec9c579342e59c0806579a40f38c1af6"
+    },
+    {
+      "file": "science.mjs",
+      "sourceFile": "src/science.mjs",
+      "bytes": 4658,
+      "sha256": "9fbc8d18e39e98bd33a379d990aa4d08c917cc2157bfe13a5261ba35d7f5ae29"
+    },
+    {
+      "file": "missions.mjs",
+      "sourceFile": "src/missions.mjs",
+      "bytes": 7867,
+      "sha256": "fa91e8cff3f6fa00cc3baad9535fa6e4463ac80d0a9d21986d048cc60a30c4db"
+    },
+    {
+      "file": "receipt.mjs",
+      "sourceFile": "src/receipt.mjs",
+      "bytes": 1062,
+      "sha256": "7597dbf1c3bfe32195e73c428f17bfda72116d40f112d935f81c7653736e8493"
+    },
+    {
+      "file": "export.mjs",
+      "sourceFile": "src/export.mjs",
+      "bytes": 5127,
+      "sha256": "55e9b3147d406456c4af682c6d512766a13b1658fe232b60705a21cb8ac34453"
+    },
+    {
+      "file": "data-integrity.mjs",
+      "sourceFile": "src/data-integrity.mjs",
+      "bytes": 96,
+      "sha256": "12a21abf8f884e5b2e9b8c354acaffa63fb97b7909a8cdbb6db42b6e132f76fe"
+    }
+  ]
+}

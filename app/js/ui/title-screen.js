@@ -20,6 +20,8 @@ import {
   requestCurrentPosition
 } from './title-screen/geolocation.js?v=1';
 function initTitleScreenUi({
+  openActivities,
+  openJournal,
   lastLocationStorageKey,
   shareExperienceStatus,
   perfSettingsStatus,
@@ -61,6 +63,7 @@ function initTitleScreenUi({
   window.addEventListener('pagehide',event=>{if(!event.persisted)portalEntry.dispose();});
   let pendingOceanSelection = null;
   let pendingOceanResume = null;
+  let pendingOceanResumeGuard = null;
   let titleLaunchMode = 'earth';
   let globeSelector = null;
   let skipGlobeGateOnce = false;
@@ -378,6 +381,7 @@ function initTitleScreenUi({
   appCtx.triggerTitleStart = (options = {}) => {
     if(titleStartPromise)return titleStartPromise;
     pendingOceanResume=options.launchMode==='ocean'?validateOceanVoyage(options.voyageResume):null;
+    pendingOceanResumeGuard=options.launchMode==='ocean'&&typeof options.isTransferCurrent==='function'?options.isTransferCurrent:null;
     const forcedLaunchMode = ['earth', 'ocean', 'moon', 'mars', 'space'].includes(options?.launchMode)
       ? options.launchMode
       : '';
@@ -426,7 +430,8 @@ function initTitleScreenUi({
       }
       return false;
     },
-    onOceanShortcut: async (selection = null) => {
+    onOceanShortcut: async (selection = null, launchContext = {}) => {
+      if(launchContext.isCurrent?.()===false)return false;
       if (!selection || !Number.isFinite(Number(selection.lat)) || !Number.isFinite(Number(selection.lon))) {
         return false;
       }
@@ -437,7 +442,7 @@ function initTitleScreenUi({
         arrivalMode: 'boat'
       }, { transient: false });
       if (!appCtx.gameStarted) {
-        pendingOceanSelection = selection;
+        pendingOceanSelection = {...selection,isTransferCurrent:launchContext.isCurrent};
         setLaunchMode('ocean');
         return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'ocean' });
       }
@@ -450,6 +455,7 @@ function initTitleScreenUi({
           name: String(selection.name || 'Open Ocean'),
           region: 'Selected coordinates'
         },
+        isTransferCurrent:launchContext.isCurrent,
         entry: selection.oceanEntry
       });
     },
@@ -482,7 +488,9 @@ function initTitleScreenUi({
         console.error(`[title] ${mode} launch failed:`, error);
       });
     },
-    primeMultiplayerUi
+    primeMultiplayerUi,
+    onActivities:openActivities,
+    onJournal:openJournal
   });
 
   appCtx.globeSelector = globeSelector;
@@ -611,7 +619,7 @@ function initTitleScreenUi({
   });
   function selectTitleGameMode(mode) {
     const elements=[...document.querySelectorAll('.mode')],target=elements.find(element=>element.dataset.mode===mode);
-    if(!target)return false;
+    if(!['free','trial','checkpoint','painttown','flower','deflock','livegps','racing'].includes(mode))return false;
     for(const element of elements)element.classList.toggle('sel',element===target);
     appCtx.gameMode=mode;return true;
   }
@@ -622,6 +630,7 @@ function initTitleScreenUi({
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
     const voyageResume=pendingOceanResume;pendingOceanResume=null;
+    const oceanResumeGuard=pendingOceanResumeGuard;pendingOceanResumeGuard=null;
     const forcedLaunchMode = pendingForcedLaunchMode;
     pendingForcedLaunchMode = '';
     const requestedLaunchMode = forcedLaunchMode || Object.entries(launchModeButtons)
@@ -711,6 +720,7 @@ function initTitleScreenUi({
             }
           : undefined,
         entry: oceanEntry,
+        isTransferCurrent:oceanResumeGuard||selectedOceanLocation?.isTransferCurrent,
         voyageResume,
         submarinePose:voyageResume?.sub,
         waveOffset:voyageResume?.waveOffset

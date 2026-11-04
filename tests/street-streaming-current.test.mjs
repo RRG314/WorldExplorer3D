@@ -182,7 +182,7 @@ test('finished cache cells retain only one geometry representation within the sa
  cache.clear();assert.equal(cache.bytes,0);
 });
 
-function harness(t,{holdType,keys=['0:0','16:0'],batch=false}={}){
+function harness(t,{holdType,keys=['0:0','16:0'],batch=false,startupError=''}={}){
  const oldThree=globalThis.THREE,oldWorker=globalThis.Worker,resources=[];
  class Texture{constructor(data,width,height){this.image={data,width,height};resources.push(this);}dispose(){this.disposed=true;}}
  class Vector4{constructor(...v){this.set(...v);}set(...v){this.values=v;}}
@@ -191,7 +191,7 @@ function harness(t,{holdType,keys=['0:0','16:0'],batch=false}={}){
  const ctx={renderer:{copyTextureToTexture(position,source,target){assert.ok(Number.isFinite(position.x));assert.ok(source.image.data.length>0);assert.ok(resources.includes(target));}},_worldLoadSequence:1,_groundSurfaceRevision:0,roads:[],buildings:[],landuses:[],linearFeatures:[],urbanSurfaceMeshes:[],terrainGroup:{children:[{userData:{isTerrainMesh:true},material}]},terrainMeshHeightAt:(x,z)=>x*.2+z*.1};
  let calls=0,worker;
  globalThis.Worker=class{
-  constructor(){worker=this;this.cursor=0;}
+  constructor(){worker=this;this.cursor=0;if(startupError)queueMicrotask(()=>this.onerror?.({message:startupError}));}
   terminate(){this.terminated=true;}
   postMessage(data){
    if(data.type==='next')assert.deepEqual(Object.keys(data.focus).sort(),['x','z'],'worker messages must exclude live scene objects');
@@ -508,4 +508,12 @@ test('initial overview still fails a real worker error when the source and load 
  for(let i=0;i<30&&!h.worker?.held;i++)await new Promise(resolve=>setImmediate(resolve));
  h.worker.onerror({message:'controlled current-source failure'});
  await assert.rejects(pending,/controlled current-source failure/);assert.equal(overview.stats.status,'failed');assert.equal(overview.stats.completedCells,0);
+});
+
+
+test('worker startup failures that arrive during source scanning are retained before the first request',async t=>{
+ const h=harness(t,{startupError:'Module bootstrap refused'});h.ctx.worldLoading=true;
+ const overview=createStreetOverview(h.ctx);
+ await assert.rejects(overview.prepareInitialCoverage({x:0,z:0}),/Module bootstrap refused/);
+ assert.equal(overview.stats.workerError,'Module bootstrap refused');assert.equal(overview.stats.status,'failed');assert.equal(h.worker.terminated,true);overview.dispose();
 });

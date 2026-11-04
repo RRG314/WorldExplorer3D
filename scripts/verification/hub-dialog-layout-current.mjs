@@ -1,57 +1,43 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { chromium } from 'playwright';
-import { startStaticServer } from './static-server.mjs';
-
-// Real markup, CSS and panel controller; no world or graphics context required.
-const server = await startStaticServer({ rootDir: process.cwd(), ports: [4498, 4499] });
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
-const directory = 'output/verification/hub-dialog-layout';
-const results = [];
-try {
-  // The component harness does not boot the world, but must preserve the real
-  // startup cover's ready handler instead of leaving it over every hit target.
-  const html = (await fs.readFile('app/index.html', 'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,
-    script => /id=["']startupCoverController["']/.test(script) ? script : '');
-  for (const { width, height, touch } of [
-    { width: 390, height: 844, touch: true },
-    { width: 1280, height: 800, touch: true },
-    { width: 1440, height: 900, touch: false }
-  ]) {
-    const context = await browser.newContext({ viewport: { width, height }, hasTouch: touch, deviceScaleFactor: 1 });
-    const page = await context.newPage();
-    const errors = [];
-    page.on('pageerror', error => errors.push(String(error)));
-    await page.goto(`http://127.0.0.1:${server.port}/404.html`);
-    await page.setContent(html.replace('<head>', `<head><base href="http://127.0.0.1:${server.port}/app/">`), { waitUntil: 'load' });
-    await page.evaluate(async () => {
-      document.body.className = 'start-hub-open globe-selector-open';
-      document.getElementById('globeSelectorScreen').classList.add('show');
-      const { setupGlobeHub } = await import('./js/ui/title-screen/globe-hub.js');
-      setupGlobeHub({});
-      window.dispatchEvent(new Event('we3d:runtime-ready'));
-      document.querySelector('[data-globe-destination="games"]').click();
-      await document.fonts.ready;
-    });
-    const checks = [];
-    for (const mode of ['free', 'painttown', 'flower']) {
-      const target = page.locator(`.mode[data-mode="${mode}"]`);
-      await target.evaluate(element => element.scrollIntoView({ block: 'center' }));
-      checks.push(await target.evaluate(element => {
-        const r = element.getBoundingClientRect();
-        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-        return { mode: element.dataset.mode, hit: hit === element || element.contains(hit), inBounds: r.top >= 0 && r.bottom <= innerHeight };
-      }));
-    }
-    results.push({ width, height, touch, checks, errors, ok: errors.length === 0 && checks.every(check => check.hit && check.inBounds) });
-    await fs.mkdir(directory, { recursive: true });
-    await page.screenshot({ path: `${directory}/${width}-${touch ? 'touch' : 'mouse'}.png` });
-    await context.close();
-  }
-  await fs.writeFile(`${directory}/report.json`, JSON.stringify({ ok: results.every(result => result.ok), evidenceScope: 'actual hub DOM/CSS/controller hit testing; no world or performance claim', results }, null, 2));
-  console.log(JSON.stringify(results));
-  assert.ok(results.every(result => result.ok), 'Every game choice must remain visible and reachable above the footer.');
-} finally {
-  await browser.close();
-  await server.close();
-}
+import {chromium} from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+// Actual shared Activities markup/CSS/controller. Adapters are isolated: no race/career completion claim.
+const server=await startStaticServer({rootDir:process.cwd(),ports:[4498,4499]});
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const directory='output/verification/experience-browser-20261102';
+const results=[];
+await fs.mkdir(directory,{recursive:true});
+try{
+ for(const [width,height] of [[390,844],[844,390],[1440,960]]){
+  const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1});
+  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(String(error)));
+  try{
+   await page.goto(`http://127.0.0.1:${server.port}/tests/fixtures/experience-browser.html`);
+   await page.locator('#open').click();await page.locator('[data-experience-id="career:racer"]').click();
+   await page.getByRole('combobox',{name:'Starting place'}).waitFor();
+   const bounds=await page.locator('[data-experience-begin]').evaluate(element=>{
+    const r=element.getBoundingClientRect(),d=element.closest('dialog').getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+    return {height:r.height,bottom:r.bottom,dialogBottom:d.bottom,hit:hit===element||element.contains(hit),inViewport:r.top>=0&&r.bottom<=innerHeight&&r.right<=innerWidth};
+   });
+   assert.ok(bounds.height>=44&&bounds.bottom<=bounds.dialogBottom&&bounds.hit&&bounds.inViewport,JSON.stringify(bounds));
+   const content=await page.locator('.experience-detail-content').boundingBox(),actions=await page.locator('.experience-actions').boundingBox();
+   assert.ok(content.y+content.height<=actions.y,'Assignment content must not overlap actions');
+   assert.equal(await page.locator('html').evaluate(el=>el.scrollWidth>innerWidth),false);
+   await page.screenshot({path:`${directory}/${width}-detail.png`});
+   if(width<701||height<481){await page.getByRole('button',{name:'← All activities'}).click();assert.equal(await page.locator('[data-experience-id="career:racer"]').getAttribute('aria-pressed'),'true');await page.locator('[data-experience-id="career:racer"]').click();}
+   await page.locator('[data-experience-begin]').click();await page.getByRole('status').filter({hasText:'could not start'}).waitFor();
+   assert.equal(await page.locator('#experienceBrowser').evaluate(el=>el.open),true);
+   assert.equal(await page.locator('.experience-detail h3').textContent(),'First clean finish');
+   await page.keyboard.press('Escape');assert.equal(await page.locator('#open').evaluate(el=>el===document.activeElement),true);
+   await page.locator('#open').click();await page.getByRole('tab',{name:'Quick play',exact:true}).focus();await page.keyboard.press('Home');
+   assert.equal(await page.getByRole('tab',{name:'Continue',exact:true}).getAttribute('aria-selected'),'true');
+   await page.getByRole('tab',{name:'Careers',exact:true}).click();await page.getByRole('searchbox',{name:'Find an activity'}).fill('Geologist');
+   await page.locator('[data-experience-id="career:geologist"]').click();assert.equal(await page.locator('[data-experience-begin]').isDisabled(),true);
+   assert.equal(errors.length,0,errors.join('\n'));
+   results.push({width,height,ok:true,bounds,checks:['primary-visible-and-hit','no-overlap','no-horizontal-overflow','selection-retained','failure-restores-brief','escape-restores-focus','keyboard-tabs','unavailable-never-starts'],errors});
+  }finally{await context.close();}
+ }
+ await fs.writeFile(`${directory}/report.json`,JSON.stringify({ok:true,evidenceScope:'Actual shared UI/controller checks with isolated adapters; no gameplay/production claim',results},null,2)+'\n');
+ console.log('PASS Activities desktop, portrait and short landscape: 8 checks each.');
+}finally{await browser.close();await server.close();}

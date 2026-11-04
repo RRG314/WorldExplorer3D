@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Hydrology station boundary</title
+  ><link rel="icon" href="/favicon.svg" /><link
+    rel="stylesheet"
+    href="/app/styles/experiences.css"
+  /><style>
+    body {
+      margin: 0;
+      background: #9baea3;
+      color: #f0f4ed;
+      font: 15px system-ui;
+    }
+    [hidden] {
+      display: none !important;
+    }
+    #scope {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      max-width: 45vw;
+    }
+    .field-photo-toolbar {
+      z-index: 175;
+      background: #16352c;
+    }
+    #worldFocusTarget {
+      position: fixed;
+      inset: 0;
+      outline: none;
+    }
+  </style>
+  <div id="worldFocusTarget" tabindex="0"></div>
+  <p id="scope">
+    Controlled measurements and presence · actual native station/profile transaction/IndexedDB · no
+    source field claim
+  </p>
+  <script type="module">
+    import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js?v=5';
+    import { createHydrologyUI } from '/app/js/campaign/hydrology-ui.js';
+    import { hydrologyHarness } from '/tests/helpers/hydrology-study.mjs';
+    import { hydrologyTarget } from '/app/js/campaign/hydrology-career.js';
+    const store = createIndexedDbDiscoveryProfileStore();
+    let state = (await store.getProfile()).researchCareers.hydrology,
+      windowReading = null,
+      fail = false,
+      paused = false,
+      ui;
+    const h = () =>
+      hydrologyHarness(
+        state,
+        state.active?.variantId || 'campaign',
+        state.active?.runId || 'hydrology-ui-study-0001',
+        Date.now()
+      );
+    if (!state.active) {
+      const q = h();
+      q.accept();
+      const result = await store.updateResearchCareer('hydrology', q.events[0].metadata.action, {
+        now: q.events[0].occurredAt,
+      });
+      state = result.state;
+    }
+    const runtime = {
+        Walk: { state: { walker: {} } },
+        getEnv: () => 'EARTH',
+        screenLayout: { setPanelLayer() {} },
+        setPauseReason: (_, v) => (paused = v),
+        stopGameplayPlugin() {},
+      },
+      tools = {
+        get busy() {
+          return false;
+        },
+        enter() {},
+        start() {
+          const q = h();
+          if (state.active.phase === 'trace') {
+            q.trace();
+            windowReading = {
+              ...q.events[0].metadata.action.trace,
+              kind: 'trace',
+              stationId: hydrologyTarget(state.active),
+              ready: true,
+              reason: 'Matched instrument reading ready to save',
+            };
+          } else
+            windowReading = {
+              ...q.reading(),
+              kind: 'measure',
+              ready: true,
+              reason: 'Matched instrument reading ready to save',
+            };
+        },
+        snapshot: () => ({ window: windowReading }),
+        prepare(command) {
+          return {
+            ...command,
+            ...(command.type === 'trace'
+              ? { trace: windowReading }
+              : command.type === 'measure'
+                ? { reading: windowReading }
+                : {}),
+          };
+        },
+      };
+    async function save(command) {
+      if (fail) {
+        fail = false;
+        throw Error('Controlled native save failure; reading kept.');
+      }
+      const q = h(),
+        evidence = {
+          supported: true,
+          verticalDistance: 0,
+          environment: 'EARTH',
+          travelMode: 'walk',
+          liveGps: false,
+          siteId: state.active.site.id,
+          position: state.active.site.points[hydrologyTarget(state.active)],
+          at: Date.now(),
+          localPosition: { x: 0, y: 0, z: 0 },
+        };
+      const result = await store.updateResearchCareer(
+        'hydrology',
+        { ...command, revision: state.revision, evidence },
+        { now: evidence.at }
+      );
+      state = result.state;
+      windowReading = null;
+    }
+    ui = createHydrologyUI({
+      runtime,
+      tools,
+      store,
+      getState: () => state,
+      near: (_, distance) => (distance ? 1 : true),
+      save,
+      onJournal() {},
+      onNext() {},
+      requestWorldFocus: () =>
+        document.getElementById('worldFocusTarget').focus({ preventScroll: true }),
+    });
+    ui.update();
+    ui.open();
+    window.hydroUi = {
+      store,
+      tools,
+      get state() {
+        return state;
+      },
+      get window() {
+        return windowReading;
+      },
+      set failNext(value) {
+        fail = value;
+      },
+      open: () => ui.open(),
+      async review(data) {
+        await store.importData(data);
+        state = (await store.getProfile()).researchCareers.hydrology;
+        windowReading = null;
+        ui.update();
+        ui.open();
+      },
+      snapshot: () => ({
+        phase: state.active.phase,
+        revision: state.revision,
+        paused,
+        windowReady: !!windowReading?.ready,
+      }),
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({ scope: 'Controlled native station/IndexedDB only', ...hydroUi.snapshot() });
+    window.advanceTime = async () => ui.update();
+    window.ready = true;
+  </script>
+</html>

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Native observing station boundary</title
+  ><link rel="icon" href="/favicon.svg" /><link
+    rel="stylesheet"
+    href="/app/styles/experiences.css"
+  /><style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #344b52;
+      color: #f2f4ed;
+      font: 15px system-ui;
+    }
+    [hidden] {
+      display: none !important;
+    }
+    #scope {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      max-width: 45vw;
+    }
+    #worldFocusTarget {
+      position: fixed;
+      inset: 0;
+      outline: none;
+    }
+    .field-photo-toolbar {
+      background: #16352c;
+      z-index: 175;
+    }
+  </style>
+  <div id="worldFocusTarget" tabindex="0"></div>
+  <p id="scope">
+    Native UI, tools, normal-frame recorder and IndexedDB. Controlled mount geometry and presence;
+    separate from source-world fieldwork.
+  </p>
+  <script type="module">
+    import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js?v=5';
+    import { createAstronomyUI } from '/app/js/campaign/astronomy-ui.js';
+    import { createAstronomyTools } from '/app/js/campaign/astronomy-tools.js';
+    import { astronomyHarness } from '/tests/helpers/astronomy-study.mjs';
+    import { astronomyTarget, astronomyExposurePlan } from '/app/js/campaign/astronomy-career.js';
+    import { astronomyAxis, astronomySeparation } from '/app/js/campaign/astronomy-instrument.js';
+    const store = createIndexedDbDiscoveryProfileStore(),
+      local = { a: { x: -6, z: 0 }, b: { x: 6, z: 0 }, bench: { x: 0, z: 8 } };
+    let state = (await store.getProfile()).researchCareers.astronomy,
+      ui,
+      last = performance.now(),
+      pointing,
+      covered = false,
+      blocked = false,
+      shown = null;
+    if (!state.active) {
+      const h = astronomyHarness();
+      state = (
+        await store.updateResearchCareer(
+          'astronomy',
+          { ...h.events[0].metadata.action, revision: state.revision },
+          { now: Date.now() }
+        )
+      ).state;
+    }
+    function restore() {
+      const a = state.active;
+      pointing = a.pointing
+        ? { ...a.pointing }
+        : { azimuth: a.catalogDirection.azimuth + 1.5, altitude: a.catalogDirection.altitude + 1 };
+      covered = a.phase === 'controls' && !!a.frames.comparison;
+    }
+    restore();
+    const runtime = {
+      scene: { uuid: 'native-observatory' },
+      Walk: { state: { walker: { x: 0, y: 1.7, z: 8, onGround: true } } },
+      paused: false,
+      getEnv: () => 'EARTH',
+      getCurrentTravelMode: () => 'walk',
+      SurfaceQuery: { walkAt: () => ({ position: { y: 0 } }) },
+      screenLayout: { setPanelLayer() {} },
+      setPauseReason: (_, v) => (runtime.paused = v),
+      stopGameplayPlugin() {},
+    };
+    const presentation = {
+      readOptics: () => ({
+        instrumentId: state.active.site.id,
+        axis: astronomyAxis(pointing.azimuth, pointing.altitude),
+        ...pointing,
+        clear: !covered && !blocked,
+        covered,
+        blocked,
+      }),
+      prepare(role) {
+        const p = astronomyExposurePlan(state.active, role);
+        pointing = { ...p.pointing };
+        covered = p.shutter === 'closed';
+        return this.readOptics();
+      },
+      turn(az, alt) {
+        pointing.azimuth += az;
+        pointing.altitude += alt;
+        return this.readOptics();
+      },
+      showFrame: (f) => (shown = f),
+    };
+    const tools = createAstronomyTools(runtime, { metersPerUnit: 1, points: local }, presentation, {
+      getState: () => state,
+    });
+    async function save(command) {
+      const id = astronomyTarget(state.active),
+        w = runtime.Walk.state.walker,
+        evidence = {
+          supported: true,
+          verticalDistance: 0,
+          environment: 'EARTH',
+          travelMode: 'walk',
+          liveGps: false,
+          siteId: state.active.site.id,
+          position: state.active.site.points[id],
+          at: Date.now(),
+          localPosition: { x: w.x, y: w.y, z: w.z },
+        };
+      state = (
+        await store.updateResearchCareer(
+          'astronomy',
+          { ...command, revision: state.revision, evidence },
+          { now: evidence.at }
+        )
+      ).state;
+      restore();
+    }
+    const near = (id, distance = false) => {
+      const w = runtime.Walk.state.walker,
+        p = local[id],
+        d = Math.hypot(w.x - p.x, w.z - p.z);
+      return distance ? d : d <= 3;
+    };
+    ui = createAstronomyUI({
+      runtime,
+      store,
+      tools,
+      getState: () => state,
+      near,
+      save,
+      onJournal() {},
+      onNext() {},
+      requestWorldFocus: () =>
+        document.getElementById('worldFocusTarget').focus({ preventScroll: true }),
+    });
+    function arrive() {
+      const p = local[astronomyTarget(state.active)];
+      Object.assign(runtime.Walk.state.walker, { x: p.x, z: p.z + 1.6 });
+      ui.update();
+    }
+    function tick(now) {
+      const dt = (now - last) / 1000;
+      last = now;
+      tools.tick(dt);
+      ui.update();
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+    arrive();
+    ui.open();
+    let failNext = false;
+    const originalTransaction = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (names, mode, ...rest) {
+      if (failNext && mode === 'readwrite' && Array.from(names).includes('events')) {
+        failNext = false;
+        throw new DOMException(
+          'Controlled IndexedDB write failure; exposure retained.',
+          'QuotaExceededError'
+        );
+      }
+      return originalTransaction.call(this, names, mode, ...rest);
+    };
+    window.astronomyUi = {
+      store,
+      tools,
+      runtime,
+      presentation,
+      get state() {
+        return state;
+      },
+      set failNext(v) {
+        failNext = v;
+      },
+      set blocked(v) {
+        blocked = v;
+      },
+      arrive,
+      open: () => ui.open(),
+      async review(data) {
+        await store.importData(data);
+        state = (await store.getProfile()).researchCareers.astronomy;
+        restore();
+        arrive();
+        ui.open();
+      },
+      snapshot: () => ({
+        phase: state.active.phase,
+        revision: state.revision,
+        paused: runtime.paused,
+        window: tools.snapshot().window,
+        pointing,
+        errorDegrees: astronomySeparation(
+          presentation.readOptics().axis,
+          state.active.catalogDirection
+        ),
+        shown: !!shown,
+      }),
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Controlled geometry and presence; native UI/tools/clock/IndexedDB',
+        ...astronomyUi.snapshot(),
+      });
+    window.advanceTime = async (ms) => {
+      await new Promise((r) => setTimeout(r, ms));
+      ui.update();
+    };
+    window.ready = true;
+  </script>
+</html>

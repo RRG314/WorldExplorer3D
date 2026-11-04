@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Survey annotation geometry boundary</title
+  ><link rel="icon" href="/favicon.svg" /><style>
+    body {
+      margin: 0;
+    }
+    canvas {
+      display: block;
+    }
+    aside {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      padding: 12px;
+      max-width: 520px;
+      background: #102f2a;
+      color: #fff5db;
+      font: 15px system-ui;
+      border: 1px solid #81ada0;
+      border-radius: 10px;
+    }
+    button {
+      padding: 10px;
+      background: #efd181;
+      color: #12332a;
+      border: 0;
+      border-radius: 6px;
+      font: inherit;
+    }
+  </style>
+  <aside>
+    Controlled actual WebGL survey annotations and sight rays; no field journey or save claim.
+    <p id="reading"></p>
+    <button id="blocker">Toggle solid sight blocker</button>
+  </aside>
+  <script src="/app/vendor/three/build/three.min.js"></script>
+  <script type="module">
+    import { createCartographyPresentation } from '/app/js/campaign/cartography-presentation.js';
+    import { applyDisplayColorPolicy } from '/app/js/engine/display-color-policy.js';
+    const T = THREE,
+      u = 1.11,
+      scene = new T.Scene(),
+      camera = new T.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 150),
+      renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    applyDisplayColorPolicy(renderer, T);
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.prepend(renderer.domElement);
+    scene.background = new T.Color('#b7cec4');
+    scene.add(new T.HemisphereLight(0xffffff, 0x537464, 0.9));
+    const sun = new T.DirectionalLight(0xfff2db, 1.1);
+    sun.position.set(-10, 20, 5);
+    scene.add(sun);
+    const height = (x, z) => 0.02 * x + 0.01 * z,
+      ground = new T.Mesh(
+        new T.PlaneGeometry(80, 80),
+        new T.MeshStandardMaterial({ color: 0x687e6b, roughness: 1 })
+      );
+    ground.material.color.convertSRGBToLinear();
+    ground.geometry.rotateX(-Math.PI / 2);
+    const vertices = ground.geometry.attributes.position;
+    for (let i = 0; i < vertices.count; i++)
+      vertices.setY(i, height(vertices.getX(i), vertices.getZ(i)));
+    ground.geometry.computeVertexNormals();
+    scene.add(ground);
+    const points = Object.fromEntries(
+        Object.entries({
+          origin: { x: -14 / u, z: 0 },
+          a: { x: 0, z: 0 },
+          b: { x: 14 / u, z: 0 },
+          entry: { x: 0, z: 10 / u },
+        }).map(([id, p]) => [id, { ...p, y: height(p.x, p.z) }])
+      ),
+      qualified = { points, metersPerUnit: u },
+      runtime = {
+        scene,
+        camera,
+        renderer,
+        METERS_PER_WORLD_UNIT: u,
+        dynamicBuildingColliders: [],
+        Walk: { state: {} },
+      },
+      active = {
+        site: { id: 'geometry-fixture' },
+        runId: 'geometry-fixture-run',
+        phase: 'controls',
+      };
+    const presentation = await createCartographyPresentation(runtime, qualified, {}, {}),
+      wall = new T.Mesh(
+        new T.BoxGeometry(0.2 / u, 2 / u, 2 / u),
+        new T.MeshStandardMaterial({ color: 0x883c32 })
+      );
+    wall.position.set(-7 / u, 1 / u + height(-7 / u, 0), 0);
+    wall.visible = false;
+    scene.add(wall);
+    camera.position.set(-19, 13, 25);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const render = () => {
+      renderer.render(scene, camera);
+      const r = presentation.controls(active);
+      document.getElementById('reading').textContent = r.sights
+        .map(
+          (s) =>
+            `${s.id.toUpperCase()}: ${s.rangeMeters.toFixed(2)} m, ${s.clear ? 'clear' : 'blocked'}`
+        )
+        .join(' · ');
+      return r;
+    };
+    document.getElementById('blocker').onclick = () => {
+      wall.visible = !wall.visible;
+      render();
+    };
+    window.surveyVisual = {
+      presentation,
+      runtime,
+      points,
+      wall,
+      read: () => presentation.controls(active),
+      render,
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Controlled geometry only',
+        ...presentation.controls(active),
+        blocker: wall.visible,
+        budget: presentation.budget,
+      });
+    window.advanceTime = async () => render();
+    render();
+    window.ready = true;
+  </script>
+</html>

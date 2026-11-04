@@ -79,7 +79,32 @@ function transitionPodJourney(journey, event, details = {}) {
   return frozenRecord({ accepted: true, reason: null, journey: next });
 }
 
+// Explicit direct Solis Reach boarding is an existing travel option. Complete
+// only its Earth shuttle after the ship interior has actually accepted entry;
+// the caller persists this folded result once. Lunar field returns cannot use it.
+function completeDirectEarthShuttleReturn(
+  journey,
+  { shipEntered = false, frameId = '', atMs = Date.now() } = {},
+) {
+  if (
+    !shipEntered ||
+    frameId !== 'sol' ||
+    journey?.bodyId !== 'earth' ||
+    journey.routeKind !== POD_ROUTE_KIND.EARTH_SHUTTLE ||
+    journey.phase !== POD_PHASE.SURFACE
+  )
+    return frozenRecord({ accepted: false, reason: 'direct-earth-return-unavailable', journey });
+  let current = journey;
+  for (const event of ['launch', 'rendezvous', 'recover']) {
+    const next = transitionPodJourney(current, event, { atMs });
+    if (!next.accepted) return next;
+    current = next.journey;
+  }
+  return frozenRecord({ accepted: true, reason: null, journey: current });
+}
+
 export {
+  completeDirectEarthShuttleReturn,
   createPodJourney,
   POD_JOURNEY_SCHEMA_VERSION,
   POD_PHASE,

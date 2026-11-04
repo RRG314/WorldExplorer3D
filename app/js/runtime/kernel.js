@@ -177,7 +177,9 @@ function createRuntimeKernel(options = {}) {
 
     const simulationPaused=isSimulationPaused(sharedContext);
     if(simulationPaused)accumulator=0;
-    const dt = simulationPaused?0:acceptedSimulationDelta(rawDelta,Math.min(maxDelta,fixedDelta*maxFixedSteps),accumulator);
+    const dt = simulationPaused
+      ? 0
+      : acceptedSimulationDelta(rawDelta, Math.min(maxDelta, fixedDelta * maxFixedSteps));
     frameNumber++;
     const frame = {
       ...sharedContext,
@@ -346,6 +348,8 @@ function createRuntimeKernel(options = {}) {
       suspendedFrames,
       fixedDelta,
       maxDelta,
+      maxFixedSteps,
+      simulationCapacity: Math.min(maxDelta, fixedDelta * maxFixedSteps),
       lastFrameDurationMs: Number(lastFrameDurationMs.toFixed(3)),
       owners: records.reduce((owners, record) => {
         const owner = owners[record.owner] || { systems: [], failures: 0, lastDurationMs: 0 };
@@ -355,10 +359,9 @@ function createRuntimeKernel(options = {}) {
         owners[record.owner] = owner;
         return owners;
       }, {}),
-      phases: Object.fromEntries(RUNTIME_PHASES.map((phase) => [
-        phase,
-        records.filter((record) => record.phase === phase)
-      ]))
+      phases: Object.fromEntries(
+        RUNTIME_PHASES.map((phase) => [phase, records.filter((record) => record.phase === phase)])
+      ),
     };
   }
 

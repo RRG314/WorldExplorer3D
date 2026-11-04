@@ -130,7 +130,7 @@
   html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileDrivePedals{flex-direction:column}
 }
 @media(max-height:560px) and (orientation:landscape) and (pointer:coarse){
-  #mobileTouchControls{--mobile-edge:12px;--mobile-bottom:max(78px,calc(var(--wx-navigation-height,78px) + env(safe-area-inset-bottom)))}
+  #mobileTouchControls{--mobile-action-row:max(52px,calc(var(--wx-type-meta) * 1.2 + 20px));--mobile-edge:12px;--mobile-bottom:max(78px,calc(var(--wx-navigation-height,78px) + env(safe-area-inset-bottom)))}
   #mobileTouchControls .mobilePad{--mobile-pad-size:112px}
   #mobileTouchControls #mobileLookPad{--mobile-pad-size:100px;right:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);bottom:var(--mobile-bottom)}
   #mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);right:auto}

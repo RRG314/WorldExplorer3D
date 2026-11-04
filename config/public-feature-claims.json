@@ -1,154 +1,328 @@
 {
   "schemaVersion": 1,
   "targetVersion": "5.6.1",
-  "publicFiles": ["index.html", "about/index.html", "README.md", "github-pages/index.html", "app/index.html"],
-  "allowedStatuses": ["review-required", "source-verified", "candidate-verified", "excluded"],
+  "publicFiles": [
+    "index.html",
+    "about/index.html",
+    "README.md",
+    "github-pages/index.html",
+    "app/index.html"
+  ],
+  "allowedStatuses": [
+    "review-required",
+    "source-verified",
+    "candidate-verified",
+    "excluded"
+  ],
   "forbiddenPublicPatterns": [
-    { "pattern": "test:multiplayer-integration", "reason": "stale verification command" },
-    { "pattern": ">\\s*Missions\\s*<", "reason": "implies a separate mission system" },
-    { "pattern": "Missions & Games", "reason": "implies a separate mission system" },
-    { "pattern": "procedural encounter", "reason": "internal evidence wording is not player-facing game language" },
-    { "pattern": "\\b(real-money economy|cash out|investment return)\\b", "reason": "Explorer Credits and virtual property have no real-money value" },
-    { "pattern": "\\b(real-time wildlife presence|nearby animal detected)\\b", "reason": "regional field leads are not live-presence reports" }
+    {
+      "pattern": "test:multiplayer-integration",
+      "reason": "stale verification command"
+    },
+    {
+      "pattern": ">\\s*Missions\\s*<",
+      "reason": "implies a separate mission system"
+    },
+    {
+      "pattern": "Missions & Games",
+      "reason": "implies a separate mission system"
+    },
+    {
+      "pattern": "procedural encounter",
+      "reason": "internal evidence wording is not player-facing game language"
+    },
+    {
+      "pattern": "\\b(real-money economy|cash out|investment return)\\b",
+      "reason": "Explorer Credits and virtual property have no real-money value"
+    },
+    {
+      "pattern": "\\b(real-time wildlife presence|nearby animal detected)\\b",
+      "reason": "regional field leads are not live-presence reports"
+    }
   ],
   "claims": [
     {
       "id": "fixed-location-earth",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Choose a location, step into a bounded playable world" },
-      "evidenceCommands": ["verify:world", "verify:assembled-locations", "verify:artifact-runtime"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Choose a location, step into a bounded playable world"
+      },
+      "evidenceCommands": [
+        "verify:world",
+        "verify:assembled-locations",
+        "verify:artifact-runtime"
+      ]
     },
     {
       "id": "earth-traversal",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,\\s+astronaut on solid planetary surfaces, or spacecraft" },
-      "evidenceCommands": ["verify:actors-vehicles", "verify:environments"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,\\s+astronaut on solid planetary surfaces, or spacecraft"
+      },
+      "evidenceCommands": [
+        "verify:actors-vehicles",
+        "verify:environments"
+      ]
     },
     {
       "id": "live-earth",
       "status": "candidate-verified",
-      "source": { "file": "github-pages/index.html", "pattern": "Live Earth separates observed aircraft" },
-      "evidenceCommands": ["verify:world", "verify:provider-release"]
+      "source": {
+        "file": "github-pages/index.html",
+        "pattern": "Live Earth separates observed aircraft"
+      },
+      "evidenceCommands": [
+        "verify:world",
+        "verify:provider-release"
+      ]
     },
     {
       "id": "buildings-and-interiors",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Enter supported buildings to explore their interiors\\." },
-      "evidenceCommands": ["verify:interiors"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Enter supported buildings to explore their interiors\\."
+      },
+      "evidenceCommands": [
+        "verify:interiors"
+      ]
     },
     {
       "id": "urban-sandbox",
       "status": "candidate-verified",
-      "source": { "file": "app/index.html", "pattern": "Character Backpack" },
-      "evidenceCommands": ["verify:urban-equipment", "verify:actors-vehicles"]
+      "source": {
+        "file": "app/index.html",
+        "pattern": "Character Backpack"
+      },
+      "evidenceCommands": [
+        "verify:urban-equipment",
+        "verify:actors-vehicles"
+      ]
     },
     {
       "id": "vehicle-handling-and-response",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "distinct\\s+vehicle handling" },
-      "evidenceCommands": ["verify:current-contracts", "verify:actors-vehicles", "verify:player-reported-blockers"]
+      "source": {
+        "file": "README.md",
+        "pattern": "distinct\\s+vehicle handling"
+      },
+      "evidenceCommands": [
+        "verify:current-contracts",
+        "verify:actors-vehicles",
+        "verify:player-reported-blockers"
+      ]
     },
     {
       "id": "character-quick-slots-and-urban-equipment",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "configurable Backpack quick slots" },
-      "evidenceCommands": ["verify:current-contracts", "verify:urban-equipment"]
+      "source": {
+        "file": "README.md",
+        "pattern": "configurable Backpack quick slots"
+      },
+      "evidenceCommands": [
+        "verify:current-contracts",
+        "verify:urban-equipment"
+      ]
     },
     {
       "id": "companion-progression-and-travel",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Care for companions, build trust and levels" },
-      "evidenceCommands": ["verify:current-contracts", "verify:explorer-coherence-browser"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Care for companions, build trust and levels"
+      },
+      "evidenceCommands": [
+        "verify:current-contracts",
+        "verify:explorer-coherence-browser"
+      ]
     },
     {
       "id": "multiplayer-rooms",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Multiplayer uses bounded rooms" },
-      "evidenceCommands": ["verify:multiplayer"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Multiplayer uses bounded rooms"
+      },
+      "evidenceCommands": [
+        "verify:multiplayer"
+      ]
     },
     {
       "id": "quick-build",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Use Quick Build to place persistent Blocks in local play or a multiplayer\\s+room\\." },
-      "evidenceCommands": ["verify:gameplay-menu", "verify:hotbar-actions", "verify:block-local-store", "verify:block-shared-sync"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Use Quick Build to place persistent Blocks in local play or a multiplayer\\s+room\\."
+      },
+      "evidenceCommands": [
+        "verify:gameplay-menu",
+        "verify:hotbar-actions",
+        "verify:block-local-store",
+        "verify:block-shared-sync"
+      ]
     },
     {
       "id": "fishing",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "drive, fly, sail, fish, survey habitats, build, or join a multiplayer room\\." },
-      "evidenceCommands": ["verify:shore-fishing", "verify:unified-fishing", "verify:fishing-loss-recovery"]
+      "source": {
+        "file": "README.md",
+        "pattern": "drive, fly, sail, fish, survey habitats, build, or join a multiplayer room\\."
+      },
+      "evidenceCommands": [
+        "verify:shore-fishing",
+        "verify:unified-fishing",
+        "verify:fishing-loss-recovery"
+      ]
     },
     {
       "id": "deflock-hunt",
       "status": "candidate-verified",
-      "source": { "file": "app/index.html", "pattern": "DeFlock Hunt" },
-      "evidenceCommands": ["verify:deflock-live-ui"]
+      "source": {
+        "file": "app/index.html",
+        "pattern": "DeFlock Hunt"
+      },
+      "evidenceCommands": [
+        "verify:deflock-live-ui"
+      ]
     },
     {
       "id": "live-gps",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "optional Live\\s+GPS play while walking" },
-      "evidenceCommands": ["verify:live-gps", "verify:walking-encounters", "verify:shore-fishing"]
+      "source": {
+        "file": "README.md",
+        "pattern": "optional Live\\s+GPS play while walking"
+      },
+      "evidenceCommands": [
+        "verify:live-gps",
+        "verify:walking-encounters",
+        "verify:shore-fishing"
+      ]
     },
     {
       "id": "connected-explorer-journal",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Your Backpack, Journal, Field Guide, companions and saved places travel with you\\." },
-      "evidenceCommands": ["verify:explorer-coherence", "verify:explorer-coherence-browser"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Your Backpack, Journal, Field Guide, companions and saved places travel with you\\."
+      },
+      "evidenceCommands": [
+        "verify:explorer-coherence",
+        "verify:explorer-coherence-browser"
+      ]
     },
     {
       "id": "regional-field-guide",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "eleven regional Field Guide packs with 180 attainable entries" },
-      "evidenceCommands": ["verify:regional-ecology", "verify:regional-world-richness", "verify:regional-guide-new-york"]
+      "source": {
+        "file": "README.md",
+        "pattern": "eleven regional Field Guide packs with 180 attainable entries"
+      },
+      "evidenceCommands": [
+        "verify:regional-ecology",
+        "verify:regional-world-richness",
+        "verify:regional-guide-new-york"
+      ]
     },
     {
       "id": "journal-backup",
       "status": "candidate-verified",
-      "source": { "file": "app/index.html", "pattern": "Download backup" },
-      "evidenceCommands": ["verify:explorer-coherence", "verify:explorer-coherence-browser"]
+      "source": {
+        "file": "app/index.html",
+        "pattern": "Download Journal backup"
+      },
+      "evidenceCommands": [
+        "verify:explorer-coherence",
+        "verify:explorer-coherence-browser"
+      ]
     },
     {
       "id": "field-discovery",
       "status": "candidate-verified",
-      "source": { "file": "index.html", "pattern": "field journal and activity-specific tools" },
-      "evidenceCommands": ["verify:walking-encounters", "verify:mission-lifecycle", "verify:field-retention-ui", "verify:regional-ecology"]
+      "source": {
+        "file": "index.html",
+        "pattern": "field journal and activity-specific tools"
+      },
+      "evidenceCommands": [
+        "verify:walking-encounters",
+        "verify:mission-lifecycle",
+        "verify:field-retention-ui",
+        "verify:regional-ecology"
+      ]
     },
     {
       "id": "contextual-ar",
       "status": "candidate-verified",
-      "source": { "file": "app/index.html", "pattern": "CONTEXTUAL WORLD VIEW" },
-      "evidenceCommands": ["verify:ar"]
+      "source": {
+        "file": "app/index.html",
+        "pattern": "CONTEXTUAL WORLD VIEW"
+      },
+      "evidenceCommands": [
+        "verify:ar"
+      ]
     },
     {
       "id": "mobile-touch-controls",
       "status": "candidate-verified",
-      "source": { "file": "github-pages/index.html", "pattern": "Touch controls, quick slots, the Backpack" },
-      "evidenceCommands": ["verify:mobile-controls"]
+      "source": {
+        "file": "github-pages/index.html",
+        "pattern": "Touch controls, quick slots, the Backpack"
+      },
+      "evidenceCommands": [
+        "verify:mobile-controls"
+      ]
     },
     {
       "id": "minimum-accessibility-boundary",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Keyboard and touch controls support browser zoom, visible focus, higher\\s+contrast, larger text, and reduced motion" },
-      "evidenceCommands": ["verify:accessibility-release", "verify:mobile-controls"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Keyboard and touch controls support browser zoom, visible focus, higher\\s+contrast, larger text, and reduced motion"
+      },
+      "evidenceCommands": [
+        "verify:accessibility-release",
+        "verify:mobile-controls"
+      ]
     },
     {
       "id": "planetary-and-space-travel",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Leave Earth for the Moon, planets, the solar system, and selected deep-space\\s+destinations" },
-      "evidenceCommands": ["verify:current-contracts", "verify:environments"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Leave Earth for the Moon, planets, the solar system, and selected deep-space\\s+destinations"
+      },
+      "evidenceCommands": [
+        "verify:current-contracts",
+        "verify:environments"
+      ]
     },
     {
       "id": "interstellar-expeditions-alpha",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Try Interstellar Expeditions in Alpha" },
-      "evidenceCommands": ["verify:interstellar-expedition", "verify:interstellar-expedition-browser", "verify:expedition-pod", "verify:current-space-journey"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Try Interstellar Expeditions in Alpha"
+      },
+      "evidenceCommands": [
+        "verify:interstellar-expedition",
+        "verify:interstellar-expedition-browser",
+        "verify:expedition-pod",
+        "verify:current-space-journey"
+      ]
     },
     {
       "id": "connected-property-and-credits",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Claim a first virtual property" },
-      "evidenceCommands": ["verify:world-economy", "verify:connected-property-backend", "verify:connected-property-multiplayer"]
+      "source": {
+        "file": "README.md",
+        "pattern": "Claim a first virtual property"
+      },
+      "evidenceCommands": [
+        "verify:world-economy",
+        "verify:connected-property-backend",
+        "verify:connected-property-multiplayer"
+      ]
     }
   ]
 }

@@ -149,16 +149,24 @@ for(const composer of [false,true])test(`loading suppresses city work and drawin
 });
 
 
-test('flight telemetry records full stalls while simulation catch-up stays bounded',()=>{
- const observed=[],steps=[];
- const app={recordPerfFrame:dt=>observed.push(dt)};
- const kernel=createRuntimeKernel();
- kernel.registerSystem(createCoreFrameSystems(app).find(s=>s.id==='core.frame-metrics'));
- kernel.registerSystem({id:'test.simulation',phase:'simulation',update:frame=>steps.push(frame.dt)});
- for(const timestamp of [0,16,2016,2032])kernel.runFrame(timestamp);
- assert.deepEqual(observed,[0,.016,2,.016]);
- assert.equal(steps[0],0);assert.equal(steps[1],.016);assert.ok(Math.abs(steps[2]-(5/60-.016))<1e-9);assert.equal(steps[3],.016);
- kernel.dispose();
+test('flight telemetry records full stalls while simulation catch-up stays bounded', () => {
+  const observed = [],
+    steps = [];
+  const app = { recordPerfFrame: (dt) => observed.push(dt) };
+  const kernel = createRuntimeKernel();
+  kernel.registerSystem(createCoreFrameSystems(app).find((s) => s.id === 'core.frame-metrics'));
+  kernel.registerSystem({
+    id: 'test.simulation',
+    phase: 'simulation',
+    update: (frame) => steps.push(frame.dt),
+  });
+  for (const timestamp of [0, 16, 2016, 2032]) kernel.runFrame(timestamp);
+  assert.deepEqual(observed, [0, 0.016, 2, 0.016]);
+  assert.equal(steps[0], 0);
+  assert.equal(steps[1], 0.016);
+  assert.ok(Math.abs(steps[2] - 5 / 60) < 1e-9);
+  assert.equal(steps[3], 0.016);
+  kernel.dispose();
 });
 
 for(const composer of [false,true])test(`first-frame preparation uses normal renderer before ready (${composer})`,()=>{

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {createWalkingEncounterDirector} from '../app/js/discovery/encounter-director.js?v=1';
+import {createDetectorSession} from '../app/js/discovery/detector-session.js?v=3';
 import { FIELD_EVIDENCE_CONTRACTS, buildFieldEvidencePayload } from '../app/js/discovery/evidence-contracts.js';
 import { compileFieldActivityPlan, createFieldActivitySession } from '../app/js/discovery/field-activities.js';
 
@@ -140,4 +142,56 @@ test('GPS observation restarts after eligibility or fix continuity breaks', () =
     assert.equal(step(start + 2000).phase, 'observing', interruption);
     assert.equal(step(start + 4000).phase, 'revealed', interruption);
   }
+});
+
+test('manual field range uses physical metres while an authoritative GPS range is already metric', () => {
+  const { environment, eligibility } = publications(),
+    plan = compileFieldActivityPlan(environment, eligibility),
+    slot = plan.slots.find((s) => s.activityId === 'nature-observe'),
+    position = { x: slot.position.x + 10, z: slot.position.z };
+  const manual = createFieldActivitySession({ plan, metersPerWorldUnit: 1.11 });
+  manual.beginSlot(slot.id, position);
+  assert.equal(manual.snapshot(position).distanceMeters, 11.1);
+  const gps = createFieldActivitySession({ plan, metersPerWorldUnit: 1.11 });
+  gps.beginSlot(slot.id, position, {
+    evaluateFieldTarget: () => ({ eligible: true, distanceMeters: 7.3 }),
+  });
+  assert.equal(gps.snapshot(position).distanceMeters, 7.3);
+});
+
+test('encounter invitations and walked cadence use the same physical scale', () => {
+  const { environment, eligibility } = publications(),
+    plan = compileFieldActivityPlan(environment, eligibility),
+    slot = plan.slots.find((s) => s.activityId === 'nature-observe'),
+    director = createWalkingEncounterDirector({
+      plan: { ...plan, slots: [slot] },
+      metersPerWorldUnit: 1.11,
+      initialDelaySeconds: 0.1,
+      fallbackDelaySeconds: 0.1,
+    });
+  const position = { x: slot.position.x + 10, z: slot.position.z };
+  director.update({ dt: 1, position, walking: true, earth: true });
+  assert.equal(director.snapshot(position).distanceMeters, 11.1);
+  director.update({
+    dt: 1,
+    position: { ...position, x: position.x + 2 },
+    walking: true,
+    earth: true,
+  });
+  assert.equal(director.snapshot().walkedMeters, 2.2);
+});
+test('detector ranges convert once at their existing sensor boundary', () => {
+  const slot = {
+      id: 'metric-test',
+      claimId: 'metric-claim',
+      slotIndex: 0,
+      catalogId: 'test-find',
+      position: { x: 10, z: 0 },
+    },
+    session = createDetectorSession({
+      plan: { type: 'EncounterPlan', slots: [slot] },
+      metersPerWorldUnit: 1.11,
+    });
+  session.sweep({ x: 0, z: 0 });
+  assert.equal(session.snapshot({ x: 0, z: 0 }).distanceMeters, 11.1);
 });

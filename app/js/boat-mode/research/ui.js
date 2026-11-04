@@ -1,9 +1,11 @@
+import {createMarineBiologyControls} from '../../campaign/marine-biology-ui.js';
+import {createOceanographyControls} from '../../campaign/oceanography-ui.js';
 import {createResearchShipMap} from './map-ui.js';
 import {createInvestigationControls} from '../../campaign/coastal-investigation-ui.js';
 import {RCRV_LAYOUT} from './layout.js';
 import {mountMarinePanel,setMarineText} from '../../ocean/interface.js';
 import {createCoastalDepartureControls} from '../../campaign/coastal-departure-ui.js';
-export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,retry,researchAct,sharedAct,coastalApi,investigationApi}) {
+export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,retry,researchAct,sharedAct,coastalApi,investigationApi,oceanographyApi,marineBiologyApi}) {
  const panel=document.createElement('section');panel.id='researchDeckControls';panel.setAttribute('aria-label','Research ship');
  mountMarinePanel(panel,'deck');
  const map=createResearchShipMap({select,onOpen:mapChanged});
@@ -21,11 +23,13 @@ export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,ret
  const mapButton=make('researchShipMapButton',()=>map.open());mapButton.textContent='Map';mapButton.setAttribute('aria-label','Ship map');
  const header=document.createElement('div');header.className='marine-panel-header';header.append(title,mapButton);
  const provisions=document.createElement('div');provisions.hidden=true;provisions.setAttribute('aria-label','Carried galley provisions');
- const legacy=document.createElement('details'),legacyTitle=document.createElement('summary');legacyTitle.textContent='Optional reef mapping · Scanner II';legacy.append(legacyTitle);let investigating=null;
+ const legacy=document.createElement('details'),legacyTitle=document.createElement('summary');legacyTitle.textContent='Optional reef mapping · Scanner II';legacy.append(legacyTitle);let investigating=null,careerMode=false;
  const more=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Vessel options';more.append(summary,helmButton,reportDetails,sharedButton,legacy);
+ const biology=createMarineBiologyControls({api:marineBiologyApi,prefix:'marineBiologistDeck'});
+ const career=createOceanographyControls({api:oceanographyApi,prefix:'oceanographerDeck'}),other=document.createElement('details'),otherTitle=document.createElement('summary');otherTitle.textContent='Other research';other.append(otherTitle);more.append(other);
  const investigation=createInvestigationControls({api:investigationApi,prefix:'coastalDeck'});
  const coastal=createCoastalDepartureControls({api:coastalApi,prefix:'coastalDeck'});
- panel.append(header,message,choice,actionButton,enterButton,retryButton,moorButton,coastal.node,investigation.node,researchInfo,researchButton,result,provisions,more);
+ panel.append(header,message,choice,actionButton,enterButton,retryButton,moorButton,career.node,biology.node,coastal.node,investigation.node,researchInfo,researchButton,result,provisions,more);
  for(const control of panel.querySelectorAll('button,select'))control.removeAttribute('style');
  return {closeMap:()=>map.close(),hide:()=>{panel.hidden=true;map.close()},dispose:()=>{map.dispose();panel.remove()},
  provisions(items,consume){provisions.replaceChildren();provisions.hidden=false;
@@ -36,10 +40,10 @@ export function createResearchDeckHud({enter,helm,moor,act,select,mapChanged,ret
   if(choice.value!==s.target?.id)choice.value=s.target?.id||'lab';
   for(const option of choice.options){const station=s.stations?.find(station=>station.id===option.value);if(station)setMarineText(option,station.label);}
   const research=s.research;researchInfo.hidden=!research?.visible;researchButton.hidden=!research?.visible||!s.active||s.target?.id!=='lab';researchInfo.textContent=research?.visible?`${research.instruction} ${research.message}`:'';researchButton.textContent=research?.labLabel||'Reef survey';researchButton.disabled=!research?.atLab||research?.busy;
-  coastal.render(research?.coastal);investigation.render(research?.investigation);
-  const nextInvestigating=!!research?.investigation?.started;
-  if(investigating!==nextInvestigating){investigating=nextInvestigating;if(investigating)legacy.append(researchInfo,researchButton);else{panel.insertBefore(researchInfo,result);panel.insertBefore(researchButton,result);}}
-  legacy.hidden=!investigating;if(investigating)coastal.node.hidden=true;
+  coastal.render(research?.coastal);investigation.render(research?.investigation);career.render(research?.oceanography);biology.render(research?.marineBiology);
+  const nextInvestigating=!!research?.investigation?.started,nextCareer=!!research?.oceanography?.visible||!!research?.marineBiology?.visible;
+  if(investigating!==nextInvestigating||careerMode!==nextCareer){investigating=nextInvestigating;careerMode=nextCareer;if(careerMode){other.append(coastal.node,investigation.node,legacy);legacy.append(researchInfo,researchButton);}else{panel.insertBefore(coastal.node,result);panel.insertBefore(investigation.node,result);more.append(legacy);if(investigating)legacy.append(researchInfo,researchButton);else{panel.insertBefore(researchInfo,result);panel.insertBefore(researchButton,result);}}}
+  other.hidden=!careerMode;legacy.hidden=!investigating&&!careerMode;if(investigating)coastal.node.hidden=true;
   const guiding=research?.coastal?.visible&&!research.coastal.completed&&(!!research.coastal.plan||coastal.node.open);
   if(guiding){researchInfo.hidden=true;if(research.coastal.phase!=='station')researchButton.hidden=true;}
   reportDetails.hidden=!research?.visible||!research?.completed;

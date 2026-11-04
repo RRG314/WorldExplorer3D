@@ -81,7 +81,10 @@ test('surface evidence is deduplicated and persists without skipping fieldwork',
 test('version-one mission records migrate in place and preserve a selected return consequence', () => {
   const mission = getDestinationMission('trappist-1-e');
   const memory = new Map();
-  const storage = { getItem: (key) => memory.get(key) || null, setItem: (key, value) => memory.set(key, value) };
+  const storage = {
+    getItem: (key) => memory.get(key) || null,
+    setItem: (key, value) => memory.set(key, value),
+  };
   const legacy = {
     type: 'DestinationMissionLedger',
     version: 1,
@@ -94,26 +97,26 @@ test('version-one mission records migrate in place and preserve a selected retur
         phase: 'analysis',
         startedAtMs: 20,
         updatedAtMs: 50,
-        evidence: ['terminator-panorama', 'surface-chemistry', 'climate-boundary']
-      }
-    }
+        evidence: ['terminator-panorama', 'surface-chemistry', 'climate-boundary'],
+      },
+    },
   };
   memory.set(DESTINATION_MISSION_STORAGE_KEY, JSON.stringify(legacy));
   const store = createDestinationMissionStore(storage);
-  assert.equal(store.get(mission).version, 2);
+  assert.equal(store.get(mission).version, 3);
   assert.equal(store.get(mission).outcomeId, null);
   const completed = store.advance(mission, 'complete_analysis', {
     atMs: 60,
     outcomeId: 'priority-follow-up',
     crewLeadId: 'crew-science',
-    returnConsequence: 'TRAPPIST-1 e remains marked for a higher-value return survey.'
+    returnConsequence: 'TRAPPIST-1 e remains marked for a higher-value return survey.',
   });
   assert.equal(completed.accepted, true);
   assert.equal(completed.state.outcomeId, 'priority-follow-up');
   assert.equal(completed.state.crewLeadId, 'crew-science');
   assert.match(completed.state.returnConsequence, /return survey/i);
   const restored = createDestinationMissionStore(storage).get(mission);
-  assert.equal(restored.version, 2);
+  assert.equal(restored.version, 3);
   assert.equal(restored.outcomeId, 'priority-follow-up');
   assert.equal(restored.crewLeadId, 'crew-science');
 });

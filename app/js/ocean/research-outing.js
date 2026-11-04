@@ -1,3 +1,6 @@
+import {createMarineBiologyRuntime} from '../campaign/marine-biology-runtime.js';
+import {createMarineCareerSelection} from '../campaign/marine-career-selection.js';
+import {createOceanographyRuntime} from '../campaign/oceanography-runtime.js';
 import {createCoastalInvestigation} from '../campaign/coastal-investigation-runtime.js';
 import {createIndexedDbDiscoveryProfileStore} from '../discovery/profile-store.js?v=5';
 import {CORAL_SHELF_SITE} from './habitat-plan.js';
@@ -28,6 +31,9 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
  let events=[],ready=false,busy=false,error='',message='',selected=REEF_SURVEY.sites[0],sequence=0;
  const store=()=>providedStore||(ctx.discoveryProfileStore ||= createIndexedDbDiscoveryProfileStore());
  const state=()=>reefSurveyState(events);
+ const oceanography=createOceanographyRuntime(ctx,{store,now});
+ const marineBiology=createMarineBiologyRuntime(ctx,{store,now});
+ const careerSelection=createMarineCareerSelection({oceanography,'marine-biology':marineBiology});
  const coastal=createCoastalDeparture(ctx,{store,survey:state,now});
  const investigation=createCoastalInvestigation(ctx,{store,coastal:()=>coastal.snapshot(),atLab,now});
  const wildlife=createWildlifeObservation(ctx,{store,now});
@@ -71,7 +77,7 @@ export function ensureMarineResearch(ctx,{store:providedStore,now=()=>Date.now()
   else if(!ctx.oceanMode?.active)instruction=s.completed?'Scanner II installed · 35 m range. Walk to the submarine cradle for a follow-up dive.':`${s.scans.length}/3 scans saved. Walk to the submarine cradle and deploy to continue.`;
   else if(t){const actor=ctx.oceanMode.diver?.active?ctx.oceanMode.diver.navigationActor():ctx.oceanMode.submarine;const heading=((180-Math.atan2(t.x-actor.position.x,t.z-actor.position.z)*180/Math.PI)%360+360)%360;instruction=`${s.completed?'Scanner II':`${s.scans.length}/3 saved`} · ${t.label} · ${Number.isFinite(gate.distance)?Math.round(gate.distance):'—'} m · bearing ${Math.round(heading)}° · target SIM depth ${Math.round(-t.y*(ctx.METERS_PER_WORLD_UNIT||1))} m. ${gate.reason}`;}
   else instruction='Return to the Coral Shelf launch area; the next study site is outside this local scene.';
-  return {...s,coastal:coastal.snapshot(),investigation:investigation.snapshot(),report:s.completed?events.filter(e=>e.eventId!==eventId('brief')).map(({eventId,name,detail})=>({eventId,name,detail})):[],ready,busy,visible:visible(),atLab:atLab(),targetId:t?.id||null,target:t?{...t}:null,canScan:ready&&s.started&&gate.allowed,labLabel:!ready?'Retry Journal':!s.started?'Take reef survey briefing':s.stage==='report'?'Submit survey · install Scanner II':s.completed?'Review Scanner II':'Review survey progress',instruction,message:error||message,storage:store().type==='IndexedDbDiscoveryProfileStore'?'device':'session'};
+  return {...s,oceanography:oceanography.snapshot(),marineBiology:marineBiology.snapshot(),coastal:coastal.snapshot(),investigation:investigation.snapshot(),report:s.completed?events.filter(e=>e.eventId!==eventId('brief')).map(({eventId,name,detail})=>({eventId,name,detail})):[],ready,busy,visible:visible(),atLab:atLab(),targetId:t?.id||null,target:t?{...t}:null,canScan:ready&&s.started&&gate.allowed,labLabel:!ready?'Retry Journal':!s.started?'Take reef survey briefing':s.stage==='report'?'Submit survey · install Scanner II':s.completed?'Review Scanner II':'Review survey progress',instruction,message:error||message,storage:store().type==='IndexedDbDiscoveryProfileStore'?'device':'session'};
  }
- const api={coastal,investigation,wildlife,refresh,labAction,scan,snapshot,select:id=>{if(REEF_SURVEY.sites.includes(id)){selected=id;message='';}}};ctx.marineResearch=api;void refresh();void coastal.refresh();void investigation.refresh();return api;
+ const api={coastal,investigation,wildlife,oceanography,marineBiology,chooseCareer:careerSelection.choose,careerSnapshot:careerSelection.snapshot,pauseCareer:careerSelection.pause,tick:dt=>{oceanography.tick(dt);marineBiology.tick(dt)},refresh,labAction,scan,snapshot,select:id=>{if(REEF_SURVEY.sites.includes(id)){selected=id;message='';}}};ctx.marineResearch=api;void refresh();void coastal.refresh();void investigation.refresh();void oceanography.refresh();void marineBiology.refresh();return api;
 }

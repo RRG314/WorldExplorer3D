@@ -1,3 +1,4 @@
+import { isolateGitFixture } from './helpers/isolated-git-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
@@ -9,6 +10,7 @@ import {assertReviewedRollbackRuntime} from '../scripts/verification/rollback-ru
 
 test('rollback review checks exact runtime bytes and unchanged protocol roots in real commits', async t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-rollback-contract-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, {recursive: true, force: true}));
   const git = (...args) => execFileSync('git', args, {cwd: root, stdio: ['ignore', 'pipe', 'pipe']}).toString().trim();
   const put = (file, text) => {mkdirSync(path.dirname(path.join(root, file)), {recursive: true}); writeFileSync(path.join(root, file), text);};
@@ -38,6 +40,7 @@ test('rollback review checks exact runtime bytes and unchanged protocol roots in
 
 test('rollback review streams multi-megabyte assets and rejects a change beyond the old buffer limit', async t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-rollback-asset-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, {recursive: true, force: true}));
   const git = (...args) => execFileSync('git', args, {cwd: root, stdio: ['ignore', 'pipe', 'pipe']}).toString().trim();
   const commit = () => { git('add', '.'); git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture'); return git('rev-parse', 'HEAD'); };

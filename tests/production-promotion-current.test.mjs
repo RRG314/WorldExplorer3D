@@ -1,3 +1,4 @@
+import { isolateGitFixture } from './helpers/isolated-git-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validatePromotion, hash, PROMOTION_RECEIPT, promotedEvidenceIdentity } from '../scripts/verification/production-promotion.mjs';
@@ -12,6 +13,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 
 function directory(t) {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-production-promotion-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const write = (file, data) => {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -57,12 +59,27 @@ test('promotion preserves the pinned current graph and validates its generated c
     assets.files[previous]=digest;
     const legacy={'js/function-api.js':hash(`old ${environment} API`),'app/js/shared-context.js':hash('old context')};Object.assign(assets.files,legacy);
     build.runtimePackaging={generation:{id,prefix,files},bundlePaths:[bundle],compatibility:[{buildId:`previous-${environment}`,generationId:null,files:{[previous]:digest,...legacy},legacyRootPaths:Object.keys(legacy)}],retainedBundlePaths:[previous],rootModuleAliases:{...legacy,'js/firebase-project-config.js':assets.files['js/firebase-project-config.js']}};
+    const groundRoot = 'location-data/ground/' + 'a'.repeat(16);
+    const groundFile = groundRoot + '/manifest-catalog.json';
+    assets.files[groundFile] = hash('tested current ground');
+    build.groundData = { outputRoot: groundRoot, fileCount: 1 };
+    if (environment === 'production') {
+      const previous = build.runtimePackaging.compatibility[0];
+      Object.assign(previous, { groundRoot, groundFileCount: 1 });
+      previous.files[groundFile] = assets.files[groundFile];
+    }
   };
   const stagingBuild=JSON.parse(f.receipt.stagingBuildJson), stagingAssets=JSON.parse(f.receipt.stagingAssetsJson);
   install(stagingBuild,stagingAssets,'staging'); install(f.productionBuild,f.productionAssets,'production');
   f.receipt.stagingBuildJson=JSON.stringify(stagingBuild); f.receipt.stagingAssetsJson=JSON.stringify(stagingAssets);
   f.receipt.stagingIdentity.buildManifestSha256=hash(f.receipt.stagingBuildJson); f.receipt.stagingIdentity.assetManifestSha256=hash(f.receipt.stagingAssetsJson);
   assert.deepEqual(validatePromotion(f),f.receipt.stagingIdentity);
+  const groundFile = f.productionBuild.groundData.outputRoot + '/manifest-catalog.json';
+  f.productionAssets.files[groundFile] = hash('untested current ground');
+  f.productionBuild.runtimePackaging.compatibility[0].files[groundFile] = hash('untested current ground');
+  assert.throws(() => validatePromotion(f), /Untested asset changed/);
+  f.productionAssets.files[groundFile] = hash('tested current ground');
+  f.productionBuild.runtimePackaging.compatibility[0].files[groundFile] = hash('tested current ground');
   f.productionAssets.files[bundle]=hash('untested current code');
   assert.throws(()=>validatePromotion(f),/Untested asset changed/);
   f.productionAssets.files[bundle]=hash('tested current code');

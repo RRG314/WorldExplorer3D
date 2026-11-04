@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><link
+    rel="icon"
+    href="/favicon.svg"
+  /><title>Wildlife station component verification</title
+  ><link rel="stylesheet" href="/app/styles/experiences.css" /><style>
+    body {
+      margin: 0;
+      background: #1c372b;
+      color: #eee;
+      font: 16px system-ui;
+    }
+    #world {
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(#8ca7a1, #3a5841);
+      border: 0;
+    }
+    * {
+      box-sizing: border-box;
+    }</style
+  ><button id="world">Controlled field surface</button>
+  <script type="module">
+    import { wildlifeHarness } from '/tests/helpers/wildlife-study.mjs';
+    import { createWildlifeUI } from '/app/js/campaign/wildlife-ui.js';
+    import { createIndexedDbDiscoveryProfileStore } from '/app/js/discovery/profile-store.js';
+    const h = wildlifeHarness();
+    h.lead();
+    h.survey('a');
+    h.survey('b');
+    h.identify();
+    h.report();
+    const log = h.events,
+      store = createIndexedDbDiscoveryProfileStore();
+    if (!(await store.getProfile()).researchCareers.wildlife.active)
+      for (const e of log.slice(0, 3))
+        await store.updateResearchCareer('wildlife', e.metadata.action, { now: e.occurredAt });
+    let state = (await store.getProfile()).researchCareers.wildlife,
+      failNextSave = false,
+      globalEscapes = 0,
+      effort = {
+        ...structuredClone(log[3].metadata.action.effort),
+        complete: true,
+        targetSeconds: 10,
+        reason: 'Controlled effort ready'
+      };
+    const runtime = {
+      Walk: { state: { walker: {} } },
+      getEnv: () => 'EARTH',
+      screenLayout: { setPanelLayer() {} },
+      setPauseReason(key, value) {
+        runtime.paused = value;
+      },
+      stopGameplayPlugin() {}
+    };
+    const tools = {
+      get busy() {
+        return false;
+      },
+      enter() {},
+      start() {
+        effort = {
+          ...structuredClone(log[state.active.habitatIndex === 0 ? 3 : 4].metadata.action.effort),
+          complete: true,
+          targetSeconds: 10,
+          reason: 'Controlled effort ready'
+        };
+      },
+      align() {
+        return 'Controlled sensor alignment';
+      },
+      snapshot: () => ({ effort, lastError: '' }),
+      async perform(type) {
+        if (type === 'record') {
+          await save({ type: 'survey', effort });
+          effort = null;
+        }
+      },
+      dispose() {}
+    };
+    async function save(command) {
+      if (failNextSave) {
+        failNextSave = false;
+        throw Error('The field record could not save. Try again.');
+      }
+      const next = log.find((e) => e.metadata.action.revision === state.revision),
+        now = next.occurredAt,
+        result = await store.updateResearchCareer(
+          'wildlife',
+          { ...command, revision: state.revision, evidence: next.metadata.action.evidence },
+          { now }
+        );
+      state = result.state;
+    }
+    const ui = createWildlifeUI({
+      runtime,
+      store,
+      tools,
+      getState: () => state,
+      near: (id, distance) => (distance ? 1 : true),
+      save,
+      onJournal() {},
+      onNext() {},
+      requestWorldFocus: () => document.querySelector('#world').focus()
+    });
+    function loop() {
+      ui.update();
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') globalEscapes++;
+    });
+    window.wildlifeCheck = {
+      store,
+      get state() {
+        return state;
+      },
+      get effort() {
+        return effort;
+      },
+      set failNextSave(v) {
+        failNextSave = v;
+      },
+      get globalEscapes() {
+        return globalEscapes;
+      }
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        evidence: 'controlled presence and measured-effort fixtures',
+        revision: state.revision,
+        phase: state.active.phase,
+        habitatIndex: state.active.habitatIndex,
+        paused: runtime.paused
+      });
+    if (new URLSearchParams(location.search).get('open') === '1') ui.open();
+  </script>
+</html>

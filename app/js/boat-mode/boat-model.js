@@ -6,6 +6,7 @@ function createBoatModeMesh(entry = getMaritimeCatalogEntry(), options = {}) {
   const catalog = entry || getMaritimeCatalogEntry();
   const visual = createVesselVisual(THREE, catalog, {
     mobile: options.mobile === true,
+    metersPerUnit: options.metersPerUnit || 1,
     state: options.state || 'active'
   });
   visual.root.visible = false;

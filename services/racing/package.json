@@ -3,7 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.23.4 <23" },
-  "scripts": { "start": "node server.mjs", "build": "node ../../scripts/build-racing-service.mjs" },
-  "dependencies": { "firebase-admin": "14.5.0", "ws": "8.22.0" }
+  "engines": {
+    "node": ">=22.23.4 <23"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node ../../scripts/build-racing-service.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.0",
+    "ws": "8.22.0"
+  },
+  "overrides": {
+    "@google-cloud/firestore-api": {
+      "rimraf": "6.1.4"
+    }
+  }
 }

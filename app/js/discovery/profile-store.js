@@ -1,3 +1,9 @@
+import {companionRecallOutcome,recallMemoryId} from '../campaign/companion-handling.js';
+import {documentarySelected} from '../campaign/documentary-story.js';
+import {prepareDocumentaryMedia,assertDocumentaryMediaCurrent} from '../campaign/documentary-media.js';
+import {normalizeResearchCareers,researchCareerDefinition} from '../campaign/research-career-definitions.js';
+import {RESEARCH_MEDIA_BACKUP_VERSION,RESEARCH_MEDIA_PREFIX,prepareResearchPhoto,researchMediaProfileRows,validateTransitionMedia,verifyResearchMediaRecords} from '../campaign/research-media.js';
+import {normalizeSoloRacer,projectSoloRacer,soloRacerReceipt} from '../campaign/solo-racer.js';
 import { THREE_VIEWS, normalizeThreeViews, emptyPhotoAlbum, transitionThreeViews } from '../campaign/three-views.js';
 import { homeAchievementEvent } from '../campaign/home-achievements.js';
 import {supportRecorder} from '../runtime/support-receipt.js';
@@ -21,8 +27,8 @@ import {
 } from './explorer-events.js?v=3';
 import { createDefaultCharacterState, normalizeCharacterState } from '../character/model.js?v=1';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
-import { normalizeHarborRun, transitionHarborRun, harborRunReceipt } from '../campaign/harbor-run.js';
-import { FIRST_BEARINGS, normalizeOpeningChapter, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
+import { normalizeHarborRun, transitionHarborRun, harborRunCommandReceipts } from '../campaign/harbor-run.js';
+import { FIRST_BEARINGS, normalizeOpeningChapter, preserveOpeningLocation, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
 const DISCOVERY_DB_VERSION = 5;
@@ -102,6 +108,8 @@ function createDefaultProfile() {
     fieldGuideCount: 0,
     explorerProgress: defaultExplorerProgress(),
     openingChapter: normalizeOpeningChapter(),
+    researchCareers: normalizeResearchCareers(),
+    soloRacer: normalizeSoloRacer(),
     harborRun: normalizeHarborRun(),
     threeViews: normalizeThreeViews(),
     characterState: createDefaultCharacterState()
@@ -110,22 +118,31 @@ function createDefaultProfile() {
 
 function normalizeProfile(profile) {
   const base = createDefaultProfile();
+  const location = preserveOpeningLocation(
+    profile?.openingChapter,
+    profile?.openingChapterLocationBackup,
+  );
   return {
     ...base,
     ...(profile || {}),
-    favoriteToolIds: Array.isArray(profile?.favoriteToolIds) ? profile.favoriteToolIds.slice(0, 6) : base.favoriteToolIds,
+    favoriteToolIds: Array.isArray(profile?.favoriteToolIds)
+      ? profile.favoriteToolIds.slice(0, 6)
+      : base.favoriteToolIds,
     publicCameraFavorites: normalizeCameraFavorites(profile?.publicCameraFavorites),
     tutorials: { ...base.tutorials, ...(profile?.tutorials || {}) },
     disciplineProgress: { ...base.disciplineProgress, ...(profile?.disciplineProgress || {}) },
     toolMastery: { ...(profile?.toolMastery || {}) },
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
-    openingChapter: normalizeOpeningChapter(profile?.openingChapter),
+    openingChapter: location.chapter,
+    ...(location.backup != null ? { openingChapterLocationBackup: location.backup } : {}),
+    researchCareers: normalizeResearchCareers(profile?.researchCareers),
+    soloRacer: normalizeSoloRacer(profile?.soloRacer),
     harborRun: normalizeHarborRun(profile?.harborRun),
     threeViews: normalizeThreeViews(profile?.threeViews),
     characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
   };
 }
 
@@ -228,7 +245,10 @@ function openDiscoveryDatabase(indexedDB = globalThis.indexedDB) {
 }
 
 async function ensureIndexedDbCharacterMigration(db) {
-  const transaction = db.transaction(['profiles', 'events', 'fieldGuide', 'companions', 'migrationBackups'], 'readwrite');
+  const transaction = db.transaction(
+    ['profiles', 'events', 'fieldGuide', 'companions', 'migrationBackups'],
+    'readwrite',
+  );
   const profiles = transaction.objectStore('profiles');
   const backups = transaction.objectStore('migrationBackups');
   const storedProfile = await requestPromise(profiles.get(PROFILE_ID));
@@ -239,6 +259,32 @@ async function ensureIndexedDbCharacterMigration(db) {
     return profile;
   }
   if (storedProfile.characterState?.schemaVersion === 1) {
+    const location = preserveOpeningLocation(
+      storedProfile.openingChapter,
+      storedProfile.openingChapterLocationBackup,
+    );
+    if (
+      location.backup != null &&
+      (JSON.stringify(location.backup) !==
+        JSON.stringify(storedProfile.openingChapterLocationBackup) ||
+        JSON.stringify(location.chapter.locationSnapshot) !==
+          JSON.stringify(storedProfile.openingChapter?.locationSnapshot))
+    ) {
+      // Reuse this existing one-time migration transaction. Preserve every
+      // other raw field and all history; no extra store, timer or progression.
+      profiles.put({
+        ...storedProfile,
+        openingChapterLocationBackup: location.backup,
+        ...(location.chapter.locationSnapshot
+          ? {
+              openingChapter: {
+                ...storedProfile.openingChapter,
+                locationSnapshot: location.chapter.locationSnapshot,
+              },
+            }
+          : {}),
+      });
+    }
     await transactionPromise(transaction);
     return normalizeProfile(storedProfile);
   }
@@ -246,7 +292,7 @@ async function ensureIndexedDbCharacterMigration(db) {
     requestPromise(transaction.objectStore('events').getAll()),
     requestPromise(transaction.objectStore('fieldGuide').getAll()),
     requestPromise(transaction.objectStore('companions').getAll()),
-    requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID))
+    requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID)),
   ]);
   const backedUpAt = Number(existingBackup?.backedUpAt) || Date.now();
   if (!existingBackup) {
@@ -254,7 +300,7 @@ async function ensureIndexedDbCharacterMigration(db) {
       id: CHARACTER_MIGRATION_BACKUP_ID,
       backedUpAt,
       sourceProfileSchemaVersion: Number(storedProfile.schemaVersion) || 0,
-      profile: clone(storedProfile)
+      profile: clone(storedProfile),
     });
   }
   const characterState = migrateLegacyCharacterState({
@@ -263,7 +309,7 @@ async function ensureIndexedDbCharacterMigration(db) {
     fieldGuide,
     companions,
     backupAvailable: true,
-    now: backedUpAt
+    now: backedUpAt,
   });
   const profile = normalizeProfile({ ...storedProfile, characterState });
   profiles.put(profile);
@@ -430,8 +476,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
       const harborRun = transitionHarborRun(current.harborRun, command, now);
       const profile = normalizeProfile({ ...current, harborRun });
-      if (harborRun.phase === 'complete') {
-        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
+      for (const receipt of harborRunCommandReceipts(current.harborRun, harborRun, command)) {
+        const event = createExplorerStoryEvent(receipt);
         transaction.objectStore('events').put(event);
         putJournalOrder(transaction, 'events', event);
       }
@@ -439,9 +485,15 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(transaction);
       return clone(harborRun);
     } catch (error) {
-      try { transaction?.abort(); } catch { /* Already ended. */ }
+      try {
+        transaction?.abort();
+      } catch {
+        /* Already ended. */
+      }
       throw error;
-    } finally { db.close(); }
+    } finally {
+      db.close();
+    }
   }
 
   async function recordHomeAchievement(kind,home) {
@@ -470,21 +522,52 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       await transactionPromise(tx);return clone(album||emptyPhotoAlbum());
     } finally {db.close();}
   }
-  async function updateThreeViews(command, now=Date.now()) {
-    const db=await open();let transaction;
+  async function updateThreeViews(command, now = Date.now()) {
+    command = clone(command);
+    const photoState = command.type === 'story-publish' ? (await getProfile()).threeViews : null;
+    const checked =
+      photoState && photoState.story?.phase !== 'complete'
+        ? await prepareDocumentaryMedia(photoState, await getThreeViewsAlbum())
+        : null;
+    const db = await open();
+    let transaction;
     try {
       await ensureCharacterMigration(db);
-      transaction=db.transaction(['profiles','events',JOURNAL_ORDER_STORE],'readwrite');
-      const profiles=transaction.objectStore('profiles');
-      const [current,album]=await Promise.all([requestPromise(profiles.get(PROFILE_ID)),requestPromise(profiles.get(THREE_VIEWS.albumId))]);
-      if(command.type==='accept'&&current?.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
-      const result=transitionThreeViews(current?.threeViews,album,command,now);
-      profiles.put(normalizeProfile({...current,threeViews:result.state}));
-      if(result.album.photos.length)profiles.put(result.album);else profiles.delete(THREE_VIEWS.albumId);
-      if(result.event){const event=createExplorerStoryEvent(result.event);transaction.objectStore('events').put(event);putJournalOrder(transaction,'events',event);}
-      await transactionPromise(transaction);return clone(result);
-    } catch(error){try{transaction?.abort();}catch{}throw error;}
-    finally{db.close();}
+      transaction = db.transaction(['profiles', 'events', JOURNAL_ORDER_STORE], 'readwrite');
+      const profiles = transaction.objectStore('profiles');
+      const [current, album] = await Promise.all([
+        requestPromise(profiles.get(PROFILE_ID)),
+        requestPromise(profiles.get(THREE_VIEWS.albumId)),
+      ]);
+      if (
+        command.type === 'accept' &&
+        current?.openingChapter?.phase !== 'complete' &&
+        !documentarySelected(current)
+      )
+        throw Error(
+          'Choose Documentary explorer in Activities or finish First Bearings before starting this job.'
+        );
+      if (command.type === 'story-publish' && current?.threeViews?.story?.phase !== 'complete')
+        assertDocumentaryMediaCurrent(checked, album);
+      const result = transitionThreeViews(current?.threeViews, album, command, now);
+      profiles.put(normalizeProfile({ ...current, threeViews: result.state }));
+      if (result.album.photos.length) profiles.put(result.album);
+      else profiles.delete(THREE_VIEWS.albumId);
+      if (result.event) {
+        const event = createExplorerStoryEvent(result.event);
+        transaction.objectStore('events').put(event);
+        putJournalOrder(transaction, 'events', event);
+      }
+      await transactionPromise(transaction);
+      return clone(result);
+    } catch (error) {
+      try {
+        transaction?.abort();
+      } catch {}
+      throw error;
+    } finally {
+      db.close();
+    }
   }
 
   async function recordDiscovery(record, policy = {}) {
@@ -591,6 +674,44 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function updateResearchCareer(id,command,options={}) {
+    const definition=researchCareerDefinition(id);
+    if(command?.capture)command=clone(command);
+    const prepared=command?.capture||options.photoAttachment?await prepareResearchPhoto(id,command?.capture,options.photoAttachment):null;
+    const db=await open();let transaction,abort;
+    try {
+      await ensureCharacterMigration(db);
+      if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
+      transaction=db.transaction(['profiles','events','items','claims',JOURNAL_ORDER_STORE],'readwrite');
+      abort=()=>{try{transaction.abort();}catch{}};options.signal?.addEventListener('abort',abort,{once:true});
+      const profiles=transaction.objectStore('profiles'),events=transaction.objectStore('events');
+      const current=normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      if(options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
+      const result=definition.transition(current.researchCareers[id],command,options.now??Date.now());
+      if(!result.event){if(prepared)throw Error('This field step does not accept a photograph.');await transactionPromise(transaction);return clone(result);}
+      await validateTransitionMedia(id,result,prepared,key=>requestPromise(profiles.get(key)));
+      if(prepared){
+        if(await requestPromise(profiles.get(prepared.id)))throw Error('This field photograph has already been saved.');
+        const mediaCount=await requestPromise(profiles.count(IDBKeyRange.bound(RESEARCH_MEDIA_PREFIX,RESEARCH_MEDIA_PREFIX+'\uffff')));
+        if(mediaCount>=128)throw Error('Field photo storage is full. Export your Journal before freeing photo storage.');
+        profiles.put(prepared);
+      }
+      for(const instanceId of result.requiredItems||[]){const item=await requestPromise(transaction.objectStore('items').get(instanceId));if(item?.researchLabel?.careerId!==id||item.researchLabel.runId!==result.state.active.runId)throw Error('A contextual find is missing from your saved collection.');}
+      const event=createExplorerStoryEvent(result.event);
+      const explorer=event.projections.profile?projectExplorerStoryProgress(current.explorerProgress,event):current.explorerProgress;
+      const character=event.projections.profile?projectCharacterProgress(current.characterState,event,{meaningful:true,explorerPointsBefore:current.explorerProgress.points,explorerPointsAfter:explorer.points}).character:current.characterState;
+      const profile=normalizeProfile({...current,researchCareers:{...current.researchCareers,[id]:result.state},collectionCount:current.collectionCount+result.samples.length,explorerProgress:explorer,characterState:character});
+      for(const item of result.samples){
+        if(await requestPromise(transaction.objectStore('claims').get(item.claimId)))throw Error('That labeled sample has already been collected.');
+        transaction.objectStore('items').put(item);putJournalOrder(transaction,'items',item);
+        transaction.objectStore('claims').put({claimId:item.claimId,item,event});
+      }
+      events.put(event);putJournalOrder(transaction,'events',event);profiles.put(profile);
+      await transactionPromise(transaction);return clone({...result,event,profile});
+    }catch(error){try{transaction?.abort();}catch{}supportRecorder.record({operation:'journal-save',error});throw error;}
+    finally{if(abort)options.signal?.removeEventListener('abort',abort);db.close();}
+  }
+
   async function recordExplorerEvent(record) {
     const event = createExplorerStoryEvent(record);
     const db = await open();
@@ -616,9 +737,13 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
             explorerPointsAfter: nextExplorerProgress.points
           })
         : { character: current.characterState, reward: null };
-      const profile = event.projections.profile
+      const projectedRacer = projectSoloRacer(current.soloRacer, event);
+      const baseProfile = event.projections.profile
         ? normalizeProfile({ ...current, explorerProgress: nextExplorerProgress, characterState: characterProjection.character })
         : current;
+      const profile = normalizeProfile({...baseProfile,soloRacer:projectedRacer});
+      const capstone = soloRacerReceipt(projectedRacer,event);
+      if(capstone&&!await requestPromise(events.get(capstone.eventId))){const receipt=createExplorerStoryEvent(capstone);events.put(receipt);putJournalOrder(transaction,'events',receipt);}
       events.put(event);
       putJournalOrder(transaction, 'events', event);
       profiles.put(profile);
@@ -663,6 +788,17 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     } finally {
       db.close();
     }
+  }
+
+  async function getItemsById(ids = []) {
+    if (!Array.isArray(ids) || ids.length > 32 || ids.some(id => typeof id !== 'string' || id.length > 260)) throw new TypeError('Expected at most 32 stable item IDs');
+    const db = await open();
+    try {
+      const transaction = db.transaction(['items'], 'readonly');
+      const records = await Promise.all(ids.map(id => requestPromise(transaction.objectStore('items').get(id))));
+      await transactionPromise(transaction);
+      return records.filter(Boolean).map(clone);
+    } finally { db.close(); }
   }
 
   async function getEventsById(ids = []) {
@@ -829,6 +965,53 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     } finally { db.close(); }
   }
 
+  async function completeCompanionRecall(instanceId, completedAt, context = {}) {
+    const db = await open();
+    let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction = db.transaction(
+        ['profiles', 'companions', 'events', JOURNAL_ORDER_STORE],
+        'readwrite'
+      );
+      const friends = transaction.objectStore('companions'),
+        stories = transaction.objectStore('events'),
+        profiles = transaction.objectStore('profiles'),
+        current = await requestPromise(friends.get(String(instanceId))),
+        existing = await requestPromise(stories.get(recallMemoryId(instanceId)));
+      if (existing && current?.training?.records?.recall?.completed) {
+        await transactionPromise(transaction);
+        return { companion: clone(current), event: clone(existing), awarded: false };
+      }
+      const outcome = companionRecallOutcome(current, completedAt, context),
+        event = existing || createExplorerStoryEvent(outcome.event);
+      friends.put(clone(outcome.companion));
+      if (!existing) {
+        const profile = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID))),
+          progress = projectExplorerStoryProgress(profile.explorerProgress, event),
+          character = projectCharacterProgress(profile.characterState, event, {
+            meaningful: true,
+            explorerPointsBefore: profile.explorerProgress.points,
+            explorerPointsAfter: progress.points,
+          }).character;
+        profiles.put(
+          normalizeProfile({ ...profile, explorerProgress: progress, characterState: character })
+        );
+        stories.put(event);
+        putJournalOrder(transaction, 'events', event);
+      }
+      await transactionPromise(transaction);
+      return clone({ ...outcome, event });
+    } catch (error) {
+      try {
+        transaction?.abort();
+      } catch {}
+      throw error;
+    } finally {
+      db.close();
+    }
+  }
+
   async function saveCompanion(companion, update) {
     if (!companion?.instanceId || !companion?.catalogId) throw new TypeError('Companion persistence requires stable instance and catalog IDs.');
     const db = await open();
@@ -926,6 +1109,11 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function getResearchPhoto(id) {
+    if(typeof id!=='string'||!id.startsWith(RESEARCH_MEDIA_PREFIX))return null;
+    const db=await open();try{const tx=db.transaction('profiles','readonly');const row=await requestPromise(tx.objectStore('profiles').get(id));await transactionPromise(tx);return row?clone(row):null;}finally{db.close();}
+  }
+
   async function exportData() {
     const db = await open();
     try {
@@ -934,7 +1122,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const tx = db.transaction(names, 'readonly');
       const rows = await Promise.all(names.map(name => requestPromise(tx.objectStore(name).getAll())));
       await transactionPromise(tx);
-      return {schemaVersion:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), portalTrail:portalTrailProfileRows(rows[0]), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
+      const media=researchMediaProfileRows(rows[0]);
+      return {schemaVersion:media.length?RESEARCH_MEDIA_BACKUP_VERSION:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), researchMedia:media, portalTrail:portalTrailProfileRows(rows[0]), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
     } finally { db.close(); }
   }
 
@@ -961,6 +1150,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   async function importData(data = {}) {
     data = validateJournalBackup(data);
+    await verifyResearchMediaRecords(data.researchMedia);
+    await prepareDocumentaryMedia(data.profile.threeViews, data.albums?.[0]);
     const db = await open();
     let transactionToAbort;
     try {
@@ -998,6 +1189,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
           };
       profiles.put(importedProfile);
       for(const album of data.albums)profiles.put(clone(album));
+      for(const photo of data.researchMedia)profiles.put(clone(photo));
       for(const row of data.portalTrail??portalTrailProfileRows(previous.profiles))profiles.put(clone(row));
       const items = Array.isArray(data.items) ? data.items : [];
       const companions = Array.isArray(data.companions) ? data.companions : [];
@@ -1041,6 +1233,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     listCompanions,
     listEvents,
     getEventsById,
+    getItemsById,
     listEventsByIdPrefix,
     listFieldGuide,
     listItems,
@@ -1048,6 +1241,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     importData,
     recordDiscovery,
     recordExplorerEvent,
+    updateResearchCareer,
+    getResearchPhoto,
     recordObservation,
     startOpeningChapter,
     completeOpeningChapter,
@@ -1058,6 +1253,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     rollbackCharacterMigration,
     rollbackLastImport,
     saveCompanion,
+    completeCompanionRecall,
     saveProfile,
     setActiveCompanion
   });
@@ -1081,6 +1277,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       })
     });
   }
+  const researchMedia=new Map((seed.researchMedia||[]).map(row=>[row.id,clone(row)]));
   const outbox = new Map((seed.receiptOutbox || []).map(row => [row.id, clone(row)]));
   const items = new Map((seed.items || []).map((item) => [item.instanceId, clone(item)]));
   const claims = new Map((seed.claims || []).map((claim) => [claim.claimId, clone(claim)]));
@@ -1175,11 +1372,34 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       characterReward = characterProjection.reward;
       profile = normalizeProfile({ ...profile, explorerProgress: nextExplorerProgress, characterState: characterProjection.character });
     }
+    profile=normalizeProfile({...profile,soloRacer:projectSoloRacer(profile.soloRacer,event)});
+    const capstone=soloRacerReceipt(profile.soloRacer,event);if(capstone&&!events.has(capstone.eventId))events.set(capstone.eventId,createExplorerStoryEvent(capstone));
     return { recorded: true, event: clone(event), profile: clone(profile), characterReward: clone(characterReward) };
   }
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
+    async updateResearchCareer(id,command,options={}) {
+      const definition=researchCareerDefinition(id);
+      if(command?.capture)command=clone(command);
+      const prepared=command?.capture||options.photoAttachment?await prepareResearchPhoto(id,command?.capture,options.photoAttachment):null;
+      if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
+      const result=definition.transition(profile.researchCareers[id],command,options.now??Date.now());
+      if(!result.event){if(prepared)throw Error('This field step does not accept a photograph.');return clone(result);}
+      await validateTransitionMedia(id,result,prepared,key=>researchMedia.get(key));
+      if(definition.normalize(profile.researchCareers[id]).revision!==command.revision)throw Error('This study changed in another tab. Reopen it to continue.');
+      if(prepared&&(researchMedia.has(prepared.id)||researchMedia.size>=128))throw Error('This photograph is already saved or field photo storage is full.');
+      if(options.signal?.aborted||options.isCurrent?.()===false)throw Error('The location changed. Reopen your field study.');
+      for(const instanceId of result.requiredItems||[]){const item=items.get(instanceId);if(item?.researchLabel?.careerId!==id||item.researchLabel.runId!==result.state.active.runId)throw Error('A contextual find is missing from your saved collection.');}
+      for(const item of result.samples)if(claims.has(item.claimId))throw Error('That labeled sample has already been collected.');
+      const event=createExplorerStoryEvent(result.event);
+      const explorer=event.projections.profile?projectExplorerStoryProgress(profile.explorerProgress,event):profile.explorerProgress;
+      const character=event.projections.profile?projectCharacterProgress(profile.characterState,event,{meaningful:true,explorerPointsBefore:profile.explorerProgress.points,explorerPointsAfter:explorer.points}).character:profile.characterState;
+      profile=normalizeProfile({...profile,researchCareers:{...profile.researchCareers,[id]:result.state},collectionCount:profile.collectionCount+result.samples.length,explorerProgress:explorer,characterState:character});
+      for(const item of result.samples){items.set(item.instanceId,clone(item));claims.set(item.claimId,{claimId:item.claimId,item,event});}
+      if(prepared)researchMedia.set(prepared.id,clone(prepared));
+      events.set(event.eventId,event);return clone({...result,event,profile});
+    },
     ...portalTrail,
     async recordHomeAchievement(kind,home) {
       if(profile.homeAchievements?.[kind])return clone(profile.homeAchievements[kind]);
@@ -1203,21 +1423,41 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       events.set(event.eventId, event);
       return { recorded: true, event: clone(event), profile: clone(profile) };
     },
+    async getResearchPhoto(id){const row=researchMedia.get(id);return row?clone(row):null;},
     async getThreeViewsAlbum(){return clone(photoAlbum);},
-    async updateThreeViews(command,now=Date.now()){
-      if(command.type==='accept'&&profile.openingChapter?.phase!=='complete')throw Error('Finish First Bearings before starting this job.');
-      const result=transitionThreeViews(profile.threeViews,photoAlbum,command,now);
-      profile=normalizeProfile({...profile,threeViews:result.state});photoAlbum=clone(result.album);
-      if(result.event){const event=createExplorerStoryEvent(result.event);events.set(event.eventId,event);}
+    async updateThreeViews(command, now = Date.now()) {
+      command = clone(command);
+      if (
+        command.type === 'accept' &&
+        profile.openingChapter?.phase !== 'complete' &&
+        !documentarySelected(profile)
+      )
+        throw Error(
+          'Choose Documentary explorer in Activities or finish First Bearings before starting this job.'
+        );
+      const checked =
+        command.type === 'story-publish' && profile.threeViews.story?.phase !== 'complete'
+          ? await prepareDocumentaryMedia(profile.threeViews, photoAlbum)
+          : null;
+      if (command.type === 'story-publish' && profile.threeViews.story?.phase !== 'complete')
+        assertDocumentaryMediaCurrent(checked, photoAlbum);
+      const result = transitionThreeViews(profile.threeViews, photoAlbum, command, now),
+        event = result.event ? createExplorerStoryEvent(result.event) : null,
+        next = normalizeProfile({ ...profile, threeViews: result.state });
+      profile = next;
+      photoAlbum = clone(result.album);
+      if (event) events.set(event.eventId, event);
       return clone(result);
     },
     async updateHarborRun(command, now = Date.now()) {
-      const harborRun = transitionHarborRun(profile.harborRun, command, now);
-      profile = normalizeProfile({ ...profile, harborRun });
-      if (harborRun.phase === 'complete') {
-        const event = createExplorerStoryEvent(harborRunReceipt(harborRun));
-        events.set(event.eventId, event);
-      }
+      const priorHarborRun = profile.harborRun,
+        harborRun = transitionHarborRun(priorHarborRun, command, now);
+      const receipts = harborRunCommandReceipts(priorHarborRun, harborRun, command).map(
+          createExplorerStoryEvent
+        ),
+        next = normalizeProfile({ ...profile, harborRun });
+      profile = next;
+      for (const event of receipts) events.set(event.eventId, event);
       return clone(harborRun);
     },
     async getReceiptSyncStatus(ownerUid) { return summarizeReceiptState([...items.values()], [...outbox.values()], ownerUid); },
@@ -1240,6 +1480,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async hasClaim(claimId) { return claims.has(String(claimId)); },
     async listItems(limit = 200) { return [...items.values()].sort((a,b)=>compareJournalRows('items',a,b)).slice(0, journalPageSize(limit)).map(clone); },
     async listFieldGuide(limit = 500) { return [...guide.values()].sort((a,b)=>compareJournalRows('fieldGuide',a,b)).slice(0, journalPageSize(limit)).map(clone); },
+    async getItemsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable item IDs');return ids.map(id=>items.get(id)).filter(Boolean).map(clone);},
     async getEventsById(ids=[]) {if(!Array.isArray(ids)||ids.length>32||ids.some(id=>typeof id!=='string'||id.length>260))throw new TypeError('Expected at most 32 stable event IDs');return ids.map(id=>events.get(id)).filter(Boolean).map(clone);},
     async listEventsByIdPrefix(prefix, page = {}) {
       const {after, limit} = eventPrefixPage(prefix, page);
@@ -1259,6 +1500,34 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async listCompanions() { return [...companions.values()].map(clone); },
     async getCharacterMigrationBackup() {
       return legacyProfileBackup ? { id: CHARACTER_MIGRATION_BACKUP_ID, profile: clone(legacyProfileBackup) } : null;
+    },
+    async completeCompanionRecall(instanceId, completedAt, context = {}) {
+      const current = companions.get(String(instanceId)),
+        existing = events.get(recallMemoryId(instanceId));
+      if (existing && current?.training?.records?.recall?.completed)
+        return { companion: clone(current), event: clone(existing), awarded: false };
+      const outcome = companionRecallOutcome(current, completedAt, context),
+        event = existing || createExplorerStoryEvent(outcome.event);
+      let nextProfile = profile;
+      if (!existing) {
+        const progress = projectExplorerStoryProgress(profile.explorerProgress, event),
+          character = projectCharacterProgress(profile.characterState, event, {
+            meaningful: true,
+            explorerPointsBefore: profile.explorerProgress.points,
+            explorerPointsAfter: progress.points,
+          }).character;
+        nextProfile = normalizeProfile({
+          ...profile,
+          explorerProgress: progress,
+          characterState: character,
+        });
+      }
+      const next = clone(outcome.companion),
+        result = clone({ ...outcome, event });
+      companions.set(String(instanceId), next);
+      if (!existing) events.set(event.eventId, event);
+      profile = nextProfile;
+      return result;
     },
     async saveCompanion(companion, update) {
       const current = companions.get(companion.instanceId);
@@ -1311,9 +1580,10 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async exportData() {
       return {
-        schemaVersion: DISCOVERY_DB_VERSION,
+        schemaVersion: researchMedia.size?RESEARCH_MEDIA_BACKUP_VERSION:DISCOVERY_DB_VERSION,
         profile: clone(profile),
         albums: photoAlbum.photos.length?[clone(photoAlbum)]:[],
+        researchMedia:[...researchMedia.values()].map(clone),
         portalTrail:[...portalRows.values()].map(clone),
         items: [...items.values()].map(clone),
         fieldGuide: [...guide.values()].map(clone),
@@ -1325,14 +1595,16 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       if (!beforeImport) return false;
       photoAlbum=clone(beforeImport.photoAlbum);
       profile = clone(beforeImport.profile); legacyProfileBackup = clone(beforeImport.legacyProfileBackup);
-      for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox,portalRows})) {
+      for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox,portalRows,researchMedia})) {
         map.clear(); for (const [id,row] of beforeImport[name]) map.set(id,clone(row));
       }
       beforeImport = null; return true;
     },
     async importData(data = {}) {
       data = validateJournalBackup(data);
-      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows]});
+      await verifyResearchMediaRecords(data.researchMedia);
+    await prepareDocumentaryMedia(data.profile.threeViews, data.albums?.[0]);
+      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows],researchMedia:[...researchMedia]});
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
       for (const [id,row] of outbox) {
@@ -1351,6 +1623,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
             backupAvailable: true
           });
       profile = normalizeProfile({ ...data.profile, characterState: importedCharacter });
+      researchMedia.clear();for(const row of data.researchMedia)researchMedia.set(row.id,clone(row));
       photoAlbum=clone(data.albums.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
       if(data.portalTrail){portalRows.clear();for(const row of data.portalTrail)portalRows.set(row.id,clone(row));}
       items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();

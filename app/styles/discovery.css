@@ -2419,3 +2419,65 @@
     font: inherit;
   }
 }
+.home-archaeology-display{display:grid;gap:8px;margin:16px 0 8px}.home-archaeology-display select{box-sizing:border-box;min-height:44px;width:100%;max-width:100%;padding:8px;background:var(--wx-panel,#14262d);color:var(--wx-text,#e1ebef);border:1px solid var(--wx-line,#496157);border-radius:6px;font:inherit}
+
+/* The retained chapter keeps its DOM and listeners while Activities focuses its owner. */
+.discoveryPane > .discoveryCareerUnfocused { display: none !important; }
+
+/* The retained album and its edited field story share one readable form. */
+.discoveryDocumentaryForm {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.discoveryDocumentaryField {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  min-width: 0;
+}
+.discoveryDocumentaryField textarea,
+.discoveryDocumentaryField select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  font: inherit;
+  line-height: 1.45;
+  color: var(--wx-text-primary, #e4efeb);
+  background: #10272c;
+  border: 1px solid var(--wx-line-soft, #526969);
+  border-radius: 4px;
+}
+.discoveryDocumentaryField textarea {
+  resize: vertical;
+}
+.discoveryDocumentaryField textarea[readonly] {
+  cursor: default;
+}
+.discoveryDocumentaryForm figure {
+  margin: 10px 0;
+  min-width: 0;
+}
+.discoveryDocumentaryForm figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: 38dvh;
+  object-fit: contain;
+}
+
+.discoveryExplorerJourney > strong { display: block; font-size: 1.2rem; }
+.discoveryExplorerJourney details { margin-top: 14px; }
+.discoveryExplorerJourney summary { min-height: 44px; align-content: center; cursor: pointer; }
+.discoveryExplorerJourney li { margin: 10px 0; }
+.discoveryExplorerJourney li button { display: block; margin-top: 6px; }
+
+@layer interface {
+.discoveryCompanionBrief { display: grid; gap: 10px; padding: 12px 0; }
+.discoveryCompanionBrief p { margin: 0; line-height: 1.5; }
+.discoveryCompanionBrief summary { min-height: 44px; align-content: center; cursor: pointer; }
+.discoveryCompanionBrief button { min-height: 44px; }
+
+}

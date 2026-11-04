@@ -28,18 +28,45 @@ export function buildingInput(i) {
 test('immutable world facts preserve independently captured building and road outputs', () => {
   const normalize = createTransportSourceNormalizer();
   for (let i = 0; i < 2400; i++) {
-    const road = roadInput(i), building = buildingInput(i);
-    if (i % 9 === 0) Object.assign(road[1], { width: ['-0', '12 ft', 'NaN', '', '120', '3;4'][i % 6],
-      oneway: ['yes', '-1', 'no', 'reversible'][i % 4], maxheight: '14\'6"', access: ['private', 'no', 'yes'][i % 3] });
-    if (i % 17 === 0) Object.assign(building[0], { _buildingMetadataSourceId: `osm:way:${i}`,
-      _buildingMetadataMapping: i % 2 ? 'explicit_stable_id' : 'ambiguous', _buildingMetadataGeometryId: `test:building:${i}` });
-    if (i % 19 === 0) Object.assign(building[1], { facadeColor: { nested: [i, null, -0] }, roofHeightMeters: NaN });
-    const actualRoad = normalize(...road), actualBuilding = compileBuildingProvenance(...building);
-    assert.deepEqual(actualRoad, previousRoad(...road));
-    assert.equal(JSON.stringify(actualRoad), JSON.stringify(previousRoad(...road)));
+    const road = roadInput(i),
+      building = buildingInput(i);
+    if (i % 9 === 0)
+      Object.assign(road[1], {
+        width: ['-0', '12 ft', 'NaN', '', '120', '3;4'][i % 6],
+        oneway: ['yes', '-1', 'no', 'reversible'][i % 4],
+        maxheight: '14\'6"',
+        access: ['private', 'no', 'yes'][i % 3],
+      });
+    if (i % 17 === 0)
+      Object.assign(building[0], {
+        _buildingMetadataSourceId: `osm:way:${i}`,
+        _buildingMetadataMapping: i % 2 ? 'explicit_stable_id' : 'ambiguous',
+        _buildingMetadataGeometryId: `test:building:${i}`,
+      });
+    if (i % 19 === 0)
+      Object.assign(building[1], { facadeColor: { nested: [i, null, -0] }, roofHeightMeters: NaN });
+    const actualRoad = normalize(...road),
+      actualBuilding = compileBuildingProvenance(...building);
+    const expectedRoad = structuredClone(previousRoad(...road));
+    // Stage 6 explicitly repaired inferred one-way major-road lane estimates.
+    // This independent historical fixture still protects every other field.
+    if (actualRoad.crossSection.lanes !== expectedRoad.crossSection.lanes) {
+      assert.equal(road[1].highway, 'motorway');
+      assert.equal(road[1].lanes, undefined);
+      assert.equal(road[1].oneway, undefined);
+      assert.equal(actualRoad.direction, 'forward');
+      assert.equal(expectedRoad.crossSection.lanes, 1);
+      assert.equal(actualRoad.crossSection.lanes, 2);
+      assert.equal(actualRoad.crossSection.lanesSource, 'fallback:road-class');
+      assert.equal(actualRoad.crossSection.widthMeters, 10.8);
+      expectedRoad.crossSection.lanes = 2;
+    }
+    assert.deepEqual(actualRoad, expectedRoad);
+    assert.equal(JSON.stringify(actualRoad), JSON.stringify(expectedRoad));
     assert.deepEqual(actualBuilding, previousBuilding(...building));
     assert.equal(JSON.stringify(actualBuilding), JSON.stringify(previousBuilding(...building)));
-    frozen(actualRoad); frozen(actualBuilding);
+    frozen(actualRoad);
+    frozen(actualBuilding);
   }
 });
 

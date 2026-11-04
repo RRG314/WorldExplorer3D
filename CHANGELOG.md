@@ -2,6 +2,31 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## Unreleased
+
+- Connect all twenty retained careers through a shared Activities entry, finite
+  assignments, saved next actions, Journal results and meaningful return visits.
+- Organize globe selection and the travel HUD for small screens, enlarged text,
+  keyboard focus, recovery and original-photo backup/export.
+- Repair bounded driving catch-up and ordinary city road markings; retain the
+  accepted three-venue racing scope, real vehicles, garage and shared systems.
+- Preserve the First Bearings starting location across older save-owner writes.
+- Repair the three backend dependency advisories in the locked source packages;
+  coordinated production rollout is pending.
+
+- Cartographer studies add supported walking measurements, original reciprocal
+  controls, a connected corner route, access notes, reusable route sheets and the
+  Route Survey badge. Real public access remains unverified.
+
+- Meteorologist studies add working virtual wind and sky instruments, paired
+  stations, forecasts saved before replay comparison, retained errors and the
+  Weather Observer badge. Source age and unavailable data remain explicit.
+
+- Hydrologist studies add matched upstream/downstream virtual instruments,
+  declared return conditions, saved watershed plates and the Water Watch badge.
+- Historical USGS river records retain source, dates and units separately from
+  simulated flow and optical readings; reports preserve uncertainty and limits.
+
 ## Racing and track creation — deployed 2026-10-31
 
 - Added complete Silverstone GP and pit access, full Nordschleife T13, and

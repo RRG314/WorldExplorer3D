@@ -2,10 +2,12 @@ import { FIELD_DISCOVERY_CATALOG } from './catalog.js?v=4';
 
 const WALKING_ENCOUNTER_SCHEMA_VERSION = 1;
 
-function distanceBetween(left = {}, right = {}) {
-  return Math.hypot(
-    Number(left.x || 0) - Number(right.x || 0),
-    Number(left.z || 0) - Number(right.z || 0)
+function distanceBetween(left = {}, right = {}, unit = 1) {
+  return (
+    Math.hypot(
+      Number(left.x || 0) - Number(right.x || 0),
+      Number(left.z || 0) - Number(right.z || 0)
+    ) * unit
   );
 }
 
@@ -41,6 +43,7 @@ function slotRichnessPenalty(slot = {}) {
 function createWalkingEncounterDirector(options = {}) {
   const plan = options.plan;
   if (plan?.type !== 'FieldActivityPlan') throw new TypeError('Walking encounters require a FieldActivityPlan.');
+  const unit = Number(options.metersPerWorldUnit) > 0 ? Number(options.metersPerWorldUnit) : 1;
   const claimedIds = options.claimedIds instanceof Set ? options.claimedIds : new Set(options.claimedIds || []);
   const canUseSlot = typeof options.canUseSlot === 'function' ? options.canUseSlot : () => true;
   const initialDelaySeconds = Math.max(0, Number(options.initialDelaySeconds) || 5);
@@ -62,7 +65,7 @@ function createWalkingEncounterDirector(options = {}) {
       .filter((slot) => !claimedIds.has(slot.claimId))
       .filter((slot) => !suppressedSlotIds.has(slot.id))
       .filter((slot) => canUseSlot(slot) === true)
-      .map((slot) => ({ slot, distance: distanceBetween(position, slot.position) }))
+      .map((slot) => ({ slot, distance: distanceBetween(position, slot.position, unit) }))
       .filter((entry) => entry.distance <= maxLeadDistance)
       .sort((left, right) => {
         const leftScore = left.distance + slotRichnessPenalty(left.slot) + (left.slot.activityId === lastActivityId ? 45 : 0);
@@ -85,7 +88,7 @@ function createWalkingEncounterDirector(options = {}) {
     const cadenceEligible = walkingEarth && input.blocked !== true && input.operationActive !== true;
     if (cadenceEligible) elapsed += dt;
     if (cadenceEligible && previousPosition) {
-      const segment = distanceBetween(position, previousPosition);
+      const segment = distanceBetween(position, previousPosition, unit);
       if (segment <= 25) walkedMeters += segment;
     }
     previousPosition = { x: Number(position.x || 0), z: Number(position.z || 0) };
@@ -101,7 +104,7 @@ function createWalkingEncounterDirector(options = {}) {
 
     if (current) {
       const stillAvailable = !claimedIds.has(current.slot.claimId) && canUseSlot(current.slot) === true;
-      const distance = distanceBetween(position, current.slot.position);
+      const distance = distanceBetween(position, current.slot.position, unit);
       if (!stillAvailable || distance > maxLeadDistance * 1.25) clear('lead-stale');
     }
     // Menus pause discovery cadence, but must not discard the invitation the
@@ -141,7 +144,7 @@ function createWalkingEncounterDirector(options = {}) {
 
   function snapshot(position = previousPosition || {}, liveGpsActive = false) {
     const slot = current?.slot;
-    const distance = slot ? distanceBetween(position, slot.position) : null;
+    const distance = slot ? distanceBetween(position, slot.position, unit) : null;
     return Object.freeze({
       type: 'WalkingEncounterSnapshot',
       schemaVersion: WALKING_ENCOUNTER_SCHEMA_VERSION,

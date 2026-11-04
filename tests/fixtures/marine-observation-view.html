@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>
+    Marine observation camera boundary</title
+  ><link rel="icon" href="/favicon.svg" /><style>
+    body {
+      margin: 0;
+      background: #123044;
+      color: #fff;
+      font: 14px system-ui;
+    }
+    canvas {
+      display: block;
+    }
+    #scope {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      background: #132c36e8;
+      padding: 10px;
+      max-width: 65vw;
+    }
+    #hudUtilities {
+      position: absolute;
+      background: #152725;
+      display: none;
+      left: calc(50% - 25px);
+      top: calc(50% - 25px);
+      width: 50px;
+      height: 50px;
+    }
+  </style>
+  <p id="scope">
+    Controlled camera/asset boundary · actual licensed models and animation · no population, source
+    journey or save claim
+  </p>
+  <div id="hudUtilities">HUD</div>
+  <script src="/app/vendor/three/build/three.min.js"></script>
+  <script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+  <script type="module">
+    import { loadDolphinVisual } from '/app/js/ocean/cetacean-visual.js';
+    import { loadFishVisual } from '/app/js/ocean/fish-visual.js';
+    import { createMarineObservationView } from '/app/js/campaign/marine-observation-view.js';
+    import { marineIndividualId } from '/app/js/ocean/observation-identity.js';
+    import { applyDisplayColorPolicy } from '/app/js/engine/display-color-policy.js';
+    const T = THREE,
+      scene = new T.Scene(),
+      camera = new T.PerspectiveCamera(64, innerWidth / innerHeight, 0.1, 400),
+      renderer = new T.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    applyDisplayColorPolicy(renderer, T);
+    document.body.prepend(renderer.domElement);
+    scene.background = new T.Color('#135772');
+    scene.fog = new T.FogExp2('#135772', 0.002);
+    scene.add(new T.HemisphereLight(0xccf3ff, 0x27444b, 1.5));
+    const sun = new T.DirectionalLight(0xffffff, 1.5);
+    sun.position.set(0, 20, 10);
+    scene.add(sun);
+    const bottom = new T.Mesh(
+      new T.PlaneGeometry(500, 500),
+      new T.MeshStandardMaterial({ color: '#687a70' })
+    );
+    bottom.rotation.x = -Math.PI / 2;
+    bottom.position.y = -100;
+    scene.add(bottom);
+    const dolphinVisual = await loadDolphinVisual(T),
+      dolphinRoot = new T.Group();
+    dolphinRoot.add(dolphinVisual.root);
+    dolphinRoot.position.set(0, -2, 60);
+    dolphinRoot.rotation.y = Math.PI / 2;
+    scene.add(dolphinRoot);
+    const fishVisual = await loadFishVisual(T, 'marine-barramundi'),
+      fishRoot = new T.Group();
+    fishRoot.add(fishVisual.root);
+    fishRoot.scale.setScalar(1 / 1.76);
+    fishRoot.position.set(0, -2, 200);
+    fishRoot.rotation.y = Math.PI / 2;
+    scene.add(fishRoot);
+    const dolphin = {
+        mesh: dolphinRoot,
+        radius: 1.3,
+        visualState: 'licensed',
+        individualId: marineIndividualId('controlled-cohort', 'short_beaked_common_dolphin', 0),
+        assetId: 'marine-common-dolphin',
+      },
+      fish = {
+        mesh: fishRoot,
+        radius: 0.55,
+        visualState: 'licensed',
+        individualId: marineIndividualId('controlled-cohort', 'barramundi', 0),
+        speciesId: 'barramundi',
+        speciesLabel: 'Barramundi',
+        assetId: 'marine-barramundi',
+      };
+    const obstacle = new T.Mesh(
+      new T.BoxGeometry(4, 4, 4),
+      new T.MeshStandardMaterial({ color: 0x617b80 })
+    );
+    obstacle.position.set(0, -2, 30);
+    obstacle.visible = false;
+    scene.add(obstacle);
+    const mode = {
+        active: true,
+        scene,
+        camera,
+        canvas: renderer.domElement,
+        submarine: { position: new T.Vector3(0, -2, 0) },
+        launchSite: { lat: 34, lon: -120 },
+        fishEntities: [fish],
+        cetaceans: [dolphin],
+        habitat: { plan: { rocks: [] }, sampleSeabedHeight: () => -100 },
+        waterSurface: { sample: () => ({ surfaceY: 0 }) },
+      },
+      ctx = { oceanMode: mode, METERS_PER_WORLD_UNIT: 1, SCALE: 111000 },
+      view = createMarineObservationView(ctx);
+    camera.position.set(0, -2, 0);
+    camera.lookAt(dolphinRoot.position);
+    let disposed = false,
+      last = performance.now(),
+      frames = 0;
+    function frame(now) {
+      if (disposed) return;
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      dolphinVisual.update(dt);
+      fishVisual.update(now * 0.001 * 7);
+      renderer.render(scene, camera);
+      frames++;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    function aim(root) {
+      camera.lookAt(root.position);
+      camera.updateMatrixWorld(true);
+      scene.updateMatrixWorld(true);
+    }
+    window.marineViewTest = {
+      mode,
+      ctx,
+      read: () => view.read({ force: true }),
+      get frames() {
+        return frames;
+      },
+      placeDolphin(d) {
+        dolphinRoot.position.z = d;
+        fishRoot.position.z = 200;
+        aim(dolphinRoot);
+      },
+      showFish(d) {
+        dolphinRoot.position.z = 220;
+        fishRoot.position.z = d;
+        aim(fishRoot);
+      },
+      setState(value) {
+        dolphin.visualState = value;
+        fish.visualState = value;
+      },
+      occlude(value) {
+        mode.habitat.plan.rocks = value ? [{ x: 0, y: -2, z: 30, rx: 5, ry: 5, rz: 5 }] : [];
+        obstacle.visible = value;
+      },
+      ownHull(value, transparent = false) {
+        if (!value) {
+          mode.submarine.mesh = null;
+          obstacle.visible = false;
+          return;
+        }
+        mode.submarine.mesh = obstacle;
+        obstacle.position.set(0, -2, 5);
+        obstacle.material.transparent = transparent;
+        obstacle.material.opacity = transparent ? 0.2 : 1;
+        obstacle.visible = true;
+        scene.updateMatrixWorld(true);
+      },
+      hud(value) {
+        document.getElementById('hudUtilities').style.display = value ? 'block' : 'none';
+      },
+      async dispose() {
+        disposed = true;
+        view.clear();
+        dolphinRoot.parent?.remove(dolphinRoot);
+        fishRoot.parent?.remove(fishRoot);
+        dolphinVisual.dispose();
+        fishVisual.dispose();
+        obstacle.geometry.dispose();
+        obstacle.material.dispose();
+        bottom.geometry.dispose();
+        bottom.material.dispose();
+        renderer.dispose();
+        return { dolphinDetached: !dolphinRoot.parent, fishDetached: !fishRoot.parent };
+      },
+    };
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        scope: 'Controlled licensed camera boundary; no source journey/save',
+        frames,
+        visible: view.read().map((o) => ({ species: o.speciesId, metres: o.distanceMeters })),
+      });
+    window.ready = true;
+  </script>
+</html>

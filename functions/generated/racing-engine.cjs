@@ -2718,21 +2718,6 @@ function integrateVehiclePlanarPosition(car, dt, { wheelBase, isDrifting, spdAbs
   return { x: nx, z: nz };
 }
 
-// app/js/physics/vehicle-speed-units.js
-var MPH_PER_SIMULATION_SPEED_UNIT2 = 0.5;
-var METERS_PER_SECOND_PER_MPH2 = 0.44704;
-var MPH_PER_METER_PER_SECOND2 = 1 / METERS_PER_SECOND_PER_MPH2;
-function finiteNumber2(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-function carSpeedToMph2(simulationSpeed = 0) {
-  return finiteNumber2(simulationSpeed) * MPH_PER_SIMULATION_SPEED_UNIT2;
-}
-function mphToCarSpeed2(mph = 0) {
-  return finiteNumber2(mph) / MPH_PER_SIMULATION_SPEED_UNIT2;
-}
-
 // app/js/transport/catalog-contract.js?v=1
 var TRANSPORT_CATALOG_SCHEMA_VERSION = 1;
 var TRANSPORT_DOMAINS = Object.freeze(["road", "aviation", "maritime"]);
@@ -3691,7 +3676,7 @@ var WHEEL_CONTACTS = Object.freeze([
   Object.freeze({ front: 1, side: -1 }),
   Object.freeze({ front: 1, side: 1 })
 ]);
-function finiteNumber3(value, fallback = 0) {
+function finiteNumber2(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 }
@@ -3699,12 +3684,12 @@ function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 function resolveVehicleRoadContactPose(options = {}) {
-  const x = finiteNumber3(options.x);
-  const y = finiteNumber3(options.y);
-  const z = finiteNumber3(options.z);
-  const yaw = finiteNumber3(options.yaw);
-  const fallbackPitch = finiteNumber3(options.pitch);
-  const fallbackRoll = finiteNumber3(options.roll);
+  const x = finiteNumber2(options.x);
+  const y = finiteNumber2(options.y);
+  const z = finiteNumber2(options.z);
+  const yaw = finiteNumber2(options.yaw);
+  const fallbackPitch = finiteNumber2(options.pitch);
+  const fallbackRoll = finiteNumber2(options.roll);
   const sampleSurface = typeof options.sampleSurface === "function" ? options.sampleSurface : null;
   const layout = vehicleWheelContactLayout(options.variant);
   const forwardX = Math.sin(yaw);
@@ -3743,7 +3728,7 @@ function resolveVehicleRoadContactPose(options = {}) {
     authority: "edge-plane-fallback"
   });
   const poseDelta = (pitch2, roll2, contact) => Math.cos(pitch2) * Math.sin(roll2) * contact.side * layout.halfTrack - Math.sin(pitch2) * contact.front * layout.halfWheelbase;
-  const maximumRoll = clamp(finiteNumber3(options.maximumRoll, 0.55), 0, Math.atan(0.7));
+  const maximumRoll = clamp(finiteNumber2(options.maximumRoll, 0.55), 0, Math.atan(0.7));
   let pitch = clamp(fallbackPitch, -0.55, 0.55);
   let roll = clamp(fallbackRoll, -maximumRoll, maximumRoll);
   if (!footprint(pitch, roll) || !sampleSurface) return fallback();
@@ -4202,8 +4187,8 @@ function applyRaceBarrierImpact(course, car, profile, normal) {
   const v = response.moverVelocity, s = Math.sin(car.angle), c = Math.cos(car.angle);
   car.vx = v.x / course.metersPerUnit;
   car.vz = v.z / course.metersPerUnit;
-  car.speed = car.vFwd = mphToCarSpeed2((v.x * s + v.z * c) * 2.2369362921);
-  car.vLat = mphToCarSpeed2((v.x * c - v.z * s) * 2.2369362921);
+  car.speed = car.vFwd = mphToCarSpeed((v.x * s + v.z * c) * 2.2369362921);
+  car.vLat = mphToCarSpeed((v.x * c - v.z * s) * 2.2369362921);
   car.yawRate = (car.yawRate || 0) + response.moverYawImpulse;
   car.rearSlip = (car.rearSlip || 0) + response.moverYawImpulse * 0.42;
   car.collisionDamage = (car.collisionDamage || 0) + applyTransportDamage(car, response.moverDamageForce).delta;
@@ -4272,7 +4257,7 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
     vehicleCondition: raceHasDamage(course) ? vehicleConditionDynamics(car.condition) : profile.condition,
     vehicleUpgrades: profile.upgrades,
     characterVehicle: profile.character,
-    maxSpd: Math.min(profile.config.maxSpd, mphToCarSpeed2(profile.handling.topSpeedMph)),
+    maxSpd: Math.min(profile.config.maxSpd, mphToCarSpeed(profile.handling.topSpeedMph)),
     friction: profile.config.friction,
     accel: profile.config.accel * profile.handling.accelerationScale
   });
@@ -4380,7 +4365,7 @@ function stepRaceVehicle(course, car, actions, dt, profile, { draftReduction = 0
   return driving;
 }
 function raceVehicleSpeedMetersPerSecond(car) {
-  return carSpeedToMph2(car.speed) * 0.44704;
+  return carSpeedToMph(car.speed) * 0.44704;
 }
 function raceVehicleGroundPose(car) {
   return { x: car.x, y: car.y - VEHICLE_ROOT_TO_GROUND_METERS, z: car.z, yaw: car.angle };

@@ -8,6 +8,7 @@ import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { completeWorldReady } from './complete-world-readiness.mjs';
 import { closeOwnedBrowser } from './owned-browser.mjs';
+import { VEHICLE_BY_ID } from '../../app/js/engine/vehicle-catalog.js';
 
 const root = process.cwd();
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -134,7 +135,10 @@ function intersections(snapshot) {
   const pairs = [
     ['tutorial', 'gameplayBar'],
     ['minimap', 'gameplayBar'],
-    ['hud', 'gameplayBar']
+    ['hudBox', 'gameplayBar'],
+    ['hudMap', 'gameplayBar'],
+    ['hudStatusPanels', 'gameplayBar'],
+    ['hudActions', 'gameplayBar']
   ];
   return pairs.filter(([leftName, rightName]) => {
     const left = snapshot[leftName];
@@ -152,7 +156,8 @@ async function publicSnapshot() {
       const bounds = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       return {
-        visible: !element.hidden && style.display !== 'none' && style.visibility !== 'hidden' && bounds.width > 0 && bounds.height > 0,
+        visible: element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
+          !element.hidden && style.display !== 'none' && style.visibility !== 'hidden' && bounds.width > 0 && bounds.height > 0,
         left: bounds.left,
         top: bounds.top,
         right: bounds.right,
@@ -169,7 +174,13 @@ async function publicSnapshot() {
         tutorial: rect('#tutorialHintCard'),
         gameplayBar: rect('#floatMenuContainer'),
         minimap: rect('#minimap'),
-        hud: rect('#hud')
+        // The original HUD root reserves transparent, pointer-free layout
+        // space. Protect its actual painted/content owners instead.
+        hudRoot: rect('#hud'),
+        hudBox: rect('#hudBox'),
+        hudMap: rect('#hudMap'),
+        hudStatusPanels: rect('#hudStatusPanels'),
+        hudActions: rect('.hudUtilityActions')
       },
       ui: {
         backpack: !!document.querySelector('#urbanEquipment'),
@@ -358,8 +369,14 @@ try {
         Number(urbanSandbox.lodPolicy?.vehiclePreloadDistance || Infinity),
     trafficVehicleScaleIsPlausible:
       vehicleDimensions.length >= 4 && vehicleDimensions.every((vehicle) =>
+        Object.hasOwn(VEHICLE_BY_ID, vehicle.id) &&
+        ['width', 'height', 'length'].every(key =>
+          Number.isFinite(Number(vehicle[key])) &&
+          Math.abs(Number(vehicle[key]) - Number(VEHICLE_BY_ID[vehicle.id][key])) < 1e-9
+        ) &&
         Number(vehicle.width) >= 1.5 && Number(vehicle.width) <= 2.6 &&
-        Number(vehicle.height) >= 1.3 && Number(vehicle.height) <= 3.2 &&
+        // Accepted real coupes include the 1.20 m DeLorean and 1.23 m M3.
+        Number(vehicle.height) >= 1.2 && Number(vehicle.height) <= 3.2 &&
         Number(vehicle.length) >= 3.4 && Number(vehicle.length) <= 10.8
       ),
     oneBackpackOwnsEquipment:
@@ -441,6 +458,8 @@ try {
     continuityRepair: beforeInput.diagnostics.transportStructures?.junctionProfile?.continuityRepair ||
       beforeInput.diagnostics.transportStructures?.continuityRepair || null,
     layoutIntersections,
+    layoutSnapshot: beforeInput.layout,
+    trafficDimensions: vehicleDimensions,
     worldCounts: beforeInput.diagnostics.worldCounts,
     visualOwners: {
       atmosphere: beforeInput.diagnostics.visualOwners?.atmosphere || null,
@@ -459,13 +478,14 @@ try {
     localFailures
   };
 
-  if (captureRequested) {
+  if (captureRequested && report.ok) {
     const manifest = JSON.parse(await fs.readFile(path.join(servedRoot, 'build-manifest.json'), 'utf8'));
     assert.equal(manifest.sourceDirty, false, 'release evidence requires a clean immutable artifact');
     // This directory also holds other gates' receipts. A screenshot must not
     // erase the evidence already collected by the release matrix.
-    await fs.mkdir(evidenceDir, { recursive: true });
-    const worldImage = path.join(evidenceDir, report.ok ? 'complete-baltimore-world.png' : 'baltimore-world-failed.png');
+    const candidateEvidenceDir = path.join(evidenceDir, manifest.buildId.replace(/[^A-Za-z0-9._+-]/g, '-'));
+    await fs.mkdir(candidateEvidenceDir, { recursive: true });
+    const worldImage = path.join(candidateEvidenceDir, 'complete-baltimore-world.png');
     await page.screenshot({ path: worldImage, fullPage: false, timeout: 120000 });
     report.screenshotsWritten.push(path.relative(root, worldImage));
   }

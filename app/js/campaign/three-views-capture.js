@@ -6,35 +6,87 @@ import { THREE_VIEWS, validateAlbumPhoto } from './three-views.js';
 // Explicit shutter actions only. No scene traversal, raycasting, canvas reads or
 // image encoding in the ordinary frame loop while the camera is not requested.
 export function inspectPhotoSubject(ctx, identity, expectedId) {
-  if(ctx.getEnv?.()!=='EARTH'||ctx.getCurrentTravelMode?.()!=='walk'||ctx.worldLoading||ctx.activeInterior||ctx.getLiveGpsSnapshot?.().active)
+  if (
+    ctx.getEnv?.() !== 'EARTH' ||
+    ctx.getCurrentTravelMode?.() !== 'walk' ||
+    ctx.worldLoading ||
+    ctx.activeInterior ||
+    ctx.getLiveGpsSnapshot?.().active
+  )
     throw Error('Explore outdoors on foot with Live GPS off to frame this place.');
-  const T=globalThis.THREE,camera=ctx.camera,frame=earthCoordinateFrame(ctx.LOC,ctx.SCALE);
+  const T = globalThis.THREE,
+    camera = ctx.camera,
+    frame = earthCoordinateFrame(ctx.LOC, ctx.SCALE),
+    units = ctx.METERS_PER_WORLD_UNIT || 111000 / (ctx.SCALE || 100000);
   camera.updateMatrixWorld();
-  const visible=object=>{for(let p=object;p;p=p.parent)if(!p.visible)return false;return true;};
+  const visible = (object) => {
+    for (let p = object; p; p = p.parent) if (!p.visible) return false;
+    return true;
+  };
   // Include vegetation, terrain and other scene geometry: picking only the
   // building array would photograph through trees, vehicles and walls.
-  const roots=ctx.scene.children.filter(visible);
-  const ray=new T.Raycaster();ray.near=.5;ray.far=180;
-  const samples=[[0,0],[-.55,0],[.55,0],[0,.45],[0,-.45]];
-  const hits=samples.map(([x,y])=>{
-    ray.setFromCamera(new T.Vector2(x,y),camera);
-    return ray.intersectObjects(roots,true).find(hit=>visible(hit.object)&&!hit.object.isSprite&&hit.object.material?.depthTest!==false&&!(hit.object.material?.transparent&&hit.object.material.opacity<.2));
+  const roots = ctx.scene.children.filter(visible);
+  const ray = new T.Raycaster();
+  ray.near = 0.5;
+  ray.far = 180 / units;
+  const samples = [
+    [0, 0],
+    [-0.55, 0],
+    [0.55, 0],
+    [0, 0.45],
+    [0, -0.45],
+  ];
+  const hits = samples.map(([x, y]) => {
+    ray.setFromCamera(new T.Vector2(x, y), camera);
+    return ray
+      .intersectObjects(roots, true)
+      .find(
+        (hit) =>
+          visible(hit.object) &&
+          !hit.object.isSprite &&
+          hit.object.material?.depthTest !== false &&
+          !(hit.object.material?.transparent && hit.object.material.opacity < 0.2)
+      );
   });
-  const hit=hits[0],target=targetFromIntersection(hit);
-  if(target?.kind!=='building'||!target.id||expectedId&&target.id!==expectedId)throw Error('Aim the center of the screen at your building, with a clear view of its facade.');
-  const metadata=ctx.buildings?.find(b=>String(b.sourceBuildingId||b.id)===target.id);
-  const p=camera.getWorldPosition(new T.Vector3());
-  const subject={id:target.id,name:String(metadata?.tags?.name||metadata?.name||target.label||'Mapped building').slice(0,180),
-    regionId:identity.regionId,regionLabel:identity.regionLabel,position:{...frame.toGeographic(hit.point.x,hit.point.z),y:hit.point.y}};
-  return {subject,view:{subjectId:target.id,regionId:identity.regionId,position:{...frame.toGeographic(p.x,p.z),y:p.y},
-    bearing:Math.atan2(hit.point.x-p.x,hit.point.z-p.z),range:hit.distance,coverage:hits.filter(h=>targetFromIntersection(h)?.id===target.id).length/samples.length,
-    environment:'EARTH',travelMode:'walk',liveGps:false,visible:true}};
+  const hit = hits[0],
+    target = targetFromIntersection(hit);
+  if (target?.kind !== 'building' || !target.id || (expectedId && target.id !== expectedId))
+    throw Error('Aim the center of the screen at your building, with a clear view of its facade.');
+  const metadata = ctx.buildings?.find((b) => String(b.sourceBuildingId || b.id) === target.id);
+  const p = camera.getWorldPosition(new T.Vector3());
+  const subject = {
+    id: target.id,
+    name: String(metadata?.tags?.name || metadata?.name || target.label || 'Mapped building').slice(
+      0,
+      180
+    ),
+    regionId: identity.regionId,
+    regionLabel: identity.regionLabel,
+    position: { ...frame.toGeographic(hit.point.x, hit.point.z), y: hit.point.y },
+  };
+  return {
+    subject,
+    view: {
+      subjectId: target.id,
+      regionId: identity.regionId,
+      position: { ...frame.toGeographic(p.x, p.z), y: p.y },
+      bearing: Math.atan2(hit.point.x - p.x, hit.point.z - p.z),
+      range: hit.distance * units,
+      rangeUnits: 'm',
+      coverage:
+        hits.filter((h) => targetFromIntersection(h)?.id === target.id).length / samples.length,
+      environment: 'EARTH',
+      travelMode: 'walk',
+      liveGps: false,
+      visible: true,
+    },
+  };
 }
 
-export function createWorldPhotoCapture(ctx) {
+export function createWorldPhotoCapture(ctx,{systemId='campaign.photo-shutter',owner='campaign-photo'}={}) {
   let pending=null,disposed=false;
   const cancel=()=>{if(pending){clearTimeout(pending.timer);pending.reject(Error('The scene changed before the photograph was ready. Try again.'));pending=null;}};
-  const unregister=ctx.registerRuntimeSystem?.({id:'campaign.photo-shutter',owner:'campaign-photo',phase:'render',priority:1000,critical:false,
+  const unregister=ctx.registerRuntimeSystem?.({id:systemId,owner,phase:'render',priority:1000,critical:false,
     enabled:frame=>!!pending&&frame.manualRender!==false&&!ctx.worldLoading&&!ctx.titleLaunchPending&&!ctx.hasPauseReason?.('manual_pause')&&!document.hidden,
     update(){
       if(!pending)return;

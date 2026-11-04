@@ -1,0 +1,151 @@
+<!doctype html><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><link
+  rel="icon"
+  href="/favicon.svg"
+/><title>Wildlife presentation boundary</title
+><style>
+  body {
+    margin: 0;
+  }
+  canvas {
+    display: block;
+  }
+  p {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: #102b20;
+    color: white;
+    padding: 10px;
+    font: 14px system-ui;
+  }
+</style>
+<p>Controlled virtual habitat presentation · no real sightings or world admission claim</p>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+  import { createWildlifePresentation } from '/app/js/campaign/wildlife-presentation.js';
+  import { WILDLIFE_STUDIES } from '/app/js/campaign/wildlife-career.js';
+  import { inspectWildlifeSensor } from '/app/js/campaign/wildlife-tools.js';
+  import {
+    inspectWildlifeObservation,
+    wildlifeOccluders
+  } from '/app/js/campaign/wildlife-sight.js';
+  import { applyDisplayColorPolicy } from '/app/js/engine/display-color-policy.js';
+  const T = THREE,
+    scene = new T.Scene(),
+    camera = new T.PerspectiveCamera(58, innerWidth / innerHeight, 0.08, 150),
+    renderer = new T.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  applyDisplayColorPolicy(renderer, T);
+  scene.background = new T.Color('#cad9db');
+  document.body.prepend(renderer.domElement);
+  scene.add(new T.HemisphereLight(0xffffff, 0x4b6044, 1));
+  const sun = new T.DirectionalLight(0xffffff, 1.4);
+  sun.position.set(-10, 20, 10);
+  scene.add(sun);
+  const floor = new T.Mesh(
+    new T.PlaneGeometry(120, 120),
+    new T.MeshStandardMaterial({ color: 0x58794e, roughness: 0.9 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+  const state = {
+      active: {
+        runId: 'wildlife-visual-case',
+        variantId: 'campaign',
+        phase: 'survey',
+        habitatIndex: 0
+      }
+    },
+    walker = { x: -9, y: 1.7, z: 0 },
+    runtime = {
+      scene,
+      camera,
+      renderer,
+      METERS_PER_WORLD_UNIT: 1,
+      Walk: { state: { walker } },
+      dynamicBuildingColliders: [],
+      SurfaceQuery: {
+        driveAt: () => ({ position: { y: 0 } }),
+        walkAt: () => ({ position: { y: 0 } })
+      },
+      getEnv: () => 'EARTH',
+      getCurrentTravelMode: () => 'walk',
+      getLiveGpsSnapshot: () => ({ active: false }),
+      worldDiscoveryPublicationStore: {
+        get: () => ({
+          environment: {
+            type: 'EnvironmentContextPublication',
+            cells: [
+              {
+                cellId: 'fixture',
+                bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 },
+                contexts: ['park']
+              }
+            ]
+          }
+        })
+      }
+    },
+    qualified = {
+      site: { id: 'controlled-wildlife' },
+      metersPerUnit: 1,
+      points: { a: { x: -9, y: 0, z: 0 }, b: { x: 9, y: 0, z: 0 }, bench: { x: 0, y: 0, z: 8 } }
+    };
+  const presentation = await createWildlifePresentation(
+    runtime,
+    qualified,
+    WILDLIFE_STUDIES.campaign,
+    { getState: () => state, isCurrent: () => true }
+  );
+  presentation.update(state.active);
+  for (const id of ['a', 'b']) {
+    const s = presentation.sensors[id],
+      p = qualified.points[id];
+    presentation.alignSensor(id, Math.atan2(p.x - s.origin.x, p.z - 7 - s.origin.z));
+  }
+  camera.position.set(-9, 1.7, 1);
+  camera.lookAt(-9, 0.9, -7);
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    presentation.tick(dt);
+    window.wildlifeVisual?.tools?.tick(dt);
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  window.wildlifeVisual = {
+    runtime,
+    presentation,
+    qualified,
+    state,
+    probe(id) {
+      const subject = presentation.subjects().find((row) => row.id.includes(`:${id}:`)),
+        trace = [],
+        before = performance.now(),
+        sensor = inspectWildlifeSensor(
+          runtime,
+          presentation.sensors[id],
+          subject,
+          undefined,
+          trace
+        ),
+        sensorMs = performance.now() - before;
+      const visual = subject.object.userData.curatedAnimalAttachment.visual;
+      return {
+        sensor,
+        trace,
+        sensorMs,
+        observer: !!inspectWildlifeObservation(runtime, [visual]),
+        budget: presentation.budget
+      };
+    }
+  };
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+</script>

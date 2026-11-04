@@ -41,6 +41,15 @@ export function validatePromotion({ receipt, baseline, productionIdentity, produ
     const assets = build === stagingBuild ? stagingAssets.files : productionAssets.files;
     verifyRuntimeGenerations(packaging, assets);
     const current = new Set([...packaging.bundlePaths, ...Object.keys(packaging.generation.files)]);
+    const groundRoot = build.groundData?.outputRoot;
+    if (groundRoot) {
+      assert.match(groundRoot, /^location-data\/ground\/[a-f0-9]{16}$/);
+      // A predecessor may use this exact current ground release too. Those
+      // shared bytes remain tested current assets, never history-only files.
+      for (const file of Object.keys(assets)) {
+        if (file.startsWith(`${groundRoot}/`)) current.add(file);
+      }
+    }
     return new Set([...Object.keys(packaging.rootModuleAliases||{}),...packaging.compatibility.flatMap(previous => Object.keys(previous.files))].filter(file => !current.has(file)));
   };
   if (stagingBuild.runtimePackaging?.generation || productionBuild.runtimePackaging?.generation) {

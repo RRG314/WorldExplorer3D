@@ -6,8 +6,13 @@ function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-function distanceTo(position, target) {
-  return Math.hypot(Number(position?.x || 0) - Number(target?.x || 0), Number(position?.z || 0) - Number(target?.z || 0));
+function distanceTo(position, target, metersPerWorldUnit = 1) {
+  return (
+    Math.hypot(
+      Number(position?.x || 0) - Number(target?.x || 0),
+      Number(position?.z || 0) - Number(target?.z || 0)
+    ) * metersPerWorldUnit
+  );
 }
 
 function detectorBearing(position, target) {
@@ -35,6 +40,7 @@ function detectorTuning(capability = null) {
 function createDetectorSession(options = {}) {
   const plan = options.plan;
   if (plan?.type !== 'EncounterPlan') throw new TypeError('Detector session requires an EncounterPlan.');
+  const unit = Number(options.metersPerWorldUnit) > 0 ? Number(options.metersPerWorldUnit) : 1;
   const claimed = options.claimedIds instanceof Set ? options.claimedIds : new Set(options.claimedIds || []);
   const observedCatalogIds = options.observedCatalogIds instanceof Set ? options.observedCatalogIds : new Set(options.observedCatalogIds || []);
   let availableToolIds = Array.isArray(options.availableToolIds) ? options.availableToolIds.map(String) : [];
@@ -51,7 +57,7 @@ function createDetectorSession(options = {}) {
 
   function nearestUnclaimed(position) {
     return prioritizeProgressiveSlots(plan.slots, { claimedIds: claimed, observedCatalogIds, progress })
-      .map((slot) => ({ slot, distance: distanceTo(position, slot.position) }))
+      .map((slot) => ({ slot, distance: distanceTo(position, slot.position, unit) }))
       .sort((a, b) => a.distance - b.distance || a.slot.id.localeCompare(b.slot.id))[0] || null;
   }
 
@@ -81,7 +87,7 @@ function createDetectorSession(options = {}) {
   function update(position, dt = 0) {
     if (!target || !['sweeping', 'signal', 'classified', 'excavating'].includes(phase)) return snapshot(position);
     elapsed += Math.max(0, Number(dt) || 0);
-    const distance = distanceTo(position, target.position);
+    const distance = distanceTo(position, target.position, unit);
     signalStrength = clamp(1 - distance / tuning.signalRange, 0.02, 1);
     if (phase === 'sweeping' && distance <= tuning.focusRadius) {
       phase = 'signal';
@@ -100,7 +106,7 @@ function createDetectorSession(options = {}) {
   function refine(position) {
     error = '';
     if (!target || !['signal', 'sweeping'].includes(phase)) return false;
-    const distance = distanceTo(position, target.position);
+    const distance = distanceTo(position, target.position, unit);
     if (distance > tuning.focusRadius) {
       error = `Move ${Math.ceil(distance - tuning.focusRadius)} m closer before refining.`;
       return false;
@@ -201,7 +207,7 @@ function createDetectorSession(options = {}) {
 
   function snapshot(position = {}) {
     const find = target ? FIND_CATALOG.find((entry) => entry.id === target.catalogId) : null;
-    const distance = target ? distanceTo(position, target.position) : null;
+    const distance = target ? distanceTo(position, target.position, unit) : null;
     return Object.freeze({
       active: phase !== 'idle', phase, message, error,
       targetId: target?.id || null,

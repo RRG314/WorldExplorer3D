@@ -23,7 +23,7 @@ export function mountTesterInvitation({
     dismissedThisSession = true;
     root.hidden = true;
     try { writeStorage?.(DISMISSAL_KEY, value); } catch { /* No persistence is required to keep playing. */ }
-    if (hadFocus) document.getElementById('globeSelectorStartBtn')?.focus({ preventScroll: true });
+    if (hadFocus) document.getElementById('globeSelectorStartBtn')?.focus();
   };
   scope.listen(document.getElementById('testerInvitationClose'), 'click', () => dismiss('dismissed'));
   const open = document.getElementById('testerInvitationOpen');

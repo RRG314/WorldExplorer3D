@@ -55,7 +55,7 @@ test('cargo and exact route survive export/import; damaged completion does not r
  data.events=[];await assert.rejects(copy.importData(data),/incomplete/);assert.equal((await copy.getProfile()).harborRun.phase,'complete');
 });
 test('physical route sampling rejects missing road, building intersections and excessive grades',()=>{
- const context={SurfaceQuery:{driveAt:(x,z)=>({kind:'road',position:{y:10}})},checkBuildingCollision:()=>({collision:false})};
+ const context={METERS_PER_WORLD_UNIT:1,SurfaceQuery:{driveAt:(x,z)=>({kind:'road',position:{y:10}})},checkBuildingCollision:()=>({collision:false})};
  const path=[{x:0,z:0},{x:210,z:0}];const valid=validatePhysicalDeliveryRoute(context,path);assert.equal(valid.distance,210);assert.ok(valid.points.length>=10);
  for(const change of [ {SurfaceQuery:{driveAt:()=>({kind:'terrain',position:{y:10}})}}, {checkBuildingCollision:()=>({collision:true})}, {SurfaceQuery:{driveAt:x=>({kind:'road',position:{y:x*.5}})}} ])assert.equal(validatePhysicalDeliveryRoute({...context,...change},path),null);
 });

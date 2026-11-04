@@ -1,6 +1,9 @@
+import {drawFossilPlate} from '../campaign/palaeontology-illustration.js';
+import {drawPlanetaryPlate} from '../campaign/planetary-report.js';
 import {workspaceCollisionProxies} from '../campaign/personal-workspace.js';
 import {detachSceneObject} from '../engine/scene-object-lifecycle.js';
 import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
+import {drawArchaeologyPlate} from '../campaign/archaeology-illustration.js';
 
 // Owns only these two model leases, their proxies and the player's record card.
 // The building shell, floor, doors and scene lighting keep their existing owner.
@@ -28,10 +31,13 @@ export async function createWorkspaceVisual(ctx,active,geometry,record,options={
     const words=String(record?.name||'Your saved field record').split(/\s+/);let line='',row=0;
     for (const word of words){const next=line?`${line} ${word}`:word;if(c.measureText(next).width>448){c.fillText(line,28,106+row*28);row++;line=word;}else line=next;if(row>=5)break;}
     c.fillText(line,28,106+row*28,448);c.font='16px sans-serif';c.fillText(String(record?.regionLabel||'Personal research notes'),28,332,450);
+    if(record?.metadata?.archaeologyReport)drawArchaeologyPlate(canvas,record.metadata.archaeologyReport);
+    if(record?.metadata?.palaeontologyReport)drawFossilPlate(canvas,record.metadata.palaeontologyReport);
+    const planetaryPlate=record?.metadata?.lunarVersion===1&&drawPlanetaryPlate(canvas,record);
     const texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;
-    const material=new T.MeshStandardMaterial({map:texture,roughness:.95,metalness:0}),paperGeometry=new T.PlaneGeometry(.44,.33);
+    const material=new T.MeshStandardMaterial({map:texture,roughness:.95,metalness:0}),paperGeometry=new T.PlaneGeometry(.44,.44*canvas.height/canvas.width);
     resources.push(texture,material,paperGeometry);
-    const paper=new T.Mesh(paperGeometry,material);paper.rotation.x=-Math.PI/2;paper.rotation.z=-geometry.yaw;
+    const paper=new T.Mesh(paperGeometry,material);paper.rotation.x=-Math.PI/2;paper.rotation.z=(record?.metadata?.archaeologyReport||record?.metadata?.palaeontologyReport||planetaryPlate)?geometry.yaw-Math.PI/2:-geometry.yaw;
     paper.position.set(geometry.origin.x,geometry.origin.y+.803,geometry.origin.z);group.add(paper);
     if(options.isCurrent&&!options.isCurrent()){dispose();return null;}
     host.add(group);owner.push(...colliders);

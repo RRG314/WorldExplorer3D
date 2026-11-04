@@ -1,18 +1,24 @@
+import {validateCompanionRecallBackup} from '../campaign/companion-handling.js';
+import {validateWorkspaceJournal} from '../campaign/engineering-workspace.js';
+import {RESEARCH_MEDIA_BACKUP_VERSION,validateResearchMediaRecord,validateResearchMediaReferences} from '../campaign/research-media.js';
+import {validateResearchCareerBackups} from '../campaign/research-career-definitions.js';
+import {validateSoloRacerBackup} from '../campaign/solo-racer.js';
 import {validateLunarHomecomingBackup} from '../campaign/lunar-homecoming.js';
+import {validateLunarStudyBackups} from '../planetary/lunar-study-records.js';
 import {validateInvestigationBackup} from '../campaign/coastal-investigation.js';
 import {validateCoastalBackup} from '../campaign/coastal-departure.js';
 import { THREE_VIEWS, validateThreeViewsBackup } from '../campaign/three-views.js';
 import {HOME_ACHIEVEMENTS} from '../campaign/home-achievements.js';
-import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute } from '../campaign/harbor-run.js';
+import { HARBOR_RUN, normalizeHarborRun, validateDeliveryRoute, validatePilotBackup } from '../campaign/harbor-run.js';
 import { validHandling, deliveryDistinction } from '../campaign/delivery-handling.js';
 import {validatePortalTrailEntry} from '../portal/trail-model.js';
 // Validate the entire file before opening a destructive replacement transaction.
 // Older backups may omit optional collections, but malformed rows are never dropped.
-import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
+import { FIRST_BEARINGS, normalizeOpeningChapter, finishOpeningChapter, validateOpeningLocation } from '../campaign/first-bearings.js?v=1';
 export function validateJournalBackup(input) {
   const fail = () => { throw new TypeError('This Journal backup is incomplete, damaged, or from an unsupported version. Existing records have not been changed.'); };
   if (!input || typeof input !== 'object' || !input.profile || typeof input.profile !== 'object' || Array.isArray(input.profile)) fail();
-  if (input.schemaVersion != null && (!Number.isInteger(input.schemaVersion) || input.schemaVersion < 1 || input.schemaVersion > 5)) fail();
+  if (input.schemaVersion != null && (!Number.isInteger(input.schemaVersion) || input.schemaVersion < 1 || input.schemaVersion > RESEARCH_MEDIA_BACKUP_VERSION)) fail();
   if (input.profile.id != null && input.profile.id !== 'local-explorer') fail();
   const data = JSON.parse(JSON.stringify(input));
   if(Object.hasOwn(data,'portalTrail')) {
@@ -38,8 +44,22 @@ export function validateJournalBackup(input) {
     const claims = new Set();
     for (const row of rows) if (row.claimId) { if (claims.has(row.claimId)) fail(); claims.add(row.claimId); }
   }
-  try{validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);}catch{fail();}
+  try{validateCompanionRecallBackup(data.companions,data.events);validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);validateLunarStudyBackups(data.events);}catch{fail();}
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
+  if(chapter.schemaVersion===1&&chapter.locationSnapshot)try{validateOpeningLocation(chapter.locationSnapshot);}catch{fail();}
+  const locationBackup = data.profile.openingChapterLocationBackup;
+  if (locationBackup?.schemaVersion === 1) {
+    try {
+      const location = validateOpeningLocation(locationBackup.locationSnapshot);
+      if (!(Number.isFinite(locationBackup.acceptedAt) && locationBackup.acceptedAt > 0) ||
+          typeof locationBackup.regionId !== 'string' || !locationBackup.regionId ||
+          locationBackup.regionId.length > 160 || typeof locationBackup.careerId !== 'string' ||
+          !locationBackup.careerId || locationBackup.careerId.length > 60) fail();
+      if (chapter.schemaVersion === 1 && chapter.acceptedAt === locationBackup.acceptedAt &&
+          chapter.regionId === locationBackup.regionId && chapter.careerId === locationBackup.careerId &&
+          chapter.locationSnapshot && JSON.stringify(validateOpeningLocation(chapter.locationSnapshot)) !== JSON.stringify(location)) fail();
+    } catch { fail(); }
+  }
   for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
     const definition=HOME_ACHIEVEMENTS[kind],receipt=data.events.find(event=>event.eventId===entry?.eventId);
     if(!definition || entry?.eventId!==`event:campaign:${definition.id}:v1` || !(entry.occurredAt>0) || !entry.metadata?.homeId || !receipt || receipt.eventType!=='campaign-completed' || receipt.metadata?.homeId!==entry.metadata.homeId)fail();
@@ -66,8 +86,14 @@ export function validateJournalBackup(input) {
         || delivery.nextPoint !== delivery.route.points.length || !data.events.some(event => event.eventId === HARBOR_RUN.receiptId
         && event.metadata?.routeId === delivery.route.id && event.eventType === 'campaign-completed'))) fail();
   }
+  try{validatePilotBackup(delivery,data.events);}catch{fail();}
   if(data.albums==null)data.albums=[];
   if(!Array.isArray(data.albums)||data.albums.length>1||data.albums.some(a=>a?.id!==THREE_VIEWS.albumId))fail();
   try{validateThreeViewsBackup(data.profile.threeViews,data.albums[0],data.events);}catch{fail();}
+  if(data.researchMedia==null)data.researchMedia=[];
+  if(!Array.isArray(data.researchMedia)||data.researchMedia.length>128||new Set(data.researchMedia.map(row=>row?.id)).size!==data.researchMedia.length)fail();
+  try{for(const row of data.researchMedia)validateResearchMediaRecord(row);validateResearchMediaReferences(data.profile.researchCareers,data.researchMedia,data.events);}catch{fail();}
+  try{validateResearchCareerBackups(data.profile.researchCareers,data.events,data.items);}catch{fail();}
+  try{validateWorkspaceJournal(data.events);validateSoloRacerBackup(data.profile.soloRacer,data.events);}catch{fail();}
   return data;
 }

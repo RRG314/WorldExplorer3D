@@ -1,10 +1,8 @@
 // Personal photographs and observations. These are game records, never GPS
 // presence proof, a currency grant or a publication to the shared world.
-export const THREE_VIEWS = Object.freeze({
-  id:'three-views', albumId:'album:local-explorer:three-views:v1',
-  receiptId:'event:campaign-completed:three-views:v1', maxPhotoBytes:384*1024,
-  kinds:Object.freeze(['context','detail','setting'])
-});
+import {THREE_VIEWS} from './three-views-config.js';
+export {THREE_VIEWS} from './three-views-config.js';
+import {transitionDocumentaryStory,validateDocumentaryStoryBackup} from './documentary-story.js';
 const copy=value=>structuredClone(value);
 const finite=Number.isFinite;
 const label=value=>typeof value==='string'&&value.trim().length>0&&value.length<=180;
@@ -62,70 +60,196 @@ export function threeViewsReceipt(state){
   return {eventId:THREE_VIEWS.receiptId,eventType:'campaign-completed',sourceSystem:'explorer-campaign',sourceId:THREE_VIEWS.id,pathId:'field',
     name:state.mode==='photo'?'A Place in Three Views · album':'A Place in Three Views · observations',
     detail:`${state.subject.name}: street context, facade detail and district setting ${state.mode==='photo'?'photographed':'observed'}.`,
-    regionId:state.regionId,regionLabel:state.regionLabel,environment:'EARTH',occurredAt:state.completedAt,points:0,
+    regionId:state.regionId,regionLabel:state.regionLabel,...(state.locationSnapshot?{locationSnapshot:copy(state.locationSnapshot)}:{}),environment:'EARTH',occurredAt:state.completedAt,points:0,
     projections:{profile:false,place:false},metadata:{chapterId:THREE_VIEWS.id,mode:state.mode,subjectId:state.subject.id,viewCount:3,reward:state.mode==='photo'?'three-view-album':'three-view-observations'}};
 }
-export function transitionThreeViews(input,albumInput,command,now=Date.now()){
-  const state=normalizeThreeViews(input),album=copy(albumInput||emptyPhotoAlbum());
-  if(state.schemaVersion!==1)throw Error('This album needs a newer World Explorer version.');
-  if(state.revision!==command.revision)throw Error('This job changed in another window. Reopen the Journal.');
-  let next={...state,revision:state.revision+1};
-  if(command.type==='accept'){
-    if(state.phase!=='available'||!['photo','observation'].includes(command.mode)||!label(command.regionId)||!label(command.regionLabel))throw Error('Choose the photo or observation job in a loaded region.');
-    next={...next,phase:'choose',mode:command.mode,regionId:command.regionId,regionLabel:command.regionLabel,acceptedAt:now,views:[],subject:null};
-  }else if(command.type==='choose'){
-    if(state.phase!=='choose')throw Error('Finish or leave your current subject before choosing another.');
-    validateSubject(command.subject);if(command.subject.regionId!==state.regionId)throw Error('Return to the accepted region.');
-    next={...next,subject:copy(command.subject),phase:'framing'};
-  }else if(command.type==='keep'){
-    if(state.phase!=='framing')throw Error('Choose a building before keeping a view.');
-    const view=validateView(state,command.view);
-    if(state.views.some(v=>v.kind===view.kind))throw Error('Remove the existing view before replacing it.');
-    if(state.mode==='photo'){
-      const photo=validateAlbumPhoto(command.photo);
-      if(photo.kind!==view.kind)throw Error('Photograph and view do not match.');
+export function transitionThreeViews(input, albumInput, command, now = Date.now()) {
+  const state = normalizeThreeViews(input),
+    album = copy(albumInput || emptyPhotoAlbum());
+  if (String(command.type).startsWith('story-'))
+    return transitionDocumentaryStory(state, album, command, now);
+  if (state.story && state.story.schemaVersion !== 1)
+    throw Error('This saved story needs a newer version. Its photographs are kept.');
+  if (state.schemaVersion !== 1) throw Error('This album needs a newer World Explorer version.');
+  if (state.revision !== command.revision)
+    throw Error('This job changed in another window. Reopen the Journal.');
+  let next = { ...state, revision: state.revision + 1 };
+  if (command.type === 'accept') {
+    if (
+      state.phase !== 'available' ||
+      !['photo', 'observation'].includes(command.mode) ||
+      !label(command.regionId) ||
+      !label(command.regionLabel)
+    )
+      throw Error('Choose the photo or observation job in a loaded region.');
+    const location = command.locationSnapshot;
+    if (
+      location != null &&
+      (!location ||
+        Array.isArray(location) ||
+        ![location.lat, location.lon].every(finite) ||
+        Math.abs(location.lat) > 90 ||
+        Math.abs(location.lon) > 180 ||
+        (location.name != null && !label(location.name)))
+    )
+      throw Error('Choose a valid location for the album.');
+    next = {
+      ...next,
+      phase: 'choose',
+      mode: command.mode,
+      regionId: command.regionId,
+      regionLabel: command.regionLabel,
+      acceptedAt: now,
+      views: [],
+      subject: null,
+      ...(location ? { locationSnapshot: copy(location) } : {}),
+    };
+  } else if (command.type === 'choose') {
+    if (state.phase !== 'choose')
+      throw Error('Finish or leave your current subject before choosing another.');
+    validateSubject(command.subject);
+    if (command.subject.regionId !== state.regionId) throw Error('Return to the accepted region.');
+    next = { ...next, subject: copy(command.subject), phase: 'framing' };
+  } else if (command.type === 'keep') {
+    if (state.phase !== 'framing') throw Error('Choose a building before keeping a view.');
+    const view = validateView(state, command.view);
+    if (state.views.some((v) => v.kind === view.kind))
+      throw Error('Remove the existing view before replacing it.');
+    if (state.mode === 'photo') {
+      const photo = validateAlbumPhoto(command.photo);
+      if (photo.kind !== view.kind) throw Error('Photograph and view do not match.');
       album.photos.push(copy(photo));
-    }else if(command.photo)throw Error('Observation records cannot include an invented photograph.');
-    next.views=[...state.views,copy(view)];next.phase=next.views.length===3?'review':'framing';
-  }else if(command.type==='remove'){
-    if(!['framing','review'].includes(state.phase)||!state.views.some(v=>v.kind===command.kind))throw Error('Only an unfinished view can be retaken.');
-    next.views=state.views.filter(v=>v.kind!==command.kind);album.photos=album.photos.filter(p=>p.kind!==command.kind);next.phase='framing';
+    } else if (command.photo)
+      throw Error('Observation records cannot include an invented photograph.');
+    next.views = [...state.views, copy(view)];
+    next.phase = next.views.length === 3 ? 'review' : 'framing';
+  } else if (command.type === 'remove') {
+    if (
+      !['framing', 'review'].includes(state.phase) ||
+      !state.views.some((v) => v.kind === command.kind)
+    )
+      throw Error('Only an unfinished view can be retaken.');
+    next.views = state.views.filter((v) => v.kind !== command.kind);
+    album.photos = album.photos.filter((p) => p.kind !== command.kind);
+    next.phase = 'framing';
     // A new context must remain the reference for the other compositions.
-    if(command.kind==='context'){next.views=[];album.photos=[];}
-  }else if(command.type==='finish'){
-    if(state.phase==='complete')return {state,album,event:null};
-    if(state.phase!=='review'||state.views.length!==3)throw Error('Keep all three views, then review the album.');
-    next={...next,phase:'complete',completedAt:now,mediaDeleted:false};
-  }else if(command.type==='delete-photos'){
-    if(state.phase!=='complete'||state.mode!=='photo')throw Error('Only saved album photographs can be deleted here.');
-    album.photos=[];next.mediaDeleted=true;next.mediaDeletedAt=now;
-  }else if(command.type==='display'){
-    if(state.phase!=='complete'||state.mediaDeleted||!label(command.homeId))throw Error('Enter an owned home to display your completed record.');
-    next.displayHomeId=command.homeId;
-  }else if(command.type==='abandon'){
-    if(state.phase==='complete')throw Error('Your completed record is kept. Delete its photographs separately.');
-    next={schemaVersion:1,revision:next.revision,phase:'available',views:[]};album.photos=[];
-  }else throw Error('Unknown album action.');
-  return {state:next,album,event:command.type==='finish'?threeViewsReceipt(next):null};
+    if (command.kind === 'context') {
+      next.views = [];
+      album.photos = [];
+    }
+  } else if (command.type === 'finish') {
+    if (state.phase === 'complete') return { state, album, event: null };
+    if (state.phase !== 'review' || state.views.length !== 3)
+      throw Error('Keep all three views, then review the album.');
+    next = { ...next, phase: 'complete', completedAt: now, mediaDeleted: false };
+  } else if (command.type === 'delete-photos') {
+    if (state.phase !== 'complete' || state.mode !== 'photo')
+      throw Error('Only saved album photographs can be deleted here.');
+    album.photos = [];
+    next.mediaDeleted = true;
+    next.mediaDeletedAt = now;
+  } else if (command.type === 'display') {
+    if (state.phase !== 'complete' || state.mediaDeleted || !label(command.homeId))
+      throw Error('Enter an owned home to display your completed record.');
+    next.displayHomeId = command.homeId;
+  } else if (command.type === 'abandon') {
+    if (state.phase === 'complete')
+      throw Error('Your completed record is kept. Delete its photographs separately.');
+    next = { schemaVersion: 1, revision: next.revision, phase: 'available', views: [] };
+    album.photos = [];
+  } else throw Error('Unknown album action.');
+  return { state: next, album, event: command.type === 'finish' ? threeViewsReceipt(next) : null };
 }
-export function validateThreeViewsBackup(stateInput,albumInput,events){
-  const state=normalizeThreeViews(stateInput),album=albumInput||emptyPhotoAlbum();
-  if(album.id!==THREE_VIEWS.albumId||album.schemaVersion!==1||album.kind!=='personal-photo-album'||!Array.isArray(album.photos)||album.photos.length>3)throw Error('Invalid album document.');
-  const kinds=new Set();for(const photo of album.photos){validateAlbumPhoto(photo);if(kinds.has(photo.kind))throw Error('Duplicate album photograph.');kinds.add(photo.kind);}
-  if(state.schemaVersion>1)return;
-  if(!Number.isInteger(state.revision)||state.revision<0||!['available','choose','framing','review','complete'].includes(state.phase)||!Array.isArray(state.views)||state.views.length>3)throw Error('Invalid three-view progress.');
-  if(state.phase==='available'){if(state.views.length||album.photos.length)throw Error('Inactive job retains photographs.');return;}
-  if(!['photo','observation'].includes(state.mode)||!label(state.regionId)||!label(state.regionLabel))throw Error('Invalid album region.');
-  if(state.phase==='choose'&&(state.views.length||state.subject))throw Error('Unselected subject retains views.');
-  if(state.mediaDeleted&&(state.phase!=='complete'||state.mode!=='photo'||!finite(state.mediaDeletedAt)))throw Error('Invalid media deletion.');
-  if(state.displayHomeId&&(!label(state.displayHomeId)||state.phase!=='complete'))throw Error('Invalid home display.');
-  if(state.phase!=='choose'){validateSubject(state.subject);if(state.subject.regionId!==state.regionId)throw Error('Subject region does not match the job.');}
-  if(state.phase==='framing'&&state.views.length===3)throw Error('Finished views must be reviewed.');
-  const distinct=new Set();for(const view of state.views){validateView({...state,views:state.views.filter(v=>v!==view)},view);if(distinct.has(view.kind))throw Error('Duplicate saved view.');distinct.add(view.kind);}
-  const needsPhotos=state.mode==='photo'&&!state.mediaDeleted;
-  if(album.photos.length!==(needsPhotos?state.views.length:0)||needsPhotos&&state.views.some(v=>!kinds.has(v.kind)))throw Error('Referenced photographs are missing.');
-  if(['review','complete'].includes(state.phase)&&state.views.length!==3)throw Error('The three-view record is incomplete.');
-  if(state.phase==='complete'&&(!state.completedAt||!events.some(e=>e.eventId===THREE_VIEWS.receiptId&&e.eventType==='campaign-completed'&&e.metadata?.mode===state.mode&&e.metadata?.subjectId===state.subject.id)))throw Error('Album completion receipt is missing.');
+export function validateThreeViewsBackup(stateInput, albumInput, events = []) {
+  const state = normalizeThreeViews(stateInput),
+    album = albumInput || emptyPhotoAlbum();
+  if (
+    album.id !== THREE_VIEWS.albumId ||
+    album.schemaVersion !== 1 ||
+    album.kind !== 'personal-photo-album' ||
+    !Array.isArray(album.photos) ||
+    album.photos.length > 3
+  )
+    throw Error('Invalid album document.');
+  const kinds = new Set();
+  for (const photo of album.photos) {
+    validateAlbumPhoto(photo);
+    if (kinds.has(photo.kind)) throw Error('Duplicate album photograph.');
+    kinds.add(photo.kind);
+  }
+  if (state.schemaVersion > 1) return;
+  validateDocumentaryStoryBackup(state, album, events);
+  const location = state.locationSnapshot;
+  if (
+    location != null &&
+    (!location ||
+      Array.isArray(location) ||
+      ![location.lat, location.lon].every(finite) ||
+      Math.abs(location.lat) > 90 ||
+      Math.abs(location.lon) > 180 ||
+      (location.name != null && !label(location.name)))
+  )
+    throw Error('Invalid album location.');
+  if (
+    !Number.isInteger(state.revision) ||
+    state.revision < 0 ||
+    !['available', 'choose', 'framing', 'review', 'complete'].includes(state.phase) ||
+    !Array.isArray(state.views) ||
+    state.views.length > 3
+  )
+    throw Error('Invalid three-view progress.');
+  if (state.phase === 'available') {
+    if (state.views.length || album.photos.length) throw Error('Inactive job retains photographs.');
+    return;
+  }
+  if (
+    !['photo', 'observation'].includes(state.mode) ||
+    !label(state.regionId) ||
+    !label(state.regionLabel)
+  )
+    throw Error('Invalid album region.');
+  if (state.phase === 'choose' && (state.views.length || state.subject))
+    throw Error('Unselected subject retains views.');
+  if (
+    state.mediaDeleted &&
+    (state.phase !== 'complete' || state.mode !== 'photo' || !finite(state.mediaDeletedAt))
+  )
+    throw Error('Invalid media deletion.');
+  if (state.displayHomeId && (!label(state.displayHomeId) || state.phase !== 'complete'))
+    throw Error('Invalid home display.');
+  if (state.phase !== 'choose') {
+    validateSubject(state.subject);
+    if (state.subject.regionId !== state.regionId)
+      throw Error('Subject region does not match the job.');
+  }
+  if (state.phase === 'framing' && state.views.length === 3)
+    throw Error('Finished views must be reviewed.');
+  const distinct = new Set();
+  for (const view of state.views) {
+    validateView({ ...state, views: state.views.filter((v) => v !== view) }, view);
+    if (distinct.has(view.kind)) throw Error('Duplicate saved view.');
+    distinct.add(view.kind);
+  }
+  const needsPhotos = state.mode === 'photo' && !state.mediaDeleted;
+  if (
+    album.photos.length !== (needsPhotos ? state.views.length : 0) ||
+    (needsPhotos && state.views.some((v) => !kinds.has(v.kind)))
+  )
+    throw Error('Referenced photographs are missing.');
+  if (['review', 'complete'].includes(state.phase) && state.views.length !== 3)
+    throw Error('The three-view record is incomplete.');
+  if (
+    state.phase === 'complete' &&
+    (!state.completedAt ||
+      !events.some(
+        (e) =>
+          e.eventId === THREE_VIEWS.receiptId &&
+          e.eventType === 'campaign-completed' &&
+          e.metadata?.mode === state.mode &&
+          e.metadata?.subjectId === state.subject.id
+      ))
+  )
+    throw Error('Album completion receipt is missing.');
 }
 
 export function threeViewsBadge(value){
