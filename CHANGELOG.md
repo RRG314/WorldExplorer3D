@@ -2,7 +2,7 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## Unreleased
+## Coherent careers and world UI — deployed 2026-11-04
 
 - Connect all twenty retained careers through a shared Activities entry, finite
   assignments, saved next actions, Journal results and meaningful return visits.
@@ -11,8 +11,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 - Repair bounded driving catch-up and ordinary city road markings; retain the
   accepted three-venue racing scope, real vehicles, garage and shared systems.
 - Preserve the First Bearings starting location across older save-owner writes.
-- Repair the three backend dependency advisories in the locked source packages;
-  coordinated production rollout is pending.
+- Deploy the locked repairs for the three backend dependency advisories while
+  preserving existing service configuration and player accounts.
 
 - Cartographer studies add supported walking measurements, original reciprocal
   controls, a connected corner route, access notes, reusable route sheets and the
