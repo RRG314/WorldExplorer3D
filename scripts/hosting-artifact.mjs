@@ -554,6 +554,7 @@ async function verifyArtifact() {
   }
   const gameHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'index.html'), 'utf8');
   const accountHtml = await fs.readFile(path.join(OUTPUT_DIR, 'account', 'index.html'), 'utf8');
+  const landingHtml = await fs.readFile(path.join(OUTPUT_DIR, 'index.html'), 'utf8');
   const portalHtml = await fs.readFile(path.join(OUTPUT_DIR, 'portal', 'index.html'), 'utf8');
   const captureHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'capture.html'), 'utf8');
   const currentAdminModule=await fs.readFile(path.join(OUTPUT_DIR,generation.prefix.slice(1),'js/admin-dashboard.js'),'utf8');
@@ -566,6 +567,7 @@ async function verifyArtifact() {
       throw new Error(`Packaged runtime entry is missing: ${name} -> ${entry}`);
     }
     const referenced = (name === 'account-social'||name === 'account-contributions') ? accountHtml.includes(`../app/${entry}`)
+      : name === 'product-preferences' ? landingHtml.includes(`/app/${entry}`) && accountHtml.includes(`/app/${entry}`)
       : name === 'living-portal' ? portalHtml.includes(`../app/${entry}`)
       : name === 'capture-phone' ? captureHtml.includes(entry)
       : name === 'capture-review' ? currentAdminModule.includes(`/app/${entry}`) : gameHtml.includes(entry);
