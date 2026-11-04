@@ -652,6 +652,11 @@ function createGlobeSelector(options = {}) {
   function open() {
     if (openState) return;
     openState = true;
+    if (backBtn) {
+      const available = options.canGoBack?.() !== false;
+      backBtn.hidden = !available;
+      backBtn.style.display = available ? '' : 'none';
+    }
     document.body.classList.add('start-hub-open');
     setGlobeSelectorScrollLock(true);
     root.classList.add('show');
@@ -738,10 +743,13 @@ function createGlobeSelector(options = {}) {
   }
 
   if (startBtn) startBtn.addEventListener('click', () => void triggerStartHere());
-  if (backBtn) backBtn.addEventListener('click', () => {
+  function requestBack() {
+    // The initial selector is the application's home, with no world behind it.
+    if (options.canGoBack?.() === false) { setPanelMode('explore'); return; }
     if (typeof options.onBack === 'function') options.onBack();
     close();
-  });
+  }
+  if (backBtn) backBtn.addEventListener('click', requestBack);
   moonBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
   spaceBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
   oceanBtn?.addEventListener('click', () => void startSelectedOcean());
@@ -849,10 +857,9 @@ function createGlobeSelector(options = {}) {
 
   window.addEventListener('keydown', (event) => {
     if (!openState) return;
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog:modal')) return;
     event.preventDefault();
-    if (typeof options.onBack === 'function') options.onBack();
-    close();
+    requestBack();
   });
 
   return {

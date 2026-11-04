@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createFieldworkQaSession} from './fieldwork-qa-session.mjs';
-const output=path.resolve(process.env.WE3D_NOVA_OUTPUT||`output/verification/nova-ui-20261104/map-layout-${Date.now()}`),selected=new Set((process.env.WE3D_NOVA_LAYOUT_CASES||'').split(',').filter(Boolean));
+const output=path.resolve(process.env.WE3D_UI_OUTPUT||`output/verification/trail-ui-20261104/map-layout-${Date.now()}`),selected=new Set((process.env.WE3D_UI_LAYOUT_CASES||'').split(',').filter(Boolean));
 const report={scope:'Actual extracted map DOM/styles. Geometry, text scale and target exposure only. No world map rendering, search service, filter action or navigation claim.',cases:[]};let qa;
 try{
  qa=await createFieldworkQaSession({rootDir:process.cwd(),output,careerId:'explorer',maximumDurationMs:4*60*1000});const {page}=qa;
- await page.goto('http://127.0.0.1:4192/tests/fixtures/nova-layout.html?context=map');await page.waitForFunction(()=>window.novaLayoutReady);
+ await page.goto('http://127.0.0.1:4192/tests/fixtures/ui-layout.html?context=map');await page.waitForFunction(()=>window.uiLayoutReady);
  for(const [width,height]of [[1440,960],[390,844],[844,390]])for(const scale of ['100','200']){
   if(selected.size&&!selected.has(`${width}-${scale}`))continue;
   report.failureCase={width,height,scale};await page.setViewportSize({width,height});await page.evaluate(scale=>{document.documentElement.dataset.we3dTextScale=scale;document.getElementById('largeMap').scrollTo(0,0);},scale);

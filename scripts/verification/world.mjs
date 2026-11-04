@@ -301,7 +301,7 @@ try {
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60000 });
   await page.getByRole('button', { name: 'Featured Cities' }).click();
   await page.locator('#globeCityList').getByText('Baltimore', { exact: true }).click();
-  await page.getByRole('button', { name: 'Explore', exact: true }).click();
+  await page.locator('#globeSelectorStartBtn').click();
 
   await waitForCompleteWorld();
   await page.waitForTimeout(4500);

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // the platform SDKs retain font scaling, controls, focus and widget backgrounds.
 const css = await fs.readFile('styles/world-explorer-tokens.css', 'utf8');
 const root = css.match(/:root\s*\{([^}]+)\}/)?.[1];
-assert.ok(root, 'Missing shared NOVA tokens');
+assert.ok(root, 'Missing shared TRAIL tokens');
 const fields = {background:'bg',card:'panel-solid',surface:'panel-soft',input:'input',
   text:'text',muted:'muted',accent:'action',actionText:'action-text',line:'line',selected:'selected',focus:'focus'};
 const colours = Object.entries(fields).map(([name, token]) => {
@@ -28,7 +28,7 @@ const outputs = new Map([
     `\n    static let cardRadius: CGFloat = ${radius}\n}\n#endif\n`]
 ]);
 for (const [file, content] of outputs) {
-  if (process.argv.includes('--check')) assert.equal(await fs.readFile(file,'utf8'), content, `Regenerate native NOVA theme: ${file}`);
+  if (process.argv.includes('--check')) assert.equal(await fs.readFile(file,'utf8'), content, `Regenerate native TRAIL theme: ${file}`);
   else await fs.writeFile(file, content);
 }
 console.log(JSON.stringify({passed:true,colours:colours.length,files:outputs.size,mode:process.argv.includes('--check')?'check':'generate'}));

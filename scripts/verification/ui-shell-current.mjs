@@ -5,8 +5,8 @@ import {createFieldworkQaSession} from './fieldwork-qa-session.mjs';
 
 const root = process.cwd();
 const base = process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192';
-const output = path.resolve(process.env.WE3D_NOVA_OUTPUT || `output/verification/nova-ui-20261104/shell-${Date.now()}`);
-const selected = new Set((process.env.WE3D_NOVA_CASES || '').split(',').filter(Boolean));
+const output = path.resolve(process.env.WE3D_UI_OUTPUT || `output/verification/trail-ui-20261104/shell-${Date.now()}`);
+const selected = new Set((process.env.WE3D_UI_CASES || '').split(',').filter(Boolean));
 const report = {scope:'Actual source selector and native workspaces. No gameplay procedure, online command, email submission or production change.',cases:[],screens:[],errors:[]};
 let qa;
 
@@ -38,12 +38,12 @@ try {
   const {page}=qa;
   await page.setViewportSize({width:1440,height:960});
   await page.goto(base+'/app/?diagnostics=1');
-  await page.locator('#globeSelectorStartBtn').waitFor({state:'visible'});
+  await page.locator('#globeSelectorStartBtn').waitFor({state:'visible'});await page.evaluate(()=>document.fonts.load('16px "World Explorer Trail"'));await page.evaluate(()=>document.fonts.ready);assert.equal(await page.evaluate(()=>document.fonts.check('16px "World Explorer Trail"')),true,'bundled TRAIL display font loads');
   await run('desktop-globe',async()=>{
     assert.equal(await page.locator('.globe-app-rail button').count(),5);
     const box=await page.locator('.globe-selector-stage').boundingBox();
     assert.ok(box.width>600&&box.height>400,'the globe retains a usable scene');
-    assert.equal(await page.locator('html').evaluate(e=>getComputedStyle(e).getPropertyValue('--wx-action').trim()),'#d1b6ff');
+    assert.equal(await page.locator('html').evaluate(e=>getComputedStyle(e).getPropertyValue('--wx-action').trim()),'#ff925d');
     await page.locator('#globeSelectorMapBasemapBtn').click();
     assert.equal(await page.locator('#globeSelectorMapBasemapBtn').getAttribute('aria-pressed'),'true');
     await page.locator('#globeSelectorSatelliteBasemapBtn').click();
@@ -54,16 +54,16 @@ try {
   });
   await run('create',async()=>{
     await page.locator('.globe-app-rail [data-globe-destination="create"]').click();
-    await page.locator('#novaCreateHub').waitFor({state:'visible'});
+    await page.locator('#explorerCreateHub').waitFor({state:'visible'});
     assert.equal(await page.locator('[data-create-start]').count(),2);
-    assert.equal(await page.locator('#novaCreateHub a').count(),2);
+    assert.equal(await page.locator('#explorerCreateHub a').count(),2);
     await capture(page,'create','#globeHubOverlay');
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#globeHubOverlay').isVisible(),false);
     await page.locator('.globe-app-rail [data-globe-destination="create"]').click();
     await page.keyboard.press('Escape');
     await page.locator('[data-globe-destination="settings"]').click();
-    assert.equal(await page.locator('#novaCreateHub').isVisible(),false,'Create does not remain under Settings');
+    assert.equal(await page.locator('#explorerCreateHub').isVisible(),false,'Create does not remain under Settings');
     await page.keyboard.press('Escape');
   });
   await run('activities',async()=>{
@@ -85,27 +85,27 @@ try {
   await run('workspace-navigation',async()=>{
     await page.locator('.globe-app-rail [data-globe-destination="games"]').click();
     await page.locator('#experienceBrowser').waitFor({state:'visible'});
-    assert.equal(await page.locator('#experienceBrowser .nova-workspace-navigation button').count(),5);
-    await page.locator('#experienceBrowser [data-nova-section="journal"]').click();
+    assert.equal(await page.locator('#experienceBrowser .explorer-workspace-navigation button').count(),5);
+    await page.locator('#experienceBrowser [data-explorer-section="journal"]').click();
     await page.locator('#discoveryPanel').waitFor({state:'visible'});
     assert.equal(await page.locator('#experienceBrowser').isVisible(),false);
     await capture(page,'workspace-journal','#discoveryPanel');
-    await page.locator('#discoveryPanel [data-nova-section="create"]').click();
-    await page.locator('#novaCreateHub').waitFor({state:'visible'});
+    await page.locator('#discoveryPanel [data-explorer-section="create"]').click();
+    await page.locator('#explorerCreateHub').waitFor({state:'visible'});
     assert.equal(await page.locator('#discoveryPanel').isVisible(),false);
     await capture(page,'workspace-create','#globeHubOverlay');
-    await page.locator('#globeHubOverlay [data-nova-section="together"]').click();
+    await page.locator('#globeHubOverlay [data-explorer-section="together"]').click();
     await page.locator('#tab-multiplayer').waitFor({state:'visible'});
-    await page.locator('#globeHubOverlay [data-nova-section="explore"]').click();
+    await page.locator('#globeHubOverlay [data-explorer-section="explore"]').click();
     assert.equal(await page.locator('#globeHubOverlay').isVisible(),false);
     await page.locator('.globe-app-rail [data-globe-destination="games"]').click();
     await page.locator('#experienceBrowser').waitFor({state:'visible'});
-    await page.locator('#experienceBrowser .nova-workspace-navigation button').first().focus();
+    await page.locator('#experienceBrowser .explorer-workspace-navigation button').first().focus();
     for(let i=0;i<8;i++)await page.keyboard.press('Tab');
     assert.equal(await page.locator('#experienceBrowser').evaluate(e=>e.contains(document.activeElement)),true);
     // Controlled UI busy state only; no transaction or progression claim.
     await page.locator('#experienceBrowser').evaluate(e=>e.setAttribute('aria-busy','true'));
-    await page.locator('#experienceBrowser [data-nova-section="journal"]').click();
+    await page.locator('#experienceBrowser [data-explorer-section="journal"]').click();
     assert.equal(await page.locator('#experienceBrowser').isVisible(),true);
     assert.equal(await page.locator('#discoveryPanel').isVisible(),false);
     await page.locator('#experienceBrowser').evaluate(e=>e.setAttribute('aria-busy','false'));
@@ -121,7 +121,7 @@ try {
         await page.locator(`.globe-app-rail [data-globe-destination="${view}"]`).click();
         const root=page.locator(selector);await root.waitFor({state:'visible'});
         const bounds=await root.boundingBox();assert.ok(bounds.x>=-.5&&bounds.y>=-.5&&bounds.x+bounds.width<=width+.5&&bounds.y+bounds.height<=height+.5,'workspace stays in viewport');
-        const buttons=root.locator('.nova-workspace-navigation button');assert.equal(await buttons.count(),5);
+        const buttons=root.locator('.explorer-workspace-navigation button');assert.equal(await buttons.count(),5);
         for(let i=0;i<5;i++){
           const button=buttons.nth(i);await button.scrollIntoViewIfNeeded();
           const valid=await button.evaluate(e=>{const r=e.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.x>=-.5&&r.right<=innerWidth+.5&&r.y>=-.5&&r.bottom<=innerHeight+.5&&e.scrollWidth<=e.clientWidth+1&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));});
@@ -161,6 +161,11 @@ try {
     await page.locator('#tab-controls').waitFor({state:'visible'});
     await capture(page,'controls','#globeHubOverlay');
     await page.keyboard.press('Escape');
+  });
+  await run('support-surfaces',async()=>{
+    await page.locator('.globe-explore-tools [data-globe-destination="live-earth"]').click();await page.locator('#globeSelectorLiveEarthPanel').waitFor({state:'visible'});await capture(page,'live-data','#globeSelectorLiveEarthPanel');await page.keyboard.press('Escape');assert.equal(await page.locator('#globeSelectorScreen').isVisible(),true,'Escape retains initial globe');assert.equal(await page.locator('#globeSelectorExplorePanel').isVisible(),true,'Escape returns to Explore');assert.equal(await page.locator('#globeSelectorBackBtn').isVisible(),false,'Initial globe has no empty Close destination');
+    await page.locator('[data-open-data-licenses]:visible').first().click();await page.locator('#dataLicensesDialog').waitFor({state:'visible'});await capture(page,'data-licenses','#dataLicensesDialog');await page.keyboard.press('Escape');assert.equal(await page.locator('#dataLicensesDialog').isVisible(),false);assert.equal(await page.locator('#globeSelectorScreen').isVisible(),true,'Native dialog Escape keeps the globe');
+    if(await page.locator('#appSignInBtn').isVisible()){await page.locator('#appSignInBtn').click();await page.locator('#authFloatPanel').waitFor({state:'visible'});await capture(page,'account-entry','#authFloatPanel');await page.keyboard.press('Escape');assert.equal(await page.locator('#authFloatPanel').isVisible(),false);assert.equal(await page.locator('#globeSelectorScreen').isVisible(),true,'Account Escape keeps the globe');}
   });
   await run('phone',async()=>{
     await page.setViewportSize({width:390,height:844});

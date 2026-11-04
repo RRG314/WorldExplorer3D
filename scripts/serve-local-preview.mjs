@@ -44,6 +44,7 @@ const mime = new Map([
   ['.ico', 'image/x-icon'],
   ['.map', 'application/json; charset=utf-8'],
   ['.glb', 'model/gltf-binary'],
+  ['.ttf', 'font/ttf'],
   ['.wasm', 'application/wasm']
 ]);
 

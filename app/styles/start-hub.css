@@ -1,4 +1,4 @@
-/* NOVA hub keeps the existing day/night preference and location owners. */
+/* TRAIL hub keeps the existing day/night preference and location owners. */
 :root {
   --hub-bg: var(--wx-bg);
   --hub-panel: var(--wx-panel-solid);
@@ -18,21 +18,21 @@
 }
 
 html[data-hub-theme="day"] {
-  --hub-bg: #f5f1fb;
-  --hub-panel: #fffcff;
-  --hub-panel-2: #eee6f8;
-  --hub-line: #cbbbdc;
-  --hub-line-strong: #857098;
-  --hub-text: #281d37;
-  --hub-muted: #645571;
-  --hub-blue: #674187;
+  --hub-bg: #f4f1ec;
+  --hub-panel: #fffdf9;
+  --hub-panel-2: #eae4dc;
+  --hub-line: #d0c4b8;
+  --hub-line-strong: #8c786b;
+  --hub-text: #28221e;
+  --hub-muted: #695a50;
+  --hub-blue: #9c3d15;
   --hub-action-text: #fff;
   --hub-green: #246347;
   --hub-input: #fff;
-  --hub-hover: #e7daf5;
-  --hub-active: #dfccef;
-  --hub-overlay: #f5f1fb;
-  --hub-bar: #fffcff;
+  --hub-hover: #f4ddcc;
+  --hub-active: #efd0b9;
+  --hub-overlay: #f4f1ec;
+  --hub-bar: #fffdf9;
 }
 
 /* The globe hub owns the complete pre-game experience. */

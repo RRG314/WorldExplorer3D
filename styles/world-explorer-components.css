@@ -1,5 +1,5 @@
 @layer interface {
-  /* Shared NOVA components; domain-specific behavior remains with each owner. */
+  /* Shared TRAIL components; domain-specific behavior remains with each owner. */
   .wx-panel {
     box-sizing: border-box;
     color: var(--wx-text);

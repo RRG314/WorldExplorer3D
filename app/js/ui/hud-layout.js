@@ -35,7 +35,7 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     'coords',
     'hudMapOpenBtn',
     'hudStatusPanels',
-    'novaGameHeader',
+    'explorerGameHeader',
   ];
   const nodes = Object.fromEntries(ids.map((id) => [id, documentRef?.getElementById(id)]));
   const toolbar = root?.querySelector?.('.hudUtilityActions');
@@ -114,7 +114,7 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     if (!scope.isActive() || !root) return;
     // The same UI layout observer measures the shared masthead even while a
     // specialist renderer hides Earth's HUD. No frame or gameplay owner added.
-    const masthead=visible(nodes.novaGameHeader);
+    const masthead=visible(nodes.explorerGameHeader);
     const mastheadHeight=masthead&&masthead.top<=1?Math.ceil(masthead.bottom):0;
     if(documentStyle){
       const value=`${mastheadHeight}px`;

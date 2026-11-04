@@ -3,19 +3,20 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createFieldworkQaSession} from './fieldwork-qa-session.mjs';
 const base=process.env.WE3D_VERIFY_BASE_URL||'http://127.0.0.1:4192';
-const output=path.resolve(process.env.WE3D_NOVA_OUTPUT||`output/verification/nova-ui-20261104/web-${Date.now()}`);
+const output=path.resolve(process.env.WE3D_UI_OUTPUT||`output/verification/trail-ui-20261104/web-${Date.now()}`);
 const paths=['index.html','portal/index.html','account/index.html','account/admin.html','account/moderation.html','account/tester.html','account/testers.html','app/capture.html','app/survey.html','about.html','about/index.html','legal/privacy.html','legal/privacy/index.html','legal/terms.html','legal/terms/index.html','legal/delete-account.html'];
-const selected=new Set((process.env.WE3D_NOVA_PAGES||'').split(',').filter(Boolean));
+const selected=new Set((process.env.WE3D_UI_PAGES||'').split(',').filter(Boolean));
 const report={scope:'Actual public source pages and signed-out authorization boundaries; no sign-in, purchases, uploads, moderation or destructive submissions. Native platform/hardware and authenticated backend acceptance retained separately.',pages:[],links:[],errors:[]};let qa;
 try{
- qa=await createFieldworkQaSession({rootDir:process.cwd(),output,careerId:'explorer',maximumDurationMs:8*60*1000});const {page}=qa;const links=new Set();
+ qa=await createFieldworkQaSession({rootDir:process.cwd(),output,careerId:'explorer',maximumDurationMs:8*60*1000});const {page}=qa;const links=new Set();if(process.env.WE3D_UI_TEXT_SCALE)await page.addInitScript(scale=>localStorage.setItem('worldExplorer3D.accessibility.v1',JSON.stringify({textScale:scale,reducedMotion:true})),process.env.WE3D_UI_TEXT_SCALE);
  for(const file of paths){if(selected.size&&!selected.has(file))continue;
   await page.setViewportSize({width:1440,height:960});await page.goto(base+'/'+file,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.readyState==='complete');await page.waitForTimeout(600);
+  if(process.env.WE3D_UI_TEXT_SCALE)await page.waitForFunction(scale=>document.documentElement.dataset.we3dTextScale===scale,process.env.WE3D_UI_TEXT_SCALE);
   const record={file,url:page.url(),views:[]};report.pages.push(record);
   for(const [width,height] of [[1440,960],[390,844],[844,390]]){
    await page.setViewportSize({width,height});await page.evaluate(()=>scrollTo(0,0));
    const layout=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,theme:getComputedStyle(document.documentElement).getPropertyValue('--wx-action').trim(),broken:[...document.images].filter(i=>i.complete&&!i.naturalWidth).map(i=>i.getAttribute('src')),controls:[...document.querySelectorAll('button,a[href],input,select,textarea,summary')].filter(e=>e.getBoundingClientRect().width>0&&getComputedStyle(e).visibility!=='hidden').map(e=>{const r=e.getBoundingClientRect();return {id:e.id,tag:e.tagName,label:(e.getAttribute('aria-label')||e.getAttribute('title')||[...(e.labels||[])].map(l=>l.textContent).join(' ')||e.textContent||e.getAttribute('placeholder')||'').trim().replace(/\s+/g,' ').slice(0,180),href:e.getAttribute('href'),disabled:!!e.disabled,width:r.width,height:r.height};})}));
-   assert.ok(layout.scrollWidth<=width+1,file+' fits '+width);assert.equal(layout.theme,'#d1b6ff');assert.deepEqual(layout.broken,[],file+' images load');
+   assert.ok(layout.scrollWidth<=width+1,file+' fits '+width);assert.equal(layout.theme,'#ff925d');assert.deepEqual(layout.broken,[],file+' images load');
    for(const control of layout.controls){if(control.href){const url=new URL(control.href,page.url());if(url.origin===new URL(base).origin)links.add(url.pathname);}}
    const image=file.replaceAll('/','-').replace('.html','')+'-'+width+'.png';await page.screenshot({path:path.join(output,image)});record.views.push({width,height,image,...layout});
   }

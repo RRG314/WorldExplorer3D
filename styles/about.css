@@ -49,8 +49,8 @@
 .about-opening h1 {
   max-width: 10ch;
   margin: 20px 0 0;
-  font: 600 clamp(47px, 6.2vw, 82px)/0.96 var(--wx-font-display);
-  letter-spacing: -0.055em;
+  font: 400 clamp(47px, 6.2vw, 82px)/1.1 var(--wx-font-display);
+  letter-spacing: 0.015em;
 }
 
 .about-deck {

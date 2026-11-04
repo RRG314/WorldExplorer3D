@@ -52,7 +52,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/map-explorer.css?v=5">
 <link rel="stylesheet" href="styles/accessibility.css?v=5">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
-<link rel="stylesheet" href="styles/nova.css?v=1">
+<link rel="stylesheet" href="styles/product-shell.css?v=1">
 </head>
 <body>
 <!-- Initial loading and recovery are available before any game module. -->
@@ -592,7 +592,7 @@ Continue ocean exploration beyond the dive site
     <section>
       <h3>Software, fonts &amp; assets</h3>
       <p>Marine coral forms: <a href="https://3d.si.edu/corals" target="_blank" rel="noopener noreferrer">Smithsonian Institution, National Museum of Natural History</a>, CC0 1.0. Museum scans were simplified, scaled and recolored for authored habitat. They are not observations of living colonies at the game coordinates.</p>
-      <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License.</p>
+      <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License. Anton by The Anton Project Authors — SIL Open Font License 1.1 (<a href="../assets/fonts/anton/OFL.txt" target="_blank" rel="noopener">license</a>).</p>
       <p>Vegetation: <a href="https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d" target="_blank" rel="noopener noreferrer">Low poly vegetation for games</a> by denoises; <a href="https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5" target="_blank" rel="noopener noreferrer">Bush</a> by lev26. Ship surface maps and computer-room equipment: <a href="https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27" target="_blank" rel="noopener noreferrer">Sci-Fi Computer Room</a> by Michael V. Adapted for the game under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.</p>
       <p>Vehicle Assembly Building and crawler models: <a href="https://github.com/nasa/NASA-3D-Resources" target="_blank" rel="noopener noreferrer">NASA 3D Resources</a>, adapted for this independent reconstruction. <a href="/app/assets/models/nasa/LICENSE.txt" target="_blank" rel="noopener noreferrer">Source and usage notes</a>. No NASA endorsement is implied.</p>
       <p>NASA, ESA, JPL-Caltech, USGS Astrogeology, LROC, Wikimedia contributors, ambientCG, and Poly Haven assets retain the credits and terms documented in the attribution index.</p>
@@ -771,15 +771,15 @@ Continue ocean exploration beyond the dive site
   <div id="globeHubPanelHost" class="globe-hub-panel-host"></div>
   <div id="globeHubFooterHost" class="globe-hub-footer-host"></div>
 </section>
-<section id="novaCreateHub" class="nova-create-hub" hidden aria-labelledby="novaCreateHeading">
-  <div class="nova-workspace-intro"><span class="nova-eyebrow">Make it yours</span><h2 id="novaCreateHeading">Create a place. Shape a journey.</h2><p>Build in the world, design a race, or bring a real place into World Explorer.</p></div>
-  <p class="nova-create-location">World projects start at <strong id="novaCreatePlace">your selected place</strong>. Change it on the globe before you begin.</p>
-  <div class="nova-create-grid">
-    <article><span class="nova-tool-symbol" aria-hidden="true">◇</span><h3>Build with Blocks</h3><p>Place, rotate and edit blocks in your selected world. Your existing local builds and room sharing stay available.</p><button type="button" class="wx-button wx-button--primary" data-create-start="blocks">Build in this place</button></article>
-    <article><span class="nova-tool-symbol" aria-hidden="true">⌁</span><h3>Design a race</h3><p>Use existing roads from above, record a driven route, or create a clean layout on open ground. Preview and validate it in Racing.</p><button type="button" class="wx-button wx-button--primary" data-create-start="tracks">Open Racing &amp; tracks</button></article>
-    <article><span class="nova-tool-symbol" aria-hidden="true">▧</span><h3>Capture your place</h3><p>Use your own building photos and measurements. Keep a draft, edit its shape and submit an improvement for review.</p><a class="wx-button" href="./capture.html">Open Reality Capture</a><a class="wx-button wx-button--quiet" href="./survey.html">Open Survey</a></article>
+<section id="explorerCreateHub" class="explorer-create-hub" hidden aria-labelledby="explorerCreateHeading">
+  <div class="explorer-workspace-intro"><span class="explorer-eyebrow">Make it yours</span><h2 id="explorerCreateHeading">Create a place. Shape a journey.</h2><p>Build in the world, design a race, or bring a real place into World Explorer.</p></div>
+  <p class="explorer-create-location">World projects start at <strong id="explorerCreatePlace">your selected place</strong>. Change it on the globe before you begin.</p>
+  <div class="explorer-create-grid">
+    <article><span class="explorer-tool-symbol" aria-hidden="true">◇</span><h3>Build with Blocks</h3><p>Place, rotate and edit blocks in your selected world. Your existing local builds and room sharing stay available.</p><button type="button" class="wx-button wx-button--primary" data-create-start="blocks">Build in this place</button></article>
+    <article><span class="explorer-tool-symbol" aria-hidden="true">⌁</span><h3>Design a race</h3><p>Use existing roads from above, record a driven route, or create a clean layout on open ground. Preview and validate it in Racing.</p><button type="button" class="wx-button wx-button--primary" data-create-start="tracks">Open Racing &amp; tracks</button></article>
+    <article><span class="explorer-tool-symbol" aria-hidden="true">▧</span><h3>Capture your place</h3><p>Use your own building photos and measurements. Keep a draft, edit its shape and submit an improvement for review.</p><a class="wx-button" href="./capture.html">Open Reality Capture</a><a class="wx-button wx-button--quiet" href="./survey.html">Open Survey</a></article>
   </div>
-  <p id="novaCreateStatus" role="status" aria-live="polite"></p>
+  <p id="explorerCreateStatus" role="status" aria-live="polite"></p>
 </section>
 </div>
 </div>
@@ -1366,19 +1366,19 @@ Continue ocean exploration beyond the dive site
 </div>
 <nav class="floatMenuContainer" id="floatMenuContainer" aria-label="Game destinations">
 <button id="returnToWorldBtn" class="gameFocusReturn" type="button">Return to world controls · Escape</button>
-<div id="novaGameHeader" class="nova-game-header">
-  <span class="nova-wordmark">◎ <span>WORLD EXPLORER</span></span>
-  <div class="nova-global-navigation" role="group" aria-label="Main sections">
-    <button type="button" data-nova-target="exploreBtn"><span aria-hidden="true">◎</span>Explore</button>
-    <button type="button" data-nova-target="fActivities"><span aria-hidden="true">⌖</span>Activities</button>
-    <button type="button" data-nova-target="fExplorerJournal"><span aria-hidden="true">▤</span>Journal</button>
-    <button type="button" data-nova-target="realEstateFloatBtn"><span aria-hidden="true">◇</span>Create</button>
-    <button type="button" data-nova-target="communityBtn"><span aria-hidden="true">♙</span>Together</button>
+<div id="explorerGameHeader" class="explorer-game-header">
+  <span class="explorer-wordmark">◎ <span>WORLD EXPLORER</span></span>
+  <div class="explorer-global-navigation" role="group" aria-label="Main sections">
+    <button type="button" data-explorer-target="exploreBtn"><span aria-hidden="true">◎</span>Explore</button>
+    <button type="button" data-explorer-target="fActivities"><span aria-hidden="true">⌖</span>Activities</button>
+    <button type="button" data-explorer-target="fExplorerJournal"><span aria-hidden="true">▤</span>Journal</button>
+    <button type="button" data-explorer-target="realEstateFloatBtn"><span aria-hidden="true">◇</span>Create</button>
+    <button type="button" data-explorer-target="communityBtn"><span aria-hidden="true">♙</span>Together</button>
   </div>
 </div>
-<div class="nova-context-actions" role="group" aria-label="Travel and equipment">
-  <button type="button" data-nova-target="travelBtn"><span aria-hidden="true">◈</span>Travel</button>
-  <button type="button" data-nova-target="backpackBtn"><span aria-hidden="true">▣</span>Kit</button>
+<div class="explorer-context-actions" role="group" aria-label="Travel and equipment">
+  <button type="button" data-explorer-target="travelBtn"><span aria-hidden="true">◈</span>Travel</button>
+  <button type="button" data-explorer-target="backpackBtn"><span aria-hidden="true">▣</span>Kit</button>
 </div>
 <!-- Stable player goals. Detailed controls stay inside their owning panels. -->
 <div class="floatMenu" id="exploreMenu">
@@ -1461,7 +1461,7 @@ Continue ocean exploration beyond the dive site
 <button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Build &amp; Home" aria-expanded="false" aria-controls="realEstateChoices" data-mobile-label="Build &amp; Home"><span class="btnIcon">⌂</span><span class="btnText">Build &amp; Home</span></button>
 <div class="floatItems" id="realEstateChoices" role="group" aria-label="Create" data-menu-title="CREATE"><h2 class="floatMenuTitle">Create</h2>
 <div class="floatItem" id="fQuickBuild">🧱 Build with Blocks</div>
-<button class="floatItem" id="fCreateRace" type="button" data-nova-target="fRacing">⌁ Design a race</button>
+<button class="floatItem" id="fCreateRace" type="button" data-explorer-target="fRacing">⌁ Design a race</button>
 <div class="floatItem" id="fRealEstate">⌂ Homes &amp; Property</div>
 </div>
 </div>

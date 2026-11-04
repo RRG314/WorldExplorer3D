@@ -3,17 +3,17 @@
 import SwiftUI
 
 enum PortalStyle {
-    static let background = Color(red: 17/255.0, green: 16/255.0, blue: 32/255.0)
-    static let card = Color(red: 33/255.0, green: 28/255.0, blue: 50/255.0)
-    static let surface = Color(red: 43/255.0, green: 37/255.0, blue: 63/255.0)
-    static let input = Color(red: 24/255.0, green: 20/255.0, blue: 38/255.0)
-    static let text = Color(red: 248/255.0, green: 244/255.0, blue: 255/255.0)
-    static let muted = Color(red: 197/255.0, green: 191/255.0, blue: 211/255.0)
-    static let accent = Color(red: 209/255.0, green: 182/255.0, blue: 255/255.0)
-    static let actionText = Color(red: 33/255.0, green: 19/255.0, blue: 48/255.0)
-    static let line = Color(red: 139/255.0, green: 125/255.0, blue: 158/255.0)
-    static let selected = Color(red: 67/255.0, green: 51/255.0, blue: 85/255.0)
-    static let focus = Color(red: 237/255.0, green: 218/255.0, blue: 255/255.0)
-    static let cardRadius: CGFloat = 18
+    static let background = Color(red: 20/255.0, green: 21/255.0, blue: 25/255.0)
+    static let card = Color(red: 24/255.0, green: 26/255.0, blue: 30/255.0)
+    static let surface = Color(red: 34/255.0, green: 37/255.0, blue: 43/255.0)
+    static let input = Color(red: 17/255.0, green: 18/255.0, blue: 21/255.0)
+    static let text = Color(red: 248/255.0, green: 247/255.0, blue: 242/255.0)
+    static let muted = Color(red: 199/255.0, green: 197/255.0, blue: 193/255.0)
+    static let accent = Color(red: 255/255.0, green: 146/255.0, blue: 93/255.0)
+    static let actionText = Color(red: 28/255.0, green: 21/255.0, blue: 17/255.0)
+    static let line = Color(red: 139/255.0, green: 137/255.0, blue: 135/255.0)
+    static let selected = Color(red: 59/255.0, green: 48/255.0, blue: 45/255.0)
+    static let focus = Color(red: 255/255.0, green: 192/255.0, blue: 152/255.0)
+    static let cardRadius: CGFloat = 3
 }
 #endif

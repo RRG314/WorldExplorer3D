@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Account layout component</title><body><script type="module">
+// Static source DOM/styles only. No account controller, credentials, permission
+// or backend handlers are loaded; this cannot exercise live account actions.
+const source=new DOMParser().parseFromString(await(await fetch('/account/index.html')).text(),'text/html');
+const base=document.createElement('base');base.href='/account/';document.head.append(base);
+for(const style of source.head.querySelectorAll('style'))document.head.append(style.cloneNode(true));
+for(const link of source.head.querySelectorAll('link[rel="stylesheet"]')){const url=new URL(link.getAttribute('href'),new URL('/account/',location.href));if(url.origin!==location.origin)continue;await new Promise((resolve,reject)=>{const item=document.createElement('link');item.rel='stylesheet';item.href=url.href;item.onload=resolve;item.onerror=reject;document.head.append(item);});}
+for(const child of [...source.body.children])if(child.tagName!=='SCRIPT')document.body.append(child);
+const auth=document.getElementById('authPrompt'),panel=document.getElementById('accountPanel');auth.hidden=true;panel.hidden=false;
+const targets=['overview','contributions','profile','social','support','security'];
+function show(view){for(const node of document.querySelectorAll('[data-account-view]'))node.hidden=node.dataset.accountView!==view;for(const node of document.querySelectorAll('.account-nav [data-account-target]'))node.classList.toggle('active',node.dataset.accountTarget===view);document.querySelector('#accountPageTitle').textContent=view;}
+document.addEventListener('click',event=>{const node=event.target.closest('[data-account-target]');if(node){event.preventDefault();show(node.dataset.accountTarget);}});show('overview');
+window.accountLayout={targets,show,scope:'Static source account DOM/styles only. No identity, network command or permission proof.'};
+await document.fonts.load('16px "World Explorer Trail"');
+</script></body></html>

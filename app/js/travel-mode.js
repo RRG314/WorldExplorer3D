@@ -24,7 +24,9 @@ function setDroneModeActive(active) {
 }
 
 function syncTravelModeButtons() {
-  const activeMode = getCurrentTravelMode();
+  const control = resolveControlState(appCtx);
+  const activeMode = control.mode;
+  const surfaceControls = control.frame === 'surface' && control.controller !== 'boat';
   const drivingBtn = document.getElementById('fDriving');
   const walkingBtn = document.getElementById('fWalk');
   const droneBtn = document.getElementById('fDrone');
@@ -52,15 +54,15 @@ function syncTravelModeButtons() {
     supports
   });
   const availability = {
-    drive: supports('drive'),
-    walk: supports('walk'),
-    drone: supports('drone'),
-    plane: supports('plane'),
+    drive: surfaceControls && control.occupancy !== 'interior' && supports('drive'),
+    walk: surfaceControls && supports('walk'),
+    drone: surfaceControls && supports('drone'),
+    plane: surfaceControls && supports('plane'),
     // Boat visibility is contextual. The boat runtime owns whether a nearby
     // vessel, an active vessel, or the ocean-to-surface transfer is available.
     // Treating every Earth location as boat-ready made the hotbar advertise a
     // mode that could silently do nothing inland.
-    boat: supports('boat') && !!(appCtx.boatMode?.active || appCtx.boatMode?.available || appCtx.oceanMode?.active)
+    boat: supports('boat') && (control.frame === 'surface' || control.frame === 'ocean') && !!(appCtx.boatMode?.active || appCtx.boatMode?.available || appCtx.oceanMode?.active)
   };
   const signature = JSON.stringify({
     activeMode,
@@ -85,7 +87,7 @@ function syncTravelModeButtons() {
   // The existing mode owner also presents the available vehicle choices.
   // A planetary rover is not an Earth garage vehicle; unavailable aircraft
   // must not leave a visible aircraft selector behind.
-  const earthVehicles = !planetaryCapabilities && currentEnvironment === appCtx.ENV?.EARTH;
+  const earthVehicles = surfaceControls && !planetaryCapabilities && currentEnvironment === appCtx.ENV?.EARTH;
   setAvailable(document.getElementById('travelVehicleSelect')?.closest('label'), earthVehicles);
   setAvailable(document.getElementById('fGarage'), earthVehicles);
   setAvailable(document.getElementById('fRacing'), earthVehicles);

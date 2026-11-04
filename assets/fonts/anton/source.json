@@ -1,0 +1,23 @@
+{
+  "family": "Anton",
+  "authors": "The Anton Project Authors",
+  "license": "SIL Open Font License 1.1",
+  "revision": "cee74d7ca45d66d5c1878c828645c862f2788d2d",
+  "modified": false,
+  "files": [
+    {
+      "name": "Anton-Regular.ttf",
+      "bytes": 170812,
+      "sha256": "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab",
+      "source": "https://raw.githubusercontent.com/google/fonts/cee74d7ca45d66d5c1878c828645c862f2788d2d/ofl/anton/Anton-Regular.ttf"
+    },
+    {
+      "name": "OFL.txt",
+      "bytes": 4390,
+      "sha256": "9267baca92b7a7ce9db6dd9e6cc32c9fe3ddf1ac96e421d5f87c5746b9089d6a",
+      "source": "https://raw.githubusercontent.com/google/fonts/cee74d7ca45d66d5c1878c828645c862f2788d2d/ofl/anton/OFL.txt",
+      "upstreamSha256": "ee67e6ee22790b7929f1a3769ca2801d565c64b5a9096942c1adf5596de9c9e4",
+      "formatting": "Line endings and trailing whitespace normalized; license wording unchanged."
+    }
+  ]
+}

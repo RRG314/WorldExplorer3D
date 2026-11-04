@@ -722,7 +722,8 @@
     }
   </style>
   <link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=4">
-  <link rel="stylesheet" href="../styles/nova-web.css?v=1">
+  <link rel="stylesheet" href="../styles/product-web.css?v=1">
+  <script type="module" src="../js/product-preferences.js?v=1"></script>
 </head>
 <body>
   <div class="account-shell">
@@ -1598,16 +1599,8 @@
         planDetail.textContent = 'Free plan: full gameplay, M map access, and multiplayer access while signed in.' + (isGooglePlay ? '' : ' Donations are optional.');
       }
 
-      if (state.isAdmin === true || state.subscriptionStatus === 'admin' || state.plan === 'pro') {
-        extrasLabel.textContent = 'Roadmap';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. This card is informational only and does not gate core features.';
-      } else if (state.plan === 'supporter' || state.plan === 'trial') {
-        extrasLabel.textContent = 'Roadmap';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Normal gameplay and map access remain available.';
-      } else {
-        extrasLabel.textContent = 'Open';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Core gameplay and map access are free for everyone.';
-      }
+      extrasLabel.textContent = 'Worlds';
+      extrasDetail.textContent = 'Explore Earth, the Moon, Mars, oceans and Space. Choose a destination in the globe selector.';
 
       trialLabel.textContent = 'Available';
       trialDetail.textContent = 'Signed-in account can create and join multiplayer rooms.';

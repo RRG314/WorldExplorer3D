@@ -1,4 +1,6 @@
-# NOVA application delivery
+# NOVA application delivery — superseded
+
+**Superseded by the owner’s later TRAIL/Cinematic selection.** Continue with [TRAIL delivery](TRAIL-DELIVERY.md); preserve the working navigation, original owners and functional acceptance. NOVA images are historical, not current appearance acceptance.
 
 Owner selection: November 4, 2026. NOVA replaces the app's previous visual design. The owner authorizes implementation, integrated verification and a complete staging candidate, **not production deployment**. The globe and accessible destination list remain. Mixed experience/age entry stays simple with optional specialist depth.
 

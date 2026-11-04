@@ -2,7 +2,7 @@
 
 November 4, 2026. **Design review; production is unchanged.** Audience: mixed ages and experience, simple entry with optional depth.
 
-**Owner selected NOVA and authorized full application implementation and staging verification.** See [NOVA delivery and fixed stops](../NOVA-DELIVERY.md). Production deployment is prohibited for this redesign. The studio below remains a design reference; its generated concept scenery is not an application asset.
+**Owner selected TRAIL / Cinematic and authorized full application implementation and staging verification.** See [TRAIL delivery and fixed stops](../TRAIL-DELIVERY.md). Production deployment is prohibited for this redesign. The studio below remains a design reference; its generated concept scenery is not an application asset.
 
 ## Start with the visual preview
 
@@ -18,11 +18,13 @@ November 4, 2026. **Design review; production is unchanged.** Audience: mixed ag
 
 Use **Compare styles** to see five HUD compositions immediately, **Full preview** to interact with a chosen direction, or **Screen board** to compare nine screen families. Scene choices cover Earth/city, Ocean, Space/stars, planetary surface, field research and home/garage; each direction includes a phone composition. A shared scene can be used for a direct comparison. The visible UI is real HTML/CSS/JavaScript over clearly identified concept scenery and sample data; no game or save APIs are connected.
 
-[Visual direction details](visual-directions.md) explain the typography, surfaces and composition changes. The earlier [Atlas/Expedition/Workbench research](options.md) remains an information-architecture comparison, not a selected visual identity. New visual selection is open. The original rejected preview remains in Git and local evidence.
+[Visual direction details](visual-directions.md) explain the typography, surfaces and composition changes. The earlier [Atlas/Expedition/Workbench research](options.md) remains an information-architecture comparison, not a selected visual identity. TRAIL / Cinematic is the selected implementation direction. The original rejected preview remains in Git and local evidence.
 
-The retained audit and implementation plan below remain applicable to the full feature portfolio. A new visual choice will set the appearance used during implementation; the selected production Roam identity does not constrain these new proposals.
+The retained audit and implementation plan below remain applicable to the full feature portfolio. TRAIL replaces the earlier production appearance in the current staging implementation; the other studio directions remain comparison references.
 
-## Main findings
+## Initial audit findings (before implementation)
+
+Current corrections and verification are recorded in [TRAIL acceptance](../TRAIL-ACCEPTANCE.md). The findings below describe the audit starting point.
 
 1. The menu changes between the globe, Earth/vessel play and Space. Journal is primary in the selector and nested under Backpack in ordinary play. Space foregrounds a separate navigation stack.
 2. Careers, worlds and cosmic destinations use large flat choices. The UI asks players to know the right profession, object or scale before it helps them choose.

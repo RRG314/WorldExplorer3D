@@ -12,3 +12,14 @@ body.panel-museum-open #mainMenuBtn,body.panel-museum-open #gameShareFloatBtn,bo
 
 body.panel-aquarium-open #floatMenuContainer,body.panel-aquarium-open #minimap,body.panel-aquarium-open #minimapZoomControls,body.panel-aquarium-open #coords,body.panel-aquarium-open #tutorialHintCard,body.panel-aquarium-open .hud-box,body.panel-aquarium-open #interiorPrompt{visibility:hidden!important;pointer-events:none!important}
 body.panel-aquarium-open #mainMenuBtn,body.panel-aquarium-open #gameShareFloatBtn,body.panel-aquarium-open #quickTimeOfDay,body.panel-aquarium-open #quickWeatherMode{visibility:hidden!important;pointer-events:none!important}
+
+/* Collection labels share the product hierarchy while leaving the exhibit visible. */
+.galleryDialog{font:400 var(--wx-type-control)/1.6 var(--wx-font-ui);background:var(--wx-panel-solid);color:var(--wx-text);border-radius:var(--wx-radius-panel)}
+.galleryDialog header{flex-wrap:wrap}.galleryDialog header>div{min-width:0;flex:1}
+.galleryDialog h2{font:400 calc(1.5rem * var(--wx-text-scale))/1.25 var(--wx-font-display);text-transform:uppercase;overflow-wrap:anywhere}
+.galleryDialog :is(p,li,summary,button){overflow-wrap:anywhere}
+.galleryDialog :is(.galleryMeta,details,li){font-size:var(--wx-type-meta);color:var(--wx-muted)}
+.galleryDialog button{min-width:44px;font-size:var(--wx-type-control);border-radius:var(--wx-radius-control);max-width:100%;white-space:normal}
+.galleryDialog summary{min-height:44px}.galleryEyebrow{font-size:var(--wx-type-meta)}
+
+.galleryMap{box-sizing:border-box}

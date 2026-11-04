@@ -61,7 +61,7 @@ function setupGlobeHub({
   const liveEarthPanel = document.getElementById('globeSelectorLiveEarthPanel');
   const liveEarthHome = liveEarthPanel?.parentElement || null;
   const liveEarthNextSibling = liveEarthPanel?.nextSibling || null;
-  const createPanel = document.getElementById('novaCreateHub');
+  const createPanel = document.getElementById('explorerCreateHub');
   const libraryPanel = document.createElement('section');
   libraryPanel.className = 'hub-library-panel';
   libraryPanel.hidden = true;
@@ -188,7 +188,7 @@ function setupGlobeHub({
       closePanel();
       createPanel.hidden = false;
       const place = globeSelector.getSelection();
-      const label = document.getElementById('novaCreatePlace');
+      const label = document.getElementById('explorerCreatePlace');
       if (label) label.textContent = place?.name || 'your selected place';
       overlay.hidden = false;
       overlay.setAttribute('aria-hidden', 'false');
@@ -269,7 +269,7 @@ function setupGlobeHub({
     creating = true;
     const controls = [...createPanel.querySelectorAll('[data-create-start]')];
     controls.forEach(control => { control.disabled = true; });
-    const status = document.getElementById('novaCreateStatus');
+    const status = document.getElementById('explorerCreateStatus');
     if (status) status.textContent = 'Opening your selected place…';
     try {
       const started = await onCreate(button.dataset.createStart);
@@ -321,7 +321,7 @@ function setupGlobeHub({
   if (titleFooter && footerHost) footerHost.appendChild(titleFooter);
   document.getElementById('globeHubOverlayCloseBtn')?.addEventListener('click', closePanel);
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || overlay?.hidden !== false) return;
+    if (event.key !== 'Escape' || event.defaultPrevented || overlay?.hidden !== false || document.querySelector('dialog:modal')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     closePanel();

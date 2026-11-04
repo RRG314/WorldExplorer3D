@@ -1,32 +1,39 @@
-/* NOVA: the shared product design system. Presentation only; no saved/game state. */
+@font-face {
+  font-family: "World Explorer Trail";
+  src: url("../assets/fonts/anton/Anton-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+/* TRAIL: the shared product design system. Presentation only; no saved/game state. */
 :root {
   color-scheme: dark;
-  --wx-bg: #111020;
-  --wx-panel: rgb(30 25 47 / 92%);
-  --wx-panel-solid: #211c32;
-  --wx-panel-soft: #2b253f;
-  --wx-input: #181426;
-  --wx-line: #8b7d9e;
-  --wx-line-soft: rgb(222 204 255 / 24%);
-  --wx-text: #f8f4ff;
-  --wx-muted: #c5bfd3;
-  --wx-action: #d1b6ff;
-  --wx-action-hover: #e1cfff;
-  --wx-action-text: #211330;
-  --wx-selected: #433355;
-  --wx-focus: #eddaff;
-  --wx-success: #a3e2c1;
-  --wx-equipped-surface: #234039;
-  --wx-warning: #ffd08b;
-  --wx-danger: #ffaaa9;
-  --wx-info: #aaceff;
+  --wx-bg: #141519;
+  --wx-panel: rgb(24 26 30 / 96%);
+  --wx-panel-solid: #181a1e;
+  --wx-panel-soft: #22252b;
+  --wx-input: #111215;
+  --wx-line: #8b8987;
+  --wx-line-soft: rgb(255 255 255 / 20%);
+  --wx-text: #f8f7f2;
+  --wx-muted: #c7c5c1;
+  --wx-action: #ff925d;
+  --wx-action-hover: #ffaa80;
+  --wx-action-text: #1c1511;
+  --wx-selected: #3b302d;
+  --wx-focus: #ffc098;
+  --wx-success: #9fd1ae;
+  --wx-equipped-surface: #20392e;
+  --wx-warning: #f2c66e;
+  --wx-danger: #ff9292;
+  --wx-info: #aac6dd;
   /* Existing readers retain their variable contract during staged migration. */
   --wx-blue: var(--wx-action);
   --wx-green: var(--wx-success);
   --wx-yellow: var(--wx-warning);
   --wx-red: var(--wx-danger);
-  --wx-font-ui: "Helvetica Neue", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-  --wx-font-display: var(--wx-font-ui);
+  --wx-font-ui: Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --wx-font-display: "World Explorer Trail", Impact, "Arial Narrow", sans-serif;
   --wx-font-instrument: ui-monospace, "SFMono-Regular", Consolas, monospace;
   --wx-text-scale: 1;
   --wx-type-body: calc(1rem * var(--wx-text-scale));
@@ -39,14 +46,14 @@
   --wx-space-4: 16px;
   --wx-space-6: 24px;
   --wx-space-8: 32px;
-  --wx-radius: 18px;
-  --wx-radius-panel: 26px;
-  --wx-radius-control: 999px;
+  --wx-radius: 3px;
+  --wx-radius-panel: 4px;
+  --wx-radius-control: 3px;
   --wx-control-height: 44px;
   --wx-motion-fast: 120ms;
-  --wx-shadow-panel: 0 18px 50px rgb(5 2 16 / 30%);
-  --wx-glass-blur: 20px;
-  --wx-page-wash: radial-gradient(ellipse at 12% 0%, #39284f 0%, transparent 58%), var(--wx-bg);
+  --wx-shadow-panel: 0 8px 26px rgb(0 0 0 / 20%);
+  --wx-glass-blur: 0px;
+  --wx-page-wash: linear-gradient(120deg,#16181d,#242326);
 }
 
 html[data-we3d-text-scale="115"] { --wx-text-scale: 1.15; }
@@ -56,10 +63,10 @@ html[data-we3d-text-scale="200"] { --wx-text-scale: 2; }
 
 html[data-we3d-contrast="more"] {
   --wx-text: #fff;
-  --wx-muted: #eee7fa;
-  --wx-line: #e2d3f5;
-  --wx-line-soft: #b6a4cc;
-  --wx-panel: #211c32;
+  --wx-muted: #f4f0e9;
+  --wx-line: #f2e3d5;
+  --wx-line-soft: #c6bcb4;
+  --wx-panel: #181a1e;
   --wx-glass-blur: 0px;
 }
 

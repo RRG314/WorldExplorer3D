@@ -408,6 +408,7 @@ function initTitleScreenUi({
   globeLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
 
   globeSelector = createGlobeSelector({
+    canGoBack: () => appCtx.gameStarted === true,
     onOpen: () => { refreshReturnPlace(); emitTutorialEvent('opened_globe_selector'); },
     onUseMyLocation: () => runUseMyLocation('globe'),
     onBack: () => customPanel?.classList.remove('show'),

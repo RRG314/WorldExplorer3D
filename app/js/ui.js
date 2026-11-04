@@ -21,7 +21,9 @@ import {mountTesterInvitation} from './ui/tester-invitation.js';
 import {bindWorldFocusControls} from './ui/world-focus.js';
 import {bindControlPanel} from './ui/control-panel.js';
 import {getScreenLayoutService} from './ui/screen-layout.js?v=3';
-import {bindNovaNavigation} from './ui/nova-navigation.js';
+import {bindWorkspaceNavigation} from './ui/workspace-navigation.js';
+import {isPlanetarySurfaceActive} from './planetary/traversal-capabilities.js?v=1';
+import {resolveControlState} from './transport/control-state.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -184,7 +186,7 @@ function setupUI() {
     }
   }
   const worldFocus = bindWorldFocusControls(appCtx, closeAllFloatMenus);
-  bindNovaNavigation(document,{onBlocked:message=>appCtx.showToast?.(message),resolveExploreTarget:()=>appCtx.spaceFlight?.active?'universeToggle':null});
+  bindWorkspaceNavigation(document,{onBlocked:message=>appCtx.showToast?.(message),resolveExploreTarget:()=>appCtx.spaceFlight?.active?'universeToggle':null});
   bindRacingUI({openCareerJourney:()=>experiences.open({experienceId:'career:racer'}),closeMenus:closeAllFloatMenus,requestWorldFocus:worldFocus.requestWorldFocus,chooseDestination:()=>{goToMainMenu();titleUi.selectGameMode('racing');}});
   bindControlPanel(appCtx, {updateMode: updateControlsModeUI, clearHeld: clearVirtualHeldInputs, requestWorldFocus: worldFocus.requestWorldFocus});
   appCtx.screenLayout.bindHudLayout();
@@ -471,9 +473,21 @@ function setupUI() {
   // Travel mode switchers - mutually exclusive
   document.getElementById('fDriving').addEventListener('click', async () => {
     if (typeof appCtx.setTravelMode === 'function') {
-      const selected=document.getElementById('travelVehicleSelect')?.value||'bmw_e34';
-      const result=await appCtx.selectPersonalVehicle?.(selected);
-      if(!result?.ok)appCtx.showToast?.(vehicleGarageMessage(result));
+      if (isPlanetarySurfaceActive(appCtx)) {
+        appCtx.setTravelMode('drive', { source: 'ui_button' });
+      } else {
+        // Air/remote controllers retire through the travel owner before the
+        // garage may prepare a personal car at the admitted surface pose.
+        const control = resolveControlState(appCtx);
+        if (!['walk', 'drive'].includes(control.locomotion)) {
+          appCtx.setTravelMode('drive', { source: 'ui_button' });
+        }
+        if (resolveControlState(appCtx).mode === 'drive' || control.mode === 'walk') {
+          const selected=document.getElementById('travelVehicleSelect')?.value||'bmw_e34';
+          const result=await appCtx.selectPersonalVehicle?.(selected);
+          if(!result?.ok)appCtx.showToast?.(vehicleGarageMessage(result));
+        }
+      }
     } else {
       console.error('Travel mode controller is unavailable.');
     }
