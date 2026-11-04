@@ -37,6 +37,7 @@ body :is(h1,h2,h3) { color: var(--wx-text); font-family: var(--wx-font-display);
 body h1 { font-weight: 350; }
 body :is(button,input,select,textarea) { font-family: var(--wx-font-ui); accent-color: var(--wx-action); }
 body a { color: var(--wx-action); overflow-wrap: anywhere; }
+body :is(p,li) { overflow-wrap: anywhere; }
 body :is(button,.button,.btn) { min-height: 44px; padding: 10px 18px; border: 1px solid var(--wx-line); background: var(--wx-panel-soft); color: var(--wx-text); font-size: var(--wx-type-control); line-height: 1.4; }
 body :is(button,.button,.btn,.top a,.account-link) { border-radius: var(--wx-radius-control); }
 body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select,textarea) {
