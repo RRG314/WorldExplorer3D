@@ -13,30 +13,70 @@ import {createRaceServer} from '../services/racing/transport.mjs';
 import {createRaceConnection} from '../app/js/racing/network-client.js';
 const input=async slug=>JSON.parse(await fs.readFile(new URL(`../config/racing-venues/catalog/${slug}.json`,import.meta.url),'utf8'));
 
-for(const [slug,roads,length] of [['silverstone',589,5870],['nordschleife',1081,20710],['daytona',139,4011]]){
- test(`reviewed ${slug} catalogue reconstructs both complete layouts through the actual authority contract`,async()=>{
-  const raw=await input(slug),{prepared,courses}=await prepareRacingVenueIntake(raw);
-  assert.equal(prepared.facts.roads.length,roads);assert.equal(courses.length,2);
-  const docs=new Map([[`racingDistricts/${prepared.id}`,prepared.record],[`racingLocations/${prepared.locationKey}`,{districtId:prepared.id}]]);
-  for(const chunk of prepared.chunks)docs.set(raceDistrictChunkPath(prepared.id,chunk.index),chunk.record);
-  for(const {id,record} of courses){
-   assert.equal(record.ownerUid,null);assert.equal(record.curation.kind,'reviewed-venue');assert.equal(record.qualification,undefined,'Platform content must not fabricate a player qualification receipt');
-   docs.set(`racingCourses/${id}`,record);
-   const course=await readPublishedRaceCourse({id,uid:'another-driver',read:async path=>docs.get(path)||null});
-   assert.equal(course.publication.purpose,'competition');assert.equal(racePhysicsVersion(course),record.physicsVersion);
-   assert.ok(Math.abs(course.lengthMeters-length)<2);assert.ok([1,2].includes(course.laps));
-   assert.doesNotThrow(()=>assertRaceCourseInDistrict(course,raw.facts));
-   const projection=raceCourseProjection(course,id);
-   assert.equal(projection.type,'RaceCourseProjection');assert.ok(Buffer.byteLength(JSON.stringify(projection))<10000);
-   assert.equal(resolveRaceCourseProjection(projection,course,id),course);
-   assert.throws(()=>resolveRaceCourseProjection({...projection,lengthMeters:projection.lengthMeters+1},course,id),/invalid_race_snapshot/);
-   for(const id of ['bmw_m3_e46','bmw_m3_e92_race','porsche_carrera_4s']){
-    const p=createRaceVehicleProfile(id);assert.ok(p.handling.width<=course.vehicleEnvelope.widthMeters);assert.ok(p.handling.length<=course.vehicleEnvelope.lengthMeters);assert.ok(p.handling.height<=course.vehicleEnvelope.heightMeters);
-   }
-   if(slug==='daytona')assert.equal(course.pitLane.course.gates.length,40);
-   if(slug==='silverstone'){assert.equal(course.pitLane.course.gates.length,73);assert.equal(record.curation.nativePitPractice.complete,true);}
-  }
- });
+for (const [slug, roads, length] of [
+  ['silverstone', 589, 5870],
+  ['nordschleife', 1081, 20710],
+  ['daytona', 139, 4011],
+]) {
+  test(`reviewed ${slug} catalogue reconstructs all three offered event durations through the actual authority contract`, async () => {
+    const raw = await input(slug),
+      { prepared, courses } = await prepareRacingVenueIntake(raw);
+    assert.equal(prepared.facts.roads.length, roads);
+    assert.equal(courses.length, 3);
+    const offeredLaps = [];
+    const docs = new Map([
+      [`racingDistricts/${prepared.id}`, prepared.record],
+      [`racingLocations/${prepared.locationKey}`, { districtId: prepared.id }],
+    ]);
+    for (const chunk of prepared.chunks)
+      docs.set(raceDistrictChunkPath(prepared.id, chunk.index), chunk.record);
+    for (const { id, record } of courses) {
+      assert.equal(record.ownerUid, null);
+      assert.equal(record.curation.kind, 'reviewed-venue');
+      assert.equal(
+        record.qualification,
+        undefined,
+        'Platform content must not fabricate a player qualification receipt',
+      );
+      docs.set(`racingCourses/${id}`, record);
+      const course = await readPublishedRaceCourse({
+        id,
+        uid: 'another-driver',
+        read: async (path) => docs.get(path) || null,
+      });
+      assert.equal(course.publication.purpose, 'competition');
+      assert.equal(racePhysicsVersion(course), record.physicsVersion);
+      assert.ok(Math.abs(course.lengthMeters - length) < 2);
+      assert.ok([1, 2, 3].includes(course.laps));
+      offeredLaps.push(course.laps);
+      assert.doesNotThrow(() => assertRaceCourseInDistrict(course, raw.facts));
+      const projection = raceCourseProjection(course, id);
+      assert.equal(projection.type, 'RaceCourseProjection');
+      assert.ok(Buffer.byteLength(JSON.stringify(projection)) < 10000);
+      assert.equal(resolveRaceCourseProjection(projection, course, id), course);
+      assert.throws(
+        () =>
+          resolveRaceCourseProjection(
+            { ...projection, lengthMeters: projection.lengthMeters + 1 },
+            course,
+            id,
+          ),
+        /invalid_race_snapshot/,
+      );
+      for (const id of ['bmw_m3_e46', 'bmw_m3_e92_race', 'porsche_carrera_4s']) {
+        const p = createRaceVehicleProfile(id);
+        assert.ok(p.handling.width <= course.vehicleEnvelope.widthMeters);
+        assert.ok(p.handling.length <= course.vehicleEnvelope.lengthMeters);
+        assert.ok(p.handling.height <= course.vehicleEnvelope.heightMeters);
+      }
+      if (slug === 'daytona') assert.equal(course.pitLane.course.gates.length, 40);
+      if (slug === 'silverstone') {
+        assert.equal(course.pitLane.course.gates.length, 73);
+        assert.equal(record.curation.nativePitPractice.complete, true);
+      }
+    }
+    assert.deepEqual(offeredLaps, [1, 2, 3]);
+  });
 }
 test('venue content cannot publish a different source, incomplete native journey, missing support or omitted mapped span',async()=>{
  const raw=await input('daytona');

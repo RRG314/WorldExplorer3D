@@ -1,3 +1,4 @@
+import { isolateGitFixture } from './helpers/isolated-git-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, chmodSync, symlinkSync } from 'node:fs';
@@ -8,6 +9,7 @@ import { sourceFingerprint, fingerprintClass, sameAcceptanceSource } from '../sc
 
 function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-source-fingerprint-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = args => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
   const write = (file, content) => { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), content); };

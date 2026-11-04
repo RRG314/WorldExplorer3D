@@ -1,3 +1,4 @@
+import { isolateGitFixture } from './helpers/isolated-git-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validatePromotion, hash, PROMOTION_RECEIPT, promotedEvidenceIdentity } from '../scripts/verification/production-promotion.mjs';
@@ -12,6 +13,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 
 function directory(t) {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-production-promotion-'));
+  isolateGitFixture(t, root);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const write = (file, data) => {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });

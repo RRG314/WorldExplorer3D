@@ -57,13 +57,31 @@ test('workspace save failure leaves placement unchanged and old home handles can
   assert.equal(old.setPrimary(candidate.id).ok,false);
   assert.equal(f.backpackStore.loadHousing().homes[0].workspace.pose.turn,0);
 });
-test('home return receipt requires the completed introduction, a branch and actual recorded home steps',()=>{
-  const profile={openingChapter:{phase:'complete'}},home={...candidate,workspace:completeWorkspace(),journey:{entered:1,displayed:2,departed:3,returned:4}};
-  assert.equal(homeAchievementEvent('maker',home,profile).points,0);
-  assert.throws(()=>homeAchievementEvent('home',home,profile),/steps/);
-  assert.equal(homeAchievementEvent('home',home,{...profile,homeAchievements:{maker:{}}}).metadata.homeId,home.id);
-  assert.throws(()=>homeAchievementEvent('maker',home,{}),/First Bearings/);
-  assert.throws(()=>homeAchievementEvent('home',{...home,journey:{entered:1}},{...profile,threeViews:{phase:'complete'}}),/steps/);
+test('home return requires a completed branch and recorded home steps while Maker remains independently available', () => {
+  const profile = { openingChapter: { phase: 'complete' } },
+    home = {
+      ...candidate,
+      workspace: completeWorkspace(),
+      journey: { entered: 1, displayed: 2, departed: 3, returned: 4 },
+    };
+  assert.equal(homeAchievementEvent('maker', home, profile).points, 0);
+  assert.throws(() => homeAchievementEvent('home', home, profile), /steps/);
+  assert.equal(
+    homeAchievementEvent('home', home, { ...profile, homeAchievements: { maker: {} } }).metadata
+      .homeId,
+    home.id,
+  );
+  assert.equal(homeAchievementEvent('maker', home, {}).metadata.homeId, home.id);
+  assert.throws(() => homeAchievementEvent('maker', { ...home, workspace: null }, {}), /steps/);
+  assert.throws(
+    () =>
+      homeAchievementEvent(
+        'home',
+        { ...home, journey: { entered: 1 } },
+        { ...profile, threeViews: { phase: 'complete' } },
+      ),
+    /steps/,
+  );
 });
 test('Maker and Home completion persist one receipt and badge with no points or money grant',async()=>{
   const store=createMemoryDiscoveryProfileStore({profile:{openingChapter:{schemaVersion:1,phase:'complete',acceptedAt:1,regionId:'test',regionLabel:'Test',eventId:'field-record',completedAt:2}}});

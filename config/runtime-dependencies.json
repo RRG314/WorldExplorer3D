@@ -359,6 +359,53 @@
           "sha256": "deae52956d13a01012d732899216e7350e89b2dac1fc8b309e46c7dd442fa471"
         }
       ]
+    },
+    {
+      "package": "collision-lab",
+      "version": "0.7.0",
+      "owner": "accelerator career recorded-data analysis",
+      "generator": null,
+      "availability": "same-origin; bounded numerical modules under existing research lifecycle",
+      "provenance": "app/vendor/collision-lab/SOURCE-NOTICE.md",
+      "license": "Original-code owner authorization, 2026-11-03; World Explorer3D project license; third-party terms retained",
+      "files": [
+        {
+          "path": "app/vendor/collision-lab/COPYING-GPL-HISTORY.txt",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "path": "app/vendor/collision-lab/SOURCE-NOTICE.md",
+          "sha256": "5263e1ac58a9d24c34b0dcb6feeda21f8bea39a640c1ea3c64210e133f325870"
+        },
+        {
+          "path": "app/vendor/collision-lab/data-integrity.mjs",
+          "sha256": "12a21abf8f884e5b2e9b8c354acaffa63fb97b7909a8cdbb6db42b6e132f76fe"
+        },
+        {
+          "path": "app/vendor/collision-lab/export.mjs",
+          "sha256": "55e9b3147d406456c4af682c6d512766a13b1658fe232b60705a21cb8ac34453"
+        },
+        {
+          "path": "app/vendor/collision-lab/missions.mjs",
+          "sha256": "fa91e8cff3f6fa00cc3baad9535fa6e4463ac80d0a9d21986d048cc60a30c4db"
+        },
+        {
+          "path": "app/vendor/collision-lab/models.mjs",
+          "sha256": "d3182f444320f5818b35f2497621dcadec9c579342e59c0806579a40f38c1af6"
+        },
+        {
+          "path": "app/vendor/collision-lab/receipt.mjs",
+          "sha256": "7597dbf1c3bfe32195e73c428f17bfda72116d40f112d935f81c7653736e8493"
+        },
+        {
+          "path": "app/vendor/collision-lab/science.mjs",
+          "sha256": "9fbc8d18e39e98bd33a379d990aa4d08c917cc2157bfe13a5261ba35d7f5ae29"
+        },
+        {
+          "path": "app/vendor/collision-lab/source-manifest.json",
+          "sha256": "45848a1c8f5d8b185fb4c7e08334d4d0275b0e823a642d3290b7bee1f69823a2"
+        }
+      ]
     }
   ],
   "locks": [
@@ -455,7 +502,7 @@
     },
     {
       "path": "functions/package-lock.json",
-      "sha256": "0cd7d8725b2a548657ef4f3053c8896106d67796a0a54346da25e8c7a2c060b5",
+      "sha256": "45f52e0dc4fc5890f072a069a2f076a95533eadef22f775b9645b8c5295feb4c",
       "direct": [
         {
           "package": "firebase-admin",
@@ -486,6 +533,22 @@
           "package": "svix",
           "version": "2.8.0",
           "integrity": "sha512-3bvu4FoVP9szUn5WBXUXUs97lLVC+Jyr0+jm+Q+DVcPMLXmeoZepbmbCzJVqGDNf9i00P7WLAH6m0q9HrzH1+g=="
+        }
+      ]
+    },
+    {
+      "path": "services/racing/package-lock.json",
+      "sha256": "9ccce19bb4265844ae1e43d2050b37f2b3e36acf2fc7f7c2169f788e9a114019",
+      "direct": [
+        {
+          "package": "firebase-admin",
+          "version": "14.5.0",
+          "integrity": "sha512-DElmgmaH9aPXu2dWXGQiDoan33UfTnbfAAKaue4fwEZxmpdaNrTk5DmuFn+vVDki2KZ6TiaC0IHRWcEzcDxB3Q=="
+        },
+        {
+          "package": "ws",
+          "version": "8.22.0",
+          "integrity": "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="
         }
       ]
     }

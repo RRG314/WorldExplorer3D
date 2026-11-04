@@ -1,5 +1,18 @@
 # Release source identities
 
+## Current observation — November 3, 2026
+
+The public production manifest was checked before the coherence candidate: build
+`5.6.1+c390d3a00ea4.11e2ccd419ea2e2b.production`, source
+`c390d3a00ea47d8a019c64559a700eaf9a26d868`, Firebase project
+`worldexplorer3d-d9b83`. Local implementation acceptance for all frozen careers,
+three racing venues and UI/dependency repairs is complete. Required CI passes
+4,066 cases in 744 selected files with no skips. Immutable runtime verification,
+review and recorded rollout remain required; the source is not newly deployed.
+See [the current candidate record](design/COHERENCE-RELEASE-CANDIDATE.md).
+
+All earlier observations below are historical and do not describe current production.
+
 ## Current observation — October 18, 2026
 
 Production remains **5.5.1**. Both public build manifests return HTTP 200;
