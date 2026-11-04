@@ -1,31 +1,32 @@
-/* Roam: shared presentation values. Gameplay and saved preferences have no owner here. */
+/* NOVA: the shared product design system. Presentation only; no saved/game state. */
 :root {
-  --wx-bg: #101818;
-  --wx-panel: rgb(26 39 39 / 96%);
-  --wx-panel-solid: #1a2727;
-  --wx-panel-soft: #223232;
-  --wx-input: #121e1d;
-  --wx-line: #708179;
-  --wx-line-soft: rgb(177 192 185 / 28%);
-  --wx-text: #f5f6ed;
-  --wx-muted: #b1c0b9;
-  --wx-action: #eec96b;
-  --wx-action-hover: #f5d786;
-  --wx-action-text: #1a251f;
-  --wx-selected: #35413a;
-  --wx-focus: #ffe49a;
-  --wx-success: #a5d6a7;
-  --wx-equipped-surface: #293e32;
-  --wx-warning: #eec96b;
-  --wx-danger: #ff9c94;
-  --wx-info: #aacde8;
+  color-scheme: dark;
+  --wx-bg: #111020;
+  --wx-panel: rgb(30 25 47 / 92%);
+  --wx-panel-solid: #211c32;
+  --wx-panel-soft: #2b253f;
+  --wx-input: #181426;
+  --wx-line: #8b7d9e;
+  --wx-line-soft: rgb(222 204 255 / 24%);
+  --wx-text: #f8f4ff;
+  --wx-muted: #c5bfd3;
+  --wx-action: #d1b6ff;
+  --wx-action-hover: #e1cfff;
+  --wx-action-text: #211330;
+  --wx-selected: #433355;
+  --wx-focus: #eddaff;
+  --wx-success: #a3e2c1;
+  --wx-equipped-surface: #234039;
+  --wx-warning: #ffd08b;
+  --wx-danger: #ffaaa9;
+  --wx-info: #aaceff;
   /* Existing readers retain their variable contract during staged migration. */
   --wx-blue: var(--wx-action);
   --wx-green: var(--wx-success);
   --wx-yellow: var(--wx-warning);
   --wx-red: var(--wx-danger);
-  --wx-font-ui: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --wx-font-display: Impact, "Arial Narrow", "Arial Black", sans-serif;
+  --wx-font-ui: "Helvetica Neue", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --wx-font-display: var(--wx-font-ui);
   --wx-font-instrument: ui-monospace, "SFMono-Regular", Consolas, monospace;
   --wx-text-scale: 1;
   --wx-type-body: calc(1rem * var(--wx-text-scale));
@@ -38,10 +39,14 @@
   --wx-space-4: 16px;
   --wx-space-6: 24px;
   --wx-space-8: 32px;
-  --wx-radius: 4px;
+  --wx-radius: 18px;
+  --wx-radius-panel: 26px;
+  --wx-radius-control: 999px;
   --wx-control-height: 44px;
   --wx-motion-fast: 120ms;
-  --wx-shadow-panel: 0 12px 32px rgb(0 0 0 / 24%);
+  --wx-shadow-panel: 0 18px 50px rgb(5 2 16 / 30%);
+  --wx-glass-blur: 20px;
+  --wx-page-wash: radial-gradient(ellipse at 12% 0%, #39284f 0%, transparent 58%), var(--wx-bg);
 }
 
 html[data-we3d-text-scale="115"] { --wx-text-scale: 1.15; }
@@ -51,9 +56,11 @@ html[data-we3d-text-scale="200"] { --wx-text-scale: 2; }
 
 html[data-we3d-contrast="more"] {
   --wx-text: #fff;
-  --wx-muted: #edf4ee;
-  --wx-line: #d4e0d7;
-  --wx-line-soft: #9aaca1;
+  --wx-muted: #eee7fa;
+  --wx-line: #e2d3f5;
+  --wx-line-soft: #b6a4cc;
+  --wx-panel: #211c32;
+  --wx-glass-blur: 0px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
 // requires the player's sound button, respects pause/visibility, and closes on exit.
 export function createOceanSoundscape({host,AudioContextCtor=globalThis.AudioContext||globalThis.webkitAudioContext,hidden=()=>document.hidden}){
  let context=null,source=null,filter=null,gain=null,enabled=false,disposed=false;
- const button=document.createElement('button');button.id='oceanSoundToggle';button.type='button';button.style.cssText='width:100%;min-height:36px;margin-top:8px;background:#103b4d;border:1px solid #5c91a4;border-radius:6px;color:white;font:inherit';
+ const button=document.createElement('button');button.id='oceanSoundToggle';button.type='button';button.style.cssText="width:100%;min-height:36px;margin-top:8px;background:var(--wx-selected);border:1px solid var(--wx-action);border-radius:6px;color:white;font:inherit";
  const label=()=>{button.textContent=`Ocean sound: ${enabled?'on':'off'}`;button.setAttribute('aria-pressed',String(enabled))};label();host?.append(button);
  async function toggle(){
   if(disposed)return false;

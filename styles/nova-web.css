@@ -1,0 +1,67 @@
+/* NOVA's shared web shell: account, Portal, capture, public and legal pages.
+   Local layouts and action owners remain in their existing styles/modules. */
+:root {
+  --page: var(--wx-bg);
+  --surface: var(--wx-panel-solid);
+  --surface-raised: var(--wx-panel-soft);
+  --bg: var(--wx-bg);
+  --bg-2: var(--wx-panel-solid);
+  --panel: var(--wx-panel);
+  --panel-2: var(--wx-panel-soft);
+  --ink: var(--wx-text);
+  --text: var(--wx-text);
+  --muted: var(--wx-muted);
+  --faint: var(--wx-muted);
+  --line: var(--wx-line-soft);
+  --line-strong: var(--wx-line);
+  --border: var(--wx-line-soft);
+  --accent: var(--wx-action);
+  --accent-2: var(--wx-action-hover);
+  --field: var(--wx-action);
+  --field-dark: var(--wx-action-text);
+  --world: var(--wx-success);
+  --world-dark: var(--wx-equipped-surface);
+  --blue: var(--wx-info);
+  --gold: var(--wx-warning);
+  --ok: var(--wx-success);
+  --warn: var(--wx-danger);
+  --danger: var(--wx-danger);
+}
+html { background: var(--wx-bg); color: var(--wx-text); }
+body {
+  color: var(--wx-text); background: var(--wx-page-wash);
+  font-family: var(--wx-font-ui); -webkit-font-smoothing: antialiased;
+}
+body::before { background: none; }
+body :is(h1,h2,h3) { color: var(--wx-text); font-family: var(--wx-font-display); font-weight: 400; letter-spacing: -.035em; }
+body h1 { font-weight: 350; }
+body :is(button,input,select,textarea) { font-family: var(--wx-font-ui); accent-color: var(--wx-action); }
+body a { color: var(--wx-action); }
+body :is(button,.button,.btn,.top a,.account-link) { border-radius: var(--wx-radius-control); }
+body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select,textarea) {
+  border-radius: 12px; background: var(--wx-input); color: var(--wx-text); border-color: var(--wx-line);
+}
+body :is(button,a,input,select,textarea,summary):focus-visible { outline: 3px solid var(--wx-focus); outline-offset: 3px; }
+body :is(button,.button,.btn):disabled { opacity: .6; cursor: default; }
+body :is(.card,.panel,.destination,.account-card,.tester-card,.install-card,.feature-card,.gallery-card,.capability-card,.support-card) {
+  background: var(--wx-panel); border-color: var(--wx-line-soft); border-radius: var(--wx-radius-panel);
+  color: var(--wx-text); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur));
+}
+body :is(.primary,.btn-primary,button.primary) { background: var(--wx-action); color: var(--wx-action-text); border-color: var(--wx-action); }
+body :is(.primary,.btn-primary,button.primary):hover { background: var(--wx-action-hover); }
+body :is(.muted,.meta,.subtitle,.intro p,.section-intro,.card p) { color: var(--wx-muted); }
+body :is(.landing-masthead,.site-header) {
+  background: var(--wx-panel); border-color: var(--wx-line-soft); backdrop-filter: blur(var(--wx-glass-blur));
+}
+.landing-masthead .landing-brand, .brand { color: var(--wx-text); font-weight: 500; letter-spacing: .055em; }
+.brand-mark { border-radius: 50%; color: var(--wx-action); border-color: var(--wx-action); background: var(--wx-input); }
+.hero-title { font-weight: 350; letter-spacing: -.055em; }
+.hero-title :is(span,em) { color: var(--wx-action); }
+.section-kicker,.eyebrow { color: var(--wx-action); }
+body dialog { background: var(--wx-panel); color: var(--wx-text); border-color: var(--wx-line-soft); border-radius: var(--wx-radius-panel); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+body dialog::backdrop { background: rgb(10 6 23 / 72%); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (forced-colors: active) {
+  body, body :is(.card,.panel,dialog) { background: Canvas; color: CanvasText; border-color: CanvasText; backdrop-filter: none; }
+  body :is(button,a,input,select,textarea,summary):focus-visible { outline-color: Highlight; }
+}

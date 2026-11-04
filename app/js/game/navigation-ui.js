@@ -124,12 +124,12 @@ export function renderInteriorLegend() {
     const distance = Number.isFinite(item.distance) ? `${Math.round(item.distance)}m` : '';
     const badge = escapeHtml(item.supportType || 'Enterable');
     return `
-      <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid rgba(0,255,255,0.28);border-radius:6px;background:rgba(0,255,255,0.06)">
+      <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid color-mix(in srgb, var(--wx-action) 28%, transparent);border-radius:6px;background:color-mix(in srgb, var(--wx-selected) 6%, transparent)">
         <div style="display:flex;flex-direction:column;gap:2px">
           <span style="color:#d9fdff">${escapeHtml(item.label || 'Building')}</span>
-          <span style="color:#8ef9ff;font-size:9px;text-transform:uppercase;letter-spacing:0.08em">${badge}</span>
+          <span style="color:var(--wx-action);font-size:9px;text-transform:uppercase;letter-spacing:0.08em">${badge}</span>
         </div>
-        <span style="color:#8ef9ff;white-space:nowrap">${distance}</span>
+        <span style="color:var(--wx-action);white-space:nowrap">${distance}</span>
       </div>
     `;
   }).join('');

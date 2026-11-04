@@ -21,6 +21,7 @@ import {mountTesterInvitation} from './ui/tester-invitation.js';
 import {bindWorldFocusControls} from './ui/world-focus.js';
 import {bindControlPanel} from './ui/control-panel.js';
 import {getScreenLayoutService} from './ui/screen-layout.js?v=3';
+import {bindNovaNavigation} from './ui/nova-navigation.js';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -115,14 +116,14 @@ function setupUI() {
     btn.addEventListener('click', () => {
       // Remove active class from all buttons
       propertyTypeButtons.forEach((b) => {
-        b.style.background = '#e2e8f0';
-        b.style.color = '#64748b';
+        b.style.background = "var(--wx-panel-soft)";
+        b.style.color = "var(--wx-action)";
         b.classList.remove('active');
       });
 
       // Add active class to clicked button
-      btn.style.background = '#667eea';
-      btn.style.color = '#ffffff';
+      btn.style.background = "var(--wx-selected)";
+      btn.style.color = "var(--wx-text)";
       btn.classList.add('active');
 
       appCtx.propertyTypeFilter = btn.dataset.type;
@@ -183,6 +184,7 @@ function setupUI() {
     }
   }
   const worldFocus = bindWorldFocusControls(appCtx, closeAllFloatMenus);
+  bindNovaNavigation();
   bindRacingUI({openCareerJourney:()=>experiences.open({experienceId:'career:racer'}),closeMenus:closeAllFloatMenus,requestWorldFocus:worldFocus.requestWorldFocus,chooseDestination:()=>{goToMainMenu();titleUi.selectGameMode('racing');}});
   bindControlPanel(appCtx, {updateMode: updateControlsModeUI, clearHeld: clearVirtualHeldInputs, requestWorldFocus: worldFocus.requestWorldFocus});
   appCtx.screenLayout.bindHudLayout();

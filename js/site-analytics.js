@@ -74,7 +74,7 @@ function addPreferenceControl() {
   const button = document.createElement('button');
   button.type = 'button';
   button.id = 'siteAnalyticsPreference';
-  button.style.cssText = 'display:block;margin:16px auto;padding:10px 14px;border:1px solid #557b89;border-radius:6px;background:#0b2029;color:#ecf5f7;font:inherit;cursor:pointer';
+  button.style.cssText = "display:block;margin:16px auto;padding:10px 14px;border:1px solid var(--wx-line);border-radius:6px;background:var(--wx-panel-solid);color:var(--wx-text);font:inherit;cursor:pointer";
   const sync = () => { button.textContent = analyticsStorageAllowed() ? 'Analytics: standard — switch to limited' : 'Analytics: limited — switch to standard'; };
   button.addEventListener('click', () => writeAnalyticsConsent(analyticsStorageAllowed() ? 'denied' : 'granted'));
   globalThis.addEventListener('we3d:analytics-consent', sync);

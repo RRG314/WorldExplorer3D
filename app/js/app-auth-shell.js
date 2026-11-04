@@ -44,12 +44,12 @@ let authMode = 'signin';
 
 function setProStatus(message, isWarn = false) {
   proAccessStatus.textContent = message || '';
-  proAccessStatus.style.color = isWarn ? '#fca5a5' : '#93c5fd';
+  proAccessStatus.style.color = isWarn ? "var(--wx-danger)" : "var(--wx-action)";
 }
 
 function setAuthStatus(message, isWarn = false) {
   authPanelStatus.textContent = message || '';
-  authPanelStatus.style.color = isWarn ? '#fca5a5' : '#93c5fd';
+  authPanelStatus.style.color = isWarn ? "var(--wx-danger)" : "var(--wx-action)";
 }
 
 function hideProAccessPanel() {

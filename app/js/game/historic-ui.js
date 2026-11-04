@@ -37,13 +37,13 @@ export function createHistoricCard(site) {
   const safeIcon = escapeHtml(site.icon || '⛩️');
 
   return `
-    <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s" onclick="openHistoricModal('${safeNameJs}')">
+    <div style="background:var(--wx-selected);border:2px solid var(--wx-warning);border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s" onclick="openHistoricModal('${safeNameJs}')">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
-        <div style="font-size:16px;font-weight:700;color:#78350f;flex:1">${safeIcon} ${safeName}</div>
-        <div style="font-size:11px;color:#d97706;font-weight:600;background:#fff;padding:3px 6px;border-radius:4px">📍 ${escapeHtml(distanceText)}</div>
+        <div style="font-size:16px;font-weight:700;color:var(--wx-warning);flex:1">${safeIcon} ${safeName}</div>
+        <div style="font-size:11px;color:var(--wx-warning);font-weight:600;background:var(--wx-panel-soft);padding:3px 6px;border-radius:4px">📍 ${escapeHtml(distanceText)}</div>
       </div>
-      <div style="font-size:11px;color:#92400e;margin-bottom:8px">${safeCategory}</div>
-      <button onclick="event.stopPropagation(); navigateToHistoric('${safeNameJs}')" style="width:100%;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:6px;padding:6px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:11px;transition:all 0.2s">
+      <div style="font-size:11px;color:var(--wx-warning);margin-bottom:8px">${safeCategory}</div>
+      <button onclick="event.stopPropagation(); navigateToHistoric('${safeNameJs}')" style="width:100%;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:6px;padding:6px;color:var(--wx-text);font-family:var(--wx-font-ui);font-weight:600;cursor:pointer;font-size:11px;transition:all 0.2s">
         ${isSelected ? '✓ Navigating' : '🧭 Get Directions'}
       </button>
     </div>
@@ -87,25 +87,25 @@ export async function openHistoricModal(siteName) {
   const wikiUrl = wikiSlug ? `https://wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}` : '';
   const navButtons = `
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="navigateToHistoric('${safeNameJs}')" style="flex:1;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">
+      <button onclick="navigateToHistoric('${safeNameJs}')" style="flex:1;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:8px;padding:12px 24px;color:var(--wx-text);font-family:var(--wx-font-ui);font-weight:600;cursor:pointer;transition:all 0.2s">
         ${isSelected ? '✓ Navigating' : '🧭 Navigate Here'}
       </button>
-      ${isSelected ? `<button onclick="clearNavigation()" style="flex:1;background:#ef4444;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">✕ Clear Route</button>` : ''}
+      ${isSelected ? `<button onclick="clearNavigation()" style="flex:1;background:var(--wx-panel-soft);border:none;border-radius:8px;padding:12px 24px;color:var(--wx-text);font-family:var(--wx-font-ui);font-weight:600;cursor:pointer;transition:all 0.2s">✕ Clear Route</button>` : ''}
     </div>
   `;
 
   appCtx.PropertyUI.modalBody.innerHTML = `
-    <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#78350f">
+    <div style="background:var(--wx-selected);border:2px solid var(--wx-warning);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#78350f">
       <strong>⛩️ Historic Site</strong><br>
       ${escapeHtml(fact)}
     </div>
-    <div style="width:100%;height:200px;background:#f5f5f5;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;font-size:64px">${safeIcon}</div>
+    <div style="width:100%;height:200px;background:var(--wx-panel-soft);border-radius:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;font-size:64px">${safeIcon}</div>
     <div class="prop-stat"><span class="prop-stat-label">Type</span><span class="prop-stat-value">${safeCategory}</span></div>
     <div class="prop-stat"><span class="prop-stat-label">Distance</span><span class="prop-stat-value">${escapeHtml(distanceText)}</span></div>
     <div class="prop-stat"><span class="prop-stat-label">Entry Support</span><span class="prop-stat-value">${escapeHtml(entrySupportText)}</span></div>
     <div class="prop-stat"><span class="prop-stat-label">Location</span><span class="prop-stat-value">${safeLat}, ${safeLon}</span></div>
     ${navButtons}
-    ${wikiUrl ? `<button onclick="window.open('${escapeJsString(wikiUrl)}','_blank','noopener,noreferrer')" style="width:100%;margin-top:8px;background:#64748b;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer">📖 Wikipedia</button>` : ''}
+    ${wikiUrl ? `<button onclick="window.open('${escapeJsString(wikiUrl)}','_blank','noopener,noreferrer')" style="width:100%;margin-top:8px;background:var(--wx-selected);border:none;border-radius:8px;padding:12px 24px;color:var(--wx-text);font-family:var(--wx-font-ui);font-weight:600;cursor:pointer">📖 Wikipedia</button>` : ''}
   `;
   appCtx.PropertyUI.modal.classList.add('show');
 }

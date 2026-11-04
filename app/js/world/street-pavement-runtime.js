@@ -154,7 +154,7 @@ export async function publishStreetPavement(appCtx, options = {}) {
       let panel = document.getElementById('streetSurfaceDiagnostics');
       if (!panel) {
         panel = document.createElement('details'); panel.id = 'streetSurfaceDiagnostics';
-        panel.style.cssText = 'position:fixed;right:8px;top:110px;z-index:9999;background:#101921;color:#fff;padding:10px;max-width:340px;max-height:calc(100vh - 130px);overflow:auto;font:12px monospace';
+        panel.style.cssText = "position:fixed;right:8px;top:110px;z-index:9999;background:var(--wx-panel-solid);color:var(--wx-text);padding:10px;max-width:340px;max-height:calc(100vh - 130px);overflow:auto;font:12px monospace";
         panel.appendChild(document.createElement('summary')).textContent = 'Street surface verification';
         const overviewProgress=panel.appendChild(document.createElement('div'));overviewProgress.id='streetOverviewProgress';
         panel.appendChild(document.createElement('pre')); document.body.appendChild(panel);

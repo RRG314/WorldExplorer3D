@@ -114,7 +114,7 @@ export function documentaryEditorMarkup({
 }
 export function documentaryStoryHtml(base, album) {
   const report = documentaryStoryReport(base);
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(report.title)} · World Explorer</title><style>body{max-width:900px;margin:32px auto;padding:0 20px;font:16px/1.5 system-ui;background:#13282d;color:#e8f0ed}img{display:block;max-width:100%;height:auto}figure{margin:24px 0}figcaption{padding:10px 0}small{color:#bdccc7}summary{font-size:1.6rem;font-weight:bold}</style><main>${documentaryReportMarkup(report, album).replace('<details ', '<details open ')}</main></html>`;
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(report.title)} · World Explorer</title><style>body{max-width:900px;margin:32px auto;padding:0 20px;font:16px/1.5 var(--wx-font-ui);background:var(--wx-panel-solid);color:var(--wx-text)}img{display:block;max-width:100%;height:auto}figure{margin:24px 0}figcaption{padding:10px 0}small{color:var(--wx-text)}summary{font-size:1.6rem;font-weight:bold}</style><main>${documentaryReportMarkup(report, album).replace('<details ', '<details open ')}</main></html>`;
 }
 
 export async function showDocumentaryStoryPhotos(button, store) {

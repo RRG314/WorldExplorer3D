@@ -5,10 +5,10 @@
     left: 8px;
     z-index: 10000;
     padding: 10px 14px;
-    border: 2px solid #fff;
+    border: 2px solid var(--wx-line-soft);
     border-radius: 6px;
-    color: #fff;
-    background: #071821;
+    color: var(--wx-text);
+    background: var(--wx-panel-solid);
     transform: translateY(-150%);
   }
 

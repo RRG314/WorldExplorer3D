@@ -1,11 +1,13 @@
 @layer interface {
-  /* Opt-in components: do not restyle unreviewed gameplay/editor controls. */
+  /* Shared NOVA components; domain-specific behavior remains with each owner. */
   .wx-panel {
     box-sizing: border-box;
     color: var(--wx-text);
-    background: var(--wx-panel-solid);
+    background: var(--wx-panel);
     border: 1px solid var(--wx-line-soft);
-    border-radius: var(--wx-radius);
+    border-radius: var(--wx-radius-panel);
+    box-shadow: var(--wx-shadow-panel);
+    backdrop-filter: blur(var(--wx-glass-blur));
   }
 
   .wx-button {
@@ -18,7 +20,7 @@
     box-sizing: border-box;
     padding: 10px 16px;
     border: 1px solid var(--wx-line);
-    border-radius: var(--wx-radius);
+    border-radius: var(--wx-radius-control);
     color: var(--wx-text);
     background: var(--wx-panel-soft);
     font: 650 var(--wx-type-control)/1.4 var(--wx-font-ui);

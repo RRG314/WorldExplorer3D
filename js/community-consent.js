@@ -16,13 +16,13 @@ function askForAcceptance(uid) {
     dialog.id = 'communityTermsDialog';
     dialog.setAttribute('aria-labelledby', 'communityTermsTitle');
     dialog.setAttribute('aria-describedby', 'communityTermsDescription');
-    dialog.style.cssText = 'max-width:460px;width:calc(100% - 32px);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;border:2px solid #667eea;border-radius:14px;padding:22px;background:#f8fafc;color:#1e293b;font:14px/1.55 system-ui;z-index:2147483000';
+    dialog.style.cssText = "max-width:460px;width:calc(100% - 32px);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;border:2px solid var(--wx-action);border-radius:14px;padding:22px;background:var(--wx-panel-soft);color:var(--wx-action);font:14px/1.55 var(--wx-font-ui);z-index:2147483000";
     dialog.innerHTML = `<h2 id="communityTermsTitle" style="margin:0 0 12px;font-size:20px">Explore together respectfully</h2>
       <div id="communityTermsDescription"><p>Before joining a room or sharing content, agree to the community rules. They apply to guests too.</p>
       <ul><li>No harassment, hate, threats, sexual content or exploitation.</li><li>Do not share someone’s personal details or upload material without permission.</li><li>Use Report for abuse. Block players to hide their chat and stop their invites. Shared world changes remain visible to keep the room consistent.</li></ul>
       <p>Shared content may be reviewed or removed, and accounts may be restricted for abuse.</p></div>
       <label style="display:flex;align-items:flex-start;gap:10px;margin:16px 0"><input id="communityTermsAgree" type="checkbox" style="margin-top:5px;min-width:18px;min-height:18px"><span>I agree to the <a href="/legal/terms.html#community-rules" target="_blank" rel="noopener">Terms and community rules</a>. <a href="/legal/privacy.html" target="_blank" rel="noopener">Privacy policy</a></span></label>
-      <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap"><button id="communityTermsCancel" type="button" style="min-height:44px;padding:10px 16px;border:1px solid #cbd5e1;border-radius:8px;background:white;color:#334155">Not now</button><button id="communityTermsContinue" type="button" disabled style="opacity:.5;min-height:44px;padding:10px 16px;border:0;border-radius:8px;background:#667eea;color:white">Agree and continue</button></div>`;
+      <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap"><button id="communityTermsCancel" type="button" style="min-height:44px;padding:10px 16px;border:1px solid var(--wx-line-soft);border-radius:8px;background:white;color:var(--wx-action)">Not now</button><button id="communityTermsContinue" type="button" disabled style="opacity:.5;min-height:44px;padding:10px 16px;border:0;border-radius:8px;background:var(--wx-selected);color:white">Agree and continue</button></div>`;
     let unsubscribe = () => {}, finished = false;
     function finish(accepted, error) {
       if (finished) return;

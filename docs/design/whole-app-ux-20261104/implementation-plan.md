@@ -1,6 +1,6 @@
 # Bounded implementation and validation plan
 
-This plan follows the recommended Expedition framework. Atlas or Workbench can replace its starting composition after owner selection without changing the preservation/ownership contracts. **Research/design is the present deliverable. No redesign implementation or production deployment is authorized by this document itself.**
+The owner has selected NOVA and authorized implementing the full working redesign and a staging candidate. [NOVA delivery](../NOVA-DELIVERY.md) records that decision, its image policy and current fixed stops. The architecture/ownership requirements below remain; old Roam appearance and design-selection holds are superseded. **Production deployment is prohibited for this redesign.**
 
 ## Definition of done and scope control
 

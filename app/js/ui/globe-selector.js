@@ -476,7 +476,7 @@ function createGlobeSelector(options = {}) {
     if (!query) {
       if (searchStatus) {
         searchStatus.textContent = 'Please enter a location.';
-        searchStatus.style.color = '#dc2626';
+        searchStatus.style.color = "var(--wx-danger)";
       }
       return;
     }
@@ -486,7 +486,7 @@ function createGlobeSelector(options = {}) {
     searchController = controller;
     if (searchStatus) {
       searchStatus.textContent = 'Searching places…';
-      searchStatus.style.color = '#64748b';
+      searchStatus.style.color = "var(--wx-action)";
     }
     clearSearchResults();
 
@@ -502,13 +502,13 @@ function createGlobeSelector(options = {}) {
 
       if (searchStatus) {
         searchStatus.textContent = results.length === 1 ? '1 place found.' : `${results.length} places found. Choose the best match.`;
-        searchStatus.style.color = '#059669';
+        searchStatus.style.color = "var(--wx-success)";
       }
     } catch (error) {
       if (controller !== searchController || error?.name === 'AbortError') return;
       if (searchStatus) {
         searchStatus.textContent = error?.message || 'Place search is unavailable right now.';
-        searchStatus.style.color = '#dc2626';
+        searchStatus.style.color = "var(--wx-danger)";
       }
     } finally {
       if (controller === searchController) {
@@ -525,7 +525,7 @@ function createGlobeSelector(options = {}) {
     if (lat == null || lon == null || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
       if (searchStatus) {
         searchStatus.textContent = 'Enter latitude from -90 to 90 and longitude from -180 to 180.';
-        searchStatus.style.color = '#dc2626';
+        searchStatus.style.color = "var(--wx-danger)";
       }
       return false;
     }
@@ -576,7 +576,7 @@ function createGlobeSelector(options = {}) {
     if (!selected) {
       if (searchStatus) {
         searchStatus.textContent = 'Choose an ocean point on the globe first.';
-        searchStatus.style.color = '#dc2626';
+        searchStatus.style.color = "var(--wx-danger)";
       }
       return Promise.resolve(false);
     }
@@ -663,7 +663,7 @@ function createGlobeSelector(options = {}) {
 
     if (searchStatus) {
       searchStatus.textContent = 'Search for a place or choose one from the globe.';
-      searchStatus.style.color = '#64748b';
+      searchStatus.style.color = "var(--wx-action)";
     }
     setLocateButtonBusy(false);
     setStartButtonBusy(false);

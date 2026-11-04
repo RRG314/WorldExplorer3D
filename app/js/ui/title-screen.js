@@ -272,7 +272,7 @@ function initTitleScreenUi({
   const setTitleUseMyLocationStatus = (message = '', color = '#6b7280') => {
     if (!(titleUseMyLocationStatus instanceof HTMLElement)) return;
     titleUseMyLocationStatus.textContent = message || '';
-    titleUseMyLocationStatus.style.color = color || '#6b7280';
+    titleUseMyLocationStatus.style.color = color || "var(--wx-muted)";
   };
   const setLocationEntryLabel = (button, label) => {
     if (!button) return;
@@ -490,7 +490,21 @@ function initTitleScreenUi({
     },
     primeMultiplayerUi,
     onActivities:openActivities,
-    onJournal:openJournal
+    onJournal:openJournal,
+    onCreate:async kind=>{
+      if (!['blocks','tracks'].includes(kind)) return false;
+      selectTitleGameMode('free');
+      const started=await globeSelector.startHere();
+      if (!started || !appCtx.gameStarted || appCtx.getEnv?.()!=='EARTH') return false;
+      if (kind==='blocks') {
+        if (typeof appCtx.openBlockBuilder!=='function') return false;
+        appCtx.openBlockBuilder();
+      } else {
+        if (typeof appCtx.startGameplayPlugin!=='function') return false;
+        await appCtx.startGameplayPlugin('racing');
+      }
+      return true;
+    }
   });
 
   appCtx.globeSelector = globeSelector;

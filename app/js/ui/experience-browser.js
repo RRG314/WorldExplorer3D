@@ -1,16 +1,17 @@
 import {experienceById,filterExperiences} from '../experiences/catalog.js';
 import {createExperienceIntent,experienceOffer} from '../experiences/entry.js';
+import {EXPERIENCE_GROUPS,experiencePresentation} from './experience-presentation.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function createExperienceBrowser({documentRef=document,readContext=()=>({}),readProfile=async()=>null,saveSelection=async()=>{},resolveAdapter=()=>null,onBegin=async()=>false,onEntered=()=>{},onJournal=()=>{},onLayer=()=>{}}={}){
  const dialog=documentRef.createElement('dialog');dialog.id='experienceBrowser';dialog.className='experience-browser';dialog.setAttribute('aria-labelledby','experienceHeading');
  dialog.innerHTML=`<header class="experience-header"><div><span class="experience-eyebrow">World Explorer</span><h2 id="experienceHeading">Activities</h2></div><button type="button" data-experience-close aria-label="Close Activities">×</button></header>
  <nav class="experience-tabs" role="tablist" aria-label="Activities"><button type="button" role="tab" data-experience-view="continue" aria-selected="false" tabindex="-1">Continue</button><button type="button" role="tab" data-experience-view="careers" aria-selected="true">Careers</button><button type="button" role="tab" data-experience-view="quick" aria-selected="false" tabindex="-1">Quick play</button></nav>
- <p class="experience-status" role="status" aria-live="polite"></p><div class="experience-body"><section class="experience-list-pane"><label class="experience-search">Find an activity<input type="search" maxlength="100" placeholder="Search careers and games" aria-label="Find an activity"></label><div class="experience-list" role="region" aria-label="Activity choices"></div></section><section class="experience-detail" tabindex="-1" aria-label="Assignment details"></section></div>`;
+ <p class="experience-status" role="status" aria-live="polite"></p><div class="experience-body"><section class="experience-list-pane"><div class="experience-intro"><h3>Follow your curiosity.</h3><p>Choose a pursuit, keep your discoveries and return when you are ready. Free exploration is always available.</p></div><label class="experience-search">Find an activity<input type="search" maxlength="100" placeholder="Search careers and games" aria-label="Find an activity"></label><div class="experience-groups" role="group" aria-label="Career interests"></div><div class="experience-list" role="region" aria-label="Activity choices"></div></section><section class="experience-detail" tabindex="-1" aria-label="Assignment details"></section></div>`;
  documentRef.body.append(dialog);
  const find=selector=>dialog.querySelector(selector),list=find('.experience-list'),detail=find('.experience-detail'),search=find('input'),status=find('.experience-status');
  const selections=new Map();
  let variantId='campaign';
- let view='careers',selected='',profile=null,revision=0,busy=false,origin=null,detailOpen=false,places=[],placeId='',returnScroll=0;
+ let view='careers',group='all',selected='',profile=null,revision=0,busy=false,origin=null,detailOpen=false,places=[],placeId='',returnScroll=0;
  const adapterFor=entry=>entry&&resolveAdapter(entry.adapterId,entry);
  function selectedPlace(){return places.find(p=>p.id===placeId)||null;}
  function message(text){status.textContent=text;}
@@ -19,8 +20,11 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
   for(const button of dialog.querySelectorAll('[data-experience-view]')){const active=button.dataset.experienceView===view;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;}
   search.closest('label').hidden=view==='continue';
   let entries=filterExperiences({view:view==='continue'?'careers':view,query:search.value});
+  const groups=find('.experience-groups');groups.hidden=view!=='careers';
+  groups.innerHTML=EXPERIENCE_GROUPS.map(item=>`<button type="button" data-experience-group="${item.id}" aria-pressed="${group===item.id}">${escape(item.label)}</button>`).join('');
+  if(view==='careers'&&group!=='all')entries=entries.filter(entry=>experiencePresentation(entry).group===group);
   if(view==='continue'){const id=profile?.activeExperience?.experienceId;entries=id&&experienceById(id)?[experienceById(id)]:[];}
-  list.innerHTML=entries.map(entry=>`<button type="button" class="experience-card${entry.id===selected?' selected':''}" data-experience-id="${escape(entry.id)}" aria-pressed="${entry.id===selected}"><span>${escape(entry.kind==='career'?'Career':entry.kind==='route'?'Local route':'Quick play')}</span><strong>${escape(entry.label)}</strong><small>${escape(entry.assignment)}</small></button>`).join('')||`<div class="experience-empty"><h3>${view==='continue'?'Choose your first journey':'No matches'}</h3><p>${view==='continue'?'Choose a career or quick game to begin. Your Journal stays with you.':'Try a different name or browse the other Activities tabs.'}</p>${view==='continue'?'<button type="button" data-browse-careers>Browse careers</button>':''}</div>`;
+  list.innerHTML=entries.map(entry=>{const presentation=experiencePresentation(entry),image=presentation.image;return `<article class="experience-tile"><button type="button" class="experience-card${entry.id===selected?' selected':''}" data-experience-id="${escape(entry.id)}" aria-pressed="${entry.id===selected}">${image?`<img src="${escape(image.src)}" alt="${escape(image.alt)}" loading="lazy" width="480" height="240">`:`<span class="experience-card-symbol" aria-hidden="true">${presentation.symbol}</span>`}<span>${escape(entry.kind==='career'?presentation.groupLabel:entry.kind==='route'?'Local route':'Quick play')}</span><strong>${escape(entry.label)}</strong><small>${escape(entry.assignment)}</small></button>${image?`<small class="experience-image-credit">${image.sourceUrl?`<a href="${escape(image.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escape(image.caption)}</a>`:escape(image.caption)}</small>`:''}</article>`;}).join('')||`<div class="experience-empty"><h3>${view==='continue'?'Choose your first journey':'No matches'}</h3><p>${view==='continue'?'Choose a career or quick game to begin. Your Journal stays with you.':'Try a different name or browse the other Activities tabs.'}</p>${view==='continue'?'<button type="button" data-browse-careers>Browse careers</button>':''}</div>`;
   const entry=experienceById(selected);
   if(!entry){detail.innerHTML='<div class="experience-empty"><h3>What would you like to do?</h3><p>Choose a career for a guided journey, or Quick play for an independent game.</p></div>';return;}
   const adapter=adapterFor(entry),context=readContext(),offer=experienceOffer(entry,{adapter,place:selectedPlace(),profile});
@@ -47,6 +51,7 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
  dialog.addEventListener('click',async event=>{
   const button=event.target.closest('button');if(!button||busy)return;
   if(button.hasAttribute('data-experience-close')){close();return;}
+  if(button.dataset.experienceGroup&&EXPERIENCE_GROUPS.some(item=>item.id===button.dataset.experienceGroup)){group=button.dataset.experienceGroup;detailOpen=false;render();find(`[data-experience-group="${group}"]`)?.focus();return;}
   if(button.hasAttribute('data-experience-back')){detailOpen=false;render();list.scrollTop=returnScroll;list.querySelector(`[data-experience-id="${selected}"]`)?.focus();return;}
   if(button.dataset.experienceView||button.hasAttribute('data-browse-careers')){view=button.dataset.experienceView||'careers';detailOpen=false;message('');render();return;}
   if(button.dataset.experienceId){returnScroll=list.scrollTop;void select(button.dataset.experienceId);return;}

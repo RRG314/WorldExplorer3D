@@ -7,9 +7,9 @@
   display: none;
   width: min(292px, calc(100vw - 40px));
   padding: 12px;
-  color: #e5e7eb;
-  background: rgba(17, 24, 39, 0.96);
-  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: var(--wx-text);
+  background: color-mix(in srgb, var(--wx-panel-solid) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wx-action) 45%, transparent);
   border-radius: 8px;
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
   max-height: calc(100vh - 104px);
@@ -26,34 +26,34 @@
   justify-content: space-between;
   margin: -12px -12px 0;
   padding: 10px 12px 8px;
-  background: rgba(17, 24, 39, 0.985);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+  background: color-mix(in srgb, var(--wx-panel-solid) 99%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--wx-action) 24%, transparent);
 }
 .blockBuilderHeader strong { font-size: 14px; }
 .blockBuilderHeaderActions { display: flex; align-items: center; gap: 6px; }
 .blockBuilderTruthNote {
   margin: 0;
   padding: 8px;
-  color: #bae6fd;
-  background: rgba(14, 116, 144, 0.18);
-  border: 1px solid rgba(34, 211, 238, 0.28);
+  color: var(--wx-action);
+  background: color-mix(in srgb, var(--wx-selected) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wx-action) 28%, transparent);
   border-radius: 6px;
-  font: 500 11px/1.4 Inter, sans-serif;
+  font: 500 11px/1.4 var(--wx-font-ui);
 }
 .editableWorldBuildingTools {
   display: grid;
   gap: 7px;
   padding-bottom: 9px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  border-bottom: 1px solid color-mix(in srgb, var(--wx-action) 28%, transparent);
 }
 .editableWorldBuildingTools > strong { font-size: 12px; }
 .editableWorldBuildingTools .blockBuilderActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-#editableWorldSelection { color: #cbd5e1; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+#editableWorldSelection { color: var(--wx-text); font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
 .blockBuilderHeader button {
   width: 30px;
   height: 30px;
   padding: 0;
-  color: #cbd5e1;
+  color: var(--wx-text);
   background: transparent;
   border: 0;
   font-size: 22px;
@@ -69,17 +69,17 @@
 #blockBuilderPanel a {
   min-height: 34px;
   padding: 7px 9px;
-  color: #e2e8f0;
-  background: #273449;
-  border: 1px solid #475569;
+  color: var(--wx-text);
+  background: var(--wx-selected);
+  border: 1px solid var(--wx-line);
   border-radius: 6px;
-  font: 600 11px/1.2 Inter, sans-serif;
+  font: 600 11px/1.2 var(--wx-font-ui);
   text-align: center;
   text-decoration: none;
   cursor: pointer;
 }
 
-#blockBuilderPanel button.active { color: #111827; background: #f59e0b; border-color: #fbbf24; }
+#blockBuilderPanel button.active { color: var(--wx-text); background: var(--wx-selected); border-color: var(--wx-warning); }
 #blockBuilderPanel button:disabled { opacity: 0.45; cursor: default; }
 .blockBuilderSwatches { display: grid; grid-template-columns: repeat(4, 32px); gap: 6px; }
 .blockBuilderSwatches button {
@@ -88,24 +88,24 @@
   padding: 0;
   border: 2px solid transparent;
 }
-.blockBuilderSwatches button.active { border-color: #f8fafc; box-shadow: 0 0 0 2px #111827; }
+.blockBuilderSwatches button.active { border-color: var(--wx-line-soft); box-shadow: 0 0 0 2px #111827; }
 #blockBuilderPanel .blockBuilderIconButton {
   width: 34px;
   min-width: 34px;
   padding: 0;
   font-size: 20px;
 }
-.blockBuilderMapActions { padding-top: 8px; border-top: 1px solid rgba(148, 163, 184, 0.28); }
+.blockBuilderMapActions { padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--wx-action) 28%, transparent); }
 #blockBuilderCount,
-#blockBuilderStatus { min-height: 15px; color: #cbd5e1; font-size: 11px; line-height: 1.35; }
-#blockBuilderStatus { color: #fbbf24; }
+#blockBuilderStatus { min-height: 15px; color: var(--wx-text); font-size: 11px; line-height: 1.35; }
+#blockBuilderStatus { color: var(--wx-warning); }
 
 #coords { display: none; align-items: center; gap: 9px; }
 #coords.show { display: flex; }
 #coordsOsmLink {
   padding-left: 8px;
-  color: #2563eb;
-  border-left: 1px solid #cbd5e1;
+  color: var(--wx-action);
+  border-left: 1px solid var(--wx-line-soft);
   font-weight: 700;
   text-decoration: none;
 }

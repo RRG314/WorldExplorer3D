@@ -103,23 +103,23 @@ function createMoonLandingUiApi(context) {
     ].join(';');
     panel.innerHTML = `
       <div style="text-align:center;margin-bottom:20px;">
-        <h2 style="color:#d4af37;margin:0;font-size:28px;text-shadow:0 0 10px rgba(212,175,55,0.8);">
+        <h2 style="color:var(--wx-warning);margin:0;font-size:28px;text-shadow:0 0 10px rgba(212,175,55,0.8);">
           Apollo 11 Landing Site
         </h2>
-        <div style="color:#888;font-size:14px;margin-top:5px;">Mare Tranquillitatis</div>
+        <div style="color:var(--wx-muted);font-size:14px;margin-top:5px;">Mare Tranquillitatis</div>
       </div>
       <div style="line-height:1.8;font-size:16px;">
-        <div style="margin:15px 0;"><strong style="color:#d4af37;">Date:</strong> ${info.date}</div>
-        <div style="margin:15px 0;"><strong style="color:#d4af37;">Crew:</strong> ${info.crew}</div>
-        <div style="margin:15px 0;"><strong style="color:#d4af37;">Coordinates:</strong> ${info.coordinates}</div>
-        <div style="margin:15px 0;"><strong style="color:#d4af37;">Landing Time:</strong> ${info.landingTime}</div>
-        <div style="margin:15px 0;"><strong style="color:#d4af37;">Location:</strong> ${info.location}</div>
+        <div style="margin:15px 0;"><strong style="color:var(--wx-warning);">Date:</strong> ${info.date}</div>
+        <div style="margin:15px 0;"><strong style="color:var(--wx-warning);">Crew:</strong> ${info.crew}</div>
+        <div style="margin:15px 0;"><strong style="color:var(--wx-warning);">Coordinates:</strong> ${info.coordinates}</div>
+        <div style="margin:15px 0;"><strong style="color:var(--wx-warning);">Landing Time:</strong> ${info.landingTime}</div>
+        <div style="margin:15px 0;"><strong style="color:var(--wx-warning);">Location:</strong> ${info.location}</div>
       </div>
-      <div style="margin:20px 0;padding:15px;background:rgba(212,175,55,0.1);border-left:3px solid #d4af37;font-style:italic;">
-        ${info.quote}<br><span style="color:#888;font-size:14px;">Neil Armstrong</span>
+      <div style="margin:20px 0;padding:15px;background:color-mix(in srgb, var(--wx-selected) 10%, transparent);border-left:3px solid var(--wx-warning);font-style:italic;">
+        ${info.quote}<br><span style="color:var(--wx-muted);font-size:14px;">Neil Armstrong</span>
       </div>
       <div style="text-align:center;margin-top:20px;">
-        <button id="apollo11CloseBtn" style="background:#d4af37;color:#000;border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:5px;cursor:pointer;font-family:Courier New, monospace;">
+        <button id="apollo11CloseBtn" style="background:var(--wx-selected);color:var(--wx-text);border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:5px;cursor:pointer;font-family:var(--wx-font-instrument);">
           Close
         </button>
       </div>

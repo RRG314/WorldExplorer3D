@@ -434,7 +434,7 @@
     border: 1px solid rgb(238 201 107 / .54);
     border-radius: var(--wx-radius);
     padding: 0 13px;
-    background: rgba(6, 13, 19, .94);
+    background: color-mix(in srgb, var(--wx-panel-solid) 94%, transparent);
     color: var(--wx-muted);
     font: 600 var(--wx-type-meta)/1 var(--wx-font-ui);
     box-shadow: 0 12px 32px rgba(0, 0, 0, .42);
@@ -511,7 +511,7 @@
   #discoveryContextPrompt[data-mode=live-gps]::before {
     content: "GPS";
     flex: 0 0 auto;
-    border: 1px solid rgba(63, 211, 159, .42);
+    border: 1px solid color-mix(in srgb, var(--wx-success) 42%, transparent);
     padding: 3px 4px;
     color: var(--wx-success);
     font: 700 var(--wx-type-meta) var(--wx-font-ui);
@@ -607,7 +607,7 @@
   .discoveryGoal {
     margin: -4px 0 12px;
     padding: 11px 12px;
-    border: 1px solid rgba(244, 185, 66, .34);
+    border: 1px solid color-mix(in srgb, var(--wx-warning) 34%, transparent);
     border-left: 3px solid var(--wx-yellow);
     background:
       linear-gradient(
@@ -636,7 +636,7 @@
   .discoveryGoalMeter {
     height: 5px;
     margin-top: 9px;
-    border: 1px solid #384149;
+    border: 1px solid var(--wx-line-soft);
     background: var(--wx-input);
     overflow: hidden;
   }
@@ -731,9 +731,9 @@
     gap: 10px;
     margin: 0 0 10px;
     padding: 9px 10px;
-    border: 1px solid rgba(63, 211, 159, .42);
+    border: 1px solid color-mix(in srgb, var(--wx-success) 42%, transparent);
     border-left: 3px solid var(--wx-success);
-    background: rgba(28, 137, 101, .1);
+    background: color-mix(in srgb, var(--wx-equipped-surface) 10%, transparent);
   }
   .discoveryFieldSession[hidden] {
     display: none;
@@ -767,9 +767,9 @@
     font: 700 calc(1rem * var(--wx-text-scale)) var(--wx-font-ui);
   }
   .discoveryFieldSession[data-state=held] {
-    border-color: rgba(244, 185, 66, .46);
+    border-color: color-mix(in srgb, var(--wx-warning) 46%, transparent);
     border-left-color: var(--wx-yellow);
-    background: rgba(244, 185, 66, .07);
+    background: color-mix(in srgb, var(--wx-selected) 7%, transparent);
   }
   .discoveryFieldSession[data-state=held] span,
   .discoveryFieldSession[data-state=held] > b {
@@ -802,7 +802,7 @@
     place-items: center;
     width: 24px;
     height: 24px;
-    border: 1px solid #3c6c91;
+    border: 1px solid var(--wx-line);
     border-radius: 50%;
     color: var(--wx-info);
     font: 700 var(--wx-type-meta) var(--wx-font-ui);
@@ -826,8 +826,8 @@
     background: rgb(238 201 107 / .1);
   }
   .discoveryExpeditionStop.complete {
-    border-color: rgba(63, 211, 159, .25);
-    background: rgba(63, 211, 159, .06);
+    border-color: color-mix(in srgb, var(--wx-success) 25%, transparent);
+    background: color-mix(in srgb, var(--wx-equipped-surface) 6%, transparent);
     cursor: default;
   }
   .discoveryExpeditionStop.complete > span {
@@ -856,7 +856,7 @@
     margin: 11px 0 12px;
     background: var(--wx-input);
     overflow: hidden;
-    border: 1px solid #26333c;
+    border: 1px solid var(--wx-line-soft);
   }
   #discoverySignalFill {
     display: block;
@@ -880,7 +880,7 @@
     letter-spacing: .05em;
   }
   .discoveryReadout span {
-    border: 1px solid rgba(157, 174, 186, .18);
+    border: 1px solid color-mix(in srgb, var(--wx-action) 18%, transparent);
     padding: 8px;
   }
   .discoveryReadout strong {
@@ -906,9 +906,9 @@
     align-items: start;
     margin: 9px 0;
     padding: 8px 9px;
-    border: 1px solid rgba(244, 185, 66, .28);
+    border: 1px solid color-mix(in srgb, var(--wx-warning) 28%, transparent);
     border-left: 2px solid var(--wx-yellow);
-    background: rgba(244, 185, 66, .06);
+    background: color-mix(in srgb, var(--wx-selected) 6%, transparent);
     color: var(--wx-muted);
     font-size: var(--wx-type-meta);
   }
@@ -985,7 +985,7 @@
     padding: 14px;
     border: 1px solid rgb(238 201 107 / .6);
     border-left: 3px solid var(--wx-blue);
-    background: rgba(5, 13, 20, .98);
+    background: color-mix(in srgb, var(--wx-panel-solid) 98%, transparent);
     box-shadow: 0 18px 42px rgba(0, 0, 0, .62);
   }
   .discoverySectionTutorial[hidden] {
@@ -1006,7 +1006,7 @@
   }
   .discoverySectionTutorial button {
     min-height: auto;
-    border: 1px solid #4b73a8;
+    border: 1px solid var(--wx-action);
     border-radius: var(--wx-radius);
     padding: 0 11px;
     background: var(--wx-panel-soft);
@@ -1040,9 +1040,9 @@
     background:
       linear-gradient(
         90deg,
-        rgba(3, 8, 12, .96) 0,
-        rgba(3, 8, 12, .72) 43%,
-        rgba(3, 8, 12, .08) 100%);
+        color-mix(in srgb, var(--wx-panel-solid) 96%, transparent) 0,
+        color-mix(in srgb, var(--wx-panel-solid) 72%, transparent) 43%,
+        color-mix(in srgb, var(--wx-panel-solid) 8%, transparent) 100%);
   }
   .discoveryInspectionBody {
     position: absolute;
@@ -1166,7 +1166,7 @@
     display: inline-block;
     margin-top: 7px;
     margin-right: 6px;
-    border: 1px solid rgba(53, 210, 114, .35);
+    border: 1px solid color-mix(in srgb, var(--wx-success) 35%, transparent);
     padding: 2px 5px;
     color: var(--wx-success);
     font: 600 var(--wx-type-meta) var(--wx-font-ui);
@@ -1215,7 +1215,7 @@
   .discoveryCompanionActions button.active {
     border-color: var(--wx-green);
     color: var(--wx-success);
-    background: rgba(53, 210, 114, .08);
+    background: color-mix(in srgb, var(--wx-equipped-surface) 8%, transparent);
   }
   .discoveryCompanionActions button:disabled {
     opacity: .45;
@@ -1265,13 +1265,13 @@
   .discoveryResultCard {
     margin-bottom: 12px;
     padding: 12px;
-    border: 1px solid rgba(53, 210, 114, .4);
+    border: 1px solid color-mix(in srgb, var(--wx-success) 40%, transparent);
     border-left: 3px solid var(--wx-green);
     background:
       linear-gradient(
         120deg,
-        rgba(53, 210, 114, .10),
-        rgba(9, 19, 27, .96) 55%);
+        color-mix(in srgb, var(--wx-equipped-surface) 10%, transparent),
+        color-mix(in srgb, var(--wx-panel-solid) 96%, transparent) 55%);
     box-shadow: 0 10px 26px rgba(0, 0, 0, .22);
   }
   .discoveryResultCard[hidden] {
@@ -1566,7 +1566,7 @@
     place-items: center;
     width: 32px;
     height: 32px;
-    border: 1px dashed #52616b;
+    border: 1px dashed var(--wx-line-soft);
     color: var(--wx-info);
     font: 700 var(--wx-type-control) var(--wx-font-ui);
     background: var(--wx-panel-solid);
@@ -1625,7 +1625,7 @@
   }
   .discoveryGearLock {
     float: right;
-    border: 1px solid #59636a;
+    border: 1px solid var(--wx-line-soft);
     padding: 2px 5px;
     color: var(--wx-muted);
     font: 700 var(--wx-type-meta) var(--wx-font-ui);
@@ -1691,7 +1691,7 @@
     grid-column: 1/-1;
     height: 4px;
     background: var(--wx-input);
-    border: 1px solid #283640;
+    border: 1px solid var(--wx-line-soft);
     overflow: hidden;
   }
   .discoveryRegionalRow em {
@@ -1745,7 +1745,7 @@
     margin-top: 8px;
     padding: 7px 8px;
     border-left: 2px solid var(--wx-blue);
-    background: rgba(36, 118, 255, .08);
+    background: color-mix(in srgb, var(--wx-selected) 8%, transparent);
     color: var(--wx-muted);
     font-size: var(--wx-type-meta);
   }
@@ -1801,12 +1801,12 @@
     gap: 9px;
     margin: 10px 0 12px;
     padding: 8px 11px;
-    border: 1px solid rgba(87, 151, 224, .48);
+    border: 1px solid color-mix(in srgb, var(--wx-action) 48%, transparent);
     background:
       linear-gradient(
         90deg,
         rgb(238 201 107 / .16),
-        rgba(11, 27, 40, .82));
+        color-mix(in srgb, var(--wx-panel-solid) 82%, transparent));
     color: var(--wx-text);
     text-align: left;
     cursor: pointer;
@@ -1818,7 +1818,7 @@
       linear-gradient(
         90deg,
         rgb(238 201 107 / .25),
-        rgba(11, 27, 40, .9));
+        color-mix(in srgb, var(--wx-panel-solid) 90%, transparent));
   }
   .discoveryEncounterLead {
     grid-template-columns: 26px minmax(0, 1fr);
@@ -1979,7 +1979,7 @@
   .discoveryJourneyOverview {
     margin: 0 0 12px;
     overflow: hidden;
-    border: 1px solid #293b48;
+    border: 1px solid var(--wx-line);
     background: var(--wx-panel-solid);
     box-shadow: 0 12px 28px rgba(0, 0, 0, .18);
   }
@@ -1990,8 +1990,8 @@
     background:
       linear-gradient(
         110deg,
-        rgba(53, 210, 114, .12),
-        rgba(7, 16, 24, .96) 76%);
+        color-mix(in srgb, var(--wx-equipped-surface) 12%, transparent),
+        color-mix(in srgb, var(--wx-panel-solid) 96%, transparent) 76%);
   }
   .discoveryJourneyIntro::after {
     content: "\2316";
@@ -2002,10 +2002,10 @@
     height: auto;
     display: grid;
     place-items: center;
-    border: 1px solid rgba(86, 214, 137, .22);
+    border: 1px solid color-mix(in srgb, var(--wx-success) 22%, transparent);
     border-radius: 50%;
     box-shadow: inset 0 0 0 8px rgba(86, 214, 137, .035);
-    color: rgba(120, 221, 160, .55);
+    color: color-mix(in srgb, var(--wx-success) 55%, transparent);
     font: 400 calc(1.125rem * var(--wx-text-scale))/1 var(--wx-font-ui);
   }
   .discoveryJourneyIntro span,
@@ -2077,7 +2077,7 @@
     place-items: center;
     width: 30px;
     height: 30px;
-    border: 1px solid #314b5e;
+    border: 1px solid var(--wx-line);
     border-radius: 50%;
     color: var(--wx-info);
     background: var(--wx-panel-soft);
@@ -2093,9 +2093,9 @@
     stroke-linejoin: round;
   }
   .suggested .discoveryJourneyRouteIcon {
-    border-color: rgba(83, 212, 134, .45);
+    border-color: color-mix(in srgb, var(--wx-success) 45%, transparent);
     color: var(--wx-success);
-    background: rgba(53, 210, 114, .07);
+    background: color-mix(in srgb, var(--wx-equipped-surface) 7%, transparent);
   }
   .discoveryJourneyRouteCopy {
     min-width: 0;
@@ -2243,9 +2243,9 @@
   .sandboxWalkthrough {
     margin: 12px 0;
     padding: 14px;
-    border: 1px solid rgba(135, 178, 201, .25);
+    border: 1px solid color-mix(in srgb, var(--wx-action) 25%, transparent);
     border-radius: var(--wx-radius);
-    background: rgba(16, 35, 49, .8);
+    background: color-mix(in srgb, var(--wx-panel-solid) 80%, transparent);
     color: var(--wx-text);
   }
   .sandboxWalkthrough h3 {
@@ -2318,10 +2318,10 @@
     min-height: 44px;
     max-width: 100%;
     padding: 9px 12px;
-    border: 1px solid #496886;
+    border: 1px solid var(--wx-line);
     background: var(--wx-panel-soft);
     color: var(--wx-text);
-    font-family: inherit;
+    font-family: var(--wx-font-ui);
     font-size: var(--wx-type-meta);
     font-weight: 600;
     cursor: pointer;
@@ -2329,7 +2329,7 @@
   }
   .discoveryOpeningChapter button:focus-visible,
   .discoveryChapterFinish:focus-visible {
-    outline: 2px solid #91c4ff;
+    outline: 2px solid var(--wx-action);
     outline-offset: 2px;
   }
   .discoveryOpeningChapter button:disabled,
@@ -2391,7 +2391,7 @@
     width: 14px;
     height: 14px;
     margin: -7px;
-    border: 1px solid #e1efff;
+    border: 1px solid var(--wx-action);
     box-shadow: 0 0 2px var(--wx-panel-soft);
     border-radius: 50%;
     pointer-events: none;
@@ -2412,7 +2412,7 @@
     width: 100%;
     min-width: 0;
     min-height: 44px;
-    border: 1px solid #496886;
+    border: 1px solid var(--wx-line);
     background: var(--wx-panel-soft);
     color: var(--wx-text);
     padding: 8px;
@@ -2446,7 +2446,7 @@
   font: inherit;
   line-height: 1.45;
   color: var(--wx-text-primary, #e4efeb);
-  background: #10272c;
+  background: var(--wx-panel-solid);
   border: 1px solid var(--wx-line-soft, #526969);
   border-radius: 4px;
 }

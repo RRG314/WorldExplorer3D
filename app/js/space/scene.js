@@ -449,7 +449,7 @@ export function resetSpaceFlightForMoon() {
   if (landBtn) {
     landBtn.disabled = true;
     landBtn.style.opacity = '0.5';
-    landBtn.style.background = '#667eea';
+    landBtn.style.background = "var(--wx-selected)";
   }
 }
 
@@ -496,7 +496,7 @@ export function resetSpaceFlightForEarth() {
   if (landBtn) {
     landBtn.disabled = true;
     landBtn.style.opacity = '0.5';
-    landBtn.style.background = '#667eea';
+    landBtn.style.background = "var(--wx-selected)";
   }
 }
 

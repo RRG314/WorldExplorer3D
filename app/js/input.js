@@ -441,7 +441,7 @@ async function searchLocation() {
   const status = document.getElementById('locationSearchStatus');
   if (!input || !status) return null;
   const result = await searchAndTravelToLocation(input.value, { statusElement: status });
-  status.style.color = result ? '#059669' : '#dc2626';
+  status.style.color = result ? "var(--wx-success)" : "var(--wx-danger)";
   return result;
 }
 Object.assign(appCtx, {

@@ -9,7 +9,7 @@ import {
 
 const HUB_PANELS = {
   games: { tab: 'games', title: 'Activities' },
-  multiplayer: { tab: 'multiplayer', title: 'Community' },
+  multiplayer: { tab: 'multiplayer', title: 'Together' },
   settings: { tab: 'settings', title: 'Settings' },
   controls: { tab: 'controls', title: 'Controls & Quick Start' }
 };
@@ -51,7 +51,8 @@ function setupGlobeHub({
   onLaunchMode,
   primeMultiplayerUi,
   onActivities,
-  onJournal
+  onJournal,
+  onCreate
 }) {
   const overlay = document.getElementById('globeHubOverlay');
   const panelHost = document.getElementById('globeHubPanelHost');
@@ -60,6 +61,7 @@ function setupGlobeHub({
   const liveEarthPanel = document.getElementById('globeSelectorLiveEarthPanel');
   const liveEarthHome = liveEarthPanel?.parentElement || null;
   const liveEarthNextSibling = liveEarthPanel?.nextSibling || null;
+  const createPanel = document.getElementById('novaCreateHub');
   const libraryPanel = document.createElement('section');
   libraryPanel.className = 'hub-library-panel';
   libraryPanel.hidden = true;
@@ -174,12 +176,26 @@ function setupGlobeHub({
     panelHost?.querySelectorAll('.tab-content').forEach((panel) => panel.classList.remove('active'));
     libraryPanel.hidden = true;
     libraryPanel.classList.remove('active');
+    if (createPanel) createPanel.hidden = true;
     setActiveDestination('location');
   };
 
   const openPanel = (destination) => {
+    if (destination !== 'create' && createPanel) createPanel.hidden = true;
     if(destination==='games'&&onActivities){closePanel();void onActivities();return true;}
     if(destination==='journal'&&onJournal){closePanel();onJournal();return true;}
+    if (destination === 'create' && createPanel && overlay && panelHost) {
+      closePanel();
+      createPanel.hidden = false;
+      const place = globeSelector.getSelection();
+      const label = document.getElementById('novaCreatePlace');
+      if (label) label.textContent = place?.name || 'your selected place';
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+      if (overlayTitle) overlayTitle.textContent = 'Create';
+      setActiveDestination('create');
+      return true;
+    }
     if (destination === 'library' && overlay && panelHost) {
       releaseOverlayFocus();
       panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));
@@ -235,6 +251,7 @@ function setupGlobeHub({
 
   if (panelHost) {
     panelHost.appendChild(libraryPanel);
+    if (createPanel) panelHost.appendChild(createPanel);
     ['location', 'games', 'multiplayer', 'settings', 'controls'].forEach((tabName) => {
       const panel = document.getElementById(`tab-${tabName}`);
       if (panel) panelHost.appendChild(panel);
@@ -245,6 +262,26 @@ function setupGlobeHub({
     const challengePanel = document.getElementById('flowerChallengePanel');
     if (challengePanel && overlay) overlay.appendChild(challengePanel);
   }
+  let creating = false;
+  createPanel?.addEventListener('click', async event => {
+    const button = event.target instanceof Element ? event.target.closest('[data-create-start]') : null;
+    if (!button || creating || typeof onCreate !== 'function') return;
+    creating = true;
+    const controls = [...createPanel.querySelectorAll('[data-create-start]')];
+    controls.forEach(control => { control.disabled = true; });
+    const status = document.getElementById('novaCreateStatus');
+    if (status) status.textContent = 'Opening your selected place…';
+    try {
+      const started = await onCreate(button.dataset.createStart);
+      if (started !== false) closePanel();
+      else if (status) status.textContent = 'Your place could not open. Your projects are kept. Return to the globe and choose a supported place, or try again.';
+    } catch {
+      if (status) status.textContent = 'The editor could not open. Your projects are kept. Please try again.';
+    } finally {
+      creating = false;
+      controls.forEach(control => { control.disabled = false; });
+    }
+  });
 
   // These are the same live controls borrowed by the in-world Controls dialog.
   const mobileSettings = document.getElementById('mobileControlSettings');

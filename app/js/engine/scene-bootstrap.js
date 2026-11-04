@@ -427,7 +427,7 @@ export function initEngineRuntime(ctx) {
     appCtx.engineInitFailed = true;
     showInitFailure(
       'Failed to create 3D renderer. Please try reloading this page or enabling hardware acceleration in your browser settings.',
-      '<div style="color:#f66;padding:40px;text-align:center;">Renderer Creation Failed<br><br>The 3D renderer could not start.<br><br>Startup diagnostics are shown at the bottom of the page.</div>'
+      "<div style=\"color:var(--wx-danger);padding:40px;text-align:center;\">Renderer Creation Failed<br><br>The 3D renderer could not start.<br><br>Startup diagnostics are shown at the bottom of the page.</div>"
     );
     return false;
   }

@@ -273,7 +273,7 @@ export function showStarInfo(star) {
   if (!infoDiv) {
     infoDiv = document.createElement("div");
     infoDiv.id = "starInfo";
-    infoDiv.style.cssText = "position:fixed;top:20px;right:20px;background:rgba(0,0,0,0.95);color:#fff;padding:20px;border-radius:12px;font-family:Inter,sans-serif;min-width:300px;box-shadow:0 8px 32px rgba(0,255,255,0.4);border:2px solid #00ffff;z-index:1000;";
+    infoDiv.style.cssText = "position:fixed;top:20px;right:20px;background:color-mix(in srgb, var(--wx-panel-solid) 95%, transparent);color:var(--wx-text);padding:20px;border-radius:12px;font-family:var(--wx-font-ui);min-width:300px;box-shadow:0 8px 32px rgba(0,255,255,0.4);border:2px solid var(--wx-action);z-index:1000;";
     const stopPanelEvent = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -284,8 +284,8 @@ export function showStarInfo(star) {
   }
 
   const type = star.isPlanet ? "\ud83e\ude90 Planet" : "\u2b50 Star";
-  const properStr = star.proper && star.proper !== star.name ? `<div style="font-size:13px;color:#888;margin-top:5px;">Designation: ${star.proper}</div>` : "";
-  const magStr = `<div style="font-size:12px;color:#aaa;margin-top:5px;">Apparent Magnitude: ${star.mag.toFixed(2)}</div>`;
+  const properStr = star.proper && star.proper !== star.name ? `<div style="font-size:13px;color:var(--wx-muted);margin-top:5px;">Designation: ${star.proper}</div>` : "";
+  const magStr = `<div style="font-size:12px;color:var(--wx-muted);margin-top:5px;">Apparent Magnitude: ${star.mag.toFixed(2)}</div>`;
 
   let distStr = "";
   if (star.dist) {
@@ -293,26 +293,26 @@ export function showStarInfo(star) {
       const distAU = star.dist * 63241;
       if (distAU < 1) {
         const distKm = distAU * 149597870.7;
-        distStr = `<div style="font-size:12px;color:#aaa;margin-top:5px;">Distance: ${distKm.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} km</div>`;
+        distStr = `<div style="font-size:12px;color:var(--wx-muted);margin-top:5px;">Distance: ${distKm.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} km</div>`;
       } else {
-        distStr = `<div style="font-size:12px;color:#aaa;margin-top:5px;">Distance: ${distAU.toFixed(2)} AU</div>`;
+        distStr = `<div style="font-size:12px;color:var(--wx-muted);margin-top:5px;">Distance: ${distAU.toFixed(2)} AU</div>`;
       }
     } else {
-      distStr = `<div style="font-size:12px;color:#aaa;margin-top:5px;">Distance: ${star.dist.toFixed(1)} light years</div>`;
+      distStr = `<div style="font-size:12px;color:var(--wx-muted);margin-top:5px;">Distance: ${star.dist.toFixed(1)} light years</div>`;
     }
   }
 
-  const constStr = star.constellation !== "Planet" ? `<div style="font-size:14px;color:#00ffff;margin-top:10px;font-weight:600;">Constellation: ${star.constellation}</div>` : "";
+  const constStr = star.constellation !== "Planet" ? `<div style="font-size:14px;color:var(--wx-action);margin-top:10px;font-weight:600;">Constellation: ${star.constellation}</div>` : "";
 
   infoDiv.innerHTML = `
-        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;">${type}</div>
-        <div style="font-size:24px;font-weight:700;margin:8px 0;color:#00ffff;">${star.name}</div>
+        <div style="font-size:11px;color:var(--wx-muted);text-transform:uppercase;letter-spacing:1px;">${type}</div>
+        <div style="font-size:24px;font-weight:700;margin:8px 0;color:var(--wx-action);">${star.name}</div>
         ${properStr}
         ${magStr}
         ${distStr}
         ${constStr}
-        <div style="font-size:11px;color:#666;margin-top:10px;">RA: ${star.ra.toFixed(2)}h • Dec: ${star.dec.toFixed(2)}°</div>
-        <button id="starInfoClose" type="button" style="margin-top:15px;background:#00ffff;color:#000;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;width:100%;font-family:Inter,sans-serif;">Close</button>
+        <div style="font-size:11px;color:var(--wx-muted);margin-top:10px;">RA: ${star.ra.toFixed(2)}h • Dec: ${star.dec.toFixed(2)}°</div>
+        <button id="starInfoClose" type="button" style="margin-top:15px;background:var(--wx-selected);color:var(--wx-text);border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;width:100%;font-family:var(--wx-font-ui);">Close</button>
     `;
 
   const closeBtn = infoDiv.querySelector("#starInfoClose");

@@ -2,6 +2,8 @@
 
 November 4, 2026. **Design review; production is unchanged.** Audience: mixed ages and experience, simple entry with optional depth.
 
+**Owner selected NOVA and authorized full application implementation and staging verification.** See [NOVA delivery and fixed stops](../NOVA-DELIVERY.md). Production deployment is prohibited for this redesign. The studio below remains a design reference; its generated concept scenery is not an application asset.
+
 ## Start with the visual preview
 
 [Open the Visual Design Studio](index.html). The owner rejected the earlier structure-only preview because it retained essentially one appearance. This replacement presents five distinct visual directions with rendered, scene-backed interfaces.

@@ -25,7 +25,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 #titleScreen.hidden { display: none; }
 #globeSelectorScreen:not(.show) { display: none; }
-#titleScreen::before { background: rgba(2, 7, 11, 0.56); backdrop-filter: none; }
+#titleScreen::before { background: color-mix(in srgb, var(--wx-panel-solid) 56%, transparent); backdrop-filter: none; }
 #titleScreen::after {
   content: '';
   position: absolute;
@@ -70,7 +70,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   color: var(--wx-muted);
   background: var(--wx-panel);
   border-bottom: 1px solid var(--wx-line-soft);
-  font: 500 12px/1 Inter, sans-serif;
+  font: 500 12px/1 var(--wx-font-ui);
   text-transform: uppercase;
   letter-spacing: 0;
 }
@@ -112,7 +112,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font: 600 11px/1.25 var(--wx-font-ui);
   text-transform: uppercase;
 }
-.tab-btn:hover { color: var(--wx-text); background: rgba(255, 255, 255, 0.04); }
+.tab-btn:hover { color: var(--wx-text); background: color-mix(in srgb, var(--wx-panel-soft) 4%, transparent); }
 .tab-btn.active { color: var(--wx-text); background: rgb(238 201 107 / 0.12); border-left-color: var(--wx-blue); }
 .tab-content {
   position: fixed;
@@ -273,7 +273,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   text-transform: uppercase;
   cursor: pointer;
 }
-.globe-app-rail button span { color: var(--wx-text); font: 24px/1 Inter, sans-serif; }
+.globe-app-rail button span { color: var(--wx-text); font: 24px/1 var(--wx-font-ui); }
 .globe-app-rail button:hover, .globe-app-rail button.active { color: var(--wx-text); background: rgb(238 201 107 / 0.1); border-left-color: var(--wx-blue); }
 .globe-selector-stage {
   grid-column: 2;
@@ -316,7 +316,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #globeSelectorBackBtn { color: var(--wx-text); background: var(--wx-panel-soft); }
 #globeSelectorStartBtn { color: var(--hub-action-text, var(--wx-action-text)); background: var(--wx-action); }
 .globe-selector-mode-tab, .globe-selector-city-tab { color: var(--wx-muted); background: var(--wx-input); border-color: var(--wx-line-soft); }
-.globe-selector-mode-tab.active, .globe-selector-city-tab.active { color: #fff; background: var(--wx-selected); border-color: var(--wx-blue); }
+.globe-selector-mode-tab.active, .globe-selector-city-tab.active { color: var(--wx-text); background: var(--wx-selected); border-color: var(--wx-blue); }
 .globe-selector-row input { color: var(--wx-text); background: var(--wx-bg); border: 1px solid var(--wx-line); border-radius: 2px; }
 .globe-destination-bar {
   grid-column: 2;
@@ -374,7 +374,7 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 }
 .worldQuickControl svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
 .worldQuickControl span { display: none; }
-.worldQuickControl:hover,.worldQuickControl:focus-visible,.worldQuickControl[aria-pressed="true"] { color: var(--wx-text); background: rgb(238 201 107 / .13); border-color: rgba(90,151,255,.7); }
+.worldQuickControl:hover,.worldQuickControl:focus-visible,.worldQuickControl[aria-pressed="true"] { color: var(--wx-text); background: rgb(238 201 107 / .13); border-color: color-mix(in srgb, var(--wx-action) 70%, transparent); }
 #coords {
   left: 14px;
   bottom: 246px;
@@ -414,7 +414,7 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
   box-shadow: none;
   font: 600 10px/1 var(--wx-font-ui);
 }
-.mainMenuBtn:hover { color: #fff; background: #101921; border-color: var(--wx-line-soft); transform: none; box-shadow: none; }
+.mainMenuBtn:hover { color: var(--wx-text); background: var(--wx-panel-solid); border-color: var(--wx-line-soft); transform: none; box-shadow: none; }
 #gameShareFloatBtn { top: 0; right: 132px; bottom: auto; left: auto; width: 58px; height: 58px; border-radius: 0; background: var(--wx-panel); border-color: var(--wx-line-soft); }
 #memoryFlowerFloatBtn { display: none !important; }
 
@@ -448,7 +448,7 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
   .globe-destination-bar button span { font-size: 21px; }
   .globe-selector-side { order: 3; flex: 0 0 auto; padding: 12px 12px 82px; overflow: visible; border-top: 1px solid var(--wx-line-soft); border-left: 0; }
   .mainMenuBtn { width: 58px; height: 66px; padding: 0; overflow: hidden; font-size: 0; pointer-events: auto; z-index: 10020; }
-  .mainMenuBtn::before { content: '☰'; font: 28px/1 Inter, sans-serif; }
+  .mainMenuBtn::before { content: '☰'; font: 28px/1 var(--wx-font-ui); }
   #gameShareFloatBtn { top: var(--wx-world-controls-top); right: 88px; width: 46px; height: 46px; border-radius: 50%; }
   /* An expanded paint tool palette must remain reachable above the map. */
   #paintTownHud[data-paint-layout="expanded"] { top: calc(70px + env(safe-area-inset-top)) !important; z-index: 110 !important; max-height: calc(100dvh - 180px); overflow-y: auto; }
@@ -470,4 +470,4 @@ body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 }
 }
 body:has(#worldSelectionNotice:not([hidden])) .tutorial-card { display: none !important; }
-#terrainImageryCredit { color: #b7d8e8; font-size: 9px; white-space: nowrap; }
+#terrainImageryCredit { color: var(--wx-action); font-size: 9px; white-space: nowrap; }
