@@ -4,6 +4,16 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ## Unreleased
 
+- Connect all twenty retained careers through a shared Activities entry, finite
+  assignments, saved next actions, Journal results and meaningful return visits.
+- Organize globe selection and the travel HUD for small screens, enlarged text,
+  keyboard focus, recovery and original-photo backup/export.
+- Repair bounded driving catch-up and ordinary city road markings; retain the
+  accepted three-venue racing scope, real vehicles, garage and shared systems.
+- Preserve the First Bearings starting location across older save-owner writes.
+- Repair the three backend dependency advisories in the locked source packages;
+  coordinated production rollout is pending.
+
 - Cartographer studies add supported walking measurements, original reciprocal
   controls, a connected corner route, access notes, reusable route sheets and the
   Route Survey badge. Real public access remains unverified.

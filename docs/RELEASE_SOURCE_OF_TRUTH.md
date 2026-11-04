@@ -7,8 +7,11 @@ The public production manifest was checked before the coherence candidate: build
 `c390d3a00ea47d8a019c64559a700eaf9a26d868`, Firebase project
 `worldexplorer3d-d9b83`. Local implementation acceptance for all frozen careers,
 three racing venues and UI/dependency repairs is complete. Required CI passes
-4,066 cases in 744 selected files with no skips. Immutable runtime verification,
-review and recorded rollout remain required; the source is not newly deployed.
+4,069 cases in 744 selected files with no skips. The immutable world and hosted
+career flow pass. Prepared production package
+`5.6.1+98c86efee14e.5f04ecddd7578f14.production` verifies with the prior runtime
+retained; exact-build human image approval and coordinated rollout remain.
+The new source is not deployed to production.
 See [the current candidate record](design/COHERENCE-RELEASE-CANDIDATE.md).
 
 All earlier observations below are historical and do not describe current production.
