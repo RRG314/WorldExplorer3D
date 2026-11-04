@@ -1,0 +1,207 @@
+<!doctype html><meta charset="utf-8" /><meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+/><title>Walking close-camera boundary</title>
+<style>
+  body {
+    margin: 0;
+    background: #173e4b;
+    color: #fff;
+    font: 14px system-ui;
+  }
+  canvas {
+    display: block;
+  }
+  aside {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    background: #18382ee8;
+    padding: 10px;
+    max-width: 560px;
+  }
+  button {
+    min-height: 44px;
+    margin: 4px;
+  }
+</style>
+<aside>
+  Controlled close-camera fixture · original walking camera and licensed avatar
+  at a 0.412-world-unit thin panel. Projection/visibility only; no field,
+  collision or locomotion claim.<br /><button id="legacy">
+    Previous near plane</button
+  ><button id="first">First view</button><button id="third">Third view</button
+  ><button id="gallery">Read display</button
+  ><button id="leave">Leave walking</button>
+</aside>
+<script src="/app/vendor/three/build/three.min.js"></script>
+<script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+  import { ctx } from "/app/js/shared-context.js?v=55";
+  import { createWalkingRuntimeHelpers } from "/app/js/walking/runtime.js";
+  import { createWalkingCharacterHelpers } from "/app/js/walking/character.js";
+  import { disposeCuratedCharacter } from "/app/js/walking/curated-explorer-character.js?v=8";
+  import { applyDisplayColorPolicy } from "/app/js/engine/display-color-policy.js";
+  const T = THREE,
+    scene = new T.Scene(),
+    camera = new T.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 12000),
+    renderer = new T.WebGLRenderer({
+      antialias: true,
+      preserveDrawingBuffer: true,
+    });
+  renderer.setSize(innerWidth, innerHeight);
+  applyDisplayColorPolicy(renderer, T);
+  document.body.prepend(renderer.domElement);
+  scene.background = new T.Color("#173e4b");
+  scene.add(new T.HemisphereLight(0xffffff, 0x64724b, 1.4));
+  const ground = new T.Mesh(
+    new T.PlaneGeometry(40, 40),
+    new T.MeshBasicMaterial({ color: 0x657565 }),
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+  const panel = new T.Mesh(
+    new T.BoxGeometry(2.4, 1.8, 0.05),
+    new T.MeshBasicMaterial({ color: 0xffb300 }),
+  );
+  panel.position.set(0, 1.7, 0.412);
+  scene.add(panel);
+  const character = createWalkingCharacterHelpers({
+    THREE: T,
+    scene,
+  }).createCharacterMesh();
+  character.position.set(0, 0, 0);
+  character.visible = true;
+  const state = {
+      mode: "walk",
+      view: "third",
+      enabled: true,
+      characterMesh: character,
+      walker: { x: 0, y: 1.7, z: 0, angle: 0, yaw: 0, pitch: 0 },
+    },
+    car = { x: 0, y: 1.2, z: 0, angle: 0 };
+  Object.assign(ctx, {
+    activeInterior: null,
+    activePlanetaryBodyId: null,
+    onMoon: false,
+    onMars: false,
+    presentationPose: null,
+    SurfaceQuery: {
+      walkAt: () => ({ feature: null }),
+      terrainAt: () => ({ position: { y: 0 } }),
+    },
+    checkBuildingCollision: () => ({ collision: false }),
+    setCameraMode() {},
+  });
+  const helper = createWalkingRuntimeHelpers({
+    CFG: {
+      eyeHeight: 1.7,
+      thirdPersonDist: 6,
+      thirdPersonHeight: 3,
+      thirdPersonLookAhead: 10,
+    },
+    camera,
+    car,
+    carMesh: null,
+    scene,
+    state,
+    createCharacterMesh: () => character,
+    finiteOr: (n, f) => (Number.isFinite(n) ? n : f),
+    getSafeDriveY: () => 1.2,
+    getWalkGroundY: () => 0,
+    resolveWalkGroundState: () => ({}),
+    pointInPolygonSafe: () => true,
+    clampPointInsideFootprint: (x, z) => ({ x, z }),
+    syncCarFromWalker() {},
+    syncWalkerFromCar() {},
+  });
+  function render() {
+    camera.updateMatrixWorld(true);
+    renderer.render(scene, camera);
+  }
+  function pixel() {
+    const gl = renderer.getContext(),
+      p = new Uint8Array(4);
+    gl.readPixels(
+      Math.floor(renderer.domElement.width / 2),
+      Math.floor(renderer.domElement.height / 2),
+      1,
+      1,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      p,
+    );
+    return [...p];
+  }
+  const views = {
+    legacy() {
+      state.mode = "walk";
+      state.view = "first";
+      ctx.activeInterior = null;
+      character.visible = false;
+      camera.near = 0.5;
+      camera.updateProjectionMatrix();
+      camera.position.set(0, 1.7, 0);
+      camera.lookAt(0, 1.7, 10);
+      render();
+    },
+    first() {
+      state.mode = "walk";
+      state.view = "first";
+      ctx.activeInterior = null;
+      character.visible = true;
+      helper.updateWalkCamera();
+      render();
+    },
+    third() {
+      state.mode = "walk";
+      state.view = "third";
+      ctx.activeInterior = null;
+      helper.updateWalkCamera();
+      render();
+    },
+    gallery() {
+      state.mode = "walk";
+      state.view = "third";
+      ctx.activeInterior = {
+        gallery: { panel: { viewTarget: { x: 0, y: 1.7, z: 0.412 } } },
+      };
+      character.visible = true;
+      helper.updateWalkCamera();
+      render();
+    },
+    leave() {
+      helper.setModeDrive({ preserveResolvedSpawn: true });
+      render();
+    },
+  };
+  for (const [id, fn] of Object.entries(views))
+    document.getElementById(id).onclick = fn;
+  window.walkCamera = {
+    state,
+    helper,
+    views,
+    scene,
+    camera,
+    renderer,
+    character,
+    snapshot: () => ({
+      near: camera.near,
+      avatarVisible: character.visible,
+      view: state.view,
+      mode: state.mode,
+      pixel: pixel(),
+      licensedAvatar: character.userData.curatedCharacterAssetId || null,
+    }),
+    dispose() {
+      helper.setModeDrive({ preserveResolvedSpawn: true });
+      disposeCuratedCharacter(character);
+      ground.geometry.dispose();
+      ground.material.dispose();
+      panel.geometry.dispose();
+      panel.material.dispose();
+      renderer.dispose();
+    },
+  };
+  views.third();
+</script>

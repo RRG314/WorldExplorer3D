@@ -806,9 +806,11 @@ Continue ocean exploration beyond the dive site
   <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
 </div>
 </div>
+<button id="hudMapOpenBtn" type="button" aria-label="Open map" hidden>Map</button>
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a><a id="terrainImageryCredit" hidden href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer" title="Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community">© Esri</a></div>
 </div>
 <div id="hudUtilities">
+<div id="hudStatusPanels">
 <div id="boatPrompt" aria-live="polite"></div>
 <section id="liveGpsHud" aria-label="Live GPS status">
   <div class="liveGpsHudTop"><strong aria-label="Live GPS">GPS</strong><button id="liveGpsStopBtn" type="button">Stop</button><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
@@ -834,6 +836,7 @@ Continue ocean exploration beyond the dive site
     <div id="urbanCivicStatusDetail">Local civic response</div>
   </div>
 </aside>
+</div>
 <div class="hudUtilityActions">
 <div id="worldQuickControls" aria-label="Quick world controls">
 <button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
@@ -863,7 +866,7 @@ Continue ocean exploration beyond the dive site
 <aside id="discoveryPanel" role="dialog" aria-modal="true" aria-labelledby="discoveryPanelTitle" aria-hidden="true" tabindex="-1">
   <header class="discoveryHead">
     <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">WORLD EXPLORER</span><h2 id="discoveryPanelTitle">Today</h2></div></div>
-    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
+    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Loading profile…</span><b id="discoveryProfilePoints">—</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
     <nav class="discoveryTabs" aria-label="Explorer fieldwork sections">
@@ -939,7 +942,7 @@ Continue ocean exploration beyond the dive site
         <section id="discoveryJourneyOverview" class="discoveryJourneyOverview" aria-label="Ways to explore"></section>
         <div id="discoveryProgress" class="discoveryProgressGrid"></div>
         <section id="discoveryCompanionSection" class="discoveryCompanionSection"><div class="discoverySectionHead"><span>COMPANIONS</span><small>ANIMALS YOU KNOW</small></div><p>Wild species belong in the Guide. Individual animals you befriend and care for live here.</p><div id="discoveryCompanionList" class="discoveryList"></div></section>
-        <details class="discoveryOnlineService"><summary>Data and backup</summary><p id="discoverySaveStatus" role="status" aria-live="polite">Checking local save status…</p><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><button id="discoveryUndoImportBtn" type="button">Undo last restore</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
+        <details class="discoveryOnlineService"><summary>Data and backup</summary><p id="discoverySaveStatus" role="status" aria-live="polite">Checking local save status…</p><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><p>The Journal backup includes saved field photographs and albums. Finish or retry unsaved work before leaving. Vehicles, homes and settings save separately on this device.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download Journal backup</button><button id="discoveryStorageBtn" type="button">Check storage</button><button id="discoveryImportBtn" type="button">Restore backup</button><button id="discoveryUndoImportBtn" type="button">Undo last restore</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
         <div class="discoveryLegacyEquipmentData" hidden><div id="discoveryEquippedSummary"></div><button id="discoveryOpenBackpackBtn" type="button">Open Backpack</button><div id="discoveryToolList"></div></div>
       </section>
     </div>

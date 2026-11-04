@@ -1,3 +1,4 @@
+import {bindJournalBackupExport} from './journal-backup-ui.js';
 import {companionHandlingMarkup} from '../campaign/companion-handling.js';
 import {explorerCareerView,explorerJourneyMarkup} from '../campaign/explorer-career.js';
 import {documentaryReportMarkup,showDocumentaryStoryPhotos} from '../campaign/documentary-ui.js';
@@ -191,7 +192,9 @@ function playerPosition(appCtx) {
 }
 
 function displayDiscoveryLabel(value, fallback = 'Discovery') {
-  const key = String(value || '').trim().toLowerCase();
+  const key = String(value || '')
+    .trim()
+    .toLowerCase();
   const labels = {
     [['procedural', 'game', 'encounter'].join('-')]: 'Guided field lead',
     'guided-field-lead': 'Guided field lead',
@@ -204,6 +207,9 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
     'wildlife-clue': 'Wildlife sign',
     'wildlife-record': 'Wildlife observation',
     'marine-wildlife-watch-v1': 'Wildlife watch',
+    'coastal-investigation-v1': 'Coastal investigation',
+    'coastal-departure-v1': 'Coastal departure',
+    'coral-shelf-survey-v1': 'Coral Shelf survey',
     'botany-record': 'Plant observation',
     'fossil-representation': 'Fossil study',
     'fictional-find': 'Expedition find',
@@ -221,7 +227,7 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
     'room-joined': 'Room joined',
     'companion-activate': 'Companion selected',
     'companion-feed': 'Companion care',
-    'companion-train': 'Companion training'
+    'companion-train': 'Companion training',
   };
   if (labels[key]) return labels[key];
   const spaced = key.replaceAll('-', ' ').replaceAll('_', ' ').replace(/\s+/g, ' ').trim();
@@ -292,7 +298,7 @@ function createDiscoveryUi(state) {
     sectionTutorialSteps: byId('discoverySectionTutorialSteps'), sectionTutorialDone: byId('discoverySectionTutorialDoneBtn'),
     inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal'),
     fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList'), expeditionMode: byId('discoveryExpeditionMode'),
-    undoImport: byId('discoveryUndoImportBtn'), exportData: byId('discoveryExportBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
+    undoImport: byId('discoveryUndoImportBtn'), exportData: byId('discoveryExportBtn'), storage:byId('discoveryStorageBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
   };
   const listeners = [];
   let activeTab = 'today';
@@ -882,7 +888,7 @@ function createDiscoveryUi(state) {
         elements.journeyOverview.innerHTML = `<div class="discoveryJourneyIntro"><span>YOUR WORLD</span><strong>Choose your next direction</strong><small>Everything you discover, make, and share becomes part of one Explorer story.</small><b>Suggested next · ${escapeHtml(nextRoute.label)}</b></div><div class="discoveryJourneyRoutes">${routeCards.map((route) => `<button type="button" data-explorer-route="${escapeHtml(route.id)}"${route.id === nextRoute.id ? ' class="suggested"' : ''}><i class="discoveryJourneyRouteIcon" aria-hidden="true">${route.icon}</i><span class="discoveryJourneyRouteCopy"><strong>${escapeHtml(route.label)}</strong><small>${escapeHtml(route.detail)}</small></span><b class="discoveryJourneyRouteStatus">${route.records ? `${route.records} ${route.records === 1 ? 'memory' : 'memories'}` : 'Begin'}</b><i class="discoveryJourneyRouteArrow" aria-hidden="true">›</i></button>`).join('')}</div>`;
       }
       const specialtyMarkup = specialties.length
-        ? specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const specialtyRank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${specialtyRank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(specialtyRank.label)} · ${specialty.meaningfulEvents || 0} meaningful activities</small></article>`; }).join('')
+        ? specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const specialtyRank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${specialtyRank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(specialtyRank.rank === 0 && (specialty.xp > 0 || specialty.meaningfulEvents > 0) ? 'Learning' : specialtyRank.label)} · ${specialty.meaningfulEvents || 0} meaningful activities</small></article>`; }).join('')
         : '<div class="discoveryEmpty">Complete meaningful activities to begin developing specialties.</div>';
       const pathMarkup = paths.length
         ? paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')
@@ -1079,21 +1085,16 @@ function createDiscoveryUi(state) {
     setOpen(false);
     state.appCtx.toggleUrbanEquipment?.(true);
   });
-  listen(elements.exportData, 'click', async () => {
-    try {
-      const data = await state.profileStore.exportData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `world-explorer-journal-${new Date().toISOString().slice(0, 10)}.json`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
-      if (elements.backupStatus) elements.backupStatus.textContent = 'Journal backup downloaded.';
-    } catch (error) {
-      if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The backup could not be created.';
-    }
+  const journalBackupExport = bindJournalBackupExport({
+    store: state.profileStore,
+    exportButton: elements.exportData,
+    storageButton: elements.storage,
+    status: elements.backupStatus,
+    otherButtons: [elements.importData, elements.undoImport],
+    listen,
+    isActive: () => !disposed,
   });
+  listeners.push(()=>journalBackupExport.dispose());
   listen(elements.undoImport, 'click', async () => {
     if (!globalThis.confirm?.('Undo the last Journal restore? This returns to the local records saved immediately before that restore and reloads the app.')) return;
     try {
@@ -1626,12 +1627,18 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     environment: appCtx.getEnv?.() || 'EARTH'
   });
   const session = createDetectorSession({
-    plan: encounters, claimedIds,
+    plan: encounters, claimedIds, metersPerWorldUnit:appCtx.METERS_PER_WORLD_UNIT,
     observedCatalogIds, progress,
     availableToolIds: entitlements.listAvailableTools().map((tool) => tool.id),
     characterCapability: initialDetectorCapability
   });
-  const fieldSession = createFieldActivitySession({ plan: fieldActivities, claimedIds, observedCatalogIds, progress });
+  const fieldSession = createFieldActivitySession({
+    plan: fieldActivities,
+    claimedIds,
+    observedCatalogIds,
+    progress,
+    metersPerWorldUnit: appCtx.METERS_PER_WORLD_UNIT,
+  });
   const owner = `world-discovery:${snapshot.sequence}`;
   const state = {
     type: 'WorldDiscoveryRuntime', owner, appCtx, publication, environment, profileStore, entitlements, session, fieldSession,
@@ -1835,6 +1842,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   });
   state.fieldExpedition = createFieldExpedition({
     plan: fieldActivities,
+    metersPerWorldUnit:appCtx.METERS_PER_WORLD_UNIT,
     claimedIds,
     observedCatalogIds,
     progress,

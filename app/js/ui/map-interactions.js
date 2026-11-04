@@ -261,6 +261,7 @@ function bindMapControls() {
     appCtx.closeMapInfo?.();
     appCtx.updateControlsModeUI?.();
   };
+  document.getElementById('hudMapOpenBtn')?.addEventListener('click',openLargeMap);
   appCtx.openLargeMap = openLargeMap;
   appCtx.closeLargeMap = closeLargeMap;
   appCtx.adjustLargeMapZoom = adjustLargeMapZoom;
