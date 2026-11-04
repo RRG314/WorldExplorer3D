@@ -1,18 +1,36 @@
 # Release source identities
 
-## Current observation — November 3, 2026
+## Current observation — November 4, 2026
 
-The public production manifest was checked before the coherence candidate: build
-`5.6.1+c390d3a00ea4.11e2ccd419ea2e2b.production`, source
-`c390d3a00ea47d8a019c64559a700eaf9a26d868`, Firebase project
-`worldexplorer3d-d9b83`. Local implementation acceptance for all frozen careers,
-three racing venues and UI/dependency repairs is complete. Required CI passes
-4,069 cases in 744 selected files with no skips. The immutable world and hosted
-career flow pass. Prepared production package
-`5.6.1+98c86efee14e.5f04ecddd7578f14.production` verifies with the prior runtime
-retained; exact-build human image approval and coordinated rollout remain.
-The new source is not deployed to production.
-See [the current candidate record](design/COHERENCE-RELEASE-CANDIDATE.md).
+[Production](https://worldexplorer3d.io/) serves the approved immutable build
+`5.6.1+98c86efee14e.5f04ecddd7578f14.production`, runtime source
+`98c86efee14e`, content hash
+`5f04ecddd7578f14901258e648e63fac191104d10e70f67dd3a875bbbd9ad221`,
+Firebase project `worldexplorer3d-d9b83`, Hosting version `4f56ae0304a6df21`.
+The live build manifest, asset manifest and Firebase configuration match the
+approved package byte-for-byte. Steven Reid accepted the exact-build images;
+finalization and promotion completed without rebuilding.
+
+[PR 138](https://github.com/RRG314/WorldExplorer3D/pull/138) merged to `stable`
+as `aabb902534a50cfc0f3c010dbdcf156609e80d83`. All twenty retained careers,
+three racing venues and accepted UI/save repairs are included. Required CI
+passed 4,069 cases in 744 files; the immutable world and hosted career flow pass.
+Accepted unchanged career, venue and hardware evidence was retained.
+
+All 104 production Functions are active after source-only dependency updates,
+with checked settings preserved. Racing revision
+`we3d-racing-coherence-20261104` serves 100% of production traffic, reports ready
+and retains its runtime settings; race entry is enabled. Previous runtime
+artifacts and service revisions remain preserved for rollback.
+
+Final read-only identity checks confirm all original production accounts remain:
+290 registered users plus seven anonymous accounts, none disabled. The twelve
+registered users shown in the review preview belong to isolated staging
+`we3d-staging-20260712`. No accounts were deleted, recreated or copied.
+See [the completed release record](design/COHERENCE-RELEASE-CANDIDATE.md).
+Local deployment receipts are in
+`output/release-evidence/production-coherence-20261104/`; private settings and
+account identities are excluded from GitHub.
 
 All earlier observations below are historical and do not describe current production.
 
