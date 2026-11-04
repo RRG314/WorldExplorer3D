@@ -1,5 +1,5 @@
-import {readAccessibilityPreferences,applyAccessibilityPreferences} from '../app/js/ui/accessibility.js?v=4';
-import {createLifecycleScope} from '../app/js/runtime/lifecycle-scope.js?v=2';
+import {readAccessibilityPreferences,applyAccessibilityPreferences} from './accessibility.js?v=4';
+import {createLifecycleScope} from '../runtime/lifecycle-scope.js?v=2';
 // Read the game's existing preferences; no second settings store or input owner.
 const scope=createLifecycleScope('product-page-preferences');
 const apply=()=>applyAccessibilityPreferences(readAccessibilityPreferences());

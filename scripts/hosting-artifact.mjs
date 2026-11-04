@@ -33,6 +33,7 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'account-social': 'app/js/multiplayer/social.js',
   'account-contributions': 'account/contribution-workspace.js',
   'living-portal': 'app/js/portal/page.js',
+  'product-preferences': 'app/js/ui/product-page-preferences.js',
   'capture-phone': 'app/js/reality-capture/phone-entry.js',
   'capture-review': 'app/js/reality-capture/result-viewer.js',
   'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
@@ -290,6 +291,13 @@ async function rewriteAccountHtml(runtime) {
   await fs.writeFile(htmlPath, html, 'utf8');
 }
 
+function packagedProductPreferencesHtml(html, runtime) {
+  const source = '/app/js/ui/product-page-preferences.js';
+  return html.includes(source)
+    ? rewritePackagedModuleReference(html, source, `/app/${runtime.entries['product-preferences']}`)
+    : html;
+}
+
 async function rewritePortalHtml(runtime) {
   const htmlPath=path.join(OUTPUT_DIR,'portal','index.html');
   const html=await fs.readFile(htmlPath,'utf8');
@@ -391,7 +399,7 @@ async function buildArtifact(environment) {
   for (const relative of await listFiles(OUTPUT_DIR)) {
     if (!relative.endsWith('.html')) continue;
     const absolute = path.join(OUTPUT_DIR, relative), html = await fs.readFile(absolute, 'utf8');
-    await fs.writeFile(absolute, pinHtmlRootModules(html, relative, generation, rootModules));
+    await fs.writeFile(absolute, pinHtmlRootModules(packagedProductPreferencesHtml(html, runtime), relative, generation, rootModules));
   }
   const compatibility = await retainRuntimeGenerations({output: OUTPUT_DIR, predecessors: readRepeatedFlag('--retain-runtime-from'), environment, projectId: config.projectId, currentGeneration:snapshot});
   const rootModuleAliases={};
@@ -491,7 +499,7 @@ async function verifyArtifact() {
     const outputHash = expectedFiles[outputRelative];
     const sourceHash = relative === 'js/admin-dashboard.js'
       ? sha256(rewritePackagedModuleReference(await fs.readFile(source, 'utf8'), '../app/js/reality-capture/result-viewer.js', `/app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
-      : relative.endsWith('.html') ? sha256(pinHtmlRootModules(await fs.readFile(source, 'utf8'), relative, generation, rootModules))
+      : relative.endsWith('.html') ? sha256(pinHtmlRootModules(packagedProductPreferencesHtml(await fs.readFile(source, 'utf8'), runtimePackaging), relative, generation, rootModules))
       : await hashFile(source);
     if(legacyRoots.has(relative)){
       const currentHash=relative==='js/admin-dashboard.js'
