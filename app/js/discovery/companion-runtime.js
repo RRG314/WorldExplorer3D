@@ -93,28 +93,33 @@ async function ensureStarterCompanion(profileStore, options = {}) {
   if (!starter) {
     const created = createStarterCompanionInstance({
       profileIdentity: profile?.id || options.profileIdentity || 'local-explorer',
-      adoptedAt: marker.starterDogGrantedAt || now
+      adoptedAt: marker.starterDogGrantedAt || now,
     });
-    starter = normalizeCompanionInstance(marker.starterDogInstanceId
-      ? { ...created, instanceId: marker.starterDogInstanceId }
-      : created);
+    starter = normalizeCompanionInstance(
+      marker.starterDogInstanceId
+        ? { ...created, instanceId: marker.starterDogInstanceId }
+        : created
+    );
     await profileStore.saveCompanion(starter);
     companions.push(starter);
   }
   const active = companions.find((entry) => entry.active) || null;
   const primaryHomeId = String(marker.primaryHomeId || '').slice(0, 420);
-  if (!active) {
+  const activateStarter =
+    !active &&
+    (!marker.starterDogGranted || !stored.some((entry) => entry.instanceId === starter.instanceId));
+  if (activateStarter) {
     await profileStore.setActiveCompanion(starter.instanceId, { homeId: primaryHomeId, now });
     starter = normalizeCompanionInstance({
       ...starter,
       active: true,
-      residence: { state: 'traveling', homeId: primaryHomeId, updatedAt: now }
+      residence: { state: 'traveling', homeId: primaryHomeId, updatedAt: now },
     });
   }
   if (profileStore.saveProfile && profile) {
     await profileStore.saveProfile((current) => ({
       ...current,
-      activeCompanionId: current.activeCompanionId || active?.instanceId || starter.instanceId,
+      activeCompanionId: active?.instanceId || (activateStarter ? starter.instanceId : null),
       companionOnboarding: {
         ...current.companionOnboarding,
         schemaVersion: 1,
@@ -122,11 +127,16 @@ async function ensureStarterCompanion(profileStore, options = {}) {
         starterDogInstanceId: starter.instanceId,
         starterDogGrantedAt: Number(marker.starterDogGrantedAt) || starter.adoptedAt || now,
         starterDogFirstNamedAt: Number(current.companionOnboarding?.starterDogFirstNamedAt) || 0,
-        primaryHomeId: current.companionOnboarding?.primaryHomeId || primaryHomeId
-      }
+        primaryHomeId: current.companionOnboarding?.primaryHomeId || primaryHomeId,
+      },
     }));
   }
-  return Object.freeze({ starter, created: !stored.some((entry) => entry.instanceId === starter.instanceId), activeInstanceId: active?.instanceId || starter.instanceId, primaryHomeId });
+  return Object.freeze({
+    starter,
+    created: !stored.some((entry) => entry.instanceId === starter.instanceId),
+    activeInstanceId: active?.instanceId || (activateStarter ? starter.instanceId : null),
+    primaryHomeId,
+  });
 }
 
 async function createCompanionRuntime(appCtx, options = {}) {
@@ -247,12 +257,24 @@ async function createCompanionRuntime(appCtx, options = {}) {
 
   function beginRecallExercise(instanceId, actor = {}) {
     const target = companions.find((entry) => entry.instanceId === String(instanceId));
-    if (!target || target.instanceId !== active?.instanceId || Number(target.progression?.level || 1) < 2) return false;
+    if (
+      exercise ||
+      exerciseWritePending ||
+      !target ||
+      target.instanceId !== active?.instanceId ||
+      Number(target.progression?.level || 1) < 2
+    )
+      return false;
     const player = { x: Number(actor.x || 0), z: Number(actor.z || 0) };
     exercise = {
-      type: 'recall', instanceId: target.instanceId, phase: 'move-away',
-      startedAt: Date.now(), playerStart: player,
-      anchor: presentation?.group ? { x: presentation.group.position.x, z: presentation.group.position.z } : player
+      type: 'recall',
+      instanceId: target.instanceId,
+      phase: 'move-away',
+      startedAt: Date.now(),
+      playerStart: player,
+      anchor: presentation?.group
+        ? { x: presentation.group.position.x, z: presentation.group.position.z }
+        : player,
     };
     options.onExerciseChange?.(exerciseSnapshot(actor));
     return true;
@@ -260,14 +282,22 @@ async function createCompanionRuntime(appCtx, options = {}) {
 
   function exerciseSnapshot(actor = {}) {
     if (!exercise) return Object.freeze({ active: false });
-    const distance = Math.hypot(Number(actor.x || 0) - exercise.playerStart.x, Number(actor.z || 0) - exercise.playerStart.z);
+    const unit =
+      Number(appCtx.METERS_PER_WORLD_UNIT) > 0 ? Number(appCtx.METERS_PER_WORLD_UNIT) : 1.11;
+    const distance =
+      Math.hypot(
+        Number(actor.x || 0) - exercise.playerStart.x,
+        Number(actor.z || 0) - exercise.playerStart.z
+      ) * unit;
     return Object.freeze({
       active: true,
       type: exercise.type,
       phase: exercise.phase,
       instanceId: exercise.instanceId,
+      message: exercise.message || '',
+      completedAt: exercise.completedAt || 0,
       playerDistance: Number(distance.toFixed(1)),
-      readyToCall: exercise.phase === 'move-away' && distance >= 6
+      readyToCall: exercise.phase === 'move-away' && distance >= 6,
     });
   }
 
@@ -280,36 +310,48 @@ async function createCompanionRuntime(appCtx, options = {}) {
   }
 
   function completeRecallExercise() {
-    if (!exercise || exerciseWritePending) return;
+    if (!exercise || exerciseWritePending || !['returning', 'save-failed'].includes(exercise.phase))
+      return progressWrites;
     const completed = exercise;
+    completed.completedAt ||= Date.now();
+    completed.storyContext ||= structuredClone(options.getStoryContext?.() || {});
+    completed.phase = 'saving';
     exerciseWritePending = true;
-    progressWrites = progressWrites.then(async () => {
-      const current = companions.find((entry) => entry.instanceId === completed.instanceId);
-      if (!current) return false;
-      let result;
-      const next = await profileStore.saveCompanion(current, latest => {
-        const learned = [...new Set([...(latest.training?.learnedCommands || ['follow']), 'recall'])];
-        const records = { ...(latest.training?.records || {}), recall: { completed: true, completedAt: Date.now() } };
-        const trained = { ...latest, training: { ...latest.training, learnedCommands: learned, records } };
-        result = awardCompanionXp(trained, {
-          receiptId: `training:${latest.instanceId}:recall:first-clear`, reasonId: 'training-first-clear'
-        });
-        return result.companion;
+    progressWrites = progressWrites
+      .then(async () => {
+        const outcome = await profileStore.completeCompanionRecall(
+          completed.instanceId,
+          completed.completedAt,
+          completed.storyContext
+        );
+        if (disposed) return true;
+        const next = outcome.companion;
+        companions = companions.map((c) => (c.instanceId === next.instanceId ? next : c));
+        if (active?.instanceId === next.instanceId) active = next;
+        if (outcome.awarded) options.onXpAward?.(next, outcome);
+        options.onTrainingComplete?.(next, 'recall');
+        if (exercise === completed) exercise = null;
+        options.onChange?.(snapshot());
+        return true;
+      })
+      .catch((error) => {
+        if (!disposed && exercise === completed) {
+          exercise.phase = 'save-failed';
+          exercise.message =
+            error?.name === 'QuotaExceededError'
+              ? 'Recall practice finished, but device storage is full. Keep this world open and retry after freeing space.'
+              : 'Recall practice finished but could not save. Your last saved companion record is kept. Retry this result.';
+        }
+        return false;
+      })
+      .finally(() => {
+        exerciseWritePending = false;
+        if (!disposed) options.onExerciseChange?.(exerciseSnapshot());
       });
-      companions = companions.map((entry) => entry.instanceId === next.instanceId ? next : entry);
-      active = next;
-      if (result.awarded) options.onXpAward?.(next, result);
-      options.onTrainingComplete?.(next, 'recall');
-      options.onChange?.(snapshot());
-      return true;
-    }).catch((error) => {
-      console.warn('[companions] Recall training could not be saved.', error);
-      return false;
-    }).finally(() => {
-      exercise = null;
-      exerciseWritePending = false;
-      options.onExerciseChange?.(Object.freeze({ active: false }));
-    });
+    return progressWrites;
+  }
+  function retryRecallSave() {
+    return exercise?.phase === 'save-failed' ? completeRecallExercise() : Promise.resolve(false);
   }
 
   async function care(instanceId, interaction = 'pet') {
@@ -462,7 +504,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
 
   syncPresentation();
   return Object.freeze({
-    adopt, assignPrimaryHome, awardXp, beginRecallExercise, callRecall, care, exerciseSnapshot, leaveAtHome, refresh, rename, setActive, snapshot, update,
+    adopt, assignPrimaryHome, awardXp, beginRecallExercise, callRecall, retryRecallSave, care, exerciseSnapshot, leaveAtHome, refresh, rename, setActive, snapshot, update,
     dispose() {
       disposed = true;
       disposeObject(presentation?.group);

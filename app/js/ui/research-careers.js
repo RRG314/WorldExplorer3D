@@ -1,3 +1,4 @@
+import { bindCompanionCareer } from '../campaign/companion-career-adapter.js';
 import {bindExplorerCareer} from '../campaign/explorer-career-adapter.js';
 import {bindDocumentaryCareer} from '../campaign/documentary-career-adapter.js';
 import {bindPilotCareer} from '../campaign/pilot-career-adapter.js';
@@ -41,9 +42,11 @@ export function bindResearchCareers(runtime, experiences, { onJournal, requestWo
   bindPilotCareer(runtime,experiences);
   bindDocumentaryCareer(runtime,experiences);
   bindExplorerCareer(runtime,experiences);
+  bindCompanionCareer(runtime, experiences);
   let active = null,
     generation = 0;
   const domains = {
+    'career:companion-handler': async () => (await import('../campaign/companion-career-adapter.js')).createCompanionCareerRuntime,
     'career:explorer':async()=>(await import('../campaign/explorer-career-adapter.js')).createExplorerCareerRuntime,
     'career:documentary-explorer':async()=>(await import('../campaign/documentary-career-adapter.js')).createDocumentaryCareerRuntime,
     'career:expedition-pilot':async()=>(await import('../campaign/pilot-career-adapter.js')).createPilotCareerRuntime,

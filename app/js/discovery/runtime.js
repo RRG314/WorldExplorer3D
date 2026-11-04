@@ -1,3 +1,4 @@
+import {companionHandlingMarkup} from '../campaign/companion-handling.js';
 import {explorerCareerView,explorerJourneyMarkup} from '../campaign/explorer-career.js';
 import {documentaryReportMarkup,showDocumentaryStoryPhotos} from '../campaign/documentary-ui.js';
 import {DOCUMENTARY_STORY,documentaryJournalRecords} from '../campaign/documentary-story.js';
@@ -296,6 +297,40 @@ function createDiscoveryUi(state) {
   const listeners = [];
   let activeTab = 'today';
   let careerFocus=null;
+  let companionCareer=null,companionActionBusy=false,companionUiMessage='',companionBriefKey='',companionRenderedMarkup='',companionFirstNode=null;
+  const companionSection=elements.companions?.closest('.discoveryCompanionSection'),companionProfilePane=companionSection?.parentElement,companionBrief=document.createElement('div');companionBrief.className='discoveryCompanionBrief';
+  function refreshCompanionBrief() {
+    if (!companionCareer) {
+      companionBrief.remove();
+      companionBriefKey = '';
+      return;
+    }
+    const html =
+      companionHandlingMarkup(state.companionRuntime?.snapshot() || {}) +
+      (companionUiMessage ? `<p role="status">${escapeHtml(companionUiMessage)}</p>` : '');
+    if (!companionBrief.isConnected)
+      companionSection?.insertBefore(companionBrief, elements.companions);
+    if (html !== companionBriefKey) {
+      companionBrief.innerHTML = html;
+      companionBriefKey = html;
+    }
+    for (const b of companionBrief.querySelectorAll('button')) b.disabled = companionActionBusy;
+  }
+  function stopCompanionCareer(options) {
+    if (options && companionCareer !== options) return;
+    const lease = companionCareer;
+    companionCareer = null;
+    refreshCompanionBrief();
+    if (companionSection?.__we3dCompanionLease === lease) {
+      delete companionSection.__we3dCompanionLease;
+      companionProfilePane.insertBefore(
+        companionSection,
+        companionProfilePane.querySelector('.discoveryOnlineService')
+      );
+    }
+    setCareerFocus(null);
+  }
+
   function setCareerFocus(focus) {
     const pane = document.querySelector('.discoveryPane[data-discovery-pane="today"]');
     if (focus && !pane?.querySelector('#' + focus.sectionId)) return false;
@@ -775,9 +810,9 @@ function createDiscoveryUi(state) {
       ).sort((left, right) => Number(state.hasWorldCompanionEncounter?.(right.id)) - Number(state.hasWorldCompanionEncounter?.(left.id))).slice(0, 4);
       const companionRows = [
         ...owned.map((companion) => ({ companion, catalog: COMPANION_CATALOG.find((entry) => entry.id === companion.catalogId) })).filter((row) => row.catalog),
-        ...localSuggestions.map((catalog) => ({ catalog, companion: null }))
+        ...(companionCareer?[]:localSuggestions.map((catalog) => ({ catalog, companion: null })))
       ];
-      elements.companions.innerHTML = companionRows.length ? companionRows.map(({ catalog, companion }) => {
+      const nextCompanionMarkup = companionRows.length ? companionRows.map(({ catalog, companion }) => {
         if (!companion) {
           const releaseReady = FIRST_RELEASE_COMPANION_IDS.has(catalog.id);
           const eligible = releaseReady && state.isCompanionEligible?.(catalog) === true && state.hasWorldCompanionEncounter?.(catalog.id) === true;
@@ -793,7 +828,7 @@ function createDiscoveryUi(state) {
           const nameAndBefriend = eligible && encounter.trustState === 'Comfortable'
             ? `<div class="discoveryCompanionName"><label>Name this companion<input data-companion-name maxlength="24" autocomplete="off" value="${escapeHtml(catalog.names.common)}"></label><button data-companion-action="befriend" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Befriend</button></div>`
             : eligible ? `<div class="discoveryCompanionActions"><button data-companion-action="locate" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Find in world</button></div>` : '';
-          return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(catalog.names.common)}</strong><small>${escapeHtml(guidance)}</small>${nameAndBefriend}${visual ? '</div>' : ''}</article>`;
+          return `<article data-companion-row="${escapeHtml(companion?.instanceId||catalog.id)}" class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(catalog.names.common)}</strong><small>${escapeHtml(guidance)}</small>${nameAndBefriend}${visual ? '</div>' : ''}</article>`;
         }
         const visual = visualForCatalogId(companion.catalogId);
         const level = Number(companion.progression?.level || 1);
@@ -810,8 +845,10 @@ function createDiscoveryUi(state) {
             : companion.residence?.state === 'home-pending' ? 'Home not chosen yet' : 'Safe with the companion care network';
         const starterLabel = companion.isStarterCompanion ? ' · First companion' : '';
         const rename = `<div class="discoveryCompanionName"><label>${companion.nameStatus === 'default' ? 'Name your dog' : 'Companion name'}<input data-companion-name maxlength="24" autocomplete="off" value="${escapeHtml(companion.name)}"></label><button data-companion-action="rename" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">${companion.nameStatus === 'default' ? 'Choose Name' : 'Rename'}</button></div>`;
-        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}${starterLabel}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${residence} · ${nextLevel}${specialty}${lastAward}`)}</small>${rename}<div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Travel together'}</button>${companion.active ? `<button data-companion-action="leave-home" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Leave at home</button>` : ''}<button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
+        return `<article data-companion-row="${escapeHtml(companion?.instanceId||catalog.id)}" class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}${starterLabel}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${residence} · ${nextLevel}${specialty}${lastAward}`)}</small>${rename}<div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Travel together'}</button>${companion.active ? `<button data-companion-action="leave-home" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Leave at home</button>` : ''}<button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
       }).join('') : '<div class="discoveryEmpty">Explore animal-friendly places to meet a potential companion.</div>';
+      if(nextCompanionMarkup!==companionRenderedMarkup||companionFirstNode!==elements.companions.firstChild){const drafts=new Map([...elements.companions.querySelectorAll('[data-companion-row]')].map(row=>{const input=row.querySelector('[data-companion-name]');return[row.dataset.companionRow,input&&input.value!==input.defaultValue?input.value:null];}));elements.companions.innerHTML=nextCompanionMarkup;companionRenderedMarkup=nextCompanionMarkup;companionFirstNode=elements.companions.firstChild;for(const row of elements.companions.querySelectorAll('[data-companion-row]')){const value=drafts.get(row.dataset.companionRow);if(value!=null)row.querySelector('[data-companion-name]').value=value;}}
+      refreshCompanionBrief();
     }
     if (elements.progress) {
       const progress = rank;
@@ -1011,13 +1048,29 @@ function createDiscoveryUi(state) {
     const button = event.target?.closest?.('[data-field-objective]');
     if (button) void state.startFieldObjective?.(button.dataset.fieldObjective);
   });
-  listen(elements.companions, 'click', (event) => {
-    const button = event.target?.closest?.('[data-companion-action]');
-    if (button) {
-      const name = button.closest('.discoveryItem')?.querySelector?.('[data-companion-name]')?.value || '';
-      void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog, name);
+  async function companionUiAction(action, instanceId, catalogId, name = '') {
+    if (companionActionBusy) return;
+    companionActionBusy = true;
+    companionUiMessage = '';
+    refreshCompanionBrief();
+    try {
+      const result = await state.handleCompanionAction(action, instanceId, catalogId, name);
+      if (result === false)
+        companionUiMessage =
+          'This action is not ready. Check the companion, travel mode and practice instructions.';
+    } catch (error) {
+      companionUiMessage =
+        error?.name === 'QuotaExceededError'
+          ? 'Device storage is full. Your last saved companion record is kept. Retry after freeing space.'
+          : error.message || 'This companion action could not save. Retry when the device is ready.';
+      state.appCtx.showToast?.(companionUiMessage);
+    } finally {
+      companionActionBusy = false;
+      refreshCompanionBrief();
     }
-  });
+  }
+  listen(elements.companions,'click',event=>{const b=event.target?.closest?.('[data-companion-action]');if(b)void companionUiAction(b.dataset.companionAction,b.dataset.companionId,b.dataset.companionCatalog,b.closest('.discoveryItem')?.querySelector('[data-companion-name]')?.value||'');});
+  listen(companionSection,'click',event=>{const b=event.target?.closest?.('[data-companion-brief]');if(!b||!companionCareer)return;const action=b.dataset.companionBrief;if(action==='activities'){companionCareer.onNext?.();return;}if(action==='retry'){void companionUiAction('retry-training');return;}if(action==='field'){const lease=companionCareer;void state.startEncounterLead?.().then(ok=>{if(companionCareer!==lease)return;lease.onField?.();if(!ok){setOpen(false);state.appCtx.showToast?.('Walk with your companion. Nearby field leads appear as you explore.');}}).catch(()=>state.appCtx.showToast?.('This field lead could not open. Reopen companions to try again.'));}});
   listen(elements.tools, 'click', (event) => {
     const help = event.target?.closest?.('[data-tool-help]');
     if (help) void state.showToolHelp?.(help.dataset.toolHelp);
@@ -1244,7 +1297,23 @@ function createDiscoveryUi(state) {
   return Object.freeze({
     get activeTab() { return activeTab; }, get open() { return open; },
     ownsFieldPrompt: !!elements.quick,
-    dispose() { explorerCareer=null; setCareerFocus(null); disposed = true; refreshSequence += 1; listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
+    dispose() { stopCompanionCareer(); explorerCareer=null; setCareerFocus(null); disposed = true; refreshSequence += 1; listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
+    async startCompanionCareer(options) {
+      companionCareer = options;
+      companionUiMessage = '';
+      await state.companionRuntime.refresh();
+      await refreshData();
+      if (disposed || companionCareer !== options || !options.isActive()) return false;
+      companionSection.__we3dCompanionLease = options;
+      document.querySelector('.discoveryPane[data-discovery-pane="today"]').append(companionSection);
+      setCareerFocus({ sectionId: 'discoveryCompanionSection', title: 'Companion handler' });
+      setTab('today');
+      setOpen(true);
+      refreshCompanionBrief();
+      return true;
+    },
+    stopCompanionCareer,refreshCompanionBrief,
+    companionSnapshot:()=>({phase:'companions',...state.companionRuntime.snapshot()}),
     async startExplorerCareer(options) {
       explorerCareer = options;
       explorerSection = 'journey';
@@ -1777,6 +1846,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   });
   state.encounterDirector = createWalkingEncounterDirector({
     plan: fieldActivities,
+    metersPerWorldUnit:appCtx.METERS_PER_WORLD_UNIT,
     claimedIds,
     canUseSlot: (slot) => {
       const toolId = ACTIVITY_TOOL[slot.activityId];
@@ -1853,23 +1923,18 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.companionRuntime = await createCompanionRuntime(appCtx, {
     profileStore,
     worldIdentity: worldIdentity.id,
+    getStoryContext:()=>({regionId:state.worldIdentityId,regionLabel:state.regionLabel,environment:appCtx.getEnv?.()||'EARTH',locationSnapshot:{...worldIdentity.location,name:state.regionLabel}}),
     onChange: () => state.ui?.refreshData?.(),
     onXpAward: (companion, award) => {
       appCtx.showToast?.(`+${award.points} Companion XP · ${award.label}`);
       emitDiscoveryTelemetry('companion_xp_awarded', { result: award.companion?.progression?.lastAward?.reasonId || 'shared-activity', contextBands: telemetryContextBands() });
     },
+    onExerciseChange:()=>state.ui?.refreshCompanionBrief?.(),
     onTrainingComplete: (companion, skill) => {
       if (skill !== 'recall') return;
       appCtx.showToast?.(`${companion.name} learned Recall.`);
       emitDiscoveryTelemetry('companion_training_completed', { result: 'recall', contextBands: telemetryContextBands() });
-      void state.recordExplorerEvent({
-        eventId: `event:companion:training:${companion.instanceId}:recall`,
-        eventType: 'companion-training', sourceSystem: 'companions',
-        sourceId: companion.instanceId, pathId: 'companion',
-        name: `${companion.name} learned Recall`,
-        detail: 'The first recall exercise was completed in the world.',
-        firstCompletion: true, points: 0, progressReason: 'companion-memory'
-      });
+
     },
     onLevelUp: (companion, previousLevel) => {
       const milestone = [3, 8, 12].includes(companion.progression.level);
@@ -2169,7 +2234,9 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       }
       appCtx.showToast?.(`${companion.name} enjoyed the attention.`);
     }
+    else if(action==='retry-training'){return state.companionRuntime.retryRecallSave();}
     else if (action === 'recall-training') {
+      if(appCtx.getEnv?.()!=='EARTH'||appCtx.getCurrentTravelMode?.()!=='walk'||appCtx.getLiveGpsSnapshot?.().active)throw Error('Switch to Walk on Earth, with Live GPS off, to practise Recall.');
       if (!state.companionRuntime.beginRecallExercise(instanceId, playerPosition(appCtx))) return false;
       state.ui?.setOpen(false);
       appCtx.showToast?.('Walk at least 6 m away, then call your companion.');

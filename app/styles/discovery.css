@@ -2473,3 +2473,11 @@
 .discoveryExplorerJourney summary { min-height: 44px; align-content: center; cursor: pointer; }
 .discoveryExplorerJourney li { margin: 10px 0; }
 .discoveryExplorerJourney li button { display: block; margin-top: 6px; }
+
+@layer interface {
+.discoveryCompanionBrief { display: grid; gap: 10px; padding: 12px 0; }
+.discoveryCompanionBrief p { margin: 0; line-height: 1.5; }
+.discoveryCompanionBrief summary { min-height: 44px; align-content: center; cursor: pointer; }
+.discoveryCompanionBrief button { min-height: 44px; }
+
+}

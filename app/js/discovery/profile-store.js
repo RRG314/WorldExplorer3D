@@ -1,3 +1,4 @@
+import {companionRecallOutcome,recallMemoryId} from '../campaign/companion-handling.js';
 import {documentarySelected} from '../campaign/documentary-story.js';
 import {prepareDocumentaryMedia,assertDocumentaryMediaCurrent} from '../campaign/documentary-media.js';
 import {normalizeResearchCareers,researchCareerDefinition} from '../campaign/research-career-definitions.js';
@@ -928,6 +929,53 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     } finally { db.close(); }
   }
 
+  async function completeCompanionRecall(instanceId, completedAt, context = {}) {
+    const db = await open();
+    let transaction;
+    try {
+      await ensureCharacterMigration(db);
+      transaction = db.transaction(
+        ['profiles', 'companions', 'events', JOURNAL_ORDER_STORE],
+        'readwrite'
+      );
+      const friends = transaction.objectStore('companions'),
+        stories = transaction.objectStore('events'),
+        profiles = transaction.objectStore('profiles'),
+        current = await requestPromise(friends.get(String(instanceId))),
+        existing = await requestPromise(stories.get(recallMemoryId(instanceId)));
+      if (existing && current?.training?.records?.recall?.completed) {
+        await transactionPromise(transaction);
+        return { companion: clone(current), event: clone(existing), awarded: false };
+      }
+      const outcome = companionRecallOutcome(current, completedAt, context),
+        event = existing || createExplorerStoryEvent(outcome.event);
+      friends.put(clone(outcome.companion));
+      if (!existing) {
+        const profile = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID))),
+          progress = projectExplorerStoryProgress(profile.explorerProgress, event),
+          character = projectCharacterProgress(profile.characterState, event, {
+            meaningful: true,
+            explorerPointsBefore: profile.explorerProgress.points,
+            explorerPointsAfter: progress.points,
+          }).character;
+        profiles.put(
+          normalizeProfile({ ...profile, explorerProgress: progress, characterState: character })
+        );
+        stories.put(event);
+        putJournalOrder(transaction, 'events', event);
+      }
+      await transactionPromise(transaction);
+      return clone({ ...outcome, event });
+    } catch (error) {
+      try {
+        transaction?.abort();
+      } catch {}
+      throw error;
+    } finally {
+      db.close();
+    }
+  }
+
   async function saveCompanion(companion, update) {
     if (!companion?.instanceId || !companion?.catalogId) throw new TypeError('Companion persistence requires stable instance and catalog IDs.');
     const db = await open();
@@ -1169,6 +1217,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     rollbackCharacterMigration,
     rollbackLastImport,
     saveCompanion,
+    completeCompanionRecall,
     saveProfile,
     setActiveCompanion
   });
@@ -1415,6 +1464,34 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async listCompanions() { return [...companions.values()].map(clone); },
     async getCharacterMigrationBackup() {
       return legacyProfileBackup ? { id: CHARACTER_MIGRATION_BACKUP_ID, profile: clone(legacyProfileBackup) } : null;
+    },
+    async completeCompanionRecall(instanceId, completedAt, context = {}) {
+      const current = companions.get(String(instanceId)),
+        existing = events.get(recallMemoryId(instanceId));
+      if (existing && current?.training?.records?.recall?.completed)
+        return { companion: clone(current), event: clone(existing), awarded: false };
+      const outcome = companionRecallOutcome(current, completedAt, context),
+        event = existing || createExplorerStoryEvent(outcome.event);
+      let nextProfile = profile;
+      if (!existing) {
+        const progress = projectExplorerStoryProgress(profile.explorerProgress, event),
+          character = projectCharacterProgress(profile.characterState, event, {
+            meaningful: true,
+            explorerPointsBefore: profile.explorerProgress.points,
+            explorerPointsAfter: progress.points,
+          }).character;
+        nextProfile = normalizeProfile({
+          ...profile,
+          explorerProgress: progress,
+          characterState: character,
+        });
+      }
+      const next = clone(outcome.companion),
+        result = clone({ ...outcome, event });
+      companions.set(String(instanceId), next);
+      if (!existing) events.set(event.eventId, event);
+      profile = nextProfile;
+      return result;
     },
     async saveCompanion(companion, update) {
       const current = companions.get(companion.instanceId);

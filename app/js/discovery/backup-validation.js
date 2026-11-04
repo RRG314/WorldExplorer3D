@@ -1,3 +1,4 @@
+import {validateCompanionRecallBackup} from '../campaign/companion-handling.js';
 import {validateWorkspaceJournal} from '../campaign/engineering-workspace.js';
 import {RESEARCH_MEDIA_BACKUP_VERSION,validateResearchMediaRecord,validateResearchMediaReferences} from '../campaign/research-media.js';
 import {validateResearchCareerBackups} from '../campaign/research-career-definitions.js';
@@ -43,7 +44,7 @@ export function validateJournalBackup(input) {
     const claims = new Set();
     for (const row of rows) if (row.claimId) { if (claims.has(row.claimId)) fail(); claims.add(row.claimId); }
   }
-  try{validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);validateLunarStudyBackups(data.events);}catch{fail();}
+  try{validateCompanionRecallBackup(data.companions,data.events);validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);validateLunarStudyBackups(data.events);}catch{fail();}
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
   if(chapter.schemaVersion===1&&chapter.locationSnapshot)try{validateOpeningLocation(chapter.locationSnapshot);}catch{fail();}
   for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
