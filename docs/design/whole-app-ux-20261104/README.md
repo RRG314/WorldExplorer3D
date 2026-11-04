@@ -1,18 +1,24 @@
-# World Explorer: whole-app UX redesign plan
+# World Explorer: design studio, UX audit and implementation plan
 
-November 4, 2026. **Research and design proposal; production is unchanged.** Audience selected by the owner: mixed ages and experience, with simple entry and optional depth. The selected Roam visual identity remains the starting point. This is the next product-design phase after the completed release, not a restart of accepted gameplay testing.
+November 4, 2026. **Design review; production is unchanged.** Audience: mixed ages and experience, simple entry with optional depth.
 
-## Start here
+## Start with the visual preview
 
-[Compare the three interactive designs](index.html). The self-contained study covers Earth, Ocean/vessel, Moon, Mars, Solar System, stars/deep space and home/room contexts; start/continue, exploration, in-world HUD, all 20 careers, brief, kit, Journal, creation/sharing, rooms, settings and saves. Switch desktop/phone/short-landscape/spatial-menu concept, text size, guidance, contrast and example failure states. It is schematic sample UI with no gameplay, backend, account or save connection.
+[Open the Visual Design Studio](index.html). The owner rejected the earlier structure-only preview because it retained essentially one appearance. This replacement presents five distinct visual directions with rendered, scene-backed interfaces.
 
-| Option | Starting point | Choose it for | Main risk |
-| --- | --- | --- | --- |
-| A · Atlas | A place, then what is possible there | Geographic and cosmic discovery | Progression/Continue can become secondary |
-| **B · Expedition — recommended** | One useful next action, with easy free exploration | Mixed ages, novices and returning players | Suggestions must be honest and optional |
-| C · Workbench | A deliberately chosen pursuit and fitted tools | Deeper science, racing, marine or creation work | More initial complexity and dense phone layouts |
+| Direction | Appearance |
+| --- | --- |
+| TRAIL | Cinematic graphite/coral, condensed display type and cut-corner game HUD |
+| ORBIT | Technical midnight/cyan, precise instruments, mono headings and square panels |
+| FIELD | Light warm paper, olive ink, serif hierarchy and editorial photography |
+| CURRENT | Bright white/cobalt, rounded controls, explicit labels and generous spacing |
+| NOVA | Violet/lavender glass, light typography, floating cards and spatial dock |
 
-The recommendation is **B as the common framework**, an atlas within Explore, and specialist workspaces within selected activities. This keeps one app with contextual depth. It does not create twenty different career apps or rewrite the game engine.
+Use **Compare styles** to see five HUD compositions immediately, **Full preview** to interact with a chosen direction, or **Screen board** to compare nine screen families. Scene choices cover Earth/city, Ocean, Space/stars, planetary surface, field research and home/garage; each direction includes a phone composition. A shared scene can be used for a direct comparison. The visible UI is real HTML/CSS/JavaScript over clearly identified concept scenery and sample data; no game or save APIs are connected.
+
+[Visual direction details](visual-directions.md) explain the typography, surfaces and composition changes. The earlier [Atlas/Expedition/Workbench research](options.md) remains an information-architecture comparison, not a selected visual identity. New visual selection is open. The original rejected preview remains in Git and local evidence.
+
+The retained audit and implementation plan below remain applicable to the full feature portfolio. A new visual choice will set the appearance used during implementation; the selected production Roam identity does not constrain these new proposals.
 
 ## Main findings
 
@@ -38,7 +44,8 @@ The plan preserves all existing gameplay and data ownership: three accepted venu
 | Document | Purpose |
 | --- | --- |
 | [Current audit](audit.md) |18 prioritized findings, current evidence, strengths and explicit limits |
-| [Design options](options.md) | Whole-app comparison, tradeoffs and recommended direction |
+| [Visual directions](visual-directions.md) | Five art directions and the interactive visual studio |
+| [Structure options](options.md) | Retained navigation research, tradeoffs and framework recommendation |
 | [Architecture and flows](architecture-and-flows.md) | Stable navigation, all domains, all 20 career workspaces, progression, saves, accessibility and system boundaries |
 | [Implementation and stopping points](implementation-plan.md) | Ten bounded phases, owner boundaries, acceptance/reuse matrix, actual usability tasks and measurement plan |
 | [Research](research.md) |15 primary references and the particular design decisions they inform |
@@ -57,6 +64,8 @@ Choose the preferred starting architecture and evaluate labels/grouping with act
 
 The stopping point for this phase is this research/design packet and a verified comparison study. Application implementation, asset production, new content and production deployment are separate work after direction selection. Accepted gameplay procedures remain closed unless a demonstrated affected boundary changes.
 
-## Design-study verification
+## Current visual-studio verification
 
-The study's first-use/returning choice, career search/brief/kit/result, Back/Escape, track methods, room scope, offline/missing-equipment and failed-save examples were exercised. All 17 screen types render; the three layouts, short landscape, phone and affected 200% text boundaries were checked. Corrected Atlas navigation height, narrow labels and large-text phone overlap were rechecked only at their affected boundaries. Track, workspace and capture concepts now retain different editor intents. Current checks report no page exceptions. This validates the review artifact, not implemented gameplay, universal accessibility or the planned redesign's production readiness. Original tool/locator/layout failures remain in the local evidence ledger.
+The v2 browser pass verifies five distinct type/palette/shape systems and multiple HUD compositions; all nine screen families render for every direction. The five phone layouts keep objectives, maps, tools and navigation separated; phone menus expose every screen. The gallery itself fits a phone. All twenty careers remain represented, and a less-featured career retains its identity. The screen board renders nine actual HTML interface compositions. Current page exceptions:zero. Sources and document links remain traceable.
+
+Evidence: `output/playwright/whole-app-ux-20261104/visual-v2/`. This verifies the design-review artifact, not implemented gameplay, physical-device accessibility or production readiness. The earlier 17-screen structure study's checks are historical and were not rerun; current application gameplay acceptance remains unchanged.

@@ -1,8 +1,8 @@
-# Three complete redesign options
+# Navigation structure alternatives — retained research
 
-These are alternative information architectures for the same app, not three new feature sets or color skins. All preserve the selected Roam identity, the 172-entry inventory, all twenty careers, existing saves/owners, optional exploration, creation, multiplayer and platform integrations. They are review proposals; no production UI has been replaced.
+These are alternative information architectures for the same app, not three new feature sets or color skins. All preserve the 172-entry inventory, all twenty careers, existing saves/owners, optional exploration, creation, multiplayer and platform integrations. The original study used Roam; the revised visual alternatives are open for selection. These remain review proposals; no production UI has been replaced.
 
-[Open the interactive design study](index.html). Switch the option, domain, screen, career, device and text size. The study uses clearly labeled sample data and schematic scenery, not a working game, real save, physical-device emulator or new gameplay evidence.
+The owner rejected the first preview’s appearance. [The revised Visual Design Studio](index.html) now presents five distinct art directions. The A/B/C options in this document describe information architecture only; they are not the current visual alternatives or an accepted aesthetic choice. See [visual-directions.md](visual-directions.md).
 
 ## A — Atlas: place first
 
