@@ -50,6 +50,45 @@ export function normalizeOpeningChapter(input = {}) {
   };
 }
 
+// Older readers retain unknown profile fields, but their chapter normalizer
+// predates locationSnapshot. This backup restores only the same accepted
+// chapter's optional location; it cannot create progress or a completion.
+export function preserveOpeningLocation(input, backup) {
+  let chapter = normalizeOpeningChapter(input);
+  if (chapter.schemaVersion !== 1) return { chapter, backup };
+  const matches =
+    backup?.schemaVersion === 1 &&
+    chapter.acceptedAt > 0 &&
+    backup.acceptedAt === chapter.acceptedAt &&
+    backup.regionId === chapter.regionId &&
+    backup.careerId === chapter.careerId;
+  if (!chapter.locationSnapshot && matches) {
+    try {
+      chapter = { ...chapter, locationSnapshot: validateOpeningLocation(backup.locationSnapshot) };
+    } catch {
+      /* Unreadable metadata cannot invent a starting place. */
+    }
+  }
+  if (
+    chapter.acceptedAt > 0 &&
+    chapter.locationSnapshot &&
+    (backup == null || backup.schemaVersion === 1)
+  ) {
+    try {
+      backup = {
+        schemaVersion: 1,
+        acceptedAt: chapter.acceptedAt,
+        regionId: chapter.regionId,
+        careerId: chapter.careerId,
+        locationSnapshot: validateOpeningLocation(chapter.locationSnapshot),
+      };
+    } catch {
+      /* Preserve the original value for validation/recovery. */
+    }
+  }
+  return { chapter, backup };
+}
+
 export function beginOpeningChapter(input, location, now = Date.now()) {
   const chapter = normalizeOpeningChapter(input);
   if (chapter.schemaVersion !== 1)

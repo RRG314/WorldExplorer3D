@@ -4,12 +4,14 @@ import { explorerCareerView, explorerCareerSummary } from '../app/js/campaign/ex
 import {
   beginOpeningChapter,
   normalizeOpeningChapter,
+  preserveOpeningLocation,
 } from '../app/js/campaign/first-bearings.js?v=1';
 import {
   bindExplorerCareer,
   createExplorerCareerRuntime,
 } from '../app/js/campaign/explorer-career-adapter.js';
 import { createMemoryDiscoveryProfileStore } from '../app/js/discovery/profile-store.js?v=5';
+import { validateJournalBackup } from '../app/js/discovery/backup-validation.js?v=1';
 const location = {
   environment: 'EARTH',
   regionId: 'test-region',
@@ -22,6 +24,55 @@ const completedOpening = () => ({
   eventId: 'field:original',
   resultName: 'Original discovery',
   completedAt: 2000,
+});
+test('an older chapter writer cannot lose the accepted location on return or create another receipt', async () => {
+  const store = createMemoryDiscoveryProfileStore({
+    profile: { openingChapter: completedOpening() },
+  });
+  const profile = await store.getProfile(),
+    legacy = structuredClone(profile);
+  assert.deepEqual(
+    profile.openingChapterLocationBackup.locationSnapshot,
+    location.locationSnapshot,
+  );
+  delete legacy.openingChapter.locationSnapshot;
+  const returned = createMemoryDiscoveryProfileStore({ profile: legacy });
+  assert.deepEqual((await returned.getProfile()).openingChapter, profile.openingChapter);
+  assert.deepEqual(await returned.listEvents(), []);
+  assert.deepEqual((await returned.getProfile()).characterState, profile.characterState);
+});
+test('location recovery cannot cross accepted chapters or interpret newer metadata', () => {
+  const chapter = completedOpening(),
+    saved = preserveOpeningLocation(chapter).backup;
+  const missing = { ...chapter };
+  delete missing.locationSnapshot;
+  for (const change of [{ acceptedAt: 999 }, { regionId: 'other' }, { careerId: 'racer' }]) {
+    assert.equal(
+      preserveOpeningLocation(missing, { ...saved, ...change }).chapter.locationSnapshot,
+      undefined,
+    );
+  }
+  const future = { ...saved, schemaVersion: 99, future: { retained: true } };
+  assert.equal(preserveOpeningLocation(missing, future).chapter.locationSnapshot, undefined);
+  assert.deepEqual(preserveOpeningLocation(missing, future).backup, future);
+  const newerChapter = { ...chapter, schemaVersion: 99 };
+  assert.deepEqual(preserveOpeningLocation(newerChapter, saved).chapter, newerChapter);
+});
+test('backup validation rejects corrupt or conflicting retained starting locations', async () => {
+  const store = createMemoryDiscoveryProfileStore({
+    profile: { openingChapter: beginOpeningChapter({}, location, 1000) },
+  });
+  const data = await store.exportData();
+  assert.doesNotThrow(() => validateJournalBackup(data));
+  for (const change of [
+    (b) => (b.locationSnapshot.lat = 91),
+    (b) => (b.acceptedAt = -1),
+    (b) => (b.locationSnapshot.lon += 1),
+  ]) {
+    const edited = structuredClone(data);
+    change(edited.profile.openingChapterLocationBackup);
+    assert.throws(() => validateJournalBackup(edited));
+  }
 });
 test('the twelve-chapter view keeps existing achievements while requiring the missing opening and one local branch', () => {
   const profile = { harborRun: { phase: 'complete' } },

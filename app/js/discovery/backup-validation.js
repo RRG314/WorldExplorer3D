@@ -47,6 +47,19 @@ export function validateJournalBackup(input) {
   try{validateCompanionRecallBackup(data.companions,data.events);validateCoastalBackup(data.events);validateInvestigationBackup(data.events);validateLunarHomecomingBackup(data.profile,data.events);validateLunarStudyBackups(data.events);}catch{fail();}
   const chapter = normalizeOpeningChapter(data.profile.openingChapter);
   if(chapter.schemaVersion===1&&chapter.locationSnapshot)try{validateOpeningLocation(chapter.locationSnapshot);}catch{fail();}
+  const locationBackup = data.profile.openingChapterLocationBackup;
+  if (locationBackup?.schemaVersion === 1) {
+    try {
+      const location = validateOpeningLocation(locationBackup.locationSnapshot);
+      if (!(Number.isFinite(locationBackup.acceptedAt) && locationBackup.acceptedAt > 0) ||
+          typeof locationBackup.regionId !== 'string' || !locationBackup.regionId ||
+          locationBackup.regionId.length > 160 || typeof locationBackup.careerId !== 'string' ||
+          !locationBackup.careerId || locationBackup.careerId.length > 60) fail();
+      if (chapter.schemaVersion === 1 && chapter.acceptedAt === locationBackup.acceptedAt &&
+          chapter.regionId === locationBackup.regionId && chapter.careerId === locationBackup.careerId &&
+          chapter.locationSnapshot && JSON.stringify(validateOpeningLocation(chapter.locationSnapshot)) !== JSON.stringify(location)) fail();
+    } catch { fail(); }
+  }
   for(const [kind,entry] of Object.entries(data.profile.homeAchievements||{})) {
     const definition=HOME_ACHIEVEMENTS[kind],receipt=data.events.find(event=>event.eventId===entry?.eventId);
     if(!definition || entry?.eventId!==`event:campaign:${definition.id}:v1` || !(entry.occurredAt>0) || !entry.metadata?.homeId || !receipt || receipt.eventType!=='campaign-completed' || receipt.metadata?.homeId!==entry.metadata.homeId)fail();

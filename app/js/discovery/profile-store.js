@@ -28,7 +28,7 @@ import {
 import { createDefaultCharacterState, normalizeCharacterState } from '../character/model.js?v=1';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
 import { normalizeHarborRun, transitionHarborRun, harborRunCommandReceipts } from '../campaign/harbor-run.js';
-import { FIRST_BEARINGS, normalizeOpeningChapter, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
+import { FIRST_BEARINGS, normalizeOpeningChapter, preserveOpeningLocation, beginOpeningChapter, projectOpeningChapter, finishOpeningChapter } from '../campaign/first-bearings.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
 const DISCOVERY_DB_VERSION = 5;
@@ -118,24 +118,31 @@ function createDefaultProfile() {
 
 function normalizeProfile(profile) {
   const base = createDefaultProfile();
+  const location = preserveOpeningLocation(
+    profile?.openingChapter,
+    profile?.openingChapterLocationBackup,
+  );
   return {
     ...base,
     ...(profile || {}),
-    favoriteToolIds: Array.isArray(profile?.favoriteToolIds) ? profile.favoriteToolIds.slice(0, 6) : base.favoriteToolIds,
+    favoriteToolIds: Array.isArray(profile?.favoriteToolIds)
+      ? profile.favoriteToolIds.slice(0, 6)
+      : base.favoriteToolIds,
     publicCameraFavorites: normalizeCameraFavorites(profile?.publicCameraFavorites),
     tutorials: { ...base.tutorials, ...(profile?.tutorials || {}) },
     disciplineProgress: { ...base.disciplineProgress, ...(profile?.disciplineProgress || {}) },
     toolMastery: { ...(profile?.toolMastery || {}) },
     companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
-    openingChapter: normalizeOpeningChapter(profile?.openingChapter),
+    openingChapter: location.chapter,
+    ...(location.backup != null ? { openingChapterLocationBackup: location.backup } : {}),
     researchCareers: normalizeResearchCareers(profile?.researchCareers),
     soloRacer: normalizeSoloRacer(profile?.soloRacer),
     harborRun: normalizeHarborRun(profile?.harborRun),
     threeViews: normalizeThreeViews(profile?.threeViews),
     characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
   };
 }
 
@@ -238,7 +245,10 @@ function openDiscoveryDatabase(indexedDB = globalThis.indexedDB) {
 }
 
 async function ensureIndexedDbCharacterMigration(db) {
-  const transaction = db.transaction(['profiles', 'events', 'fieldGuide', 'companions', 'migrationBackups'], 'readwrite');
+  const transaction = db.transaction(
+    ['profiles', 'events', 'fieldGuide', 'companions', 'migrationBackups'],
+    'readwrite',
+  );
   const profiles = transaction.objectStore('profiles');
   const backups = transaction.objectStore('migrationBackups');
   const storedProfile = await requestPromise(profiles.get(PROFILE_ID));
@@ -249,6 +259,32 @@ async function ensureIndexedDbCharacterMigration(db) {
     return profile;
   }
   if (storedProfile.characterState?.schemaVersion === 1) {
+    const location = preserveOpeningLocation(
+      storedProfile.openingChapter,
+      storedProfile.openingChapterLocationBackup,
+    );
+    if (
+      location.backup != null &&
+      (JSON.stringify(location.backup) !==
+        JSON.stringify(storedProfile.openingChapterLocationBackup) ||
+        JSON.stringify(location.chapter.locationSnapshot) !==
+          JSON.stringify(storedProfile.openingChapter?.locationSnapshot))
+    ) {
+      // Reuse this existing one-time migration transaction. Preserve every
+      // other raw field and all history; no extra store, timer or progression.
+      profiles.put({
+        ...storedProfile,
+        openingChapterLocationBackup: location.backup,
+        ...(location.chapter.locationSnapshot
+          ? {
+              openingChapter: {
+                ...storedProfile.openingChapter,
+                locationSnapshot: location.chapter.locationSnapshot,
+              },
+            }
+          : {}),
+      });
+    }
     await transactionPromise(transaction);
     return normalizeProfile(storedProfile);
   }
@@ -256,7 +292,7 @@ async function ensureIndexedDbCharacterMigration(db) {
     requestPromise(transaction.objectStore('events').getAll()),
     requestPromise(transaction.objectStore('fieldGuide').getAll()),
     requestPromise(transaction.objectStore('companions').getAll()),
-    requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID))
+    requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID)),
   ]);
   const backedUpAt = Number(existingBackup?.backedUpAt) || Date.now();
   if (!existingBackup) {
@@ -264,7 +300,7 @@ async function ensureIndexedDbCharacterMigration(db) {
       id: CHARACTER_MIGRATION_BACKUP_ID,
       backedUpAt,
       sourceProfileSchemaVersion: Number(storedProfile.schemaVersion) || 0,
-      profile: clone(storedProfile)
+      profile: clone(storedProfile),
     });
   }
   const characterState = migrateLegacyCharacterState({
@@ -273,7 +309,7 @@ async function ensureIndexedDbCharacterMigration(db) {
     fieldGuide,
     companions,
     backupAvailable: true,
-    now: backedUpAt
+    now: backedUpAt,
   });
   const profile = normalizeProfile({ ...storedProfile, characterState });
   profiles.put(profile);
