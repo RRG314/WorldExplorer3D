@@ -37,6 +37,7 @@ body :is(h1,h2,h3) { color: var(--wx-text); font-family: var(--wx-font-display);
 body h1 { font-weight: 350; }
 body :is(button,input,select,textarea) { font-family: var(--wx-font-ui); accent-color: var(--wx-action); }
 body a { color: var(--wx-action); }
+body :is(button,.button,.btn) { min-height: 44px; padding: 10px 18px; border: 1px solid var(--wx-line); background: var(--wx-panel-soft); color: var(--wx-text); font-size: var(--wx-type-control); line-height: 1.4; }
 body :is(button,.button,.btn,.top a,.account-link) { border-radius: var(--wx-radius-control); }
 body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select,textarea) {
   border-radius: 12px; background: var(--wx-input); color: var(--wx-text); border-color: var(--wx-line);
@@ -65,3 +66,34 @@ body dialog::backdrop { background: rgb(10 6 23 / 72%); }
   body, body :is(.card,.panel,dialog) { background: Canvas; color: CanvasText; border-color: CanvasText; backdrop-filter: none; }
   body :is(button,a,input,select,textarea,summary):focus-visible { outline-color: Highlight; }
 }
+
+/* Product navigation and content use one display hierarchy. */
+body .landing-brand, body :is(.eyebrow,.section-kicker,.hero-brand,.journey-number,.hero-label,.hero-context) { font-family: var(--wx-font-ui); }
+body .masthead-actions .nav-launch { color: var(--wx-action-text); background: var(--wx-action); border-color: var(--wx-action); border-radius: var(--wx-radius-control); }
+body .hero-frame { overflow: hidden; border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); }
+body .hero-frame::after { border-radius: var(--wx-radius-panel); }
+body .hero-caption { border-color: var(--wx-line-soft); }
+body .account-shell { align-content: start; align-items: start; gap: 24px; padding: 16px; }
+body .account-rail { top: 16px; height: calc(100dvh - 32px); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-panel); background: var(--wx-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+body .account-shell > .wrap { width: 100%; margin: 0; padding: 24px 24px 48px 0; }
+body .account-brand strong { font: 400 calc(1.5rem * var(--wx-text-scale))/1.2 var(--wx-font-display); letter-spacing: -.035em; text-transform: none; }
+body .account-shell .top h1 { font: 350 calc(clamp(2rem,4vw,3.5rem) * var(--wx-text-scale))/1.1 var(--wx-font-display); letter-spacing: -.045em; text-transform: none; }
+body .account-nav { gap: 8px; }
+body .account-nav button { background: transparent; color: var(--wx-muted); border: 1px solid transparent; border-radius: var(--wx-radius); }
+body .account-nav button.active { background: var(--wx-selected); color: var(--wx-text); border-color: var(--wx-line-soft); }
+body .account-nav strong { font-size: var(--wx-type-control); font-weight: 500; }
+body .account-nav span { font-size: var(--wx-type-meta); line-height: 1.5; }
+body .account-shell .panel { border-radius: var(--wx-radius-panel); background: var(--wx-panel); border-color: var(--wx-line-soft); }
+body .account-shell .top a { font-size: var(--wx-type-control); }
+@media(max-width:980px) {
+ body .account-shell { gap: 0; padding: 8px; }
+ body .account-rail { position: static; top: auto; height: auto; padding: 16px; border-radius: 24px; }
+ body .account-shell > .wrap { padding: 24px 8px; }
+ body .account-brand { padding-bottom: 12px; }
+ body .account-nav button { border-radius: var(--wx-radius-control); }
+}
+
+body .account-shell #authPrompt, body .account-view { border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); background: var(--wx-panel); }
+body .account-view :is(.status-item,.identity-card,.creator-card,.plan) { border-radius: var(--wx-radius); background: var(--wx-panel-soft); }
+body .account-section-heading h2, body .section-title { font-family: var(--wx-font-display); font-weight: 400; text-transform: none; letter-spacing: -.025em; }
+body .about-hero h1 { font-weight: 350; }

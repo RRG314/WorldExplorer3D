@@ -1,52 +1,48 @@
-@layer interface{
-#largeMap{--map-edge:max(14px,env(safe-area-inset-left));box-sizing:border-box;padding:74px 72px 58px;background:color-mix(in srgb, var(--wx-panel-solid) 90%, transparent);backdrop-filter:blur(12px)}
-#largeMapCanvas{width:min(calc(100vw - 144px),calc(100vh - 132px),800px);height:auto;aspect-ratio:1;max-width:800px;max-height:800px;border:1px solid color-mix(in srgb, var(--wx-action) 50%, transparent);border-radius:10px;background:var(--wx-panel-solid);box-shadow:0 24px 80px rgba(0,0,0,.48);cursor:grab;touch-action:none}
-#largeMapCanvas.is-panning{cursor:grabbing}
-#mapExplorerHeader{position:absolute;top:max(14px,env(safe-area-inset-top));left:var(--map-edge);right:var(--map-edge);z-index:202;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:none}
-#mapExplorerHeader>div{display:grid;gap:2px;min-width:0;padding:8px 11px;border-left:2px solid var(--wx-action);background:color-mix(in srgb, var(--wx-panel-solid) 88%, transparent)}
-#mapExplorerHeader span{color:var(--wx-action);font:700 9px var(--wx-font-ui);letter-spacing:.14em}
-#mapExplorerHeader strong{color:var(--wx-text);font:600 11px var(--wx-font-ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#mapExplorerHeader button,#mapClose,#mapControlDock button,#mapLegend{min-height:42px;border:1px solid color-mix(in srgb, var(--wx-action) 50%, transparent)!important;border-radius:8px!important;color:var(--wx-text)!important;background:color-mix(in srgb, var(--wx-panel-solid) 90%, transparent)!important;box-shadow:0 8px 24px rgba(0,0,0,.25);font:700 9px var(--wx-font-ui)!important;letter-spacing:.04em;pointer-events:auto}
-#mapExplorerHeader button{padding:0 13px}
-#mapClose{top:max(14px,env(safe-area-inset-top));right:var(--map-edge);z-index:204;padding:0 15px;transform:none!important}
-#mapExplorerHeader{padding-right:78px}
-#mapExplorerHint{position:absolute;left:50%;bottom:max(13px,env(safe-area-inset-bottom));z-index:202;max-width:calc(100vw - 170px);padding:7px 11px;border:1px solid color-mix(in srgb, var(--wx-action) 25%, transparent);border-radius:8px;color:var(--wx-action);background:color-mix(in srgb, var(--wx-panel-solid) 88%, transparent);font:600 10px/1.3 var(--wx-font-ui);transform:translateX(-50%);pointer-events:none}
-#mapControlDock{position:absolute;right:var(--map-edge);bottom:max(14px,env(safe-area-inset-bottom));z-index:203;display:grid;grid-template-columns:repeat(2,44px);gap:7px}
-#mapControlDock button{width:44px;height:42px;padding:0;font-size:16px!important}
-#mapControlDock>span{grid-column:1/-1;height:1px;background:color-mix(in srgb, var(--wx-selected) 28%, transparent)}
-#mapControlDock #zoomLevel{grid-column:1/-1;padding:5px;border:1px solid color-mix(in srgb, var(--wx-action) 30%, transparent);border-radius:7px;color:var(--wx-action);background:color-mix(in srgb, var(--wx-panel-solid) 90%, transparent);font:700 9px var(--wx-font-ui);text-align:center}
-#mapSatelliteToggle.active,#mapRoadsToggle.active,#mapPathsToggle.active{border-color:var(--wx-action)!important;color:var(--wx-text)!important;background:var(--wx-selected)!important}
-#mapLegend{left:var(--map-edge)!important;bottom:max(14px,env(safe-area-inset-bottom))!important;padding:0 13px!important}
-#largeMap.browsing #mapExplorerStatus{color:var(--wx-warning)}
-#largeMap.browsing #mapRecenter{border-color:var(--wx-warning)!important;color:var(--wx-warning)!important}
-.mapSearchForm{position:absolute;top:10px;left:50%;width:min(520px,calc(100vw - 500px));transform:translateX(-50%);display:grid;grid-template-columns:minmax(140px,1fr) auto;gap:6px;z-index:3;pointer-events:auto}
-.mapSearchForm input,.mapSearchForm button{box-sizing:border-box;height:36px;border:1px solid color-mix(in srgb, var(--wx-action) 48%, transparent);border-radius:6px;background:color-mix(in srgb, var(--wx-panel-solid) 96%, transparent);color:var(--wx-text);font:600 10px var(--wx-font-ui)}
-.mapSearchForm input{min-width:0;padding:0 11px;font-family:var(--wx-font-ui);font-size:12px;outline:none}
-.mapSearchForm input:focus{border-color:var(--wx-action);box-shadow:0 0 0 2px rgba(111,232,255,.16)}
-.mapSearchForm button{padding:0 14px;cursor:pointer}
-.mapSearchForm button:disabled{cursor:wait;opacity:.62}
-#mapSearchStatus{grid-column:1/-1;min-height:13px;padding-left:2px;color:var(--wx-action);font:600 9px var(--wx-font-ui)}
-#mapSearchStatus[data-tone="error"]{color:var(--wx-danger)}
-#mapSearchStatus[data-tone="success"]{color:var(--wx-success)}
-body:has(#largeMap.show) #mainMenuBtn,body:has(#largeMap.show) #hud,body:has(#largeMap.show) #minimap,body:has(#largeMap.show) #minimapZoomControls,body:has(#largeMap.show) #coords,body:has(#largeMap.show) #floatMenuContainer,body:has(#largeMap.show) #urbanEquipmentToggle,body:has(#largeMap.show) #urbanVehiclePrompt,body:has(#largeMap.show) #urbanWeaponReticle,body:has(#largeMap.show) #mobileTouchControls,body:has(#largeMap.show) #liveGpsHud,body:has(#largeMap.show) .tutorial-card{display:none!important}
-@media(max-width:760px),(pointer:coarse){#largeMap{padding:max(110px,calc(env(safe-area-inset-top) + 104px)) 8px max(112px,calc(env(safe-area-inset-bottom) + 104px))}#largeMapCanvas{width:min(calc(100vw - 16px),calc(100dvh - max(222px,calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 208px))));height:auto;max-width:none;max-height:none;border-radius:8px}#mapExplorerHeader{right:8px;left:8px;padding-right:63px}#mapExplorerHeader>div{padding:7px 9px}#mapExplorerHeader>button{padding:0 9px;font-size:8px!important}.mapSearchForm{top:52px;left:8px;width:calc(100vw - 16px);transform:none;grid-template-columns:minmax(0,1fr) auto}.mapSearchForm input{font-size:11px}.mapSearchForm button{font-size:8px;padding:0 10px}#mapClose{right:8px;padding:0 12px}#mapExplorerHint{left:8px;right:8px;bottom:max(66px,calc(env(safe-area-inset-bottom) + 58px));max-width:none;text-align:center;transform:none}#mapControlDock{right:8px;bottom:max(8px,env(safe-area-inset-bottom));display:flex}#mapControlDock>span{display:none}#mapControlDock #zoomLevel{display:grid;min-width:40px;place-items:center}#mapLegend{left:8px!important;bottom:max(8px,env(safe-area-inset-bottom))!important}#legendPanel{inset:108px 8px 64px!important;max-width:none!important;max-height:none!important;box-sizing:border-box}#mapInfoPanel{inset:108px 8px 64px!important;width:auto!important;max-height:none!important;box-sizing:border-box}}
-}
-
-@layer interface{
-@media(min-width:761px) and (pointer:fine){
-  #largeMap{padding:48px 24px 24px}
-  #largeMapCanvas{width:min(calc(100vw - 48px),calc(100dvh - 48px),1040px);max-width:1040px;max-height:1040px}
-  #legendPanel{top:70px!important;left:14px!important;width:min(390px,calc(100vw - 28px));max-width:390px!important;max-height:calc(100% - 140px)!important;box-sizing:border-box;padding:12px!important}
-}
-#legendPanel{border:1px solid color-mix(in srgb, var(--wx-action) 55%, transparent)!important;background:color-mix(in srgb, var(--wx-panel-solid) 96%, transparent)!important;color:var(--wx-action)!important}
-#legendPanel>div{margin-bottom:8px!important}
-#legendPanel label{color:var(--wx-action);text-transform:none}
-#legendPanel input[type="checkbox"]{accent-color:var(--wx-action)}
-.mapLegendGroup{margin:7px 0;border:1px solid color-mix(in srgb, var(--wx-action) 22%, transparent);border-radius:7px;background:color-mix(in srgb, var(--wx-panel-solid) 54%, transparent)}
-.mapLegendSummary{display:flex!important;align-items:center;gap:6px;min-height:40px;box-sizing:border-box;margin:0!important;padding:9px 10px;cursor:pointer;list-style:none;color:var(--wx-action)!important}
-.mapLegendSummary::-webkit-details-marker{display:none}
-.mapLegendSummary::after{content:'+';margin-left:auto;color:var(--wx-action);font-size:14px}
-.mapLegendGroup[open]>.mapLegendSummary::after{content:'−'}
-.mapLegendSummary small{margin-left:auto;color:var(--wx-action);font:600 8px var(--wx-font-ui)}
-.mapLegendGroup>div{padding:2px 10px 10px!important}
+@layer interface {
+  /* One map workspace; the existing canvas projection and interaction owner stay. */
+  #largeMap { box-sizing: border-box; padding: 16px 24px 96px; gap: 20px; background: var(--wx-panel); backdrop-filter: blur(var(--wx-glass-blur)); overflow: auto; overscroll-behavior: contain; }
+  #largeMap.show { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
+  #mapExplorerHeader { position: relative; inset: auto; z-index: 202; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; width: 100%; box-sizing: border-box; padding-right: 100px; }
+  #mapExplorerHeader > div { display: grid; gap: 4px; min-width: 0; }
+  #mapExplorerHeader span { color: var(--wx-action); font: 500 var(--wx-type-meta)/1.4 var(--wx-font-ui); letter-spacing: .08em; }
+  #mapExplorerHeader strong { color: var(--wx-text); font: 400 var(--wx-type-control)/1.5 var(--wx-font-ui); }
+  .mapSearchForm { position: static; transform: none; flex: 1; min-width: min(240px,100%); display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px; margin: 0; }
+  .mapSearchForm input, .mapSearchForm button { min-height: 44px; box-sizing: border-box; min-width: 0; border: 1px solid var(--wx-line); border-radius: var(--wx-radius-control); background: var(--wx-input); color: var(--wx-text); padding: 10px 16px; font: 400 var(--wx-type-control)/1.4 var(--wx-font-ui); }
+  .mapSearchForm button { color: var(--wx-action-text); background: var(--wx-action); cursor: pointer; }
+  .mapSearchForm button:disabled { cursor: wait; opacity: .65; }
+  #mapSearchStatus { grid-column: 1 / -1; min-height: 1.4em; color: var(--wx-muted); font: 400 var(--wx-type-meta)/1.4 var(--wx-font-ui); }
+  #mapSearchStatus:empty { display: none; }
+  #mapSearchStatus[data-tone="error"] { color: var(--wx-danger); }
+  #mapSearchStatus[data-tone="success"] { color: var(--wx-success); }
+  #largeMapCanvas { flex: none; display: block; width: min(calc(100vw - 48px),max(180px,calc(100dvh - 220px)),1000px); height: auto; aspect-ratio: 1; max-width: 100%; max-height: none; box-sizing: border-box; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-panel); background: var(--wx-bg); box-shadow: var(--wx-shadow-panel); cursor: grab; touch-action: none; }
+  #largeMapCanvas.is-panning { cursor: grabbing; }
+  #mapExplorerHeader button, #mapClose, #mapControlDock button, #mapLegend { min-width: 44px; min-height: 44px; height: auto; border: 1px solid var(--wx-line) !important; border-radius: var(--wx-radius-control) !important; color: var(--wx-text) !important; background: var(--wx-panel-solid) !important; font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui) !important; letter-spacing: normal; padding: 10px 16px; cursor: pointer; }
+  #mapExplorerHeader #mapSearchBtn { background: var(--wx-action) !important; color: var(--wx-action-text) !important; }
+  #mapClose { position: fixed; top: max(16px,env(safe-area-inset-top)); right: max(16px,env(safe-area-inset-right)); z-index: 204; transform: none !important; }
+  #mapExplorerHint { position: static; transform: none; max-width: 65ch; padding: 0; color: var(--wx-muted); font: 400 var(--wx-type-meta)/1.5 var(--wx-font-ui); text-align: center; }
+  #mapControlDock { position: fixed; right: 16px; bottom: max(16px,env(safe-area-inset-bottom)); z-index: 203; display: flex; align-items: center; gap: 6px; padding: 6px; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-panel); background: var(--wx-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+  #mapControlDock button { width: 44px; padding: 8px; font-size: 18px !important; }
+  #mapControlDock > span { width: 1px; height: 24px; background: var(--wx-line-soft); }
+  #mapControlDock #zoomLevel { min-width: 44px; color: var(--wx-muted); font: 400 var(--wx-type-meta)/1.4 var(--wx-font-ui); text-align: center; }
+  #mapSatelliteToggle.active, #mapRoadsToggle.active, #mapPathsToggle.active { border-color: var(--wx-action) !important; color: var(--wx-action) !important; background: var(--wx-selected) !important; }
+  #mapLegend { position: fixed !important; left: 16px !important; bottom: max(16px,env(safe-area-inset-bottom)) !important; padding: 12px 18px !important; }
+  #legendPanel, #mapInfoPanel { position: fixed !important; inset: 86px auto 90px 16px !important; width: min(440px,calc(100vw - 32px)) !important; max-width: none !important; max-height: none !important; padding: 20px !important; box-sizing: border-box; background: var(--wx-panel-solid) !important; color: var(--wx-text) !important; border: 1px solid var(--wx-line) !important; border-radius: var(--wx-radius-panel) !important; box-shadow: var(--wx-shadow-panel); z-index: 205 !important; overflow: auto; }
+  #legendPanel :is(div,label,summary), #mapInfoContent { font-size: var(--wx-type-control) !important; font-weight: 400 !important; line-height: 1.6 !important; }
+  #legendPanel label, #legendPanel summary { min-height: 44px; align-content: center; }
+  #legendPanel input[type="checkbox"] { width: 22px; height: 22px; flex: none; accent-color: var(--wx-action); }
+  #legendPanel button, #mapInfoCloseBtn { width: auto !important; min-width: 44px !important; height: auto !important; min-height: 44px !important; padding: 8px 12px !important; border-radius: var(--wx-radius-control) !important; font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui) !important; color: var(--wx-text) !important; background: var(--wx-panel-soft) !important; }
+  #largeMap.browsing #mapExplorerStatus { color: var(--wx-warning); }
+  #largeMap.browsing #mapRecenter { border-color: var(--wx-warning) !important; }
+  body:has(#largeMap.show) :is(#mainMenuBtn,#hud,#minimap,#minimapZoomControls,#coords,#floatMenuContainer,#urbanEquipmentToggle,#urbanVehiclePrompt,#urbanWeaponReticle,#mobileTouchControls,#liveGpsHud,.tutorial-card) { display: none !important; }
+  @media(max-width:760px),(pointer:coarse) {
+    #largeMap { padding: 12px 8px 160px; gap: 16px; }
+    #mapExplorerHeader { padding-right: 84px; gap: 12px; }
+    .mapSearchForm { flex: 0 0 calc(100% + 84px); order: 2; }
+    #mapExplorerHeader > div { flex: 1; }
+    #mapExplorerHeader #mapRecenter { max-width: 45%; }
+    #largeMapCanvas { width: min(calc(100vw - 16px),max(180px,calc(100dvh - 340px))); }
+    #mapControlDock { left: 8px; right: 8px; bottom: max(8px,env(safe-area-inset-bottom)); justify-content: center; }
+    #mapLegend { left: 8px !important; bottom: max(76px,calc(env(safe-area-inset-bottom) + 70px)) !important; }
+    #legendPanel, #mapInfoPanel { inset: 76px 8px 144px !important; width: auto !important; }
+  }
 }

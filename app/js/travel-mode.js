@@ -82,6 +82,16 @@ function syncTravelModeButtons() {
   setAvailable(droneBtn, availability.drone);
   setAvailable(planeBtn, availability.plane);
   setAvailable(boatBtn, availability.boat);
+  // The existing mode owner also presents the available vehicle choices.
+  // A planetary rover is not an Earth garage vehicle; unavailable aircraft
+  // must not leave a visible aircraft selector behind.
+  const earthVehicles = !planetaryCapabilities && currentEnvironment === appCtx.ENV?.EARTH;
+  setAvailable(document.getElementById('travelVehicleSelect')?.closest('label'), earthVehicles);
+  setAvailable(document.getElementById('fGarage'), earthVehicles);
+  setAvailable(document.getElementById('fRacing'), earthVehicles);
+  setAvailable(document.getElementById('fCreateRace'), earthVehicles);
+  setAvailable(document.getElementById('travelAircraftSelect')?.closest('label'), availability.plane);
+  if (drivingBtn) drivingBtn.textContent = planetaryCapabilities ? '⌁ Drive rover' : '🚗 Drive';
 
   // Environment choices have one owner and are published only when their
   // underlying state changes. The HUD frame loop must never rewrite menus.

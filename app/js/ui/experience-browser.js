@@ -17,6 +17,7 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
  function message(text){status.textContent=text;}
  function render(){
   dialog.dataset.detail=String(detailOpen);dialog.dataset.view=view;
+  dialog.setAttribute('aria-busy',String(busy));
   for(const button of dialog.querySelectorAll('[data-experience-view]')){const active=button.dataset.experienceView===view;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;}
   search.closest('label').hidden=view==='continue';
   let entries=filterExperiences({view:view==='continue'?'careers':view,query:search.value});

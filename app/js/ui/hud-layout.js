@@ -35,11 +35,15 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     'coords',
     'hudMapOpenBtn',
     'hudStatusPanels',
+    'novaGameHeader',
   ];
   const nodes = Object.fromEntries(ids.map((id) => [id, documentRef?.getElementById(id)]));
   const toolbar = root?.querySelector?.('.hudUtilityActions');
   const previous = new Map(),
     written = new Map();
+  const documentStyle=documentRef?.documentElement?.style;
+  const oldMastheadHeight=documentStyle?.getPropertyValue('--wx-masthead-height');
+  let writtenMastheadHeight=null;
   let resizeFrame = null;
   const map = nodes.hudMap,
     visual = map?.querySelector?.('.hudMapVisual'),
@@ -107,7 +111,17 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     written.set(name, text);
   }
   function refresh() {
-    if (!scope.isActive() || !root || !visible(root)) return;
+    if (!scope.isActive() || !root) return;
+    // The same UI layout observer measures the shared masthead even while a
+    // specialist renderer hides Earth's HUD. No frame or gameplay owner added.
+    const masthead=visible(nodes.novaGameHeader);
+    const mastheadHeight=masthead&&masthead.top<=1?Math.ceil(masthead.bottom):0;
+    if(documentStyle){
+      const value=`${mastheadHeight}px`;
+      if(documentStyle.getPropertyValue('--wx-masthead-height')!==value)documentStyle.setProperty('--wx-masthead-height',value);
+      writtenMastheadHeight=value;
+    }
+    if (!visible(root)) return;
     const obstacles = [visible(nodes.floatMenuContainer)].filter(Boolean);
     if (visible(nodes.mobileTouchControls)) {
       for (const id of [
@@ -176,6 +190,10 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     if (!event.persisted) scope.dispose('page closed');
   });
   scope.defer(() => {
+    if(documentStyle&&documentStyle.getPropertyValue('--wx-masthead-height')===writtenMastheadHeight){
+      if(oldMastheadHeight)documentStyle.setProperty('--wx-masthead-height',oldMastheadHeight);
+      else documentStyle.removeProperty('--wx-masthead-height');
+    }
     if (toolbar && toolbar.hidden === writtenToolbarHidden) toolbar.hidden = oldToolbarHidden;
     if (statusPanels && statusPanels.hidden === writtenStatusHidden)
       statusPanels.hidden = oldStatusHidden;

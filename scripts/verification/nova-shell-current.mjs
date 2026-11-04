@@ -82,6 +82,63 @@ try {
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#experienceBrowser').isVisible(),false);
   });
+  await run('workspace-navigation',async()=>{
+    await page.locator('.globe-app-rail [data-globe-destination="games"]').click();
+    await page.locator('#experienceBrowser').waitFor({state:'visible'});
+    assert.equal(await page.locator('#experienceBrowser .nova-workspace-navigation button').count(),5);
+    await page.locator('#experienceBrowser [data-nova-section="journal"]').click();
+    await page.locator('#discoveryPanel').waitFor({state:'visible'});
+    assert.equal(await page.locator('#experienceBrowser').isVisible(),false);
+    await capture(page,'workspace-journal','#discoveryPanel');
+    await page.locator('#discoveryPanel [data-nova-section="create"]').click();
+    await page.locator('#novaCreateHub').waitFor({state:'visible'});
+    assert.equal(await page.locator('#discoveryPanel').isVisible(),false);
+    await capture(page,'workspace-create','#globeHubOverlay');
+    await page.locator('#globeHubOverlay [data-nova-section="together"]').click();
+    await page.locator('#tab-multiplayer').waitFor({state:'visible'});
+    await page.locator('#globeHubOverlay [data-nova-section="explore"]').click();
+    assert.equal(await page.locator('#globeHubOverlay').isVisible(),false);
+    await page.locator('.globe-app-rail [data-globe-destination="games"]').click();
+    await page.locator('#experienceBrowser').waitFor({state:'visible'});
+    await page.locator('#experienceBrowser .nova-workspace-navigation button').first().focus();
+    for(let i=0;i<8;i++)await page.keyboard.press('Tab');
+    assert.equal(await page.locator('#experienceBrowser').evaluate(e=>e.contains(document.activeElement)),true);
+    // Controlled UI busy state only; no transaction or progression claim.
+    await page.locator('#experienceBrowser').evaluate(e=>e.setAttribute('aria-busy','true'));
+    await page.locator('#experienceBrowser [data-nova-section="journal"]').click();
+    assert.equal(await page.locator('#experienceBrowser').isVisible(),true);
+    assert.equal(await page.locator('#discoveryPanel').isVisible(),false);
+    await page.locator('#experienceBrowser').evaluate(e=>e.setAttribute('aria-busy','false'));
+    await page.locator('[data-experience-close]').click();
+  });
+  await run('workspace-layout',async()=>{
+    const views=[['games','#experienceBrowser','[data-experience-close]'],['journal','#discoveryPanel','#discoveryCloseBtn'],['create','#globeHubOverlay','#globeHubOverlayCloseBtn'],['multiplayer','#globeHubOverlay','#globeHubOverlayCloseBtn']];
+    for(const [width,height] of [[1440,960],[390,844],[844,390]])for(const scale of ['100','200']){
+      await page.setViewportSize({width,height});
+      await page.locator('[data-globe-destination="settings"]').click();
+      await page.locator('#accessibilityTextScale').selectOption(scale);await page.keyboard.press('Escape');
+      for(const [view,selector,close] of views){
+        await page.locator(`.globe-app-rail [data-globe-destination="${view}"]`).click();
+        const root=page.locator(selector);await root.waitFor({state:'visible'});
+        const bounds=await root.boundingBox();assert.ok(bounds.x>=-.5&&bounds.y>=-.5&&bounds.x+bounds.width<=width+.5&&bounds.y+bounds.height<=height+.5,'workspace stays in viewport');
+        const buttons=root.locator('.nova-workspace-navigation button');assert.equal(await buttons.count(),5);
+        for(let i=0;i<5;i++){
+          const button=buttons.nth(i);await button.scrollIntoViewIfNeeded();
+          const valid=await button.evaluate(e=>{const r=e.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.x>=-.5&&r.right<=innerWidth+.5&&r.y>=-.5&&r.bottom<=innerHeight+.5&&e.scrollWidth<=e.clientWidth+1&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));});
+          assert.ok(valid,`${view} navigation target ${i} fits at ${width}/${scale}`);
+        }
+        await capture(page,`workspace-${view}-${width}-${scale}`,selector);
+        await page.locator(close).click();
+      }
+    }
+  });
+  await run('appearance',async()=>{
+    await page.locator('#globeHubThemeBtn').click();
+    await capture(page,'day-globe','#globeSelectorScreen');
+    await page.locator('.globe-app-rail [data-globe-destination="create"]').click();await capture(page,'day-create','#globeHubOverlay');await page.keyboard.press('Escape');
+    await page.setViewportSize({width:390,height:844});await page.locator('.globe-selector-side').evaluate(e=>e.scrollTo(0,0));await capture(page,'day-phone','#globeSelectorScreen');
+    await page.locator('#globeHubThemeBtn').click();await page.setViewportSize({width:1440,height:960});
+  });
   await run('journal',async()=>{
     await page.locator('.globe-app-rail [data-globe-destination="journal"]').click();
     await page.locator('#discoveryPanel').waitFor({state:'visible'});

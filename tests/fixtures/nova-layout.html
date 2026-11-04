@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>NOVA source composition fixture</title>
+<body><script type="module">
+  import {getScreenLayoutService} from '/app/js/ui/screen-layout.js?v=3';
+  const source=new DOMParser().parseFromString(await (await fetch('/app/index.html')).text(),'text/html');
+  // Layer order is part of the real entry document's cascade contract.
+  for(const style of source.head.querySelectorAll('style'))document.head.append(style.cloneNode(true));
+  await Promise.all([...source.querySelectorAll('link[rel="stylesheet"]')].map(link=>{
+    const url=new URL(link.getAttribute('href'),new URL('/app/',location.href));
+    if(url.origin!==location.origin)return;
+    return new Promise((resolve,reject)=>{const node=document.createElement('link');node.rel='stylesheet';node.href=url.href;node.onload=resolve;node.onerror=reject;document.head.append(node);});
+  }));
+  const context=new URLSearchParams(location.search).get('context')||'earth';
+  if(context==='map'){
+    const node=source.getElementById('largeMap');document.body.append(node);node.classList.add('show');
+  }else if(context==='hub'){
+    document.body.append(source.getElementById('globeSelectorScreen'));
+    document.getElementById('globeSelectorScreen').classList.add('show');
+    document.body.classList.add('start-hub-open');
+  }else{
+    for(const id of ['hud','floatMenuContainer','mainMenuBtn']){const node=source.getElementById(id);document.body.append(node);node.classList.add('show');}
+    getScreenLayoutService().bindHudLayout();
+    if(context==='space'){document.body.classList.add('space-flight-active');document.getElementById('floatMenuContainer').style.display='none';document.getElementById('hud').style.display='none';}
+  }
+  window.novaLayoutReady={context,scope:'Actual source DOM and styles, presentation-only. No renderer, game admission, save or action execution.'};
+</script></body></html>

@@ -41,7 +41,7 @@
 .about-kicker {
   display: block;
   color: var(--field);
-  font: 700 11px/1.3 'Orbitron', sans-serif;
+  font: 700 11px/1.3 var(--wx-font-display);
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
@@ -49,7 +49,7 @@
 .about-opening h1 {
   max-width: 10ch;
   margin: 20px 0 0;
-  font: 600 clamp(47px, 6.2vw, 82px)/0.96 'Orbitron', sans-serif;
+  font: 600 clamp(47px, 6.2vw, 82px)/0.96 var(--wx-font-display);
   letter-spacing: -0.055em;
 }
 
@@ -131,7 +131,7 @@
 .about-index {
   padding-top: 7px;
   color: var(--faint);
-  font: 500 12px/1 'Orbitron', sans-serif;
+  font: 500 12px/1 var(--wx-font-display);
 }
 
 .about-section h2,
@@ -140,7 +140,7 @@
 .about-person h2 {
   max-width: 19ch;
   margin: 15px 0 0;
-  font: 600 clamp(34px, 4.6vw, 58px)/1.04 'Orbitron', sans-serif;
+  font: 600 clamp(34px, 4.6vw, 58px)/1.04 var(--wx-font-display);
   letter-spacing: -0.04em;
 }
 
@@ -194,12 +194,12 @@
 
 .sequence-number {
   color: var(--field);
-  font: 600 11px/1 'Orbitron', sans-serif;
+  font: 600 11px/1 var(--wx-font-display);
 }
 
 .synthesis-sequence strong {
   margin-top: 45px;
-  font: 600 17px/1.25 'Orbitron', sans-serif;
+  font: 600 17px/1.25 var(--wx-font-display);
 }
 
 .synthesis-sequence li > span:last-child {
@@ -282,7 +282,7 @@
   max-width: 17ch;
   margin: 0;
   color: var(--ink);
-  font: 500 clamp(34px, 5.2vw, 64px)/1.12 'Orbitron', sans-serif;
+  font: 500 clamp(34px, 5.2vw, 64px)/1.12 var(--wx-font-display);
   letter-spacing: -0.04em;
 }
 

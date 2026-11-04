@@ -43,6 +43,10 @@
   .experience-detail h3 { font-family: var(--wx-font-display); font-weight: 350; letter-spacing: -.035em; }
   .experience-tabs { margin: 0 20px; }
   .experience-list-pane { padding: 24px; }
+  #discoveryPanel { inset: max(88px,calc(var(--wx-masthead-height,76px) + 12px)) 24px 24px; width: min(1200px,calc(100vw - 48px)); margin-inline: auto; }
+  body.start-hub-open #discoveryPanel { top: 142px; width: calc(100vw - 48px); }
+  #urbanEquipment { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); max-height: calc(100dvh - var(--wx-masthead-height,76px) - 36px); }
+  .urbanEquipmentHead h2 { font-weight: 350; letter-spacing: -.035em; }
   :is(dialog, .floatItems, .globe-hub-overlay, .globe-selector-side, .hud-box,
       #discoveryPanel, #urbanEquipment, .mp-card, .room-panel, .loadingCard,
       .expeditionPanel, .universe-navigator) {
@@ -89,6 +93,7 @@
 
   /* The globe stays live and interactive. Its tools float beside the scene. */
   #globeSelectorScreen { background: var(--wx-page-wash); }
+  #globeSelectorScreen { --wx-input: var(--hub-input); --wx-action: var(--hub-blue); --wx-action-text: var(--hub-action-text); --wx-selected: var(--hub-active); --wx-focus: var(--hub-blue); }
   .globe-selector-shell { background: transparent; }
   .globe-selector-brand { font: 500 .8125rem/1.4 var(--wx-font-ui); letter-spacing: .075em; }
   .globe-brand-mark { border-width: 1px; }
@@ -132,7 +137,9 @@
   #minimap { border-radius: 50%; }
   #coords { border-radius: var(--wx-radius); }
   .hudUtilityActions { padding: 6px; border-radius: var(--wx-radius-control); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); }
-  .floatMenuContainer { padding: 6px; gap: 4px; border-radius: var(--wx-radius-control); background: var(--wx-panel); border-color: var(--wx-line-soft); backdrop-filter: blur(var(--wx-glass-blur)); }
+  /* A filter on this ancestor would contain the viewport-fixed masthead and
+     menus inside the small dock. Glass belongs on their individual surfaces. */
+  .floatMenuContainer { padding: 6px; gap: 4px; border-radius: var(--wx-radius-control); background: var(--wx-panel); border-color: var(--wx-line-soft); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .floatBtn { border: 0; border-radius: var(--wx-radius-control); font-weight: 500; }
   .floatBtn:hover, .floatBtn[aria-expanded="true"] { color: var(--wx-action-text); background: var(--wx-action); border: 0; }
   .floatItems { padding: 0 14px 14px; }
@@ -169,8 +176,33 @@
   .nova-global-navigation button:hover, .nova-context-actions button:hover { background: var(--wx-selected); }
   .nova-global-navigation button[aria-expanded="true"], .nova-context-actions button[aria-expanded="true"] { color: var(--wx-action-text); background: var(--wx-action); }
   .nova-context-actions { display: flex; gap: 4px; }
-  #hud { top: max(88px, calc(env(safe-area-inset-top) + 76px)); }
-  #mainMenuBtn { z-index: 121; top: 14px; right: 16px; border-radius: var(--wx-radius-control); font-family: var(--wx-font-ui); }
+  .nova-workspace-navigation { display: flex; flex: none; gap: 4px; min-width: 0; margin: 18px 20px 4px; padding: 5px; overflow-x: auto; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-control); background: var(--wx-input); }
+  .nova-workspace-navigation button { display: inline-flex; flex: 1 0 max-content; align-items: center; justify-content: center; gap: 8px; width: auto; height: auto; min-width: 44px; min-height: 44px; padding: 8px 16px; color: var(--wx-text); background: transparent; border: 1px solid transparent; border-radius: var(--wx-radius-control); font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); cursor: pointer; }
+  .nova-workspace-navigation button:hover { background: var(--wx-selected); }
+  .nova-workspace-navigation button[aria-current="page"] { background: var(--wx-action); color: var(--wx-action-text); }
+  .nova-workspace-navigation button:disabled { opacity: .6; cursor: default; }
+  .urbanEquipmentHead:has(.nova-workspace-navigation) { flex-wrap: wrap; top: 0; }
+  .urbanEquipmentHead > .nova-workspace-navigation { flex: 0 0 100%; box-sizing: border-box; order: -1; margin: 0 0 12px; }
+  #urbanEquipment.nova-workspace-host { top: 24px; max-height: calc(100dvh - 48px); }
+  #discoveryPanel.nova-workspace-host, body.start-hub-open #discoveryPanel.nova-workspace-host { top: 24px; bottom: 24px; }
+  .globe-hub-overlay.nova-workspace-host { grid-row: 2 / 5; grid-template-rows: auto minmax(0,1fr) auto; }
+  .globe-hub-overlay-header:has(.nova-workspace-navigation) { display: grid; grid-template-columns: minmax(0,1fr) 44px; gap: 12px; }
+  .globe-hub-overlay-header > .nova-workspace-navigation { grid-column: 1 / -1; margin: 0; }
+  #globeSelectorScreen:has(#globeHubOverlay.nova-workspace-host:not([hidden])) .globe-app-rail { visibility: hidden; }
+  body:is(.panel-journal-open,.panel-backpack-open,.panel-experiences-open) #hud { visibility: hidden; pointer-events: none; }
+  #hud { top: max(88px, calc(var(--wx-masthead-height,76px) + 12px)); }
+  #mainMenuBtn { z-index: 10022; top: 14px; right: 16px; border-radius: var(--wx-radius-control); font-family: var(--wx-font-ui); }
+  /* Space hides Earth instrumentation through its existing owner. The shared
+     navigation keeps its original action/input ancestry without an Earth dock. */
+  body.space-flight-active #floatMenuContainer.show { display: contents !important; }
+  body.space-flight-active .nova-game-header { z-index: 10020; }
+  body.space-flight-active .nova-context-actions { display: none; }
+  body.space-flight-active .floatItems { z-index: 10024; }
+  body:is(.panel-vr-open,.panel-vr-setup-open) #floatMenuContainer.show { display: none !important; }
+  .spaceFlightHud, .solarSystemInfoCard, .solarSystemTravelBar { border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); background: var(--wx-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+  .spaceFlightHud, .solarSystemInfoCard, .solarSystemTravelBar { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); }
+  .solarSystemTravelBar { padding: 8px; gap: 4px; }
+  .solarSystemTravelBar .ssToggleBtn { border-radius: var(--wx-radius-control); }
   .nova-eyebrow { color: var(--wx-action); font: 600 var(--wx-type-meta)/1.5 var(--wx-font-ui); letter-spacing: .12em; text-transform: uppercase; }
   .nova-workspace-intro h2 { margin: 12px 0; max-width: 18ch; font: 350 calc(clamp(2rem,4vw,3.5rem) * var(--wx-text-scale))/1.08 var(--wx-font-display); letter-spacing: -.045em; }
   .nova-workspace-intro p, .nova-create-location { color: var(--wx-muted); line-height: 1.6; }
@@ -219,13 +251,23 @@
     #mainMenuBtn { left: 12px; right: auto; top: 12px; }
     .floatBtn { font-size: var(--wx-type-navigation); }
     .nova-create-grid { grid-template-columns: minmax(0,1fr); }
+    body.space-flight-active .nova-game-header { position: fixed; inset: auto 0 0; min-height: 68px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); border-radius: 24px 24px 0 0; backdrop-filter: blur(var(--wx-glass-blur)); }
+    body.space-flight-active .spaceFlightMessage { bottom: calc(88px + env(safe-area-inset-bottom)); }
   }
   @media (max-width: 900px), (pointer: coarse) {
     .globe-app-rail { border-radius: 24px 24px 0 0; }
+    .globe-app-rail button { min-height: 66px; }
     .globe-selector-stage { border-radius: 0 0 28px 28px; }
     .globe-selector-side { border-radius: 24px 24px 0 0; }
     .globe-hub-overlay { border-radius: 24px 24px 0 0; }
     .experience-browser[data-detail="false"] .experience-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    #discoveryPanel, body.start-hub-open #discoveryPanel { inset: 70px 8px calc(var(--wx-navigation-height) + 10px + env(safe-area-inset-bottom)); width: calc(100vw - 16px); }
+    #urbanEquipment { top: 70px; width: calc(100vw - 16px); max-height: calc(100dvh - var(--wx-navigation-height) - 90px); }
+    #urbanEquipment.nova-workspace-host { top: max(8px,env(safe-area-inset-top)); max-height: calc(100dvh - 16px - env(safe-area-inset-top)); }
+    #discoveryPanel.nova-workspace-host, body.start-hub-open #discoveryPanel.nova-workspace-host { top: max(8px,env(safe-area-inset-top)); bottom: max(8px,env(safe-area-inset-bottom)); }
+    .globe-hub-overlay.nova-workspace-host { bottom: max(8px,env(safe-area-inset-bottom)); }
+    .nova-workspace-navigation { margin: 12px 12px 4px; }
+    .nova-workspace-navigation button { padding-inline: 12px; }
   }
   @media (max-width: 620px) {
     .globe-selector-brand { width: 125px; padding-right: 0; gap: 5px; font-size: 9px; letter-spacing: .025em; }
@@ -255,3 +297,53 @@
     :is(dialog, .floatItems, .hud-box, .floatMenuContainer, .globe-app-rail) { background: Canvas; color: CanvasText; border: 1px solid CanvasText; backdrop-filter: none; }
     .floatBtn[aria-expanded="true"], .globe-app-rail button.active { background: Highlight; color: HighlightText; }
   }
+
+  /* Domain instruments share the shell without covering a foreground workspace. */
+  body.space-flight-active:is(.panel-journal-open,.panel-backpack-open,.panel-experiences-open) :is(#spaceFlightHUD,#ssToggleContainer,#solarSystemScale,#universeNavigator) { visibility: hidden; pointer-events: none; }
+  .universe-navigator { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); max-height: calc(100dvh - var(--wx-masthead-height,76px) - 36px); overflow: auto; box-sizing: border-box; }
+  .universe-heading { background: var(--wx-panel-solid); }
+  .universe-action, .universe-icon-button, .spaceFlightAction, .ssToggleBtn { border-radius: var(--wx-radius-control); min-height: 44px; font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); }
+  .universe-icon-button { min-width: 44px; }
+  .universe-action.primary, .spaceFlightAction.primary { background: var(--wx-action); border-color: var(--wx-action); color: var(--wx-action-text); }
+  .universe-kicker, .universe-field span, .spaceFlightHudHead { font-family: var(--wx-font-ui); font-size: var(--wx-type-meta); }
+  .universe-field select { min-height: 44px; border-radius: 12px; }
+  @media (max-width:760px) {
+    .universe-navigator { top: max(12px,env(safe-area-inset-top)); right: 8px; width: calc(100vw - 16px); max-height: calc(100dvh - 100px - env(safe-area-inset-bottom)); }
+  }
+
+  #sfLandBtn { background: var(--wx-action) !important; color: var(--wx-action-text); }
+  #mainMenuBtn { font-size: var(--wx-type-control); }
+  body.space-flight-active:has(#universeNavigator:not([hidden])) #mainMenuBtn { visibility: hidden; }
+  @media (max-width:760px) {
+    #mainMenuBtn { font-size: 0; place-items: center; }
+    #mainMenuBtn.show { display: grid; }
+    #mainMenuBtn::before { font: 26px/1 var(--wx-font-ui); }
+    .solarSystemTravelBar .ssToggleBtn { font-size: var(--wx-type-meta); }
+    .spaceFlightHud:not(.collapsed) { width: min(320px,calc(100vw - 16px)); max-height: calc(100dvh - 180px); }
+    body.space-flight-hud-expanded #ssToggleContainer { visibility: hidden; pointer-events: none; }
+  }
+
+  body:has(#universeNavigator[aria-hidden="false"]) #mainMenuBtn { display: none !important; }
+  #universeToggle { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+
+  #mainMenuBtn { transition: background-color var(--wx-motion-fast), border-color var(--wx-motion-fast); }
+  #vrSetup { border-radius: var(--wx-radius-panel); background: var(--wx-panel); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+  #vrSetup button, #vrEmergencyExit { border-radius: var(--wx-radius-control); }
+
+  body.start-hub-open #mainMenuBtn { display: none !important; }
+  html[data-hub-theme="day"] #globeSelectorScreen { background: radial-gradient(ellipse at 12% 0%,#e9d9f7 0%,transparent 58%),var(--hub-bg); }
+  .discoveryProfileHero > div, .discoveryProfileGroup, .discoveryOnlineService,
+  .discoveryRegionalProgress, .discoveryJourneyStory { border-radius: var(--wx-radius); border-color: var(--wx-line-soft); }
+  .discoveryProfileHero > div { padding: 20px; background: var(--wx-panel-soft); }
+  .discoveryProfileHero strong { font: 400 calc(1.5rem * var(--wx-text-scale))/1.3 var(--wx-font-display); letter-spacing: -.025em; }
+  .discoveryProfileGroup, .discoveryOnlineService { padding: 16px; }
+  .discoveryOnlineService summary, .discoveryProfileGroup summary { min-height: 44px; align-content: center; font-weight: 500; }
+
+  #blockBuilderPanel { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); width: min(360px,calc(100vw - 32px)); padding: 18px; box-sizing: border-box; max-height: calc(100dvh - var(--wx-masthead-height,76px) - 36px); border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); background: var(--wx-panel); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+  .blockBuilderHeader { top: -18px; margin: -18px -18px 0; padding: 12px 18px; background: var(--wx-panel-solid); }
+  .blockBuilderHeader strong { font: 400 calc(1.375rem * var(--wx-text-scale))/1.3 var(--wx-font-display); }
+  #blockBuilderPanel button, #blockBuilderPanel a { min-height: 44px; min-width: 44px; border-radius: var(--wx-radius-control); font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); }
+  #blockBuilderPanel .blockBuilderSwatches { grid-template-columns: repeat(4,44px); }
+  #blockBuilderPanel .blockBuilderSwatches button { width: 44px; padding: 0; border-radius: 50%; }
+  #blockBuilderPanel :is(.blockBuilderTruthNote,#editableWorldSelection,#blockBuilderCount,#blockBuilderStatus) { font: 400 var(--wx-type-meta)/1.5 var(--wx-font-ui); border-radius: var(--wx-radius); }
+  @media(max-width:640px) { #blockBuilderPanel { top: auto; left: 8px; right: 8px; bottom: max(8px,env(safe-area-inset-bottom)); width: auto; max-height: min(60dvh,540px); } }
