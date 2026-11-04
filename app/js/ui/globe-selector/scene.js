@@ -32,6 +32,7 @@ export function createGlobeSelectorScene(options = {}) {
   let scene = null;
   let camera = null;
   let renderer = null;
+  let canvasResizeObserver = null;
   let globeRoot = null;
   let earthMesh = null;
   let markerMesh = null;
@@ -131,7 +132,7 @@ export function createGlobeSelectorScene(options = {}) {
 
   function ensureSize() {
     if (!renderer || !camera) return;
-    const bounds = stage?.getBoundingClientRect();
+    const bounds = canvas?.getBoundingClientRect() || stage?.getBoundingClientRect();
     const width = Math.max(1, Math.floor(bounds?.width || canvas.clientWidth || 1));
     const height = Math.max(1, Math.floor(bounds?.height || canvas.clientHeight || 1));
     renderer.setSize(width, height, false);
@@ -519,9 +520,17 @@ export function createGlobeSelectorScene(options = {}) {
     raycaster = new THREE.Raycaster();
     sceneReady = true;
     ensureSize();
+    // Fonts, controls and reserved space can resize the canvas after the window event.
+    // This belongs to the existing selector renderer's creation/disposal boundary.
+    if (canvas && typeof ResizeObserver === 'function') {
+      canvasResizeObserver = new ResizeObserver(() => { ensureSize(); renderFrame(); });
+      canvasResizeObserver.observe(canvas);
+    }
   }
 
   function destroy() {
+    canvasResizeObserver?.disconnect();
+    canvasResizeObserver = null;
     stopRenderLoop();
     pointerActive = false;
     activePointers.clear();
