@@ -1,0 +1,2420 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>World Explorer — whole-app design options</title
+  ><link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2712%27 fill=%27%2315271e%27 stroke=%27%23efd07b%27 stroke-width=%273%27/%3E%3C/svg%3E"
+  />
+  <style>
+    :root {
+      color-scheme: dark;
+      font:
+        15px/1.5 system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      color: #e8eee7;
+      background: #0b100e;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+    }
+    button,
+    select,
+    input[type="search"] {
+      min-height: 44px;
+    }
+    button {
+      cursor: pointer;
+      border: 1px solid #526458;
+      background: #203329;
+      color: inherit;
+      padding: 0.65em 0.9em;
+      border-radius: 9px;
+    }
+    button:hover {
+      background: #30483a;
+    }
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible,
+    a:focus-visible {
+      outline: 3px solid #f2cf75;
+      outline-offset: 3px;
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    a {
+      color: #f2cf75;
+    }
+    .review-head {
+      padding: 24px 28px 18px;
+      border-bottom: 1px solid #344338;
+      display: flex;
+      justify-content: space-between;
+      gap: 25px;
+      align-items: start;
+    }
+    .eyebrow {
+      font-size: 0.75em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 750;
+      color: #eecb76;
+    }
+    .review-head h1 {
+      font-size: 1.55rem;
+      margin: 4px 0;
+    }
+    .review-head p {
+      max-width: 850px;
+      color: #bdcbbf;
+      margin: 6px 0;
+    }
+    .review-head a {
+      white-space: nowrap;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 268px minmax(0, 1fr);
+      min-height: 85vh;
+    }
+    .controls {
+      padding: 22px 20px;
+      border-right: 1px solid #344338;
+      background: #101a14;
+    }
+    .controls h2 {
+      font-size: 1rem;
+      margin: 0 0 12px;
+    }
+    .presets {
+      display: grid;
+      gap: 8px;
+    }
+    .preset {
+      text-align: left;
+    }
+    .preset small {
+      display: block;
+      color: #b9c7be;
+    }
+    .preset[aria-pressed="true"] {
+      border-color: #f2cf75;
+      background: #354333;
+      box-shadow: inset 3px 0 #f2cf75;
+    }
+    .control {
+      display: grid;
+      gap: 5px;
+      margin: 17px 0 0;
+    }
+    .control span {
+      font-size: 0.88rem;
+      color: #c5d0c6;
+    }
+    .control select {
+      width: 100%;
+      background: #1a2920;
+      color: #f2f3ec;
+      border: 1px solid #526458;
+      border-radius: 7px;
+      padding: 9px;
+    }
+    .controls details {
+      margin-top: 20px;
+    }
+    .controls summary {
+      cursor: pointer;
+      min-height: 44px;
+      padding-top: 10px;
+    }
+    .controls .note {
+      font-size: 0.84rem;
+      color: #b9c7be;
+    }
+    .stage {
+      padding: 24px;
+      min-width: 0;
+      background: radial-gradient(ellipse at 60% 0, #203328 0, transparent 65%);
+    }
+    .option-note {
+      max-width: 1140px;
+      margin: 0 auto 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+    }
+    .option-note h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+    .option-note p {
+      margin: 5px 0;
+      color: #bdcbbf;
+      max-width: 850px;
+    }
+    .study-tag {
+      font:
+        12px ui-monospace,
+        monospace;
+      border: 1px solid #526458;
+      padding: 7px 11px;
+      border-radius: 50px;
+      align-self: start;
+      white-space: nowrap;
+      color: #f2cf75;
+    }
+    .frame-wrap {
+      display: flex;
+      justify-content: center;
+      overflow: visible;
+    }
+    .sim {
+      --cream: #f4f0df;
+      --muted: #becdc0;
+      --surface: #15271e;
+      --card: #21372a;
+      --edge: #506956;
+      --accent: #efd07b;
+      --ink: #172016;
+      --scale: 1;
+      font-size: calc(16px * var(--scale));
+      width: 1120px;
+      max-width: 100%;
+      height: 760px;
+      position: relative;
+      border: 1px solid #6b7c68;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #102018;
+      color: var(--cream);
+      box-shadow: 0 30px 90px #0008;
+      container-type: inline-size;
+    }
+    .sim.phone {
+      width: 390px;
+      height: 804px;
+    }
+    .sim.wide {
+      width: 844px;
+      height: 500px;
+    }
+    .sim.vr {
+      width: 1000px;
+      height: 720px;
+      border-radius: 38px;
+    }
+    .sim.contrast {
+      --surface: #07110b;
+      --card: #111f15;
+      --edge: #a4bba9;
+      --muted: #e1e8df;
+      --accent: #ffe698;
+    }
+    .sim button {
+      border-color: var(--edge);
+      background: var(--card);
+      color: var(--cream);
+      min-height: 44px;
+      border-radius: 9px;
+      padding: 0.6em 0.85em;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .sim button.primary {
+      color: var(--ink);
+      background: var(--accent);
+      border-color: var(--accent);
+      font-weight: 750;
+    }
+    .sim button.quiet {
+      background: transparent;
+    }
+    .sim h1,
+    .sim h2,
+    .sim h3,
+    .sim p {
+      margin: 0;
+    }
+    .sim h1 {
+      font-size: 1.9em;
+      line-height: 1.15;
+      letter-spacing: -0.035em;
+    }
+    .sim h2 {
+      font-size: 1.35em;
+      line-height: 1.2;
+    }
+    .sim h3 {
+      font-size: 1.05em;
+    }
+    .sim p {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .sim .micro {
+      font-size: 0.875em;
+      color: var(--muted);
+    }
+    .sim .kicker {
+      font-size: 0.75em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 750;
+    }
+    .sim .app-head {
+      min-height: 68px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--edge);
+      background: var(--surface);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+    .brand b {
+      color: var(--accent);
+      font-size: 1.4em;
+    }
+    .head-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .sim .scope {
+      font-size: 0.75em;
+      color: var(--muted);
+    }
+    .shell {
+      display: grid;
+      grid-template-columns: 10.75em minmax(0, 1fr);
+      height: calc(100% - 68px);
+      min-height: 0;
+    }
+    .main-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 14px 10px;
+      border-right: 1px solid var(--edge);
+      background: var(--surface);
+      min-width: 0;
+    }
+    .sim .main-nav button {
+      border-color: transparent;
+      display: flex;
+      gap: 10px;
+      text-align: left;
+      align-items: center;
+      background: transparent;
+    }
+    .sim .main-nav button.selected {
+      background: #354333;
+      border-color: var(--edge);
+      color: var(--accent);
+    }
+    .nav-symbol {
+      font-size: 1.1em;
+      min-width: 20px;
+    }
+    .nav-foot {
+      margin-top: auto;
+      padding: 10px;
+      font-size: 0.75em;
+      color: var(--muted);
+    }
+    .content {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      position: relative;
+    }
+    .page {
+      padding: 25px;
+      display: grid;
+      gap: 22px;
+    }
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 14px;
+    }
+    .page-head .intro {
+      display: grid;
+      gap: 8px;
+    }
+    .actions {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--edge);
+      border-radius: 13px;
+      padding: 17px;
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+    .card strong {
+      line-height: 1.3;
+    }
+    .card .primary {
+      justify-self: start;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--card);
+      min-height: 265px;
+    }
+    .hero-copy {
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+    }
+    .hero-copy .actions {
+      margin-top: 6px;
+    }
+    .map-art {
+      position: relative;
+      min-height: 220px;
+      overflow: hidden;
+      background: #112a25;
+    }
+    .map-art svg {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+    }
+    .map-caption {
+      position: absolute;
+      left: 14px;
+      bottom: 12px;
+      max-width: 80%;
+      font-size: 0.75em;
+      padding: 7px 10px;
+      color: #e8efe6;
+      background: #0b1a16df;
+      border: 1px solid #617665;
+      border-radius: 7px;
+    }
+    .map-label {
+      position: absolute;
+      left: 47%;
+      top: 38%;
+      padding: 9px 12px;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      font-size: 0.875em;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .sim .chips button {
+      font-size: 0.875em;
+    }
+    .sim .chips button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      background: var(--card);
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+    }
+    .row > div {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .step {
+      display: flex;
+      gap: 12px;
+      align-items: start;
+    }
+    .step-num {
+      width: 30px;
+      min-width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 1px solid var(--edge);
+      display: grid;
+      place-items: center;
+      font-size: 0.875em;
+      color: var(--accent);
+    }
+    .steps {
+      display: grid;
+      gap: 15px;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(230px, 1fr);
+      gap: 16px;
+    }
+    .badge {
+      font-size: 0.75em;
+      border: 1px solid var(--edge);
+      padding: 5px 9px;
+      border-radius: 50px;
+      display: inline-block;
+      align-self: start;
+      color: var(--muted);
+    }
+    .rail {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+    .notice {
+      padding: 13px 16px;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      background: #3b3720;
+      color: var(--cream);
+    }
+    .notice.error {
+      border-color: #f6a987;
+      background: #452a22;
+    }
+    .empty {
+      border: 1px dashed var(--edge);
+      padding: 22px;
+      border-radius: 12px;
+    }
+    .sim input[type="search"],
+    .sim select {
+      background: var(--surface);
+      border: 1px solid var(--edge);
+      color: var(--cream);
+      border-radius: 8px;
+      padding: 0.65em;
+      max-width: 100%;
+      min-height: 44px;
+      min-width: 0;
+    }
+    .sim label {
+      display: grid;
+      gap: 5px;
+    }
+    .atlas-home {
+      display: grid;
+      grid-template-columns: minmax(0, 1.65fr) minmax(240px, 1fr);
+      height: 100%;
+      min-height: 0;
+    }
+    .atlas-home > .map-art {
+      min-height: 460px;
+    }
+    .atlas-detail {
+      padding: 22px;
+      overflow: auto;
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+    .atlas .shell {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+    .atlas .main-nav {
+      flex-direction: row;
+      border-right: 0;
+      border-bottom: 1px solid var(--edge);
+      padding: 8px 12px;
+      align-items: center;
+    }
+    .atlas .nav-foot {
+      margin: 0 0 0 auto;
+      padding: 0;
+    }
+    .atlas .main-nav button {
+      flex: 0 1 auto;
+    }
+    .workbench .shell {
+      grid-template-columns: 11em minmax(0, 1fr);
+    }
+    .workspace-bar {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: var(--card);
+      border: 1px solid var(--edge);
+      padding: 10px 13px;
+      border-radius: 10px;
+    }
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(210px, 0.75fr);
+      gap: 13px;
+    }
+    .workspace-grid .map-art {
+      min-height: 220px;
+      border-radius: 12px;
+    }
+    .workspace-grid .card {
+      padding: 14px;
+    }
+    .sim .progress-track {
+      height: 6px;
+      background: #0c1b13;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .sim .progress-track span {
+      display: block;
+      width: 40%;
+      height: 100%;
+      background: var(--accent);
+    }
+    .play {
+      height: 100%;
+      position: relative;
+      min-height: 470px;
+      background: #17352d;
+    }
+    .play > .map-art {
+      position: absolute;
+      inset: 0;
+      min-height: 0;
+    }
+    .world-top {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      right: 15px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+    .world-badge {
+      background: #102018ed;
+      border: 1px solid var(--edge);
+      border-radius: 11px;
+      padding: 12px 14px;
+      display: grid;
+      gap: 5px;
+      max-width: 52%;
+    }
+    .world-objective {
+      position: absolute;
+      left: 20px;
+      bottom: 92px;
+      width: min(420px, calc(100% - 40px));
+      background: #14291fed;
+      border: 1px solid var(--edge);
+      border-left: 4px solid var(--accent);
+      padding: 15px;
+      border-radius: 11px;
+      display: grid;
+      gap: 9px;
+    }
+    .world-tools {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .instrument {
+      position: absolute;
+      right: 18px;
+      top: 100px;
+      max-width: 250px;
+      display: grid;
+      gap: 7px;
+      padding: 15px;
+      background: #14291fed;
+      border: 1px solid var(--edge);
+      border-radius: 10px;
+    }
+    .world-tools button {
+      background: #203329f5;
+    }
+    .atlas .world-objective {
+      left: auto;
+      right: 20px;
+    }
+    .workbench .world-objective {
+      top: 100px;
+      bottom: auto;
+      max-width: 290px;
+    }
+    .workbench .instrument {
+      top: auto;
+      bottom: 100px;
+    }
+    .kit-slots {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+    }
+    .slot {
+      border: 1px solid var(--edge);
+      border-radius: 9px;
+      padding: 15px;
+      min-height: 85px;
+      display: grid;
+      align-content: center;
+      gap: 5px;
+      background: #11251a;
+    }
+    .artifact {
+      min-height: 120px;
+      display: grid;
+      place-items: center;
+      background: repeating-linear-gradient(0deg, #193b2c, #193b2c 15px, #1f4332 16px);
+      border: 1px solid var(--edge);
+      border-radius: 8px;
+      color: var(--accent);
+    }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--edge);
+    }
+    .toggle-row input {
+      width: 24px;
+      height: 24px;
+    }
+    .menu-panel {
+      margin: 18px;
+      padding: 20px;
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--edge);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    .menu-panel .grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .phone .scope,
+    .wide .scope {
+      display: none;
+    }
+    .phone .head-actions .settings-head {
+      display: none;
+    }
+    .phone .shell,
+    .phone.atlas .shell,
+    .phone.workbench .shell {
+      display: flex;
+      flex-direction: column-reverse;
+      height: calc(100% - 68px);
+    }
+    .phone .content {
+      flex: 1;
+      width: 100%;
+    }
+    .phone .main-nav {
+      flex: none;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      padding: 5px;
+      border-right: 0;
+      border-top: 1px solid var(--edge);
+      height: 74px;
+      gap: 0;
+      align-items: stretch;
+    }
+    .phone .main-nav button {
+      font-size: 0.75em;
+      padding: 6px 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      justify-content: center;
+      min-width: 0;
+    }
+    .phone .nav-foot {
+      display: none;
+    }
+    .phone .page {
+      padding: 17px;
+      gap: 18px;
+    }
+    .phone h1 {
+      font-size: 1.65em;
+    }
+    .phone .hero {
+      grid-template-columns: 1fr;
+    }
+    .phone .hero .map-art {
+      min-height: 145px;
+      order: -1;
+    }
+    .phone .hero-copy {
+      padding: 18px;
+    }
+    .phone .grid {
+      grid-template-columns: 1fr;
+    }
+    .phone .split,
+    .phone .workspace-grid {
+      grid-template-columns: 1fr;
+    }
+    .phone .atlas-home {
+      display: flex;
+      flex-direction: column;
+    }
+    .phone .atlas-home > .map-art {
+      min-height: 245px;
+      flex: none;
+    }
+    .phone .atlas-detail {
+      overflow: visible;
+      padding: 17px;
+    }
+    .phone .page-head {
+      flex-wrap: wrap;
+    }
+    .phone .row {
+      align-items: start;
+      flex-wrap: wrap;
+    }
+    .phone .world-top {
+      top: 12px;
+      left: 12px;
+      right: 12px;
+    }
+    .phone .world-badge {
+      max-width: 65%;
+      padding: 9px 11px;
+    }
+    .phone .play {
+      min-height: 100%;
+      height: 100%;
+    }
+    .phone .world-objective,
+    .phone.atlas .world-objective,
+    .phone.workbench .world-objective {
+      left: 12px;
+      right: 12px;
+      top: auto;
+      bottom: 118px;
+      width: auto;
+      max-width: none;
+      padding: 12px;
+    }
+    .phone .instrument {
+      display: none;
+    }
+    .phone .world-tools {
+      left: 10px;
+      right: 10px;
+      bottom: 14px;
+      gap: 5px;
+    }
+    .phone .world-tools button {
+      font-size: 0.875em;
+      flex: 1;
+      padding: 0.55em;
+    }
+    .phone .kit-slots {
+      grid-template-columns: 1fr 1fr;
+    }
+    .phone .map-label {
+      left: 38%;
+    }
+    .phone.large-text .main-nav {
+      display: flex;
+      height: auto;
+      min-height: 70px;
+      padding: 8px;
+      gap: 10px;
+    }
+    .phone.large-text .main-nav button {
+      flex: 1;
+      font-size: 1em;
+      flex-direction: row;
+    }
+    .phone.large-text .main-nav button:not(.selected):not(.mobile-menu) {
+      display: none;
+    }
+    .mobile-menu {
+      display: none !important;
+    }
+    .phone.large-text .mobile-menu {
+      display: flex !important;
+    }
+    .phone.large-text .world-objective {
+      position: relative;
+      left: auto;
+      right: auto;
+      bottom: auto;
+      margin: 12px;
+      top: 100px;
+    }
+    .phone.large-text .world-tools {
+      position: relative;
+      top: 110px;
+      left: auto;
+      right: auto;
+      bottom: auto;
+      margin: 12px;
+    }
+    .phone.large-text .play {
+      min-height: 750px;
+    }
+    .phone.large-text .world-badge {
+      max-width: 100%;
+    }
+    .phone.large-text .world-top > button {
+      display: none;
+    }
+    .phone.large-text .map-label {
+      display: none;
+    }
+    .phone.large-text .app-head {
+      min-height: 90px;
+    }
+    .phone.large-text .shell {
+      height: calc(100% - 90px);
+    }
+    .wide .shell {
+      grid-template-columns: 10em minmax(0, 1fr);
+    }
+    .wide .page {
+      padding: 18px;
+    }
+    .wide .hero-copy {
+      padding: 18px;
+    }
+    .wide .grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .vr .app-head {
+      padding-left: 32px;
+      padding-right: 32px;
+    }
+    .vr .shell {
+      grid-template-columns: 180px minmax(0, 1fr);
+    }
+    .vr .main-nav button {
+      min-height: 60px;
+    }
+    .vr .page {
+      padding: 30px;
+    }
+    .decision {
+      max-width: 1140px;
+      margin: 22px auto 0;
+      padding: 20px;
+      border: 1px solid #526458;
+      border-radius: 12px;
+      background: #152219;
+    }
+    .decision h2 {
+      font-size: 1rem;
+      margin: 0 0 8px;
+    }
+    .decision p {
+      color: #c5d0c6;
+      margin: 6px 0 14px;
+    }
+    .decision button {
+      background: #efd07b;
+      color: #152117;
+      font-weight: 700;
+    }
+    .foot-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin-top: 16px;
+      font-size: 0.875rem;
+    }
+    .result-line {
+      min-height: 24px;
+      color: #f2cf75;
+      font-size: 0.875rem;
+      margin-top: 8px;
+    }
+    .sim .inline-button {
+      justify-self: start;
+    }
+    .screen-count {
+      font-size: 0.8rem;
+      color: #b9c7be;
+    }
+    .preview-back {
+      font-size: 0.875em;
+    }
+    .sim .feature-result {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--edge);
+    }
+    .sim .feature-result:last-child {
+      border: 0;
+    }
+    @container (max-width:700px) {
+      .sim:not(.phone) .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .sim:not(.phone) .hero {
+        grid-template-columns: 1fr;
+      }
+      .sim:not(.phone) .hero .map-art {
+        min-height: 150px;
+      }
+      .sim:not(.phone) .split,
+      .sim:not(.phone) .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+      .atlas-home {
+        grid-template-columns: 1fr;
+      }
+      .atlas-home > .map-art {
+        min-height: 240px;
+      }
+      .atlas-detail {
+        overflow: visible;
+      }
+      .sim .instrument {
+        display: none;
+      }
+    }
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .controls {
+        border-right: 0;
+        border-bottom: 1px solid #344338;
+      }
+      .presets {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .control-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .control {
+        margin-top: 12px;
+      }
+      .stage {
+        padding: 16px;
+      }
+      .review-head {
+        padding: 18px;
+      }
+      .review-head > a {
+        display: none;
+      }
+      .option-note {
+        grid-template-columns: 1fr;
+      }
+      .study-tag {
+        justify-self: start;
+      }
+      .controls details {
+        margin-top: 10px;
+      }
+    }
+    @media (max-width: 560px) {
+      .review-head h1 {
+        font-size: 1.3rem;
+      }
+      .presets {
+        grid-template-columns: 1fr;
+      }
+      .preset {
+        padding: 10px 13px;
+      }
+      .control-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .option-note p {
+        font-size: 0.9rem;
+      }
+      .stage {
+        padding: 12px;
+      }
+      .sim {
+        border-radius: 12px;
+      }
+      .sim:not(.phone) .shell {
+        grid-template-columns: 108px minmax(0, 1fr);
+      }
+      .sim:not(.phone) .brand {
+        font-size: 0.8em;
+      }
+      .sim:not(.phone) .scope {
+        display: none;
+      }
+      .sim:not(.phone) .main-nav button {
+        padding: 8px 2px;
+        font-size: 0.8em;
+      }
+      .sim:not(.phone) .nav-symbol {
+        display: none;
+      }
+      .decision {
+        padding: 15px;
+      }
+      .sim:not(.phone) .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        scroll-behavior: auto !important;
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+    .sim {
+      display: flex;
+      flex-direction: column;
+    }
+    .sim .app-head {
+      flex: none;
+    }
+    .sim .shell {
+      flex: 1;
+      min-height: 0;
+      height: auto !important;
+    }
+    .sim .head-actions {
+      flex-shrink: 0;
+    }
+    .sim .brand {
+      min-width: 0;
+    }
+    .phone.large-text .brand b {
+      display: none;
+    }
+    .sim .returnbar {
+      padding: 14px 20px 0;
+    }
+    .sim .returnbar button {
+      background: transparent;
+      font-size: 0.875em;
+    }
+    .phone.large-text .brand {
+      font-size: 0.875em;
+    }
+    .phone .page-head .badge {
+      max-width: 100%;
+    }
+    .atlas .main-nav {
+      flex-wrap: wrap;
+      align-content: center;
+    }
+    .atlas .nav-foot {
+      display: none;
+    }
+    .main-nav button > span:last-child {
+      white-space: nowrap;
+    }
+    .phone .main-nav button > span:last-child {
+      white-space: normal;
+    }
+    .phone.large-text .play {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px;
+      min-height: 100%;
+      height: auto;
+    }
+    .phone.large-text .world-top {
+      position: relative;
+      inset: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .phone.large-text .world-badge {
+      width: 100%;
+      max-width: 100%;
+    }
+    .phone.large-text .world-top > button {
+      display: block;
+      align-self: start;
+    }
+    .phone.large-text .world-objective {
+      position: relative;
+      inset: auto;
+      margin: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+    .phone.large-text .world-tools {
+      position: relative;
+      inset: auto;
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      width: 100%;
+    }
+  </style>
+  <body>
+    <header class="review-head">
+      <div>
+        <div class="eyebrow">World Explorer · design review · November 4, 2026</div>
+        <h1>A whole app, with a clearer way through it.</h1>
+        <p>
+          Compare three complete layouts across worlds, careers and devices.
+          <strong>Design study only:</strong> schematic scenes and sample records; no gameplay,
+          account, save or production connection.
+        </p>
+      </div>
+      <a href="README.md">Read the audit and plan ↗</a>
+    </header>
+    <div class="layout">
+      <aside class="controls" aria-label="Design study controls">
+        <h2>Choose a direction</h2>
+        <div class="presets">
+          <button class="preset" data-preset="atlas">
+            <strong>A · Atlas</strong><small>Start with a place</small></button
+          ><button class="preset" data-preset="expedition">
+            <strong>B · Expedition</strong><small>Start with a useful next action</small></button
+          ><button class="preset" data-preset="workbench">
+            <strong>C · Workbench</strong><small>Start with a chosen pursuit</small>
+          </button>
+        </div>
+        <div class="control-grid">
+          <label class="control"
+            ><span>Player state</span
+            ><select id="player">
+              <option value="new">First visit</option>
+              <option value="returning">Returning player</option>
+            </select></label
+          >
+          <label class="control"
+            ><span>World / context</span
+            ><select id="domain"></select></label
+          ><label class="control"
+            ><span>Screen</span
+            ><select id="screen"></select></label
+          ><label class="control"
+            ><span>Career</span
+            ><select id="career"></select></label
+          ><label class="control"
+            ><span>Presentation</span
+            ><select id="device">
+              <option value="desktop">Desktop</option>
+              <option value="phone">Phone · 390px</option>
+              <option value="wide">Short landscape</option>
+              <option value="vr">VR menu concept</option>
+            </select></label
+          ><label class="control"
+            ><span>Text size</span
+            ><select id="zoom">
+              <option value="1">100%</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+              <option value="2">200%</option>
+            </select></label
+          ><label class="control"
+            ><span>Example state</span
+            ><select id="status">
+              <option value="ready">Ready</option>
+              <option value="offline">Offline</option>
+              <option value="missing">Missing equipment</option>
+              <option value="failure">Save failed</option>
+            </select></label
+          >
+        </div>
+        <details>
+          <summary>Guidance and display</summary>
+          <label class="control"
+            ><span>Guidance</span
+            ><select id="guidance">
+              <option value="guided">More guidance</option>
+              <option value="brief">Less guidance</option>
+            </select></label
+          ><label class="control"
+            ><span>Contrast</span
+            ><select id="contrast">
+              <option value="normal">Roam default</option>
+              <option value="high">Higher contrast</option>
+            </select></label
+          >
+          <p class="note">
+            VR is a flat representation of navigation and panel hierarchy. Physical comfort, angular
+            text size, headset controls and room-scale safety are not simulated here.
+          </p>
+        </details>
+        <p class="note">
+          Click inside the preview to try navigation, a career brief, kit, results, creation and
+          social flows. This does not run or modify the app.
+        </p>
+      </aside>
+      <main class="stage">
+        <div class="option-note">
+          <div>
+            <div class="eyebrow" id="option-kicker"></div>
+            <h2 id="option-title"></h2>
+            <p id="option-description"></p>
+          </div>
+          <span class="study-tag">SCHEMATIC · SAMPLE DATA</span>
+        </div>
+        <div class="frame-wrap">
+          <section
+            id="preview"
+            class="sim expedition"
+            aria-label="Interactive design preview"
+          ></section>
+        </div>
+        <div class="decision">
+          <h2>Capture your preferred direction</h2>
+          <p id="decision-text"></p>
+          <button id="copy">Copy design choice</button>
+          <div class="result-line" id="copy-status" role="status"></div>
+          <div class="foot-links">
+            <a href="options.md">Compare all areas</a><a href="audit.md">Current UX findings</a
+            ><a href="architecture-and-flows.md">System and career plan</a
+            ><a href="implementation-plan.md">Implementation stops</a
+            ><a href="feature-inventory.csv">172-entry inventory</a
+            ><a href="research.md">Research sources</a>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script>
+      const CAREERS = [
+        {
+          id: "career:racer",
+          kind: "career",
+          label: "Racer",
+          assignment: "First clean finish",
+          adapterId: "racing",
+          summary: "Prepare your car, finish cleanly and build your race record.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:geologist",
+          kind: "career",
+          label: "Geologist",
+          assignment: "Reading the Landscape",
+          adapterId: "geology",
+          summary: "Compare rock exposures, labeled samples and the story of a landscape.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:archaeologist",
+          kind: "career",
+          label: "Archaeologist",
+          assignment: "A Place in Context",
+          adapterId: "archaeology",
+          summary: "Survey a training site and interpret objects with their layers and locations.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:mining-engineer",
+          kind: "career",
+          label: "Mining engineer",
+          assignment: "From Vein to Material",
+          adapterId: "mining",
+          summary: "Survey a virtual quarry, work a supported face and restore the site.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:palaeontologist",
+          kind: "career",
+          label: "Palaeontologist",
+          assignment: "The Fossil Bed",
+          adapterId: "palaeontology",
+          summary: "Record a fossil in context, prepare it carefully and compare its form.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:oceanographer",
+          kind: "career",
+          label: "Oceanographer",
+          assignment: "Across the Water Column",
+          adapterId: "oceanography",
+          summary: "Compare coastal stations, survey the seabed and return to your research ship.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:marine-biologist",
+          kind: "career",
+          label: "Marine biologist",
+          assignment: "Life Along the Slope",
+          adapterId: "marine-biology",
+          summary: "Observe marine life and compare the habitats where you find it.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:wildlife-ecologist",
+          kind: "career",
+          label: "Wildlife ecologist",
+          assignment: "Two Habitats",
+          adapterId: "wildlife",
+          summary: "Use comparable watches to investigate two different habitats.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:botanist",
+          kind: "career",
+          label: "Botanist",
+          assignment: "A Living Patch",
+          adapterId: "botany",
+          summary: "Study plant structures and follow a virtual restoration plot through a season.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:hydrologist",
+          kind: "career",
+          label: "Hydrologist",
+          assignment: "Following the Water",
+          adapterId: "hydrology",
+          summary: "Measure two stream stations and investigate changes along the catchment.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:meteorologist",
+          kind: "career",
+          label: "Meteorologist",
+          assignment: "Reading the Sky",
+          adapterId: "meteorology",
+          summary: "Compare weather stations and test a forecast against observations.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:cartographer",
+          kind: "career",
+          label: "Cartographer",
+          assignment: "Make the Route Usable",
+          adapterId: "cartography",
+          summary: "Measure a route, check access and prepare a useful route sheet.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:planetary-scientist",
+          kind: "career",
+          label: "Planetary scientist",
+          assignment: "Two Sides of the Moon",
+          adapterId: "planetary",
+          summary: "Compare lunar sites and bring your observations safely home.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:astronomer",
+          kind: "career",
+          label: "Astronomer",
+          assignment: "A Night’s Observing",
+          adapterId: "astronomy",
+          summary: "Align an instrument, compare observations and keep a reproducible log.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:accelerator-scientist",
+          kind: "career",
+          label: "Accelerator scientist",
+          assignment: "Collision Lab",
+          adapterId: "accelerator",
+          summary: "Steer beams, inspect detector measurements and analyze recorded collisions.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:field-engineer",
+          kind: "career",
+          label: "Field engineer",
+          assignment: "Make a Useful Place",
+          adapterId: "engineering",
+          summary: "Diagnose a need, build or repair something useful and test the result.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:expedition-pilot",
+          kind: "career",
+          label: "Expedition pilot",
+          assignment: "Harbor Run",
+          adapterId: "pilot",
+          summary: "Prepare a route and deliver equipment with care.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:documentary-explorer",
+          kind: "career",
+          label: "Documentary explorer",
+          assignment: "A Place in Three Views",
+          adapterId: "documentary",
+          summary: "Tell a visual story with contrasting photographs and a saved album.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:explorer",
+          kind: "career",
+          label: "Explorer",
+          assignment: "First Bearings",
+          adapterId: "explorer",
+          summary: "Find your bearings, record a discovery and choose your next journey.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+        {
+          id: "career:companion-handler",
+          kind: "career",
+          label: "Companion handler",
+          assignment: "Exploring Together",
+          adapterId: "companions",
+          summary: "Care for a companion, build trust and learn useful field skills together.",
+          persistence: "Your Journal and career progress save in this browser.",
+        },
+      ];
+      const QUICK = [
+        {
+          id: "game:racing",
+          kind: "game",
+          label: "Road racing",
+          assignment: "Road racing",
+          adapterId: "game",
+          mode: "racing",
+          summary: "Choose an event, prepare your car or create a track.",
+          persistence: "Results save in your Journal. Online rankings require a successful upload.",
+        },
+        {
+          id: "game:trial",
+          kind: "game",
+          label: "Time trial",
+          assignment: "Time trial",
+          adapterId: "game",
+          mode: "trial",
+          summary: "Reach the gold destination ring before time runs out.",
+          persistence: "Results save in your Journal. Online rankings require a successful upload.",
+        },
+        {
+          id: "game:checkpoint",
+          kind: "game",
+          label: "Checkpoint run",
+          assignment: "Checkpoint run",
+          adapterId: "game",
+          mode: "checkpoint",
+          summary: "Drive through all the marked road checkpoints.",
+          persistence: "Results save in your Journal. Online rankings require a successful upload.",
+        },
+        {
+          id: "game:painttown",
+          kind: "game",
+          label: "Paint Town",
+          assignment: "Paint Town",
+          adapterId: "game",
+          mode: "painttown",
+          summary: "Paint buildings and compete with your room.",
+          persistence: "Results save in your Journal. Online rankings require a successful upload.",
+        },
+        {
+          id: "game:flower",
+          kind: "game",
+          label: "Flower Sprint",
+          assignment: "Flower Sprint",
+          adapterId: "game",
+          mode: "flower",
+          summary: "Find the marked flowers and improve your time.",
+          persistence: "Results save in your Journal. Online rankings require a successful upload.",
+        },
+        {
+          id: "game:deflock",
+          kind: "game",
+          label: "DeFlock Hunt",
+          assignment: "DeFlock Hunt",
+          adapterId: "game",
+          mode: "deflock",
+          summary: "Explore mapped camera locations and complete the hunt.",
+          persistence: "Results save in your Journal. Online rankings require a successful upload.",
+        },
+        {
+          id: "route:driving_route",
+          kind: "route",
+          label: "Street Race",
+          assignment: "Street Race",
+          adapterId: "route",
+          templateId: "driving_route",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:walking_route",
+          kind: "route",
+          label: "City Walk",
+          assignment: "City Walk",
+          adapterId: "route",
+          templateId: "walking_route",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:rooftop_run",
+          kind: "route",
+          label: "Roof Run",
+          assignment: "Roof Run",
+          adapterId: "route",
+          templateId: "rooftop_run",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:interior_route",
+          kind: "route",
+          label: "Indoor Run",
+          assignment: "Indoor Run",
+          adapterId: "route",
+          templateId: "interior_route",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:boat_course",
+          kind: "route",
+          label: "Boat Run",
+          assignment: "Boat Run",
+          adapterId: "route",
+          templateId: "boat_course",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:fishing_trip",
+          kind: "route",
+          label: "Fishing Trip",
+          assignment: "Fishing Trip",
+          adapterId: "route",
+          templateId: "fishing_trip",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:submarine_course",
+          kind: "route",
+          label: "Dive Run",
+          assignment: "Dive Run",
+          adapterId: "route",
+          templateId: "submarine_course",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:drone_course",
+          kind: "route",
+          label: "Drone Run",
+          assignment: "Drone Run",
+          adapterId: "route",
+          templateId: "drone_course",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+        {
+          id: "route:collectible_hunt",
+          kind: "route",
+          label: "Treasure Hunt",
+          assignment: "Treasure Hunt",
+          adapterId: "route",
+          templateId: "collectible_hunt",
+          summary: "Choose a local route, review its checkpoints and follow the marked course.",
+          persistence: "Your created routes and Journal save in this browser.",
+        },
+      ];
+      const OPTIONS = {
+        atlas: {
+          name: "Atlas",
+          line: "A · Place first",
+          description:
+            "Keep the world at the center. Select a place, see what is possible there, then explore or follow a career. Best for geographic discovery; Continue must stay easy to find.",
+        },
+        expedition: {
+          name: "Expedition",
+          line: "B · Next action first · recommended",
+          description:
+            "A simple start, one genuine Continue item and room to explore. Stable navigation across worlds, with specialist tools when a task needs them. Best fit for mixed ages and experience.",
+        },
+        workbench: {
+          name: "Workbench",
+          line: "C · Pursuit first",
+          description:
+            "Choose a pursuit and bring its map, tools and project together. Best for returning specialist players; a general Explorer workspace and easy switching keep it approachable.",
+        },
+      };
+      const DOMAINS = {
+        earth: {
+          name: "Earth · City",
+          place: "Baltimore",
+          crumb: "Earth / North America / Baltimore",
+          mode: "Walking",
+          instrument: "Map and nearby places",
+          value: "Selected district",
+          task: "Record a discovery at your chosen place",
+          action: "Open field kit",
+          art: "earth",
+        },
+        ocean: {
+          name: "Ocean · Vessel and dive",
+          place: "Coral Shelf",
+          crumb: "Earth / Coral Sea / Coral Shelf",
+          mode: "Research vessel · On deck",
+          instrument: "Vessel and dive status",
+          value: "Vessel health 100% · At anchor",
+          task: "Go to the wet lab for the reef survey briefing",
+          action: "Open vessel tools",
+          art: "ocean",
+        },
+        moon: {
+          name: "Moon · Surface",
+          place: "Moon · Mare survey",
+          crumb: "Universe / Milky Way / Solar System / Moon",
+          mode: "Surface survey",
+          instrument: "Suit and return vehicle",
+          value: "Surface tools · Return available",
+          task: "Compare the marked site with your first observation",
+          action: "Open survey kit",
+          art: "moon",
+        },
+        mars: {
+          name: "Mars · Rover",
+          place: "Mars · Survey site",
+          crumb: "Universe / Milky Way / Solar System / Mars",
+          mode: "Rover exploration",
+          instrument: "Rover and survey status",
+          value: "Rover condition 100%",
+          task: "Inspect the next supported survey station",
+          action: "Open survey kit",
+          art: "mars",
+        },
+        space: {
+          name: "Space · Solar System",
+          place: "Solar System",
+          crumb: "Universe / Milky Way / Solar System",
+          mode: "Free space flight",
+          instrument: "Flight and course",
+          value: "Course: Moon · Manual flight",
+          task: "Review the Moon course and choose flight assist",
+          action: "Review course",
+          art: "space",
+        },
+        stars: {
+          name: "Stars · Deep space",
+          place: "Proxima Centauri",
+          crumb: "Universe / Milky Way / Proxima Centauri",
+          mode: "Atlas and navigation",
+          instrument: "Scale and destination",
+          value: "Observed system · Light-year scale",
+          task: "Inspect a destination and its supported travel options",
+          action: "Inspect system",
+          art: "space",
+        },
+        room: {
+          name: "Home · Shared room",
+          place: "My workshop",
+          crumb: "Earth / Baltimore / Workshop",
+          mode: "Workspace",
+          instrument: "Room and project",
+          value: "Private draft · Editing allowed",
+          task: "Inspect your project before choosing how to share it",
+          action: "Open project",
+          art: "room",
+        },
+      };
+      const SCREENS = {
+        travel: "Travel / arrival options",
+        recovery: "Recovery",
+        quick: "Quick play",
+        "quick-brief": "Quick-play brief",
+        project: "Project / sharing",
+        "room-detail": "Room details",
+        home: "Start / Continue",
+        explore: "Explore / atlas",
+        play: "In-world HUD",
+        activities: "Activities / all careers",
+        brief: "Career brief",
+        journal: "Journal / results",
+        kit: "Kit / equipment",
+        create: "Create / projects",
+        together: "Together / rooms",
+        settings: "Settings / access",
+        profile: "Profile / saves",
+      };
+      const NAV = [
+        ["explore", "Explore", "◎"],
+        ["activities", "Activities", "⌖"],
+        ["journal", "Journal", "▤"],
+        ["create", "Create", "◇"],
+        ["together", "Together", "♙"],
+      ];
+      const DEFAULTS = {
+        option: "expedition",
+        player: "new",
+        domain: "earth",
+        screen: "home",
+        career: "career:explorer",
+        device: "desktop",
+        zoom: 1,
+        status: "ready",
+        guidance: "guided",
+        contrast: "normal",
+      };
+      const state = {
+        ...DEFAULTS,
+        menu: false,
+        quick: null,
+        filter: "Interests",
+        query: "",
+        sampleRecorded: false,
+        history: [],
+      };
+      const preview = document.getElementById("preview");
+      const esc = (x) =>
+        String(x ?? "").replace(
+          /[&<>"']/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+        );
+      function career() {
+        return CAREERS.find((x) => x.id === state.career) || CAREERS[0];
+      }
+      function domain() {
+        return DOMAINS[state.domain];
+      }
+      function btn(label, screen, kind = "", extra = "") {
+        return `<button class="${kind}" data-screen="${screen}" ${extra}>${label}</button>`;
+      }
+      function group(c) {
+        const id = c.id;
+        return /racer|pilot|field-engineer/.test(id)
+          ? "Build & move"
+          : /oceanographer|marine-biologist/.test(id)
+            ? "Ocean"
+            : /planetary|astronomer|accelerator/.test(id)
+              ? "Space & physics"
+              : /wildlife|botanist|companion/.test(id)
+                ? "Life & nature"
+                : /geologist|archaeologist|palaeontologist|mining|hydrologist|meteorologist/.test(
+                      id,
+                    )
+                  ? "Earth & history"
+                  : "Places & stories";
+      }
+      function art() {
+        const d = domain();
+        let svg = "";
+        if (d.art === "space") {
+          svg = `<rect width="900" height="500" fill="#101a25"/>${Array.from({ length: 55 }, (_, i) => `<circle cx="${(i * 173 + 51) % 900}" cy="${(i * 89 + 17) % 500}" r="${i % 3 === 0 ? 2 : 1}" fill="#b7c9ca"/>`).join("")}<ellipse cx="465" cy="260" rx="310" ry="122" fill="none" stroke="#46625c"/><ellipse cx="465" cy="260" rx="205" ry="78" fill="none" stroke="#46625c"/><ellipse cx="465" cy="260" rx="112" ry="43" fill="none" stroke="#46625c"/><circle cx="465" cy="260" r="22" fill="#e9c87b"/><circle cx="665" cy="280" r="14" fill="#7fbdb9"/><circle cx="250" cy="177" r="9" fill="#c39273"/>`;
+        } else if (d.art === "moon" || d.art === "mars") {
+          const color = d.art === "moon" ? "#8c9484" : "#b98569";
+          svg = `<rect width="900" height="500" fill="#17291e"/><circle cx="470" cy="310" r="250" fill="${color}"/><circle cx="380" cy="210" r="62" fill="#273128" opacity=".3"/><circle cx="585" cy="350" r="85" fill="#273128" opacity=".3"/><path d="M350 370 Q460 230 590 290" fill="none" stroke="#f1d480" stroke-width="4" stroke-dasharray="10 8"/><circle cx="350" cy="370" r="9" fill="#f1d480"/><circle cx="590" cy="290" r="9" fill="#f1d480"/>`;
+        } else if (d.art === "ocean") {
+          svg = `<rect width="900" height="500" fill="#153f45"/>${[0, 1, 2, 3, 4, 5].map((i) => `<path d="M-50 ${70 + i * 70} Q180 ${-10 + i * 60} 450 ${90 + i * 56} T950 ${80 + i * 60}" fill="none" stroke="#60908a" stroke-width="2" opacity=".5"/>`).join("")}<path d="M90 360 Q290 90 620 210 T840 165" fill="none" stroke="#e8ca79" stroke-width="4" stroke-dasharray="12 10"/><path d="M80 330 L110 365 80 395 65 365Z" fill="#eed17a"/><circle cx="620" cy="210" r="11" fill="#eed17a"/>`;
+        } else if (d.art === "room") {
+          svg = `<rect width="900" height="500" fill="#203c2b"/><path d="M150 80H750V420H150Z M430 80V260H750 M150 290H310" fill="none" stroke="#b5c9ab" stroke-width="6"/><rect x="510" y="120" width="160" height="80" fill="#526d4b"/><rect x="210" y="140" width="120" height="100" fill="#526d4b"/><rect x="460" y="320" width="220" height="45" fill="#a38b53"/>`;
+        } else {
+          svg = `<rect width="900" height="500" fill="#294331"/><path d="M700 -50Q480 210 670 550H1000V-50" fill="#27555a"/><path d="M0 110H650 M0 245H590 M0 380H620 M150 0V500 M330 0V500 M510 0V500" stroke="#aeb8a0" stroke-width="12"/>${[
+            [30, 25],
+            [195, 25],
+            [375, 25],
+            [30, 140],
+            [195, 140],
+            [375, 140],
+            [30, 280],
+            [195, 280],
+            [375, 280],
+            [30, 420],
+            [195, 420],
+            [375, 420],
+          ]
+            .map(
+              ([x, y]) => `<rect x="${x}" y="${y}" width="95" height="64" rx="5" fill="#52674b"/>`,
+            )
+            .join(
+              "",
+            )}<path d="M150 380V245H510V110" fill="none" stroke="#f0d078" stroke-width="5" stroke-dasharray="10 7"/><circle cx="150" cy="380" r="11" fill="#f0d078"/>`;
+        }
+        return `<div class="map-art" aria-label="Schematic ${esc(d.name)} view"><svg viewBox="0 0 900 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${svg}</svg><span class="map-label">${esc(d.place)}</span><span class="map-caption">${d.art === "space" ? "Object / system / galaxy · labeled scale" : d.art === "room" ? "Plan view · draft" : "Map view · chosen route"}</span></div>`;
+      }
+      function notice() {
+        return state.status === "offline"
+          ? '<div class="notice" role="status">You are offline. Online actions need a connection. Already-loaded solo work can continue.</div>'
+          : state.status === "missing"
+            ? '<div class="notice" role="status">A required tool is not in your kit. Review equipment before starting.</div>'
+            : state.status === "failure"
+              ? '<div class="notice error" role="alert">This result has not saved. Your current work is still here. <button data-action="retry">Retry save</button></div>'
+              : "";
+      }
+      function nextCard() {
+        if (state.player === "new")
+          return `<div class="card"><span class="kicker">Your first journey</span><h2>Start small. Keep a discovery.</h2><p>Explore at your pace, try a tool and see what you can keep in your Journal.</p><div class="actions">${btn("Start exploring", "play", "primary")}${btn("Choose an interest", "activities")}</div></div>`;
+        return `<div class="card"><span class="kicker">${state.player === "new" ? "Your first journey" : "Continue · " + esc(career().label)}</span><h2>${state.player === "new" ? "Start small. Discover something." : esc(career().assignment)}</h2><p>${state.player === "new" ? "Explore at your pace, try a tool and keep a discovery." : esc(domain().task)}</p><div class="micro">Progress kept on this device</div><div class="actions">${btn("Continue", "play", "primary")}${btn("Review plan", "brief")}</div></div>`;
+      }
+      function home() {
+        if (state.option === "atlas")
+          return `<div class="atlas-home">${art()}<div class="atlas-detail"><span class="kicker">Your next place</span><h1>${esc(domain().place)}</h1><p>Explore freely, or choose a journey at this place.</p>${btn("Explore this place", "play", "primary")}${btn("Choose another place", "explore")}${nextCard()}${btn("What can I do here?", "activities")}</div></div>`;
+        if (state.option === "workbench")
+          return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Your workspace</span><h1>${esc(career().label)}</h1><p>Pick up useful work, plan a visit, or review what you kept.</p></div>${btn("Switch pursuit", "activities")}</div><div class="workspace-bar"><strong>${esc(domain().place)}</strong><span class="badge">${state.player === "new" ? "Ready to explore" : "Saved here"}</span>${btn("Plan", "brief", "quiet")}${btn("Play", "play", "primary")}${btn("Review", "journal", "quiet")}</div><div class="workspace-grid">${art()}${nextCard()}</div><div class="grid">${card("My kit", "The tools for this work.", "Open kit", "kit")}${card("My projects", "Drafts, tracks and useful creations.", "Open projects", "create")}${card("My records", "Photos, reports and actual results.", "Open Journal", "journal")}</div></div>`;
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Your explorer</span><h1>What will you discover next?</h1><p>Pick up a journey, explore a place, or try something new.</p></div><span class="badge">Guest · Saved on this device</span></div><div class="hero"><div class="hero-copy"><span class="kicker">${state.player === "new" ? "Your first journey" : "Continue · " + esc(career().label)}</span><h2>${state.player === "new" ? "Start small. Discover something." : esc(career().assignment)}</h2><p>${state.player === "new" ? "Explore at your pace, try a tool and keep a discovery." : esc(domain().task)}</p><div class="actions">${btn(state.player === "new" ? "Start exploring" : "Continue journey", "play", "primary")}${btn(state.player === "new" ? "Choose an interest" : "See the plan", state.player === "new" ? "activities" : "brief")}</div><span class="micro">${esc(domain().place)} · ${state.player === "new" ? "No account needed for solo exploration" : "Your progress stays here"}</span></div>${art()}</div><div class="grid">${card("Explore a place", "Earth, Ocean, the planets and beyond.", "Choose a place", "explore")}${card("Try an activity", "Find an interest. Keep a real result.", "Browse activities", "activities")}${card("Explore together", "A friend, a shared place, a useful task.", "Find a room", "together")}</div></div>`;
+      }
+      function card(title, text, label, screen, projectKind = "track") {
+        return `<article class="card"><h3>${title}</h3><p>${text}</p>${btn(label, screen, "inline-button", screen === "project" ? `data-project-kind="${projectKind}"` : "")}</article>`;
+      }
+      function explore() {
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Explore</span><h1>Choose where to go</h1><p>Look around before you travel. Your current journey stays saved.</p></div>${btn("My places", "journal")}</div><div class="chips">${Object.entries(
+          DOMAINS,
+        )
+          .filter(([id]) => id !== "room")
+          .map(
+            ([id, d]) =>
+              `<button data-domain="${id}" class="${state.domain === id ? "active" : ""}">${esc(d.name.split(" · ")[0])}</button>`,
+          )
+          .join(
+            "",
+          )}</div><div class="split"><div class="hero" style="grid-template-columns:1fr">${art()}<div class="hero-copy"><span class="micro">${esc(domain().crumb)}</span><h2>${esc(domain().place)}</h2><p>${esc(state.domain === "stars" ? "Inspect this observed system and its catalog bodies. Supported travel options are shown separately." : state.domain === "ocean" ? "Board a research vessel or review a supported dive site. Deck, submarine and diver controls follow your active role." : state.domain === "earth" ? "A detailed starting district. Optional extended scenery does not provide detailed roads everywhere." : "Review this destination and its supported arrival options.")}</p><div class="actions">${btn(state.domain === "stars" ? "Review travel options" : "Review and enter", "travel", "primary")}${btn("Activities here", "activities")}</div></div></div><div class="rail"><div class="card"><span class="kicker">Places and scale</span>${Object.entries(
+          DOMAINS,
+        )
+          .map(([id, d]) => `<button data-domain="${id}">${esc(d.place)}</button>`)
+          .join(
+            "",
+          )}</div><div class="card"><h3>About this view</h3><p>Source and modeled details remain separate. Browsing does not record a physical visit.</p>${btn("View records", "journal")}</div></div></div></div>`;
+      }
+      function activities() {
+        const families = [
+          "Interests",
+          "Browse all",
+          "Places & stories",
+          "Earth & history",
+          "Life & nature",
+          "Ocean",
+          "Space & physics",
+          "Build & move",
+        ];
+        let list = CAREERS.filter(
+          (c) =>
+            (["Interests", "Browse all"].includes(state.filter) || group(c) === state.filter) &&
+            (!state.query ||
+              `${c.label} ${c.assignment} ${c.summary} ${group(c)} ${{ "career:racer": "cars driving racing", "career:geologist": "geology rocks", "career:documentary-explorer": "photography photos camera", "career:astronomer": "astronomy stars" }[c.id] || ""}`
+                .toLowerCase()
+                .includes(state.query.toLowerCase())),
+        );
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Activities</span><h1>Follow your interests</h1><p>A short start or a deeper pursuit. You can switch without losing completed work.</p></div>${btn("Continue current", "play", "primary")}</div><div class="chips">${families.map((f) => `<button data-filter="${f}" class="${state.filter === f ? "active" : ""}">${f}</button>`).join("")}</div><label>Search all twenty careers<input id="careerSearch" type="search" placeholder="Try cars, geology or photography" value="${esc(state.query)}"></label>${
+          state.filter === "Interests" && !state.query
+            ? `<div class="grid">${families
+                .slice(2)
+                .map(
+                  (f) =>
+                    `<button class="card" data-filter="${f}"><h3>${f}</h3><span class="micro">See the journeys →</span></button>`,
+                )
+                .join("")}</div><h2>Approachable starts</h2>`
+            : ""
+        }<div class="grid">${(state.filter === "Interests" && !state.query ? list.filter((c) => ["career:explorer", "career:racer", "career:oceanographer"].includes(c.id)) : list).map((c) => `<article class="card"><span class="kicker">${group(c)}</span><h3>${esc(c.label)}</h3><p>${esc(c.assignment)}</p><button data-career="${c.id}" class="${state.career === c.id ? "primary" : ""}">See the journey</button></article>`).join("") || "<p>No matching careers. Try another word or choose All.</p>"}</div><div class="card"><h2>Just want a quick game?</h2><p>Racing practice, time trials, checkpoint runs, Flower Sprint, Paint Town, DeFlock and local routes remain available.</p>${btn("Browse quick play", "quick")}</div></div>`;
+      }
+      function brief() {
+        const c = career();
+        const steps =
+          state.career === "career:racer"
+            ? [
+                "Choose an event and real owned car",
+                "Check condition and prepare your setup",
+                "Drive the marked course and finish cleanly",
+                "Review the result, repair if needed and choose what is next",
+              ]
+            : [
+                "Choose a supported place and method",
+                "Prepare the tools for this assignment",
+                "Do the fieldwork and keep its evidence",
+                "Review your result and choose a useful return",
+              ];
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">${esc(c.label)} · ${esc(group(c))}</span><h1>${esc(c.assignment)}</h1><p>${esc(c.summary)}</p></div>${btn("All activities", "activities", "quiet")}</div><div class="split"><div class="card"><h2>Your next step</h2><p>${esc(domain().task)}</p><div class="steps">${steps.map((t, i) => `<div class="step"><span class="step-num">${i + 1}</span><div>${esc(t)}</div></div>`).join("")}</div><p class="micro">Follow the field steps at the site. Your notes and photographs stay with the assignment.</p></div><div class="rail"><div class="card"><h3>Before you begin</h3><strong>${esc(domain().place)}</strong><p>${state.career === "career:racer" ? "BMW M3 E92 race car · Check condition in Garage. Practice and online competition remain distinct." : "Review your kit and the place requirements. Your starting place and tools are checked before travel."}</p><span class="badge">Saved on this device</span>${btn("Review equipment", "kit")}${btn(state.status === "missing" ? "Equipment needed" : "Begin or resume", "play", "primary", state.status === "missing" ? "disabled" : "")}${btn("Back to exploring", "explore", "quiet")}</div><div class="card"><h3>What you keep</h3><p>Your original result and evidence, with the relevant skill or progress benefit. Online results show their own acknowledgement.</p></div></div></div></div>`;
+      }
+      function play() {
+        const d = domain();
+        return `<section class="play" aria-label="In-world interface concept">${art()}<div class="world-top"><div class="world-badge"><span class="kicker">${esc(d.place)}</span><strong>${esc(d.mode)}</strong><span class="micro">${esc(d.value)}</span></div>${btn("Map", "explore")}</div>${state.option === "workbench" ? `<div class="instrument"><span class="kicker">${esc(d.instrument)}</span><strong>${esc(career().label)}</strong>${btn("Tools", "kit")}${btn("Review readings", "journal")}</div>` : ""}<div class="world-objective"><span class="kicker">${esc(career().label)} · Next action</span><strong>${esc(d.task)}</strong>${state.guidance === "guided" ? '<p class="micro">Move at your own pace. Open the plan for directions and the tools you need.</p>' : ""}<div class="actions">${btn(esc(d.action), ["space", "stars"].includes(state.domain) ? "travel" : state.domain === "room" ? "project" : "kit", "primary")}${btn("Plan", "brief", "quiet")}</div></div><div class="world-tools">${btn("Interact", "kit")}${btn("Travel", "travel")}${btn("Kit", "kit")}${btn("Journal", "journal")}${btn("Recover", "recovery")}</div></section>`;
+      }
+      function kit() {
+        let items =
+          state.career === "career:racer"
+            ? [
+                "BMW M3 E92",
+                "Condition and repair",
+                "Tyres and upgrades",
+                "Camera",
+                "Track tools",
+                "Race records",
+              ]
+            : state.domain === "ocean"
+              ? [
+                  "Chart and compass",
+                  "Survey camera",
+                  "Water instruments",
+                  "Dive equipment",
+                  "Vessel stations",
+                  "Recovery",
+                ]
+              : [
+                  "Camera",
+                  "Compass and map",
+                  "Field instrument",
+                  "Notebook",
+                  "Carried samples",
+                  "Companion",
+                ];
+        const roleKits = {
+          "career:archaeologist": [
+            "Site grid",
+            "Tape and compass",
+            "Trowel",
+            "Brush",
+            "Find packing",
+            "Catalog notebook",
+          ],
+          "career:geologist": [
+            "Compass",
+            "Hand lens",
+            "Field notebook",
+            "Sample labels",
+            "Measurement tools",
+            "Comparison plate",
+          ],
+          "career:accelerator-scientist": [
+            "Beam controls",
+            "Detector view",
+            "Recorded data",
+            "Measurement plot",
+            "Experiment notes",
+            "Report",
+          ],
+          "career:planetary-scientist": [
+            "Surface camera",
+            "Survey instrument",
+            "Sample kit",
+            "Site map",
+            "Pod return",
+            "Field notebook",
+          ],
+        };
+        if (roleKits[state.career]) items = roleKits[state.career];
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Kit and equipment</span><h1>Ready for this task</h1><p>Useful tools first. Your other belongings remain available.</p></div>${btn("Return to play", "play", "primary")}</div><div class="split"><div class="card"><h2>${esc(career().label)} kit</h2><div class="kit-slots">${items.map((x, i) => `<button class="slot" data-action="inspect-tool"><span class="kicker">Slot ${i + 1}</span><strong>${esc(x)}</strong></button>`).join("")}</div></div><div class="card"><h2>Using this kit</h2><p>Tool actions appear when your place and active role support them. Controls follow your current bindings.</p><p>${state.status === "missing" ? "The required tool is missing. Review how to obtain it before beginning." : "Your kit is ready for this task."}</p><div class="actions">${state.career === "career:racer" ? btn("Review an event", "quick", "primary") : '<button data-action="record" class="primary">Record an observation</button>'}${btn("Review evidence", "journal")}</div><p class="micro">Tools belong to your explorer. Repairs and purchases finish when you see confirmation.</p></div></div></div>`;
+      }
+      function journal() {
+        if (state.player === "new" && !state.sampleRecorded)
+          return `<div class="page"><span class="kicker">Journal</span><h1>Your discoveries begin here</h1><div class="empty"><h2>Nothing kept yet</h2><p>Start exploring or choose an activity. Your saved observations, photographs and results will appear here.</p><div class="actions">${btn("Start exploring", "explore", "primary")}${btn("Choose an activity", "activities")}</div></div>${btn("Understand saves and backup", "profile")}</div>`;
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Journal</span><h1>What you kept</h1><p>Your work has a place to return to, beyond a progress number.</p></div>${btn("Saves and backup", "profile")}</div><div class="chips">${btn("Records", "journal", "primary")}${btn("My progress", "profile")}${btn("My equipment", "kit")}${btn("Places and trail", "explore")}</div><div class="split"><article class="card"><div class="artifact">⌖ ${esc(domain().place)} · Field record</div><span class="kicker">${state.sampleRecorded ? "Latest record" : "Saved work"}</span><h2>${esc(career().assignment)}</h2><p>Original observations, photographs and context are kept together. A report explains what the evidence supports and what it cannot show.</p><span class="badge">Saved on this device</span><div class="actions">${btn("Review the work", "brief", "primary")}${btn("Return to this place", "explore")}</div></article><div class="rail"><div class="card"><h3>Your progress</h3><p>The useful outcome from this work appears here with its original record.</p><div class="progress-track" aria-label="Illustrative career progress"><span></span></div>${btn("See skills and badges", "profile")}</div><div class="card"><h3>A reason to return</h3><p>Compare another place, revisit a saved project or build on the skill you practiced.</p>${btn("Choose next work", "activities")}</div></div></div></div>`;
+      }
+      function create() {
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Create</span><h1>Make something worth keeping</h1><p>Tracks, places, useful projects and visual stories.</p></div><span class="badge">Drafts stay private</span></div><div class="grid">${card("Create a track", "Choose existing roads overhead, record a drive, or build a supported roadless course. Review a clean layout before sharing.", "Open track project", "project")}${card("Build and home", "Blocks, a workspace, exhibits and virtual property keep their existing permissions.", "Open workspace", "project", "workspace")}${card("Capture and contribute", "Photos and mapped building drafts remain separate from reviewed publication.", "Open contribution", "project", "capture")}</div><div class="card"><h2>Continue a project</h2><div class="row"><div><strong>A route through my place</strong><span class="micro">Private draft · Needs validation</span></div><button data-action="project">Review draft</button></div><p class="micro">A local draft, a room creation and a published contribution have different audiences and confirmation.</p></div></div>`;
+      }
+      function project() {
+        const kind = state.projectKind || "track";
+        const cfg = {
+          track: {
+            title: "A clean route through your place",
+            kind: "Track project",
+            intro: "Choose a method, inspect the route and validate it before sharing.",
+            steps: ["Choose roads overhead", "Record a drive", "Create without roads"],
+            review:
+              "Inspect start/finish, direction, width, checkpoints and supported barriers. Use stable anchors and editable segments.",
+            scope: [
+              "Private draft on this device",
+              "Current room, when supported",
+              "Submit for review, when eligible",
+            ],
+          },
+          workspace: {
+            title: "Make a useful space",
+            kind: "Workspace project",
+            intro: "Plan a home, build with Blocks or arrange your kept work.",
+            steps: ["Inspect the space", "Place or edit objects", "Review access and layout"],
+            review:
+              "Inspect scale, support, entrances and the objects you own. Undo changes before saving the layout.",
+            scope: [
+              "Private local workspace",
+              "Shared room, with edit permission",
+              "Online property, when authorized",
+            ],
+          },
+          capture: {
+            title: "A place, carefully recorded",
+            kind: "Photo contribution",
+            intro:
+              "Keep original photos, align the supported building representation and review what you will submit.",
+            steps: ["Add original photos", "Review layout and entrance", "Inspect contribution"],
+            review:
+              "Check the selected building, original photos, layout revision and intended audience. Saving a draft does not publish it.",
+            scope: ["Private draft", "Authorized private sharing", "Submit for review"],
+          },
+        }[kind];
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Create · ${cfg.kind}</span><h1>${cfg.title}</h1><p>${cfg.intro}</p></div>${btn("All projects", "create")}</div><div class="chips">${cfg.steps.map((t) => `<button data-action="project-info">${t}</button>`).join("")}</div><div class="split"><div class="card">${kind === "capture" ? '<div class="artifact">Photos · Layout · Entrance</div>' : art()}<h3>Layout review</h3><p>${cfg.review}</p><button data-action="validate" class="primary">Validate layout</button></div><div class="card"><h3>Who can use it?</h3><label>Save or share scope<select aria-label="Project audience">${cfg.scope.map((t) => `<option>${t}</option>`).join("")}</select></label><p>Sharing and publication finish only after their checks pass and you receive confirmation.</p>${btn("Back to projects", "create")}</div></div></div>`;
+      }
+      function together() {
+        return `<div class="page"><div class="page-head"><div class="intro"><span class="kicker">Together</span><h1>A shared place, a clear purpose</h1><p>See what is shared and who can edit before joining.</p></div>${btn("Account", "profile")}</div><div class="grid">${card("Join by invitation", "Use a room code or invitation link.", "Review invitation", "room-detail")}${card("Find a public room", "Check its world, capacity, permissions and supported activities.", "Browse rooms", "room-detail")}${card("Invite a friend", "Choose your room or share a destination link.", "Review sharing", "room-detail")}</div><div class="card"><h2>Safety is easy to find</h2><p>Chat controls, block/report, room permissions and leave/reconnect stay attached to the relevant people and room.</p><button data-action="safety">View room and safety controls</button></div></div>`;
+      }
+      function roomDetail() {
+        return `<div class="page"><span class="kicker">Together · Room details</span><h1>Coral Shelf research room</h1><div class="card"><strong>World: Ocean · Shared marine roles</strong><p>Membership, role availability and room capacity are checked on join. Only one person pilots a shared vessel at a time; others can join as shipmates.</p><p>Your personal Journal remains separate. Not every solo action is shared.</p><div class="actions"><button data-action="room-join" class="primary" ${state.status === "offline" ? "disabled" : ""}>Review and join</button>${btn("Back to rooms", "together")}</div></div></div>`;
+      }
+      function settings() {
+        return `<div class="page"><div class="intro"><span class="kicker">Settings</span><h1>Make it comfortable for you</h1><p>Guidance and accessibility are independent of your career.</p></div><div class="split"><div class="card"><h2>Read and navigate</h2><label>Text size<select data-setting="zoom">${[1, 1.25, 1.5, 2].map((n) => `<option value="${n}" ${state.zoom === n ? "selected" : ""}>${n * 100}%</option>`).join("")}</select></label><label>Guidance<select data-setting="guidance"><option value="guided" ${state.guidance === "guided" ? "selected" : ""}>More guidance</option><option value="brief" ${state.guidance === "brief" ? "selected" : ""}>Less guidance</option></select></label><label class="toggle-row"><span>Higher contrast</span><input type="checkbox" data-setting="contrast" ${state.contrast === "high" ? "checked" : ""}></label><label class="toggle-row"><span>Reduced interface motion</span><input type="checkbox" checked></label></div><div class="card"><h2>Control and play</h2><p>Choose controls that feel comfortable. Labels follow your saved key and button choices. Look for click or keyboard alternatives when editing.</p><button data-action="controls">Controls for this mode</button>${btn("Saves and backup", "profile")}${btn("Return to play", "play", "primary")}<p class="micro">You can change guidance, contrast and controls independently.</p></div></div></div>`;
+      }
+      function profile() {
+        return `<div class="page"><div class="intro"><span class="kicker">Your explorer</span><h1>Your progress and your saves</h1><p>Understand what is kept here and what belongs to your account or room.</p></div><div class="grid"><div class="card"><h2>On this device</h2><p>Journal, career evidence, original photos and supported solo progress. Signing in does not automatically copy this history to another device.</p><button data-action="backup">Review full backup</button></div><div class="card"><h2>Online account</h2><p>Account profile, supported credits, friends, shared records and contributions are managed through your online account.</p><button data-action="account">Open account details</button></div><div class="card"><h2>Shared room</h2><p>Shared creations and roles depend on membership, permissions and acknowledgement.</p>${btn("Room details", "together")}</div></div><div class="card"><h2>Skills and kept work</h2><p>Career completion, character skills, credits and equipment improvements remain different facts. Each benefit links to the actual result that earned it.</p>${btn("Review Journal", "journal", "primary")}</div></div>`;
+      }
+
+      function travel() {
+        const d = domain();
+        const arrival =
+          state.domain === "earth"
+            ? "Explore this district"
+            : state.domain === "ocean"
+              ? "Board research vessel"
+              : ["moon", "mars"].includes(state.domain)
+                ? "Enter supported surface"
+                : state.domain === "room"
+                  ? "Enter workspace"
+                  : "Review course and fly";
+        return `<div class="page"><span class="kicker">Travel · Review before entering</span><h1>${esc(d.place)}</h1><p class="micro">${esc(d.crumb)}</p><div class="split"><div class="card"><h2>How would you like to visit?</h2><p>${esc(state.domain === "stars" ? "Inspect the observed system, select a catalog body or plot a supported course. A star-system selection does not promise surface landing." : state.domain === "ocean" ? "Board the ship, walk the deck and use its stations. Submarine deployment and diving are separate actions at supported points." : state.domain === "earth" ? "Enter the selected detailed district. Browsing this map has not moved your explorer or recorded a visit." : ["moon", "mars"].includes(state.domain) ? "This body supports the illustrated surface mode. Other bodies may offer orbit or observation only." : "Review the destination, flight mode and current course before committing.")}</p><div class="actions">${btn(arrival, "play", "primary")}${btn("Keep exploring the map", "explore")}</div></div><div class="card"><h3>Before changing worlds</h3><p>Your saved task and Journal remain here. The arrival point, active vehicle and voyage resume follow the destination’s available options.</p>${btn("Review saved work", "journal")}${btn("Review equipment", "kit")}</div></div></div>`;
+      }
+      function recovery() {
+        return `<div class="page"><span class="kicker">Recovery</span><h1>Return to a safe point</h1><div class="card"><p>Choose the recovery available for your current role. Vessel, submarine, diver, vehicle and surface recovery keep their own safe return points.</p><p>Saved records stay in your Journal. Your destination and any pending result are explained before the return.</p><div class="actions">${btn("Review safe return", "play", "primary")}${btn("Go back without recovering", "play")}</div></div></div>`;
+      }
+      function quick() {
+        return `<div class="page"><span class="kicker">Quick play</span><h1>One game, your choice</h1><p>Choose an independent activity without committing to a career.</p><div class="grid">${QUICK.map((q) => `<article class="card"><h3>${esc(q.label)}</h3><p>${esc(q.summary)}</p><button data-quick="${esc(q.id)}">Review activity</button></article>`).join("")}</div></div>`;
+      }
+      function quickBrief() {
+        const q = QUICK.find((x) => x.id === state.quick) || QUICK[0];
+        return `<div class="page"><span class="kicker">Quick play</span><h1>${esc(q.label)}</h1><div class="card"><p>${esc(q.summary)}</p><strong>${esc(domain().place)}</strong><p>The current place, equipment and course are checked before play. Practice results and online rankings have separate status.</p><div class="actions">${btn("Begin activity", "play", "primary", state.status === "missing" ? "disabled" : "")}${btn("Review kit", "kit")}${btn("Other quick games", "quick")}</div></div></div>`;
+      }
+
+      function body() {
+        if (state.menu)
+          return `<section class="menu-panel" aria-label="Navigation menu"><div class="page-head"><h2>Where would you like to go?</h2><button data-action="close-menu">Close menu</button></div><div class="grid">${NAV.map(([id, label]) => btn(label, id)).join("")}${btn("Start / Continue", "home")}${btn("Kit", "kit")}${btn("Settings and accessibility", "settings")}${btn("Profile, saves and account", "profile")}</div></section>`;
+        const pages = {
+          travel,
+          recovery,
+          quick,
+          "quick-brief": quickBrief,
+          home,
+          explore,
+          play,
+          activities,
+          brief,
+          journal,
+          kit,
+          create,
+          project,
+          together,
+          "room-detail": roomDetail,
+          settings,
+          profile,
+        };
+        return (pages[state.screen] || home)();
+      }
+      function nav() {
+        const active =
+          state.screen === "home" && state.option === "atlas"
+            ? "explore"
+            : ["travel", "recovery"].includes(state.screen)
+              ? "explore"
+              : ["quick", "quick-brief", "home", "play", "brief", "kit", "settings"].includes(
+                    state.screen,
+                  )
+                ? "activities"
+                : state.screen === "project"
+                  ? "create"
+                  : state.screen === "room-detail"
+                    ? "together"
+                    : state.screen === "profile"
+                      ? "journal"
+                      : state.screen;
+        return `<nav class="main-nav" aria-label="Main destinations">${NAV.map(([id, label, symbol]) => `<button data-screen="${id}" class="${active === id ? "selected" : ""}" ${active === id ? 'aria-current="page"' : ""}><span class="nav-symbol" aria-hidden="true">${symbol}</span><span>${label}</span></button>`).join("")}<button class="mobile-menu" data-action="menu">Menu</button><div class="nav-foot">Your world.<br>Your pace.<br>${btn("Start", "home", "quiet")}</div></nav>`;
+      }
+      function render() {
+        const option = OPTIONS[state.option];
+        document.getElementById("option-kicker").textContent = option.line;
+        document.getElementById("option-title").textContent =
+          option.name +
+          " · " +
+          (state.option === "atlas"
+            ? "A world to explore"
+            : state.option === "workbench"
+              ? "A pursuit with purpose"
+              : "One clear next step");
+        document.getElementById("option-description").textContent = option.description;
+        for (const el of document.querySelectorAll("[data-preset]"))
+          el.setAttribute("aria-pressed", String(el.dataset.preset === state.option));
+        for (const id of [
+          "player",
+          "domain",
+          "screen",
+          "career",
+          "device",
+          "zoom",
+          "status",
+          "guidance",
+          "contrast",
+        ])
+          document.getElementById(id).value = String(state[id]);
+        preview.className = `sim ${state.option} ${state.device} ${state.contrast === "high" ? "contrast" : ""} ${state.zoom >= 1.5 ? "large-text" : ""}`;
+        preview.style.setProperty("--scale", state.zoom);
+        preview.innerHTML = `<header class="app-head"><button class="brand quiet" data-screen="home" aria-label="World Explorer start"><b aria-hidden="true">◎</b> World Explorer</button><div class="head-actions"><span class="scope">Guest · This device</span><button class="settings-head quiet" data-screen="settings">Settings</button><button class="quiet" data-action="menu" aria-expanded="${state.menu}">Menu</button></div></header><div class="shell">${nav()}<div class="content" role="region" aria-label="${esc(SCREENS[state.screen] || "Project detail")}">${state.screen !== "play" && notice() ? `<div style="padding:16px 16px 0">${notice()}</div>` : ""}${state.history.length && state.screen !== "play" && !state.menu ? '<div class="returnbar"><button data-action="back">← Back</button></div>' : ""}${body()}</div></div>`;
+        updatePrompt();
+      }
+      function go(screen) {
+        if (screen === state.screen && !state.menu) return;
+        state.history.push(state.screen);
+        state.screen = screen;
+        state.menu = false;
+        render();
+        preview.querySelector(".content")?.scrollTo(0, 0);
+      }
+      function updatePrompt() {
+        let text = `Use ${OPTIONS[state.option].name} (${state.option === "atlas" ? "place first" : state.option === "workbench" ? "pursuit first" : "next useful action first"}) as the direction for World Explorer’s whole-app UI. Keep mixed ages and experience as the audience, Roam as the visual identity, stable navigation across Earth, Ocean, planetary and Space contexts, and all existing feature/save/ownership boundaries. `;
+        if (state.guidance !== DEFAULTS.guidance)
+          text += "Make reduced guidance available without hiding essential state. ";
+        if (state.contrast !== DEFAULTS.contrast) text += "Use the higher-contrast treatment. ";
+        if (state.zoom !== DEFAULTS.zoom)
+          text += `Review the design at ${state.zoom * 100}% text. `;
+        if (state.device !== DEFAULTS.device)
+          text += `Pay particular attention to the ${state.device === "vr" ? "spatial-menu concept and later physical headset validation" : state.device + " layout"}. `;
+        if (state.career !== DEFAULTS.career)
+          text += `Use ${career().label} as an early specialist workflow. `;
+        text +=
+          "Proceed through the written implementation stages and their exits; do not replace gameplay authorities or deploy this design study.";
+        document.getElementById("decision-text").textContent = text;
+      }
+      for (const [id, values] of [
+        ["domain", Object.entries(DOMAINS).map(([id, d]) => [id, d.name])],
+        ["screen", Object.entries(SCREENS)],
+        ["career", CAREERS.map((c) => [c.id, c.label])],
+      ])
+        document.getElementById(id).innerHTML = values
+          .map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`)
+          .join("");
+      for (const id of [
+        "player",
+        "domain",
+        "screen",
+        "career",
+        "device",
+        "zoom",
+        "status",
+        "guidance",
+        "contrast",
+      ])
+        document.getElementById(id).addEventListener("change", (e) => {
+          state[id] = id === "zoom" ? Number(e.target.value) : e.target.value;
+          state.menu = false;
+          render();
+        });
+      for (const el of document.querySelectorAll("[data-preset]"))
+        el.addEventListener("click", () => {
+          state.option = el.dataset.preset;
+          state.screen = "home";
+          state.menu = false;
+          state.history = [];
+          render();
+        });
+      preview.addEventListener("click", (event) => {
+        const b = event.target.closest("button");
+        if (!b || b.disabled) return;
+        if (b.dataset.screen) {
+          if (b.dataset.screen === "project") state.projectKind = b.dataset.projectKind || "track";
+          go(b.dataset.screen);
+          return;
+        }
+        if (b.dataset.career) {
+          state.quick = null;
+          state.career = b.dataset.career;
+          go("brief");
+          return;
+        }
+        if (b.dataset.quick) {
+          state.quick = b.dataset.quick;
+          go("quick-brief");
+          return;
+        }
+        if (b.dataset.domain) {
+          state.domain = b.dataset.domain;
+          render();
+          return;
+        }
+        if (b.dataset.filter) {
+          state.filter = b.dataset.filter;
+          render();
+          return;
+        }
+        switch (b.dataset.action) {
+          case "back":
+            state.screen = state.history.pop() || "home";
+            state.menu = false;
+            render();
+            break;
+          case "menu":
+            state.menu = !state.menu;
+            render();
+            break;
+          case "close-menu":
+            state.menu = false;
+            render();
+            preview.querySelector("[data-action=menu]")?.focus();
+            break;
+          case "retry":
+            state.status = "ready";
+            render();
+            break;
+          case "record":
+            state.sampleRecorded = true;
+            go("journal");
+            break;
+          case "project":
+            go("project");
+            break;
+          case "validate":
+            b.insertAdjacentHTML(
+              "afterend",
+              '<p role="status">Illustrated review: inspect the clean route and its supported sharing scope.</p>',
+            );
+            b.disabled = true;
+            break;
+          case "room-join":
+            b.insertAdjacentHTML(
+              "afterend",
+              '<p role="status">Before joining: review room privacy, community consent, available space and your role.</p>',
+            );
+            break;
+          case "backup":
+            go("journal");
+            break;
+          case "account":
+            b.insertAdjacentHTML(
+              "afterend",
+              '<p role="status">Online account data and device-local progress remain separate.</p>',
+            );
+            break;
+          case "safety":
+            b.insertAdjacentHTML(
+              "afterend",
+              '<p role="status">Room permissions · Leave room · Block player · Report message</p>',
+            );
+            break;
+          case "controls":
+            b.insertAdjacentHTML(
+              "afterend",
+              '<p role="status">Current actions: Move · Look · Interact · Pause · Recenter. Prompts follow saved bindings.</p>',
+            );
+            break;
+          default:
+            b.insertAdjacentHTML(
+              "afterend",
+              '<p role="status">Review the existing tool, context and supported action here.</p>',
+            );
+        }
+      });
+      preview.addEventListener("input", (event) => {
+        if (event.target.id === "careerSearch") {
+          const pos = event.target.selectionStart;
+          state.query = event.target.value;
+          render();
+          const input = document.getElementById("careerSearch");
+          input.focus();
+          input.setSelectionRange(pos, pos);
+        }
+      });
+      preview.addEventListener("change", (event) => {
+        const id = event.target.dataset.setting;
+        if (id) {
+          state[id] =
+            id === "zoom"
+              ? Number(event.target.value)
+              : id === "contrast"
+                ? event.target.checked
+                  ? "high"
+                  : "normal"
+                : event.target.value;
+          render();
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && state.menu) {
+          event.preventDefault();
+          state.menu = false;
+          render();
+          preview.querySelector("[data-action=menu]")?.focus();
+        }
+      });
+      document.getElementById("copy").addEventListener("click", async () => {
+        const text = document.getElementById("decision-text").textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          document.getElementById("copy-status").textContent = "Copied your design choice.";
+        } catch {
+          const s = window.getSelection(),
+            r = document.createRange();
+          r.selectNodeContents(document.getElementById("decision-text"));
+          s.removeAllRanges();
+          s.addRange(r);
+          document.getElementById("copy-status").textContent =
+            "Select and copy the highlighted design choice.";
+        }
+      });
+      const params = new URLSearchParams(location.search);
+      for (const key of ["option", "domain", "screen", "career", "device"])
+        if (params.has(key)) {
+          const value = params.get(key);
+          if (
+            (key === "option" && OPTIONS[value]) ||
+            (key === "domain" && DOMAINS[value]) ||
+            (key === "screen" && SCREENS[value]) ||
+            (key === "career" && CAREERS.some((c) => c.id === value)) ||
+            (key === "device" && ["desktop", "phone", "wide", "vr"].includes(value))
+          )
+            state[key] = value;
+        }
+      if (innerWidth < 600 && !params.has("device")) state.device = "phone";
+      render();
+    </script>
+  </body>
+</html>
