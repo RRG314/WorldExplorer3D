@@ -622,21 +622,7 @@ Continue ocean exploration beyond the dive site
   </div>
 </aside>
 <div id="globeSelectorScreen" aria-hidden="true">
-<aside id="testerInvitation" class="tester-invitation" hidden aria-labelledby="testerInvitationTitle">
-  <button id="testerInvitationClose" class="tester-invitation-close" type="button" aria-label="Dismiss tester invitation">×</button>
-  <p class="tester-invitation-label">HELP SHAPE WHAT’S NEXT</p>
-  <h2 id="testerInvitationTitle">Want to be an early tester?</h2>
-  <p>We’re developing a new World Explorer app. Interested in trying an early version and sharing feedback?</p>
-  <button id="testerInvitationOpen" class="tester-invitation-email" type="button" aria-expanded="false" aria-controls="testerInvitationForm">I’m interested</button>
-  <form id="testerInvitationForm" hidden>
-    <label for="testerInvitationAddress">Email address</label>
-    <input id="testerInvitationAddress" type="email" autocomplete="email" maxlength="254" required>
-    <label class="tester-invitation-consent"><input id="testerInvitationConsent" type="checkbox" required> Email me about testing the new World Explorer app.</label>
-    <button id="testerInvitationSubmit" class="tester-invitation-email" type="submit">Send confirmation email</button>
-  </form>
-  <p id="testerInvitationStatus" role="status" aria-live="polite" hidden></p>
-  <small>Confirm your email to register interest. Invitations depend on availability. No newsletter signup. <a href="../legal/privacy#app-testing" target="_blank" rel="noopener">Privacy</a></small>
-</aside>
+
 <div class="globe-selector-shell">
 <div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
 <nav class="globe-app-rail" aria-label="Main sections">
@@ -661,6 +647,18 @@ Continue ocean exploration beyond the dive site
 </div>
 </div>
 <div class="globe-selector-side">
+<section class="globe-launch-summary" aria-label="Selected place">
+<div class="globe-selector-stat">
+<div class="globe-selector-stat-label">Selected place</div>
+<div id="globeSelectorPlace" class="globe-selector-stat-value">Choose a place on the globe.</div>
+<div id="globeSelectorLatLon" class="globe-selector-stat-label">No point selected</div>
+<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
+</div>
+<div class="globe-selector-actions">
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
+<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
+</div>
+</section>
 <nav class="globe-explore-tools" aria-label="Explore tools"><button type="button" data-globe-destination="library">My Places</button><button type="button" data-globe-destination="live-earth">Live Data</button><button type="button" data-globe-destination="controls">Quick Start</button></nav>
 <div class="globe-location-entry-pair" aria-label="Choose how to use your location">
   <button id="globeSelectorLocateBtn" class="globe-location-entry-card globe-location-current" type="button">
@@ -680,21 +678,27 @@ Continue ocean exploration beyond the dive site
 <div id="globeLocationSearchStatus" role="status" aria-live="polite" style="font-size:12px;min-height:16px;color:#64748b">Search for a place or choose one from the globe.</div>
 <div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 </div>
-<div class="globe-selector-stat">
-<div class="globe-selector-stat-label">Selected Coordinates</div>
-<div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
-<div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
-<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
-</div>
-<div class="globe-selector-actions">
-<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
-<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
-</div>
 <section class="globe-first-journey" aria-label="Start or return">
   <button id="globeGuidedStartBtn" type="button"><strong>Start a guided walk</strong><small>Baltimore · move, try an activity, keep a discovery</small></button>
   <button id="globeReturnPlaceBtn" type="button" hidden><strong id="globeReturnPlaceLabel">Return to your last place</strong><small>Start at its arrival point · Journal saved on this device</small></button>
+  <button id="coralResearchStart" type="button"><strong>Start a coastal voyage</strong><small>Coral Shelf · research vessel and submarine</small></button>
   <span id="globeJourneyStatus" role="status" aria-live="polite"></span>
 </section>
+<aside id="testerInvitation" class="tester-invitation" hidden aria-labelledby="testerInvitationTitle">
+  <button id="testerInvitationClose" class="tester-invitation-close" type="button" aria-label="Dismiss tester invitation">×</button>
+  <p class="tester-invitation-label">HELP SHAPE WHAT’S NEXT</p>
+  <h2 id="testerInvitationTitle">Want to be an early tester?</h2>
+  <p>We’re developing a new World Explorer app. Interested in trying an early version and sharing feedback?</p>
+  <button id="testerInvitationOpen" class="tester-invitation-email" type="button" aria-expanded="false" aria-controls="testerInvitationForm">I’m interested</button>
+  <form id="testerInvitationForm" hidden>
+    <label for="testerInvitationAddress">Email address</label>
+    <input id="testerInvitationAddress" type="email" autocomplete="email" maxlength="254" required>
+    <label class="tester-invitation-consent"><input id="testerInvitationConsent" type="checkbox" required> Email me about testing the new World Explorer app.</label>
+    <button id="testerInvitationSubmit" class="tester-invitation-email" type="submit">Send confirmation email</button>
+  </form>
+  <p id="testerInvitationStatus" role="status" aria-live="polite" hidden></p>
+  <small>Confirm your email to register interest. Invitations depend on availability. No newsletter signup. <a href="../legal/privacy#app-testing" target="_blank" rel="noopener">Privacy</a></small>
+</aside>
 <div class="globe-selector-mode-tabs" role="tablist" aria-label="Globe selector mode">
 <button id="globeSelectorExploreModeBtn" class="globe-selector-mode-tab active" type="button">Choose Location</button>
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>

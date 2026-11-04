@@ -2,6 +2,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=13';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=3';
+import { WORLD_SIMULATION_CLOCK } from './runtime/simulation-clock.js';
 import { createRuntimeFrameSource } from './runtime/frame-source.js';
 import { createLoadingPresentation } from './ui/loading-progress.js?v=1';
 import { dedicatedPresentationActive,presentationFrameVisible } from './runtime/renderer-owners.js';
@@ -90,11 +91,7 @@ function dedicatedRendererActive() {
 }
 
 const runtimeKernel = createRuntimeKernel({
-  fixedDelta: 1 / 60,
-  maxDelta: 0.1,
-  // Bound catch-up work so a slow frame cannot recursively create another
-  // slow frame. Excess wall-clock time is intentionally dropped.
-  maxFixedSteps: 2,
+  ...WORLD_SIMULATION_CLOCK,
   getContext: () => ({
     appCtx,
     environment: appCtx.getEnv?.() || null,

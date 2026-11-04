@@ -119,9 +119,13 @@ function normalizedAccess(tags = {}) {
 
 function defaultLaneCount(highway = '', tags = {}) {
   const kind = sourceString(highway).toLowerCase();
-  if (normalizedDirection(tags) === 'forward' || normalizedDirection(tags) === 'reverse') return 1;
+  if (sourceString(tags.junction).toLowerCase() === 'roundabout') return 1;
+  // Direction and lane count are separate facts. Major road-class widths
+  // retain room for two lanes even when both lanes travel the same way.
+  // Explicit source lane counts still take precedence in normalizedCrossSection.
   if (/^(motorway|trunk)(?:_link)?$/.test(kind)) return kind.endsWith('_link') ? 1 : 2;
   if (/^(primary|secondary|tertiary)(?:_link)?$/.test(kind)) return kind.endsWith('_link') ? 1 : 2;
+  if (normalizedDirection(tags) === 'forward' || normalizedDirection(tags) === 'reverse') return 1;
   return kind.endsWith('_link') ? 1 : 2;
 }
 
@@ -185,22 +189,52 @@ function normalizedCrossSection(tags = {}) {
   const highway = sourceString(tags.highway).toLowerCase();
   const explicitWidth = parseMeters(tags.width || tags['width:carriageway']);
   const explicitLanes = parseLaneCount(tags.lanes);
-  const lanes = explicitLanes ?? defaultLaneCount(highway, tags);
+  let lanes = explicitLanes ?? defaultLaneCount(highway, tags);
   let widthMeters;
   let widthSource;
   const parking = {};
   for (const side of ['left', 'right']) {
     const modern = sourceString(tags[`parking:${side}`] || tags['parking:both']).toLowerCase();
-    const legacy = sourceString(tags[`parking:lane:${side}`] || tags['parking:lane:both']).toLowerCase();
-    const orientation = sourceString(tags[`parking:${side}:orientation`] || tags['parking:both:orientation'] || legacy || 'parallel').toLowerCase();
-    const legacyPosition = sourceString(tags[`parking:lane:${side}:${orientation}`] || tags[`parking:lane:both:${orientation}`]).toLowerCase();
-    const onCarriageway = modern ? modern === 'lane' : /^(parallel|diagonal|perpendicular)$/.test(legacy) && (!legacyPosition || legacyPosition === 'on_street');
+    const legacy = sourceString(
+      tags[`parking:lane:${side}`] || tags['parking:lane:both']
+    ).toLowerCase();
+    const orientation = sourceString(
+      tags[`parking:${side}:orientation`] ||
+        tags['parking:both:orientation'] ||
+        legacy ||
+        'parallel'
+    ).toLowerCase();
+    const legacyPosition = sourceString(
+      tags[`parking:lane:${side}:${orientation}`] || tags[`parking:lane:both:${orientation}`]
+    ).toLowerCase();
+    const onCarriageway = modern
+      ? modern === 'lane'
+      : /^(parallel|diagonal|perpendicular)$/.test(legacy) &&
+        (!legacyPosition || legacyPosition === 'on_street');
     const supplied = parseMeters(tags[`parking:${side}:width`] || tags['parking:both:width']);
-    const inferredWidth = orientation === 'perpendicular' ? 5 : orientation === 'diagonal' ? 4.5 : 2;
+    const inferredWidth =
+      orientation === 'perpendicular' ? 5 : orientation === 'diagonal' ? 4.5 : 2;
     parking[side] = Object.freeze({
-      widthMeters: onCarriageway ? (Number.isFinite(supplied) && supplied > 0 && supplied <= 8 ? supplied : inferredWidth) : 0,
-      source: !onCarriageway ? 'not-on-carriageway' : Number.isFinite(supplied) && supplied > 0 && supplied <= 8 ? 'source:parking-width' : 'inferred:parking-orientation'
+      widthMeters: onCarriageway
+        ? Number.isFinite(supplied) && supplied > 0 && supplied <= 8
+          ? supplied
+          : inferredWidth
+        : 0,
+      source: !onCarriageway
+        ? 'not-on-carriageway'
+        : Number.isFinite(supplied) && supplied > 0 && supplied <= 8
+          ? 'source:parking-width'
+          : 'inferred:parking-orientation',
     });
+  }
+  if (
+    !Number.isFinite(explicitLanes) &&
+    Number.isFinite(explicitWidth) &&
+    ['forward', 'reverse'].includes(normalizedDirection(tags)) &&
+    explicitWidth - parking.left.widthMeters - parking.right.widthMeters <
+      2 * laneWidthMeters(highway)
+  ) {
+    lanes = 1;
   }
   if (Number.isFinite(explicitWidth) && explicitWidth > 0) {
     widthMeters = explicitWidth;
@@ -235,7 +269,7 @@ function normalizedCrossSection(tags = {}) {
     inferredLanes: !Number.isFinite(explicitLanes),
     inferredWidth: !(Number.isFinite(explicitWidth) && explicitWidth > 0),
     parking: Object.freeze(parking),
-    placement: normalizedPlacement(tags, lanes, boundedWidth)
+    placement: normalizedPlacement(tags, lanes, boundedWidth),
   });
 }
 

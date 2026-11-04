@@ -1,4 +1,12 @@
 // @ts-check
+// Accommodate ordinary 20–60 Hz display intervals while limiting catch-up to
+// three fixed updates. Longer stalls still discard debt on the current frame.
+export const WORLD_SIMULATION_CLOCK = Object.freeze({
+  fixedDelta: 1 / 60,
+  maxDelta: 0.1,
+  maxFixedSteps: 3,
+});
+
 // Accept a bounded interval. Backlog beyond this frame's simulation capacity is
 // deliberately discarded; presentation and network leases have separate clocks.
 /** @param {number} elapsed @param {number} capacity */

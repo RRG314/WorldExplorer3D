@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import {ctx} from '../app/js/shared-context.js?v=55';
 import {configureSpaceRuntimeDependencies,updateSpaceFlightCamera} from '../app/js/space/runtime.js';
 import {createRuntimeKernel} from '../app/js/runtime/kernel.js';
-import {acceptedSimulationDelta,frameDamping} from '../app/js/runtime/simulation-clock.js';
+import {acceptedSimulationDelta,frameDamping,WORLD_SIMULATION_CLOCK} from '../app/js/runtime/simulation-clock.js';
 configureSpaceRuntimeDependencies({THREE});
 test('actual Space overview and chase position response matches 30/60/120 Hz',()=>{
  for(const overviewMode of ['inner',null]){
@@ -77,5 +77,47 @@ test('mixed normal display intervals retain elapsed movement time and bounded fi
       assert.ok(Math.abs(player - population) < 1 / 60 + 1e-9);
     }
   assert.ok(Math.abs(player - time / 1000) < 1e-9);
+  kernel.dispose();
+});
+
+test('production clock retains 16.7/33.4/50 ms driving intervals and discards long-stall debt', () => {
+  const kernel = createRuntimeKernel(WORLD_SIMULATION_CLOCK);
+  let variableTime = 0,
+    fixedTime = 0,
+    steps = 0;
+  kernel.registerSystem({
+    id: 'traffic',
+    fixedUpdate(frame) {
+      fixedTime += frame.dt;
+      steps++;
+    },
+  });
+  kernel.registerSystem({
+    id: 'driver',
+    update(frame) {
+      variableTime += frame.dt;
+    },
+  });
+  let timestamp = 0;
+  kernel.runFrame(timestamp);
+  const advance = (seconds) => {
+    const before = variableTime;
+    steps = 0;
+    timestamp += seconds * 1000;
+    kernel.runFrame(timestamp);
+    assert.ok(steps <= 3);
+    assert.ok(Math.abs(variableTime - fixedTime) < 1 / 60 + 1e-9);
+    return variableTime - before;
+  };
+  for (let i = 0; i < 150; i++)
+    for (const seconds of [0.0167, 0.0334, 0.0166, 0.05])
+      assert.ok(Math.abs(advance(seconds) - seconds) < 1e-10);
+  assert.ok(Math.abs(variableTime - timestamp / 1000) < 1e-9);
+  for (const seconds of [0.1, 0.25, 1]) {
+    assert.ok(Math.abs(advance(seconds) - 0.05) < 1e-10);
+    assert.ok(Math.abs(advance(1 / 60) - 1 / 60) < 1e-10);
+  }
+  assert.equal(kernel.snapshot().maxFixedSteps, 3);
+  assert.equal(kernel.snapshot().simulationCapacity, 0.05);
   kernel.dispose();
 });

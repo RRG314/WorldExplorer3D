@@ -1,4 +1,5 @@
 import {PAVEMENT_NORMAL_CREASE_RADIANS} from './road-crease-normals.js';
+import {roadMarkingJunctionClearance,markingSpansOutsideJunctions} from './road-marking-clearance.js';
 import {reviewedRoadEdgeRecipe} from '../world/reviewed-road-edge-source.js';
 import {createRoadRegionLease} from './road-region-lease.js';
 import {hasReviewedPavement} from '../world/compiler/reviewed-deck-profile.js';
@@ -67,48 +68,56 @@ export function shouldRenderRoadCenterMarkings(road) {
   return road?.structureSemantics?.terrainMode !== 'elevated';
 }
 
-export function appendRoadCenterMarkings(road, points, outputVerts, outputIndices, widthSamplesMeters = null, surfaceHeightAt = (x,z)=>sampleFeatureSurfaceY(road,x,z), contactIndex = null) {
-  const targetVerts=[], targetIndices=[];
-  if (
-    !shouldRenderRoadCenterMarkings(road) ||
-    !Array.isArray(points) ||
-    points.length < 2
-  ) return;
+export function appendRoadCenterMarkings(
+  road,
+  points,
+  outputVerts,
+  outputIndices,
+  widthSamplesMeters = null,
+  surfaceHeightAt = (x, z) => sampleFeatureSurfaceY(road, x, z),
+  contactIndex = null
+) {
+  const targetVerts = [],
+    targetIndices = [];
+  if (!shouldRenderRoadCenterMarkings(road) || !Array.isArray(points) || points.length < 2) return;
 
   const markHalfWidth = 0.15;
   const dashLength = 6;
   const patternLength = 12;
   const laneCount = Math.max(1, Number(road?.transportRecord?.crossSection?.lanes) || 1);
+  const junctionClearance = roadMarkingJunctionClearance(road);
   let distanceBeforeSegment = 0;
   for (let index = 0; index < points.length - 1; index += 1) {
-      const corridorOffset = roadPlacementOffsetWorld(road,index,.5);
-      const start = points[index];
-      const end = points[index + 1];
-      const dx = end.x - start.x;
-      const dz = end.z - start.z;
-      const segmentLength = Math.hypot(dx, dz);
-      if (!(segmentLength > 1e-5)) continue;
-      const localWidth = Math.min(
-        Number(widthSamplesMeters?.[index]) || Number(road.width) || 0,
-        Number(widthSamplesMeters?.[index + 1]) || Number(road.width) || 0
-      );
-      if (localWidth < 8.4) {
-        distanceBeforeSegment += segmentLength;
-        continue;
-      }
-      const dirX = dx / segmentLength;
-      const dirZ = dz / segmentLength;
-      const normalX = -dirZ;
-      const normalZ = dirX;
-      const markingOffsets = Array.from({ length: Math.max(1, laneCount - 1) }, (_, laneIndex) =>
-        laneCount > 1
-          ? -localWidth * 0.5 + localWidth * (laneIndex + 1) / laneCount
-          : 0
-      );
-      for (const laneOffset of markingOffsets) {
-        const lateralOffset = corridorOffset + laneOffset;
-        let localDistance = 0;
-        while (localDistance < segmentLength) {
+    const corridorOffset = roadPlacementOffsetWorld(road, index, 0.5);
+    const start = points[index];
+    const end = points[index + 1];
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const segmentLength = Math.hypot(dx, dz);
+    if (!(segmentLength > 1e-5)) continue;
+    const localWidth = Math.min(
+      Number(widthSamplesMeters?.[index]) || Number(road.width) || 0,
+      Number(widthSamplesMeters?.[index + 1]) || Number(road.width) || 0
+    );
+    // Road width is in world units. The previous 8.4-unit cutoff discarded
+    // paint from ordinary 6.9 m two-lane streets even with an admitted lane
+    // count. Keep narrow single-track roads unpainted, using physical width.
+    const widthMeters = localWidth * (Number(road.metersPerWorldUnit) || 1);
+    if (widthMeters < (laneCount > 1 ? Math.max(5, laneCount * 2.4) : 8.4)) {
+      distanceBeforeSegment += segmentLength;
+      continue;
+    }
+    const dirX = dx / segmentLength;
+    const dirZ = dz / segmentLength;
+    const normalX = -dirZ;
+    const normalZ = dirX;
+    const markingOffsets = Array.from({ length: Math.max(1, laneCount - 1) }, (_, laneIndex) =>
+      laneCount > 1 ? -localWidth * 0.5 + (localWidth * (laneIndex + 1)) / laneCount : 0
+    );
+    for (const laneOffset of markingOffsets) {
+      const lateralOffset = corridorOffset + laneOffset;
+      let localDistance = 0;
+      while (localDistance < segmentLength) {
         const globalDistance = distanceBeforeSegment + localDistance;
         const phase = ((globalDistance % patternLength) + patternLength) % patternLength;
         const advanceToDash = phase < dashLength ? 0 : patternLength - phase;
@@ -117,60 +126,84 @@ export function appendRoadCenterMarkings(road, points, outputVerts, outputIndice
         const activePhase = (distanceBeforeSegment + dashStart) % patternLength;
         const availableDash = dashLength - activePhase;
         const dashEnd = Math.min(segmentLength, dashStart + Math.max(0.01, availableDash));
-        const x1 = start.x + dirX * dashStart + normalX * lateralOffset;
-        const z1 = start.z + dirZ * dashStart + normalZ * lateralOffset;
-        const x2 = start.x + dirX * dashEnd + normalX * lateralOffset;
-        const z2 = start.z + dirZ * dashEnd + normalZ * lateralOffset;
-        const y1 = surfaceHeightAt(x1, z1) + 0.012;
-        const y2 = surfaceHeightAt(x2, z2) + 0.012;
-        if (Number.isFinite(y1) && Number.isFinite(y2)) {
-          const baseVertex = targetVerts.length / 3;
-          targetVerts.push(
-            x1 + normalX * markHalfWidth, y1, z1 + normalZ * markHalfWidth,
-            x1 - normalX * markHalfWidth, y1, z1 - normalZ * markHalfWidth,
-            x2 + normalX * markHalfWidth, y2, z2 + normalZ * markHalfWidth,
-            x2 - normalX * markHalfWidth, y2, z2 - normalZ * markHalfWidth
-          );
-          targetIndices.push(
-            baseVertex, baseVertex + 2, baseVertex + 1,
-            baseVertex + 1, baseVertex + 2, baseVertex + 3
-          );
+        for (const [paintFrom, paintTo] of markingSpansOutsideJunctions(
+          distanceBeforeSegment + dashStart,
+          distanceBeforeSegment + dashEnd,
+          junctionClearance
+        )) {
+          const x1 = start.x + dirX * (paintFrom - distanceBeforeSegment) + normalX * lateralOffset;
+          const z1 = start.z + dirZ * (paintFrom - distanceBeforeSegment) + normalZ * lateralOffset;
+          const x2 = start.x + dirX * (paintTo - distanceBeforeSegment) + normalX * lateralOffset;
+          const z2 = start.z + dirZ * (paintTo - distanceBeforeSegment) + normalZ * lateralOffset;
+          const y1 = surfaceHeightAt(x1, z1) + 0.012;
+          const y2 = surfaceHeightAt(x2, z2) + 0.012;
+          if (Number.isFinite(y1) && Number.isFinite(y2)) {
+            const baseVertex = targetVerts.length / 3;
+            targetVerts.push(
+              x1 + normalX * markHalfWidth,
+              y1,
+              z1 + normalZ * markHalfWidth,
+              x1 - normalX * markHalfWidth,
+              y1,
+              z1 - normalZ * markHalfWidth,
+              x2 + normalX * markHalfWidth,
+              y2,
+              z2 + normalZ * markHalfWidth,
+              x2 - normalX * markHalfWidth,
+              y2,
+              z2 - normalZ * markHalfWidth
+            );
+            targetIndices.push(
+              baseVertex,
+              baseVertex + 2,
+              baseVertex + 1,
+              baseVertex + 1,
+              baseVertex + 2,
+              baseVertex + 3
+            );
+          }
         }
         localDistance = Math.max(dashEnd, dashStart + 0.01);
         const newPhase = (distanceBeforeSegment + localDistance) % patternLength;
         if (newPhase < dashLength) localDistance += dashLength - newPhase;
-        }
       }
-      distanceBeforeSegment += segmentLength;
+    }
+    distanceBeforeSegment += segmentLength;
   }
-  for(let i=0;i<targetVerts.length;i+=3) targetVerts[i+1]=surfaceHeightAt(targetVerts[i],targetVerts[i+2])+.012;
-  if(contactIndex){
+  for (let i = 0; i < targetVerts.length; i += 3)
+    targetVerts[i + 1] = surfaceHeightAt(targetVerts[i], targetVerts[i + 2]) + 0.012;
+  if (contactIndex) {
     // Clip each complete dash once. Splitting its rectangle first introduces
     // an arbitrary diagonal into every terrain-support fragment, doubling
     // queries and creating extra triangles on the same planar surface.
     if (typeof contactIndex.projectPolygon === 'function') {
       for (let start = 0; start < targetVerts.length; start += 12) {
-        const points = [0, 2, 3, 1].map(vertex => ({x:targetVerts[start+vertex*3],z:targetVerts[start+vertex*3+2]}));
-        const projected = contactIndex.projectPolygon(points,.012,'at_grade');
+        const points = [0, 2, 3, 1].map((vertex) => ({
+          x: targetVerts[start + vertex * 3],
+          z: targetVerts[start + vertex * 3 + 2],
+        }));
+        const projected = contactIndex.projectPolygon(points, 0.012, 'at_grade');
         const base = outputVerts.length / 3;
         for (const value of projected) outputVerts.push(value);
         for (let index = 0; index < projected.length / 3; index++) outputIndices.push(base + index);
       }
     } else {
       // Compatibility for callers that only expose the triangle interface.
-      for(let i=0;i<targetIndices.length;i+=3){
-        const points=targetIndices.slice(i,i+3).map(j=>({x:targetVerts[j*3],z:targetVerts[j*3+2]}));
-        const projected=contactIndex.projectTriangle(points,.012,'at_grade');
-        const base=outputVerts.length/3;
-        for(const v of projected)outputVerts.push(v);
-        for(let j=0;j<projected.length/3;j++)outputIndices.push(base+j);
+      for (let i = 0; i < targetIndices.length; i += 3) {
+        const points = targetIndices
+          .slice(i, i + 3)
+          .map((j) => ({ x: targetVerts[j * 3], z: targetVerts[j * 3 + 2] }));
+        const projected = contactIndex.projectTriangle(points, 0.012, 'at_grade');
+        const base = outputVerts.length / 3;
+        for (const v of projected) outputVerts.push(v);
+        for (let j = 0; j < projected.length / 3; j++) outputIndices.push(base + j);
       }
     }
     return;
   }
-  const base=outputVerts.length/3;
-  for(const v of targetVerts)outputVerts.push(v);
-  for(const i of targetIndices)outputIndices.push(i+base);
+  const base = outputVerts.length / 3;
+  for (const v of targetVerts) outputVerts.push(v);
+  for (const i of targetIndices) outputIndices.push(i + base);
 }
 
 export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5, baseHeightAt = null) {

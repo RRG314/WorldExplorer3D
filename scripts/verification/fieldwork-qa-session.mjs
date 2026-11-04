@@ -4,7 +4,7 @@ import {chromium} from 'playwright';
 import {closeOwnedBrowser, withinDeadline} from './owned-browser.mjs';
 import {createHostResourceGuard} from './host-resource-guard.mjs';
 
-export async function createFieldworkQaSession({output, careerId, rootDir = process.cwd(), maximumDurationMs = 12 * 60 * 1000, walkLegMaximumDurationMs = 22000}) {
+export async function createFieldworkQaSession({output, careerId, rootDir = process.cwd(), maximumDurationMs = 12 * 60 * 1000, walkLegMaximumDurationMs = 22000, pageOptions = {}}) {
   await fs.mkdir(output, {recursive: true});
   let server, browser, page;
   const report = {scope: 'Actual source world; keyboard walking with controlled facing, no position teleport or time advance. Disposable browser data; production unchanged.', checks: [], errors: [], providerErrors: []};
@@ -14,7 +14,10 @@ export async function createFieldworkQaSession({output, careerId, rootDir = proc
   try {
     server = await chromium.launchServer({channel: 'chrome', headless: true, host: '127.0.0.1'});
     report.ownedBrowserPid = server.process().pid; browser = await chromium.connect(server.wsEndpoint());
-    page = await browser.newPage({viewport: {width: 1280, height: 800}});
+    page = await browser.newPage({viewport: {width: 1280, height: 800}, ...pageOptions});
+    page.setDefaultTimeout(10000);
+    page.setDefaultNavigationTimeout(120000);
+    await fs.writeFile(`${output}/owned-task.json`,JSON.stringify({ownedBrowserPid:report.ownedBrowserPid,startedAt:Date.now(),scope:'Disposable owned verification browser; ordinary Chrome is preserved'})+'\n');
     page.on('pageerror', error => report.errors.push(error.message));
     page.on('console', message => {if (message.type() === 'error') report.providerErrors.push(message.text().replace(/https?:\/\/\S+/g, '[provider]'));});
   } catch (error) {guard.dispose(); await server?.close().catch(() => {}); throw error;}
