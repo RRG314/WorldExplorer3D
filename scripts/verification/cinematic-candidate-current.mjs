@@ -94,7 +94,9 @@ try {
   await page.locator('[data-intro-group=all]').click();
   await page.locator('[data-intro-career="career:geologist"]').click();
   await page.locator('#playerIntroduction [data-intro=next]').click();
-  await page.locator('#playerIntroduction canvas[data-asset-id="vehicle-bmw-525i-e34"]').waitFor({ state: 'visible', timeout: 45000 });
+  await page
+    .locator('#playerIntroduction canvas[data-asset-id="vehicle-bmw-525i-e34"]')
+    .waitFor({ state: 'visible', timeout: 45000 });
   await shot('original-owned-bmw');
   await page.locator('#playerIntroduction [data-intro=next]').click();
   assert.equal(await page.locator('#introGuided').isChecked(), true);
@@ -103,8 +105,14 @@ try {
     ['Kyoto, Japan', 33, 37, 133, 137],
     ['10 Downing Street, London', 51, 52, -1, 1],
   ]) {
-    await page.locator('#globeLocationSearch').fill(query);
-    await page.locator('#globeLocationSearch').press('Enter');
+    await page
+      .locator('#globeLocationSearch:visible, #globeMobileLocationSearch:visible')
+      .first()
+      .fill(query);
+    await page
+      .locator('#globeLocationSearch:visible, #globeMobileLocationSearch:visible')
+      .first()
+      .press('Enter');
     await page
       .locator('#globeLocationSearchResults button')
       .first()
@@ -118,8 +126,14 @@ try {
     report.checks.push({ search: query, lat: p.lat, lon: p.lon });
   }
   await shot('live-address-on-original-globe');
-  await page.locator('#globeLocationSearch').fill('39.2904, -76.6122');
-  await page.locator('#globeLocationSearch').press('Enter');
+  await page
+    .locator('#globeLocationSearch:visible, #globeMobileLocationSearch:visible')
+    .first()
+    .fill('39.2904, -76.6122');
+  await page
+    .locator('#globeLocationSearch:visible, #globeMobileLocationSearch:visible')
+    .first()
+    .press('Enter');
   await page.waitForFunction(
     () => Math.abs(Number(document.getElementById('globeCustomLat').value) - 39.2904) < 0.000001
   );
@@ -145,6 +159,21 @@ try {
   assert.equal(tutorial.enabled, true);
   assert.equal(tutorial.skipped, false);
   report.guidance = tutorial;
+  const covered = await page.evaluate(() => {
+    const c = document.getElementById('tutorialHintCard').getBoundingClientRect();
+    return [...document.querySelectorAll('#mobileMovePad,#mobileLookPad,#mobileActionStack button')]
+      .filter((e) => {
+        const r = e.getBoundingClientRect();
+        return (
+          r.width &&
+          r.height &&
+          Math.min(r.right, c.right) - Math.max(r.left, c.left) > 1 &&
+          Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top) > 1
+        );
+      })
+      .map((e) => e.id);
+  });
+  assert.deepEqual(covered, [], 'Optional first steps cover touch controls');
   await shot('saved-explorer-and-native-first-steps');
   report.checks.push('saved-introduction-and-original-guided-first-session');
   await page.evaluate(() => candidateCtx.renderer.domElement.focus());

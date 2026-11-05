@@ -751,13 +751,16 @@ body.start-hub-open #flowerChallengePanel {
   .globe-selector-side::after { display: none; }
   .globe-mobile-search {
     display: grid;
+    order: -1;
     grid-template-columns: minmax(0, 1fr) auto;
     margin-bottom: 10px;
   }
+  .globe-search-feedback { order: -1; }
   .globe-mobile-search input {
     min-width: 0;
-    min-height: 44px;
-  height: auto;
+    min-height: var(--wx-control-height);
+    height: auto;
+    font: 500 var(--wx-type-control)/1.35 var(--wx-font-ui);
     padding: 0 10px;
     color: var(--hub-text);
     background: var(--hub-input);
@@ -771,7 +774,7 @@ body.start-hub-open #flowerChallengePanel {
     background: var(--wx-selected);
     border: 1px solid var(--hub-blue);
     border-radius: 0;
-    font: 700 9px/1 var(--wx-font-ui);
+    font: 700 var(--wx-type-control)/1.35 var(--wx-font-ui);
     text-transform: uppercase;
   }
   .globe-selector-stat { padding-top: 8px; }
@@ -808,7 +811,7 @@ body.start-hub-open #flowerChallengePanel {
   .globe-selector-top { grid-column: 2; grid-row: 1; }
   .globe-selector-stage { grid-column: 1; grid-row: 2; min-height: 0; }
   .globe-selector-side { grid-column: 2; grid-row: 2; min-height: 0; overflow-y: auto; padding: 10px; gap: 8px; border-top: 0; border-left: 1px solid var(--hub-line); }
-  .globe-selector-side::before, .globe-mobile-search { display: none; }
+  .globe-selector-side::before { display: none; }
   .globe-destination-bar { grid-column: 1; grid-row: 2; align-self: end; z-index: 4; background: var(--hub-bar); }
   .globe-selector-zoom-controls { top: 8px; transform: none; }
 }

@@ -176,6 +176,12 @@ body:not(:has(#floatMenuContainer.show)) :is(#explorerGameHeader, #explorerOppor
 #tutorialHintCard[data-guidance-requested='true']:not([hidden]) {
   display: block !important;
 }
+/* Touch controls can be enabled on a wide display without a coarse primary
+   pointer. Reserve their real screen area whenever the native controls show. */
+body:has(#mobileTouchControls.show) #tutorialHintCard[data-guidance-requested='true'] {
+  bottom: max(360px, calc(env(safe-area-inset-bottom) + 352px));
+  max-height: calc(100dvh - 386px - env(safe-area-inset-top));
+}
 @media (max-height: 520px) and (orientation: landscape) {
   #tutorialHintCard[data-guidance-requested='true'] {
     top: max(100px, calc(env(safe-area-inset-top) + 92px));
@@ -185,6 +191,31 @@ body:not(:has(#floatMenuContainer.show)) :is(#explorerGameHeader, #explorerOppor
     transform: translateX(-50%);
     width: min(420px, calc(100vw - 280px));
     max-height: calc(100dvh - 240px);
+  }
+  body:has(#mobileTouchControls.show) #tutorialHintCard[data-guidance-requested='true'] {
+    top: max(156px, calc(env(safe-area-inset-top) + 148px));
+    bottom: auto;
+    left: max(156px, calc(env(safe-area-inset-left) + 148px));
+    right: auto;
+    transform: none;
+    width: min(360px, calc(100vw - 312px));
+    max-height: calc(100dvh - 244px);
+  }
+  #tutorialHintCard .tutorial-eyebrow { display: none; }
+  #tutorialHintCard .tutorial-details-btn {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    font-size: 0;
+  }
+  #tutorialHintCard .tutorial-details-btn::before {
+    content: 'ⓘ';
+    font: 700 24px/1 var(--wx-font-ui);
+  }
+}
+@media (max-width: 759px) and (max-height: 520px) and (orientation: landscape) {
+  body:has(#mobileTouchControls.show) #tutorialHintCard[data-guidance-requested='true'] {
+    max-height: calc(100dvh - 288px);
   }
 }
 #hud {
