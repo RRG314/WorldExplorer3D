@@ -1,5 +1,7 @@
 # Cinematic application staging acceptance
 
+November5 follow-up: the preview now includes the [globe-selector space correction](GLOBE-SELECTOR-SPACE-REVIEW.md), build `5.6.1+7b53b2bd7d8c.6672d431963a3ef2.staging`. The original application evidence below is retained; only the selector layout and adjacent controls changed.
+
 The selected A / B / Field design is implemented in the application. The five stops in [the delivery contract](CINEMATIC-APP-DELIVERY.md) are closed for this staging delivery. GitHub remains unchanged under the owner's publication freeze. Production deployment is prohibited.
 
 Preview: https://we3d-staging-20260712--trail-20261104-78mwznd9.web.app/app/
