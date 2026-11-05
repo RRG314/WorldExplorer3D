@@ -8,7 +8,7 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
  <nav class="experience-tabs" role="tablist" aria-label="Activities"><button type="button" role="tab" data-experience-view="continue" aria-selected="false" tabindex="-1">Continue</button><button type="button" role="tab" data-experience-view="careers" aria-selected="true">Careers</button><button type="button" role="tab" data-experience-view="quick" aria-selected="false" tabindex="-1">Quick play</button></nav>
  <p class="experience-status" role="status" aria-live="polite"></p><div class="experience-body"><section class="experience-list-pane"><div class="experience-intro"><h3>Follow your curiosity.</h3><p>Choose a pursuit, keep your discoveries and return when you are ready. Free exploration is always available.</p></div><label class="experience-search">Find an activity<input type="search" maxlength="100" placeholder="Search careers and games" aria-label="Find an activity"></label><div class="experience-groups" role="group" aria-label="Career interests"></div><div class="experience-list" role="region" aria-label="Activity choices"></div></section><section class="experience-detail" tabindex="-1" aria-label="Assignment details"></section></div>`;
  documentRef.body.append(dialog);
- const find=selector=>dialog.querySelector(selector),list=find('.experience-list'),detail=find('.experience-detail'),search=find('input'),status=find('.experience-status');
+ const find=selector=>dialog.querySelector(selector),list=find('.experience-list'),scrollPane=find('.experience-list-pane'),detail=find('.experience-detail'),search=find('input'),status=find('.experience-status');
  const selections=new Map();
  let variantId='campaign';
  let view='careers',group='all',selected='',profile=null,revision=0,busy=false,origin=null,detailOpen=false,places=[],placeId='',returnScroll=0;
@@ -53,9 +53,9 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
   const button=event.target.closest('button');if(!button||busy)return;
   if(button.hasAttribute('data-experience-close')){close();return;}
   if(button.dataset.experienceGroup&&EXPERIENCE_GROUPS.some(item=>item.id===button.dataset.experienceGroup)){group=button.dataset.experienceGroup;detailOpen=false;render();find(`[data-experience-group="${group}"]`)?.focus();return;}
-  if(button.hasAttribute('data-experience-back')){detailOpen=false;render();list.scrollTop=returnScroll;list.querySelector(`[data-experience-id="${selected}"]`)?.focus();return;}
+  if(button.hasAttribute('data-experience-back')){detailOpen=false;render();scrollPane.scrollTop=returnScroll;list.querySelector(`[data-experience-id="${selected}"]`)?.focus();return;}
   if(button.dataset.experienceView||button.hasAttribute('data-browse-careers')){view=button.dataset.experienceView||'careers';detailOpen=false;message('');render();return;}
-  if(button.dataset.experienceId){returnScroll=list.scrollTop;void select(button.dataset.experienceId);return;}
+  if(button.dataset.experienceId){returnScroll=scrollPane.scrollTop;void select(button.dataset.experienceId);return;}
   if(button.hasAttribute('data-experience-prepare')){const adapter=adapterFor(experienceById(selected));close();await adapter?.prepare?.();return;}
   if(button.hasAttribute('data-experience-journal')){close();onJournal();return;}
   if(button.hasAttribute('data-experience-begin')||button.hasAttribute('data-experience-recovery')){

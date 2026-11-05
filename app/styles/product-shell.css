@@ -25,6 +25,9 @@
   .experience-browser .experience-groups button { flex: none; padding: 8px 14px; white-space: nowrap; border-radius: var(--wx-radius-control); font-size: var(--wx-type-meta); background: transparent; }
   .experience-browser .experience-groups button[aria-pressed="true"] { color: var(--wx-action-text); background: var(--wx-action); border-color: var(--wx-action); }
   .experience-list { flex: 1; min-height: 0; }
+  .experience-browser:not(.research-station) .experience-list-pane { overflow-y: auto; overscroll-behavior: contain; }
+  .experience-browser:not(.research-station) .experience-list { flex: none; overflow: visible; }
+  .experience-intro { flex: none; }
   .experience-browser[data-detail="false"] .experience-list { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
   .experience-browser .experience-card { border-radius: var(--wx-radius-panel); padding: 0 0 18px; overflow: hidden; align-content: start; height: 100%; gap: 6px; background: var(--wx-panel-soft); border-color: var(--wx-line-soft); }
   .experience-card img { display: block; width: 100%; height: 130px; object-fit: cover; margin-bottom: 8px; }
