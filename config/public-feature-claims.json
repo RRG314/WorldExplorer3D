@@ -49,7 +49,7 @@
       "status": "candidate-verified",
       "source": {
         "file": "README.md",
-        "pattern": "Choose a location, step into a bounded playable world"
+        "pattern": "Each location opens a bounded playable area"
       },
       "evidenceCommands": [
         "verify:world",

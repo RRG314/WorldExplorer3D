@@ -69,8 +69,7 @@ rollback builds were preserved.
 
 These desktop/browser and backend checks do not establish physical-phone,
 headset or native-store acceptance. Existing mobile and VR lifecycle evidence
-is retained. See [known limitations](KNOWN_ISSUES.md) and the
-[release readiness record](docs/racing-rnd/RELEASE_READINESS.md).
+is retained. See [known limitations](KNOWN_ISSUES.md).
 
 Location-based play, optional continuous exploration, buildings, travel modes,
 Ocean, Space, saves and platform integration remain part of the same app.

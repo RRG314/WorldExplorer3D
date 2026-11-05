@@ -1,28 +1,30 @@
 # World Explorer 3D
 
-[Racing update](RELEASE_NOTES_RACING.md) · [5.6.1 release notes](RELEASE_NOTES_5.6.1.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
+[Play](https://worldexplorer3d.io/app/) · [Get the app](https://worldexplorer3d.io/about/download.html) · [5.7 release notes](RELEASE_NOTES_5.7.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
 [![Play in your browser](https://img.shields.io/badge/Play-in_your_browser-1677ff?style=flat-square)](https://worldexplorer3d.io/app/)
 [![Latest release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=release)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![Platform: WebGL](https://img.shields.io/badge/platform-WebGL-546e7a?style=flat-square)](https://worldexplorer3d.io/app/)
 [![License: Source Available](https://img.shields.io/badge/license-source_available-546e7a?style=flat-square)](LICENSE)
 
-World Explorer 3D is a browser-based world sandbox built around real places.
-Choose a location, step into a bounded playable world, and explore by land,
-water, air, or space. Discovery, vehicles, virtual property, persistent building,
-photo-based home improvements and shared rooms connect the experience.
+**The real world. Your next adventure.**
 
-The 5.6 update connects opening journeys, a walkable research ship, geographic
-ocean travel and a shared Journal. Explore furnished vessel rooms, deploy the
-submarine, and return with your findings. Visit the aquarium reef galleries
-or explore a museum collection from Baltimore’s streets. Distant Earth buildings keep
-more facade detail as scenery moves with you. Existing locations and progress
-remain part of the same game.
+Pick a place and see where it takes you. Explore real cities and wild places,
+drive real roads, build a home, or start a career. Go your own way or bring
+friends along—from familiar streets to the ocean floor and beyond Earth.
+
+Version **5.7.0** introduces a cinematic interface, guided explorer setup,
+nineteen available careers, starter homes and private personal saves across
+signed-in devices. Free exploration and the interactive globe remain available
+from the start. Each location opens a bounded playable area; optional continuous
+exploration brings surrounding terrain and buildings with you.
+
+![Exploring Baltimore by drone in World Explorer 3D 5.7](assets/gallery/5.7/drone-13189f8a014d.jpg)
 
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.6.1.md">5.6.1 release notes</a>
+  · <a href="RELEASE_NOTES_5.7.0.md">5.7 release notes</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
@@ -169,6 +171,13 @@ wildlife-presence, or safety service.
 - [Acknowledgements](ACKNOWLEDGEMENTS.md)
 
 Required map attribution: `© OpenStreetMap contributors`
+
+## Install on your device
+
+The full web app runs on supported phones, tablets and computers. Use
+[installation and downloads](https://worldexplorer3d.io/about/download.html) for
+browser installation and the signed Android APK. Google Play is in testing;
+the iPhone and iPad App Store edition is being prepared.
 
 ## Playing in your browser
 

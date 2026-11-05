@@ -4,6 +4,24 @@ import {readFileSync} from 'node:fs';
 // The public source tree contains product code, source assets, licenses,
 // dependency locks, useful tests and contributor documentation. Operator notes
 // and generated diagnostic evidence belong in private/ignored storage.
+const publicDocumentation=new Set([
+  "docs/ARCHITECTURE_MAP.md",
+  "docs/DEVELOPMENT_ENVIRONMENT_ISOLATION.md",
+  "docs/MARYLAND_PARCEL_SOURCES.md",
+  "docs/README.md",
+  "docs/RELEASE_VALIDATION.md",
+  "docs/SYSTEM_INVENTORY.md",
+  "docs/VERSIONING.md",
+  "docs/analytics/README.md",
+  "docs/aquarium-expansion/LICENSE-REVIEW.md",
+  "docs/aquarium-expansion/OPEN-SOURCE-ASSETS.md",
+  "docs/aquarium-expansion/SOURCE-PROVENANCE.json",
+  "docs/audits/2026-09-16-rdt-restoration/RDT-SPATIAL-LICENSE.txt",
+  "docs/interior-expansion/CONTENT-SOURCES.md",
+  "docs/interior-expansion/LICENSE-REVIEW.md",
+  "docs/visual-quality/assets/atlantic-explorer-submarine.json",
+  "docs/visual-quality/assets/ship-surfaces.json"
+]);
 const privateRoots=['docs/architecture-evaluation/','docs/audits/','docs/product-audit/','docs/aquarium-expansion/evidence/',
   'docs/system-review/','docs/verification/','docs/release-review/','docs/visual-quality/',
   'scripts/architecture-evaluation/'];
@@ -14,7 +32,9 @@ const sourceExceptions=new Set([
   'scripts/architecture-evaluation/tooling/package.json',
   'scripts/architecture-evaluation/tooling/package-lock.json'
 ]);
-const localOnly=new Set(['AGENTS.md','CURRENT-STATE.md','progress.md',
+const localOnly=new Set(['AGENTS.md','CURRENT-STATE.md','progress.md','report-source.md',
+  'COMMUNITY_REALITY_CAPTURE_RND.md','COMMUNITY_REALITY_CAPTURE_V1.md',
+  'scripts/verification/facility-navigation-current.mjs','scripts/verification/worldcover-browser-cache-current.mjs',
   ...['BASELINE','CHANGE-LEDGER','FINAL-REPORT','VERIFICATION'].map(name=>`docs/architecture-consolidation/${name}.md`),
   'docs/aquarium-expansion/FINAL-REPORT.md','docs/aquarium-expansion/VERIFICATION.md',
   'docs/streets/baseline-probes.json','docs/streets/street-system-inventory.json',
@@ -27,6 +47,7 @@ if(files.length<100)throw Error('Refusing to verify an empty or unrelated Git in
 const rejected=files.filter(file=>{
   if(sourceExceptions.has(file))return false;
   return localOnly.has(file)||privateRoots.some(root=>file.startsWith(root))||
+    file.startsWith('docs/')&&!publicDocumentation.has(file)||file.startsWith('scripts/research/')||
     /^docs\/streets\/(audit|validation|evidence)[^/]*\//.test(file)||
     /^(output|dist|public|_site|test-results|coverage|node_modules|\.firebase|\.playwright-cli|\.local-candidates|android-artifacts|android-widget-evidence|android-launch-evidence|apple-portal-evidence)\//.test(file)||
     /(^|\/)node_modules\//.test(file)||/\.private\./i.test(file)||/(^|\/)native-acceptance\.json$/.test(file)||

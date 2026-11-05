@@ -23,7 +23,7 @@ private and owner-only independently of any public exterior contribution.
 Unapproved photos and private processed assets are not public data sources and
 must only be delivered through the authorized short-lived asset broker.
 
-See [Community Reality Capture](COMMUNITY_REALITY_CAPTURE_V1.md) for contribution and publication boundaries.
+See the [privacy policy](https://worldexplorer3d.io/legal/privacy) for account data and contribution controls.
 
 ## Earth Geometry And Surfaces
 

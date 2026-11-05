@@ -16,7 +16,7 @@ Original photos stay protected; saving a draft does not publish it.
 
 The manual exterior workflow is now deployed, including protected uploads and
 review. Interiors and paid reconstruction are not part of the public workflow.
-See [release status](docs/RELEASE_AUDIT_2026_09_08.md) for remaining limitations.
+See [known limitations](KNOWN_ISSUES.md) for the current scope.
 
 ## More character in the landscape
 
@@ -51,5 +51,4 @@ Complex bridge and tunnel entrances, cold-start loading, and worldwide terrain
 detail still need work. This update does not turn incomplete map data into a
 survey-quality model of every place.
 
-Explore the [full project description](docs/PROJECT_DESCRIPTION.md),
-[controls](CONTROLS_REFERENCE.md), and [roadmap](ROADMAP.md).
+Explore the [project overview](README.md), [controls](CONTROLS_REFERENCE.md), and [roadmap](ROADMAP.md).
