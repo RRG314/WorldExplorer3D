@@ -21,3 +21,7 @@ Local source branch: `steven/cinematic-app-staging-20261105`, based on `7b54af3b
 S1–S4 are closed at the affected boundaries recorded in the local ledger: real saved introduction and storage-failure recovery, full globe roundtrip and live city/address search, nineteen released career admissions, original Geology entry/focus/Continue, genuine legacy Harbor Run continuation, native Home destinations, original five world launches/travel controllers, real200% text, touch/keyboard and model-lease cleanup. Existing complete domain procedures and72surface public-route acceptance are reused; no new laps or scientific methods were replayed.
 
 Required source/ownership214/boundary types/runtime/dependency checks passed. The initial4096-case suite passed4092 and exposed an obsolete search-timing fixture with three dependent cancellations; the corrected five-case lifecycle check (including a new slow-response cooldown regression),749-file inventory and sensitivity gate passed. The failed full log is preserved. S5 immutable package/hosted acceptance is still required. GitHub and production remain unchanged.
+
+## Delivery result
+
+S5 staging delivery is complete at the explicit scopes in [staging acceptance](CINEMATIC-APP-STAGING-ACCEPTANCE.md). The final preview is build `5.6.1+035355e41b6e.3d282d078712c03c.staging`. GitHub and production remain unchanged. Future production publication still needs its exact remote checks and human release review; this staging handoff does not authorize deployment to production.
