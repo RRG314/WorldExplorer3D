@@ -258,6 +258,67 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-app-rail button { letter-spacing: 0; }
 .globe-app-rail button span { font-size: 23px; }
 
+/* One viewport and a separate footer: metadata and world navigation never
+   reserve an invisible band or paint over the interactive globe. */
+.globe-selector-map {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+}
+.globe-selector-map > .globe-selector-stage {
+  grid-area: 1 / 1;
+  min-height: 0;
+  padding: 0;
+}
+.globe-map-footer {
+  grid-area: 2 / 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  min-height: 0;
+  background: var(--hub-bg);
+}
+.globe-map-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 4px 12px 0;
+  color: var(--hub-muted);
+  font: 500 calc(10px * var(--wx-text-scale, 1))/1.4 var(--wx-font-ui);
+}
+.globe-map-meta .globe-selector-basemap-attribution,
+.globe-map-meta output {
+  position: static;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+}
+.globe-map-meta .globe-selector-basemap-attribution:hover { text-decoration: underline; }
+.globe-map-meta .globe-selector-basemap-attribution:focus-visible { outline: 2px solid var(--wx-focus); outline-offset: 2px; }
+.globe-map-footer .globe-destination-bar {
+  position: static;
+  grid-area: auto;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 70px;
+  padding: 0 18px;
+  background: transparent;
+  border-radius: 0;
+}
+.globe-selector-hint[hidden] { display: none !important; }
 .globe-selector-stage {
   background-color: var(--wx-panel-solid);
   background-image: url('../assets/textures/universe/orion-nebula-nasa.jpg');
@@ -528,7 +589,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   background-image: url('../assets/textures/ui-thumbnails/space.jpg');
   background-size: cover;
 }
-#globeSelectorSpaceBtn { position: static; inset: auto; width: 70px; height: 70px; aspect-ratio: 1; border-radius: 50%; }
+#globeSelectorSpaceBtn { position: static; inset: auto; }
 .destination-thumb.ocean { background-image: url('../assets/textures/ui-thumbnails/ocean-gameplay-20261104.png'); background-position: center; }
 .globe-destination-bar button:hover .destination-thumb,
 .globe-destination-bar button.active .destination-thumb {
@@ -722,7 +783,7 @@ body.start-hub-open #flowerChallengePanel {
   body.start-hub-open #authFloatPanel { top: 106px; max-height: calc(100dvh - 118px); overflow-y: auto; }
   #globeSelectorScreen .globe-selector-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: 62px minmax(250px, 43vh) minmax(230px, 1fr) 86px;
+    grid-template-rows: 62px minmax(250px, 1.3fr) minmax(180px, 1fr) auto;
     height: calc(100dvh - 68px - env(safe-area-inset-bottom));
     min-height: 0;
     overflow: auto;
@@ -743,7 +804,11 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-tools { pointer-events: auto; }
   .globe-hub-tools button { flex-shrink: 0; width: 36px; height: 36px; }
   .globe-hub-tools #globeHubShareBtn { display: none; }
-  .globe-selector-stage { grid-column: 1; grid-row: 2; min-height: 250px; }
+  .globe-selector-map { display: contents; }
+  .globe-selector-map > .globe-selector-stage { grid-column: 1; grid-row: 2; min-height: 0; }
+  .globe-selector-map > .globe-map-footer { grid-column: 1; grid-row: 4; }
+  .globe-map-footer .globe-destination-bar { min-height: 52px; padding: 0; }
+  .globe-map-footer .globe-destination-bar button { width: 48px; height: 48px; }
   .globe-selector-side { grid-column: 1; grid-row: 3; border-left: 0; border-top: 1px solid var(--hub-line); }
   .globe-selector-side::before {
     display: none;
@@ -778,6 +843,8 @@ body.start-hub-open #flowerChallengePanel {
     text-transform: uppercase;
   }
   .globe-selector-stat { padding-top: 8px; }
+  .globe-selector-actions { display: flex; align-items: stretch; gap: 8px; }
+  .globe-selector-actions #globeSelectorBackBtn { flex: 0 0 auto; }
   .globe-selector-city-list { max-height: 150px; }
   .globe-location-search-results { max-height: 136px; }
   .globe-destination-bar { grid-column: 1; grid-row: 4; padding: 0; }
@@ -809,10 +876,11 @@ body.start-hub-open #flowerChallengePanel {
   }
   .globe-selector-brand { grid-column: 1; grid-row: 1; padding-right: 0; }
   .globe-selector-top { grid-column: 2; grid-row: 1; }
-  .globe-selector-stage { grid-column: 1; grid-row: 2; min-height: 0; }
+  .globe-selector-map { display: grid; grid-column: 1; grid-row: 2; }
+  .globe-selector-map > .globe-selector-stage { grid-area: 1 / 1; }
+  .globe-selector-map > .globe-map-footer { grid-area: 2 / 1; }
   .globe-selector-side { grid-column: 2; grid-row: 2; min-height: 0; overflow-y: auto; padding: 10px; gap: 8px; border-top: 0; border-left: 1px solid var(--hub-line); }
   .globe-selector-side::before { display: none; }
-  .globe-destination-bar { grid-column: 1; grid-row: 2; align-self: end; z-index: 4; background: var(--hub-bar); }
   .globe-selector-zoom-controls { top: 8px; transform: none; }
 }
 
@@ -831,11 +899,6 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-panel-host .loc-grid { grid-template-columns: 1fr; }
 }
 
-/* The short-window destination strip shares the stage row. Keep the renderer
-   above that real 72px reservation instead of drawing the globe behind it. */
-@media (min-width: 621px) and (max-height: 520px) {
-  #globeSelectorCanvas { height: calc(100% - 72px); bottom: 72px; }
-}
 
 /* The overlay keeps its viewport bounds across responsive grids and touch. */
 @media (max-width: 900px), (pointer: coarse) {

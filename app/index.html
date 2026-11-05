@@ -37,7 +37,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/universe.css?v=10">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=40">
-<link rel="stylesheet" href="styles/start-hub.css?v=25">
+<link rel="stylesheet" href="styles/start-hub.css?v=26">
 <link rel="stylesheet" href="styles/experiences.css?v=1">
 <link rel="stylesheet" href="styles/navigation.css?v=3">
 <link rel="stylesheet" href="styles/discovery.css?v=21">
@@ -52,7 +52,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/map-explorer.css?v=5">
 <link rel="stylesheet" href="styles/accessibility.css?v=5">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
-<link rel="stylesheet" href="styles/product-shell.css?v=1">
+<link rel="stylesheet" href="styles/product-shell.css?v=2">
 <link rel="stylesheet" href="styles/player-entry.css?v=1">
 <link rel="stylesheet" href="styles/gameplay-shell.css?v=3">
 </head>
@@ -750,8 +750,9 @@ Continue ocean exploration beyond the dive site
   <a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
 </nav>
 </div>
+<div class="globe-selector-map">
 <div class="globe-selector-stage">
-<canvas id="globeSelectorCanvas"></canvas>
+<canvas id="globeSelectorCanvas" aria-label="Choose a place on the globe" aria-describedby="globeSelectorGestureHint"></canvas>
 <div class="globe-selector-basemap-controls" role="group" aria-label="Globe map style">
   <button id="globeSelectorMapBasemapBtn" type="button" aria-pressed="false">Map</button>
   <button id="globeSelectorSatelliteBasemapBtn" class="active" type="button" aria-pressed="true">Satellite</button>
@@ -759,17 +760,22 @@ Continue ocean exploration beyond the dive site
 <div class="globe-selector-zoom-controls" role="group" aria-label="Globe zoom controls">
   <button id="globeSelectorZoomInBtn" type="button" aria-label="Zoom in">+</button>
   <button id="globeSelectorZoomOutBtn" type="button" aria-label="Zoom out">−</button>
-  <output id="globeSelectorScaleReadout" aria-live="polite">Global view</output>
+  </div>
 </div>
+<footer class="globe-map-footer">
+<div class="globe-map-meta">
 <a id="globeSelectorBasemapAttribution" class="globe-selector-basemap-attribution" href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Imagery © Esri and contributors</a>
-<div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
+<output id="globeSelectorScaleReadout" aria-live="polite">Global view</output>
 </div>
+<div id="globeSelectorGestureHint" class="globe-selector-hint" hidden>Drag to rotate · Scroll or pinch to zoom · Tap or click to pick. Quick Start explains the controls.</div>
 <div class="globe-destination-bar" aria-label="World destinations">
   <button id="globeSelectorEarthBtn" class="active" type="button" title="Explore Earth" aria-label="Explore Earth"><span class="destination-thumb earth" aria-hidden="true"></span></button>
   <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
   <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
   <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
   <button id="globeSelectorOceanBtn" type="button" title="Board a research vessel at eligible ocean coordinates" aria-label="Board a research vessel at eligible ocean coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
+</div>
+</footer>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="globeHubOverlayTitle" tabindex="-1">
   <header class="globe-hub-overlay-header">
