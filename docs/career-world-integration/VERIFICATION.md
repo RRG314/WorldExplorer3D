@@ -1,3 +1,9 @@
+# November 5 — Interactive globe correction
+
+The original game globe replaces the static screenshot, with arbitrary point/coordinate selection and intro location carry. A/B/Field is the owner's preferred preview configuration. Affected functional, visual and lifetime evidence, preserved failures and the local named-search service limitation are recorded in [GLOBE_REVISION.md](GLOBE_REVISION.md). No new deployment or whole-game acceptance is claimed.
+
+---
+
 # R&D verification receipt
 
 ## November 5 landing/introduction revision

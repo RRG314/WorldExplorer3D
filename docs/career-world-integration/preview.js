@@ -6,6 +6,7 @@ import {
 } from '../../app/js/ui/experience-presentation.js';
 import { runNativePrototypes } from './native-prototypes.js';
 import { createIntroSequence } from './intro-sequence.js';
+import { createInteractiveGlobe } from './interactive-globe.js';
 
 const $ = (s) => document.querySelector(s),
   escape = (s) =>
@@ -19,6 +20,7 @@ const captures = {
   ocean: ['research-deck-40e79f50319d.webp', 'Gameplay · research vessel'],
   space: ['space-fd854981b14d.webp', 'Gameplay · Solar System navigation'],
   moon: ['ship-interior-2070577970ce.webp', 'Gameplay · ship interior; lunar departure context'],
+  mars: ['space-fd854981b14d.webp', 'Gameplay · Solar System; Mars departure context'],
 };
 const models = {
   A: {
@@ -60,7 +62,7 @@ const intros = {
   C: 'Choose a place → explore immediately → accept help only when requested.',
 };
 const s = {
-  model: 'C',
+  model: 'A',
   intro: 'B',
   composition: 'field',
   device: 'desktop',
@@ -81,7 +83,9 @@ const s = {
   vehicleId: 'bmw_e34',
   vehicleLabel: 'BMW 525i E34',
   setupComplete: false,
+  destination: null,
 };
+let globeReturn = 'start';
 const introFlow = createIntroSequence({
   onChange: () => render(),
   onBegin: (draft) => {
@@ -93,11 +97,27 @@ const introFlow = createIntroSequence({
       vehicleId: draft.vehicleId,
       vehicleLabel: draft.vehicleLabel,
       world: draft.destination.world,
+      destination: draft.destination,
       setupComplete: true,
       prepared: true,
       screen: 'play',
     });
     render({ focus: true });
+  },
+});
+const globe = createInteractiveGlobe({
+  onUse: (place) => {
+    s.destination = place;
+    s.world = 'earth';
+    introFlow.setDestination(place);
+    s.screen = globeReturn === 'setup' ? 'setup' : 'play';
+    render({ focus: true });
+    $('#view').scrollIntoView({ block: 'start' });
+  },
+  onCancel: () => {
+    s.screen = globeReturn;
+    render({ focus: true });
+    $('#view').scrollIntoView({ block: 'start' });
   },
 });
 const params = new URLSearchParams(location.search);
@@ -182,31 +202,38 @@ function start() {
   <section class="landing-return"><div><span class="eyebrow">ALREADY AN EXPLORER?</span><h2>Your story keeps going.</h2><p>Return to your Journal, tools, vehicles and unfinished work. Choose a new direction whenever you like.</p></div><div class="actions">${button('Continue exploring', 'returning', 'primary')}${button('Open Journal', 'journal')}</div></section>`;
 }
 function worlds() {
+  const contexts = `<div class="destination-contexts" aria-label="Choose a world">${[
+    ['earth', 'earth.jpg', 'Earth'],
+    ['moon', 'moon.jpg', 'Moon'],
+    ['mars', 'mars.jpg', 'Mars'],
+    ['space', 'space.jpg', 'Space'],
+    ['ocean', 'ocean-gameplay-20261104.png', 'Ocean'],
+  ]
+    .map(
+      ([id, image, label]) =>
+        `<button data-world="${id}" aria-pressed="${s.world === id}"><img src="../../app/assets/textures/ui-thumbnails/${image}" alt="">${label}</button>`
+    )
+    .join('')}</div>`;
   return (
-    hero(
-      'Where to next?',
-      'Your interests never replace the globe. A destination opens the original world and its supported travel modes.',
-      {
-        image: {
-          src: asset('world-entry-7a23d5f7d4a7.webp'),
-          alt: 'Actual World Explorer globe selector',
-          caption: 'Gameplay · globe selector',
-        },
-        actions: button('Choose an activity here', 'experiences', 'primary'),
-      }
-    ) +
-    `<div class="content"><div class="chip-row">${Object.entries({
-      earth: '◎ Earth',
-      ocean: '≈ Ocean',
-      space: '✧ Space',
-      moon: '◒ Moon / planets',
-    })
-      .map(([id, l]) => `<button data-world="${id}" aria-pressed="${s.world === id}">${l}</button>`)
-      .join(
-        ''
-      )}</div><div class="cards">${card('Explore this destination', 'Start freely in the selected environment. No focus required.', button('Preview play screen', 'play', 'primary'))}${card('What works here?', 'See supported activities, equipment and a clear reason when travel is needed.', button('Browse activities', 'experiences'))}${card('Travel together', 'Use the existing room origin and admission. Career choices do not create a private world.', button('See crew view', 'crew'))}</div></div>`
+    contexts +
+    (s.world === 'earth'
+      ? '<div data-globe-host></div>'
+      : hero(
+          s.world === 'ocean'
+            ? 'The ocean awaits'
+            : s.world === 'moon'
+              ? 'Beyond Earth'
+              : 'A sky full of places',
+          'Explore this environment, or return to Earth to choose any point on the globe.',
+          {
+            actions:
+              button('Continue to this world', 'play', 'primary') +
+              '<button data-world="earth">Choose a place on Earth</button>',
+          }
+        ))
   );
 }
+
 function careers() {
   return `<div class="content">${heading('ONE EXPLORER · ALL INTERESTS', s.model === 'B' ? 'Discover through practice' : 'Choose a direction', 'This selection guides the preview only. Actual availability still belongs to each original activity adapter.')}<div class="chip-row">${EXPERIENCE_GROUPS.map((g) => `<button data-group="${g.id}" aria-pressed="${s.group === g.id}">${g.label}</button>`).join('')}</div><div class="cards career-grid">${CAREER_EXPERIENCES.filter(
     (c) => s.group === 'all' || experiencePresentation(c).group === s.group
@@ -268,7 +295,15 @@ function play() {
             ];
   return (
     hero(
-      s.world === 'earth' ? 'Baltimore' : s.world === 'ocean' ? 'Coral Shelf' : 'Solar System',
+      s.destination?.world === s.world
+        ? s.world === 'earth' && !Number.isFinite(s.destination.lat)
+          ? 'Your Earth journey'
+          : s.destination.name
+        : s.world === 'earth'
+          ? 'Choose your starting place'
+          : s.world === 'ocean'
+            ? 'Coral Shelf'
+            : 'Solar System',
       s.setupComplete
         ? `${s.explorerName} · ${focus} · ${s.vehicleLabel}. Follow your first chapter, or explore at your own pace.`
         : 'The world stays in view. One deliberate objective; everything else is in the menu.',
@@ -277,6 +312,11 @@ function play() {
         actions: action('Preview a result', 'record', 'primary') + button('Change focus', 'switch'),
       }
     ) +
+    (s.destination?.world === 'earth' &&
+    Number.isFinite(s.destination.lat) &&
+    Number.isFinite(s.destination.lon)
+      ? `<div class="content"><p>Selected starting place · ${escape(s.destination.name)} · ${Number(s.destination.lat).toFixed(5)}, ${Number(s.destination.lon).toFixed(5)}</p>${button('Change starting place', 'worlds')}</div>`
+      : '') +
     `<div class="goal-strip"><div><span class="eyebrow">${s.recorded ? 'RESULT AVAILABLE' : 'CURRENT TASK'}</span><h3>${s.focus ? c.assignment : 'First Bearings'}</h3><p>${objectives[Math.min(s.step, 2)]}</p></div>${action('Next instruction', 'step')}</div><div class="content"><div class="split">${s.composition === 'atlas' ? mapScene() : `<article class="card"><span class="eyebrow">${s.composition === 'desk' ? 'FIELD NOTES' : 'YOUR NEXT STEP'}</span><h2>${s.recorded ? 'A result to keep' : 'Do one thing well'}</h2><ol class="step-list">${objectives.map((l, i) => `<li class="${s.step > i ? 'done' : ''}">${l}</li>`).join('')}</ol><small>Preview controls illustrate sequencing; real gameplay is in the app.</small></article>`}<div class="stack">${card('Travel', 'Walk, Drive, Drone, Fly or supported water and space controls follow the current environment.', button('Review travel modes', 'travel'))}${card('Quiet help', 'A small help control opens the current action. No flashing ambient banners.', button('Controls & help', 'controls'))}</div></div></div>`
   );
 }
@@ -439,8 +479,11 @@ function render({ focus = false } = {}) {
   $('#identityLabel').textContent =
     `ONE EXPLORER · ${s.focus ? models[s.model].identity + ': ' + career().label.toUpperCase() : 'FREE EXPLORATION'}`;
   if (s.screen !== 'setup') introFlow.dispose();
+  if (s.screen !== 'worlds' || s.world !== 'earth') globe.unmount();
   $('#view').innerHTML = (screens[s.screen] || start)();
   $('#application').dataset.screen = s.screen;
+  if (s.screen === 'worlds' && s.world === 'earth')
+    globe.mount($('[data-globe-host]'), s.destination?.world === 'earth' ? s.destination : null);
   if (s.screen === 'setup') introFlow.mount($('#view'));
   if (s.screen === 'setup' && previousIntroStep === String(introFlow.snapshot().step)) {
     const pane = $('#view').querySelector('.intro-split,.intro-careers,.intro-departure');
@@ -502,12 +545,23 @@ document.addEventListener('click', async (e) => {
       vehicleId: 'bmw_e34',
       vehicleLabel: 'BMW 525i E34',
       setupComplete: false,
+      destination: null,
+      world: 'earth',
     });
     introFlow.reset();
+    globe.reset();
     render({ focus: true });
     return;
   }
   if (s.screen === 'setup') {
+    if (b.dataset.intro === 'choose-place') {
+      globeReturn = 'setup';
+      s.world = 'earth';
+      s.screen = 'worlds';
+      render({ focus: true });
+      $('#view').scrollIntoView({ block: 'start' });
+      return;
+    }
     if (b.dataset.intro === 'exit') {
       s.screen = 'start';
       render({ focus: true });
@@ -530,12 +584,14 @@ document.addEventListener('click', async (e) => {
     }
   }
   if (b.dataset.landingWorld) {
+    globeReturn = s.screen;
     s.world = b.dataset.landingWorld;
     s.screen = 'worlds';
     render({ focus: true });
     return;
   }
   if (b.dataset.screen) {
+    if (b.dataset.screen === 'worlds' && s.screen !== 'worlds') globeReturn = s.screen;
     s.screen = b.dataset.screen;
     render({ focus: true });
     return;
@@ -619,5 +675,9 @@ window.render_game_to_text = () =>
     ...s,
     native: window.nativePrototypeResult?.ok ?? null,
     introduction: introFlow.snapshot(),
+    globe: globe.snapshot(),
   });
-addEventListener('pagehide', () => introFlow.dispose());
+addEventListener('pagehide', () => {
+  introFlow.dispose();
+  globe.unmount();
+});

@@ -29,6 +29,7 @@ export function createIntroSequence({ onBegin, onChange }) {
     step: 0,
     group: 'all',
     complete: false,
+    destination: null,
   };
   let viewer = null,
     previewAsset = '';
@@ -37,7 +38,8 @@ export function createIntroSequence({ onBegin, onChange }) {
     CAREER_EXPERIENCES.find((c) => c.id === 'career:explorer');
   const vehicle = () => personalVehicleById(draft.vehicleId);
   const destination = () =>
-    ['career:oceanographer', 'career:marine-biologist'].includes(draft.careerId)
+    draft.destination ||
+    (['career:oceanographer', 'career:marine-biologist'].includes(draft.careerId)
       ? {
           name: 'Coral Shelf research vessel',
           world: 'ocean',
@@ -59,7 +61,7 @@ export function createIntroSequence({ onBegin, onChange }) {
                 : 'Earth · choose a compatible starting place',
             world: 'earth',
             image: 'walking-a8119ad855de.webp',
-          };
+          });
   const stage = (kind, title) =>
     `<section class="intro-showroom"><div class="showroom-label"><span class="eyebrow">${kind === 'character' ? 'YOUR IN-GAME EXPLORER' : 'ORIGINAL GAME VEHICLE'}</span><h2>${escape(title)}</h2></div><div class="intro-model" data-intro-model></div><p class="model-status" data-model-status role="status">Loading the game model…</p><div class="showroom-tools"><span>Drag to rotate</span><button data-intro="rotate-left" aria-label="Rotate model left">↶</button><button data-intro="rotate-right" aria-label="Rotate model right">↷</button></div><small class="model-credit" data-model-credit></small></section>`;
   function panel() {
@@ -81,7 +83,7 @@ export function createIntroSequence({ onBegin, onChange }) {
       return `<div class="intro-split">${stage('vehicle', vehicle().label)}<section class="intro-choices"><span class="eyebrow">03 / YOUR FIRST SET OF KEYS</span><h1>Choose your<br>first car.</h1><p>A familiar way to begin on Earth. Your car stays part of the same Explorer collection when you try another career.</p><div class="intro-car-list">${cars.map((v) => `<button data-intro-car="${v.id}" aria-pressed="${draft.vehicleId === v.id}"><span><strong>${v.label}</strong><small>${v.category} · ${v.price === 0 ? 'Included starter' : `${v.price.toLocaleString()} Explorer Credits in Garage`}</small></span><span>${draft.vehicleId === v.id ? '✓' : '→'}</span></button>`).join('')}</div><p class="intro-hint">Prefer to start on foot? You can keep the included BMW and leave it parked. Water and space journeys use their own vehicles.</p></section></div>`;
     const dest = destination(),
       c = career();
-    return `<section class="intro-departure"><div class="departure-image"><img src="../../assets/gallery/5.6/${dest.image}" alt="Actual ${dest.world} gameplay"><span>WORLD EXPLORER GAMEPLAY</span></div><div class="departure-copy"><span class="eyebrow">04 / READY WHEN YOU ARE</span><h1>Your world.<br>Your beginning.</h1><p>${escape(draft.name.trim() || 'Explorer')}, your first direction is ${c.id === 'career:explorer' ? 'free exploration' : escape(c.label.toLowerCase())}. Start with one real task and keep its story in your Journal.</p><div class="departure-summary"><button data-intro-edit="0"><small>EXPLORER</small><strong>${escape(draft.name.trim() || 'Explorer')} · ${draft.gender === 'woman' ? 'Woman' : 'Man'}</strong><span>Edit ↗</span></button><button data-intro-edit="1"><small>DIRECTION</small><strong>${c.id === 'career:explorer' ? 'Free Explorer' : escape(c.label)}</strong><span>Edit ↗</span></button><button data-intro-edit="2"><small>FIRST CAR</small><strong>${escape(vehicle().label)}</strong><span>Edit ↗</span></button></div><div class="first-assignment"><span class="eyebrow">YOUR FIRST CHAPTER</span><h3>${escape(c.assignment)}</h3><p>${escape(dest.name)}</p><small>Move and look → try an action → keep a result</small></div></div></section>`;
+    return `<section class="intro-departure"><div class="departure-image"><img src="../../assets/gallery/5.6/${dest.image}" alt="Actual ${dest.world} gameplay"><span>WORLD EXPLORER GAMEPLAY</span></div><div class="departure-copy"><span class="eyebrow">04 / READY WHEN YOU ARE</span><h1>Your world.<br>Your beginning.</h1><p>${escape(draft.name.trim() || 'Explorer')}, your first direction is ${c.id === 'career:explorer' ? 'free exploration' : escape(c.label.toLowerCase())}. Start with one real task and keep its story in your Journal.</p><div class="departure-summary"><button data-intro-edit="0"><small>EXPLORER</small><strong>${escape(draft.name.trim() || 'Explorer')} · ${draft.gender === 'woman' ? 'Woman' : 'Man'}</strong><span>Edit ↗</span></button><button data-intro-edit="1"><small>DIRECTION</small><strong>${c.id === 'career:explorer' ? 'Free Explorer' : escape(c.label)}</strong><span>Edit ↗</span></button><button data-intro-edit="2"><small>FIRST CAR</small><strong>${escape(vehicle().label)}</strong><span>Edit ↗</span></button></div><div class="departure-location"><span class="eyebrow">STARTING PLACE</span><strong>${escape(dest.name)}</strong>${Number.isFinite(dest.lat) ? `<small>${dest.lat.toFixed(5)}, ${dest.lon.toFixed(5)}</small>` : ''}<button data-intro="choose-place">Choose anywhere on the globe ↗</button></div><div class="first-assignment"><span class="eyebrow">YOUR FIRST CHAPTER</span><h3>${escape(c.assignment)}</h3><p>${escape(dest.name)}</p><small>Move and look → try an action → keep a result</small></div></div></section>`;
   }
   return {
     render() {
@@ -140,6 +142,9 @@ export function createIntroSequence({ onBegin, onChange }) {
     input(target) {
       if (target.id === 'introName') draft.name = target.value.slice(0, 32);
     },
+    setDestination(place) {
+      draft.destination = { ...place };
+    },
     snapshot: () => ({ ...draft, previewAsset }),
     reset() {
       viewer?.dispose();
@@ -153,6 +158,7 @@ export function createIntroSequence({ onBegin, onChange }) {
         step: 0,
         group: 'all',
         complete: false,
+        destination: null,
       });
     },
     dispose() {

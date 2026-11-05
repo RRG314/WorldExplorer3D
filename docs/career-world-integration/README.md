@@ -1,5 +1,7 @@
 # One Explorer: career and world integration review
 
+**Latest owner feedback:** retain the Field cinematic look and shown A/B configuration; these are now the preview defaults. The globe is interactive and uncovered, and arbitrary Earth selections carry into the introduction. See [the globe correction and evidence limits](GLOBE_REVISION.md). The earlier C recommendation below is research history, not the current preview default.
+
 **November 5 owner revision:** the preview now starts with a full landing and **Explorer → career → first car → departure** introduction, using actual gender/vehicle models. Comparison controls are collapsed below the app. See [the introduction revision](INTRODUCTION_REVISION.md). The earlier B-first recommendation below remains research history; the current preview reflects the owner’s requested career-first sequence. Persistent architecture and production deployment remain unapproved.
 
 Status: review packet prepared; final checks/publication recorded in [verification receipt](VERIFICATION.md). No architecture selected. TRAIL staging and production are unchanged. The owner’s three supplied texts are one deduplicated assignment: comprehensive system/progression R&D plus a first-time-player audit **before** the recommendation is finalized. Broad implementation is explicitly gated on owner review.
