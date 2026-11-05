@@ -89,7 +89,7 @@ try {
         assert.ok(Math.abs(icon.width - icon.height) < 0.1);
         assert.equal(icon.radius, '50%');
       }
-      assert.match(icons[4].image, /research-vessel-4d75a6902221/);
+      assert.match(icons[4].image, /ocean-gameplay-20261104/);
       await shot(`selector-${width}-${scale}`);
       report.cases.push({ ...report.active, shape, icons, ok: true });
     }
@@ -149,6 +149,13 @@ try {
       assert.ok(geometry.hud.height < height * 0.36, 'status does not dominate the world');
       assert.equal(geometry.oldMenu.visible, false);
       assert.ok(geometry.menu.visible);
+      const footer = await page.locator('#coords').boundingBox();
+      assert.ok(footer?.width > 0 && footer.height > 0, 'map attribution remains visible');
+      assert.ok(
+        footer.x + footer.width <= geometry.map.right + 1 &&
+          footer.y + footer.height <= geometry.map.bottom + 1,
+        'attribution fits inside the minimap'
+      );
       await shot(`play-${width}-${scale}`);
       await page.locator('#explorerGameMenuBtn').click();
       await page.locator('#explorerGameMenu').waitFor({ state: 'visible' });
@@ -187,6 +194,17 @@ try {
       await shot('action-' + target);
       await page.keyboard.press('Escape');
     }
+    await page.locator('#explorerGameMenuBtn').click();
+    await page.locator('#explorerGameMenu .explorer-menu-world summary').click();
+    assert.equal(await page.locator('#explorerGameMenu #weatherPanel').isVisible(), true);
+    const weatherBefore = await page.evaluate(() => hudQA.weatherMode || 'live');
+    await page.locator('#explorerGameMenu [data-explorer-target="quickWeatherMode"]').click();
+    assert.notEqual(await page.evaluate(() => hudQA.weatherMode || 'live'), weatherBefore);
+    await page.locator('#explorerGameMenuBtn').click();
+    if (!(await page.locator('#explorerGameMenu .explorer-menu-world').getAttribute('open')))
+      await page.locator('#explorerGameMenu .explorer-menu-world summary').click();
+    await page.locator('#explorerGameMenu [data-explorer-target="quickTimeOfDay"]').click();
+    assert.equal(await page.evaluate(() => hudQA.hasPauseReason('game_menu')), false);
     report.cases.push({ section: 'menu-actions', ok: true });
   }
   assert.deepEqual(qa.report.errors, []);
