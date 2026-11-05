@@ -21,7 +21,7 @@ Esri's [copyright guidance](https://doc.arcgis.com/en/arcgis-online/reference/di
 
 ## Verification scope
 
-Actual application browser checks cover1440×960 and1280×508 desktop;390×844 and844×390 native-touch emulation at100%/200% text; default and zoomed views; positive point selection in the revised canvas; visible normal-size compact Explore actions; Map/Satellite credits and unchanged selection; accessible gesture help; footer/control bounds and hit targets. Screenshots were opened and reviewed. Existing780 static DOM IDs are preserved, with one new unique description ID. Source and214-field ownership gates pass.
+Actual application browser checks cover1440×960 and1280×508 desktop;390×844 and844×390 native-touch emulation at100%/200% text; default and zoomed views; positive point selection in the revised canvas; visible normal-size compact Explore actions; Map/Satellite credits and unchanged selection; accessible gesture help; footer/control bounds and hit targets. Screenshots were opened and reviewed. Existing780 static DOM IDs are preserved, with one new unique description ID. Source parsing and context-ownership gates pass (214 registered writer files).
 
 The first touch driver targeted a desktop header action hidden by the native mobile menu. Its failed evidence is retained; the visible native action was used for the corrected checks. The generic skill client invoked the real zoom action but captured the inactive main canvas, yielding a black image. That image is invalid visual evidence; native full-page captures provide the accepted selector images. No renderer or App Check change was made to accommodate automation.
 

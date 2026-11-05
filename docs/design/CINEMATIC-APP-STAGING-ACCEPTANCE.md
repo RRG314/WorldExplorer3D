@@ -24,7 +24,7 @@ The first immutable package passed the native saved introduction, live search, g
 
 ## Checks and limitations
 
-Dependencies, source parsing/entry graph (2,266 files), context ownership (214 fields), boundary types, runtime names, public repository policy and staged secret scans passed. The initial 4,096-case suite passed 4,092 and found an outdated search-timing expectation with three dependent cancellations. All five corrected lifecycle cases, including the new slow-response cooldown case, passed. The 749-file test inventory and sensitivity checks passed. The failed original full log is retained; it is not represented as a successful full command rerun.
+Dependencies, source parsing/entry graph (2,266 files), context ownership (214 registered writer files), boundary types, runtime names, public repository policy and staged secret scans passed. The initial 4,096-case suite passed 4,092 and found an outdated search-timing expectation with three dependent cancellations. All five corrected lifecycle cases, including the new slow-response cooldown case, passed. The 749-file test inventory and sensitivity checks passed. The failed original full log is retained; it is not represented as a successful full command rerun.
 
 A fresh automated Chrome profile was rejected by App Check during hosted search. In regular Chrome, live Kyoto and 10 Downing Street searches selected the correct coordinates through the unchanged protected service. The deployed browser also showed nineteen Ready to play careers and a disabled Pilot. A subsequent Baltimore provider lookup returned an upstream 502; native coordinate search restored the original Baltimore point. No attestation, provider or security setting was weakened. No user profile was replaced in regular Chrome.
 
