@@ -31,7 +31,7 @@ See [implementation acceptance](TRAIL-ACCEPTANCE.md) for scope and evidence leve
 
 ## Staging delivery — accepted November 4
 
-All six stops are complete for this web staging release. [Test TRAIL](https://we3d-staging-20260712--trail-20261104-78mwznd9.web.app/app/) (preview expires December 4). Build: `5.6.1+a2d0bfe9a88c.6d199aa1d96650ef.staging`, runtime source `a2d0bfe9a88cf217ca24bd28b369373260bb0062`. [Implementation PR](https://github.com/RRG314/WorldExplorer3D/pull/141) contains the release handoff. This acceptance record changes no runtime input.
+All six stops are complete for this web staging release. [Test TRAIL](https://we3d-staging-20260712--trail-20261104-78mwznd9.web.app/app/) (preview expires December 4). Build: `5.6.1+1dafbc19d642.fa23e7e71b00778b.staging`, runtime source `1dafbc19d642062b8f9d5f97eeb7231ff5c1581b`. [Implementation PR](https://github.com/RRG314/WorldExplorer3D/pull/141) contains the release handoff. This acceptance record changes no runtime input.
 
 Required runtime CI passed. The exact package passed sixteen public routes at three sizes and 200% text; actual hosted globe, Activities, world entry, Travel, Journal and phone checks passed. Thirty critical hosted files match the immutable 1,073-file artifact. Failed local service calls were rechecked successfully at their staging service/Hosting boundary; the original failed report remains. The exact staging hostname was registered without weakening App Check, and ordinary-browser live weather was verified. Detailed receipt: `output/release-evidence/trail-staging-20261104/RECEIPT.md` (local).
 
