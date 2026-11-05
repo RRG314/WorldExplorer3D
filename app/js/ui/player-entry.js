@@ -124,12 +124,14 @@ export function createPlayerEntry({
     renderIntroduction();
     const version = ++generation,
       uid = runtime.getAccountUserId?.() || '';
+    let firstArrival=false;
     try {
       const store = await getStore();
       if (version !== generation || disposed) return;
       profile = await store.saveProfile((current) => {
         if ((runtime.getAccountUserId?.() || '') !== uid)
           throw Error('Your account changed. Review your Explorer and try again.');
+        firstArrival=!current.journeyPreferences?.introCompletedAt&&!current.characterState?.rewardLedger?.length&&!current.collectionCount&&!current.fieldGuideCount&&current.openingChapter?.phase!=='complete';
         return applyPlayerIntroduction(current, draft, { ownsVehicle: canSelectVehicle });
       });
       if (version !== generation || disposed) return;
@@ -146,6 +148,7 @@ export function createPlayerEntry({
       );
       if (result === false)
         runtime.showToast?.('Your Explorer is saved. Choose a place on the globe to try again.');
+      else if(firstArrival&&draft.guided!==false)void runtime.openPlayerJourney?.();
     } catch (error) {
       if (version !== generation || disposed) return;
       if (!dialog.open && !runtime.gameStarted) dialog.showModal();
@@ -170,7 +173,7 @@ export function createPlayerEntry({
     const placeAction = saved
       ? `<button class="${secondaryClass}" data-entry="return">Return to ${escape(saved.name)} →</button>`
       : `<button class="${secondaryClass}" data-entry="journey">Start your journey →</button>`;
-    landing.innerHTML = `<header class="player-entry-header"><button class="entry-brand" data-entry="home"><span>◎</span> WORLD EXPLORER <em>3D</em></button><nav id="playerHomeNavigation" aria-label="Main destinations"><button data-entry="explore">Explore</button><button data-entry="careers">Careers</button><button data-entry="create">Create</button><button data-entry="together">Together</button><button data-entry="journal">Journal</button><button data-entry="settings">Settings</button></nav><a href="../account/">Sign in / Account</a><button data-entry="menu" aria-label="Open home menu" aria-controls="playerHomeNavigation" aria-expanded="false">☰</button></header>
+    landing.innerHTML = `<header class="player-entry-header"><button class="entry-brand" data-entry="home"><span>◎</span> WORLD EXPLORER <em>3D</em></button><nav id="playerHomeNavigation" aria-label="Main destinations"><button data-entry="explore">Explore</button><button data-entry="careers">Careers</button><button data-entry="create">Create</button><button data-entry="together">Together</button><button data-entry="progress">Your journey</button><button data-entry="journal">Journal</button><button data-entry="settings">Settings</button></nav><a href="../account/">Sign in / Account</a><button data-entry="menu" aria-label="Open home menu" aria-controls="playerHomeNavigation" aria-expanded="false">☰</button></header>
     <section class="landing-hero"><img src="${image('drone-cf7691b9c943.webp')}" alt="World Explorer gameplay above mapped Baltimore"><div class="landing-hero-copy"><span class="entry-eyebrow">ONE EXPLORER. A WORLD OF POSSIBILITIES.</span><h1>Make the world<br>your next story.</h1><p>Choose who you are. Find what moves you. Start on familiar streets, head out to sea, or set your sights beyond Earth.</p><div class="entry-actions">${continueAction}${placeAction}<button data-entry="explore">Explore freely</button></div><small>${prefs?.introCompletedAt ? `${escape(prefs.explorerName)} · ${escape(focus?.label || 'Free exploration')}` : 'Your Explorer → Your direction → Your first car → Your starting place'}</small>${saved ? '<button class="entry-personalize" data-entry="journey">Personalize your Explorer ↗</button>' : ''}</div><span class="landing-image-credit">Actual gameplay · mapped Baltimore</span></section>
     <section class="landing-worlds"><div><span class="entry-eyebrow">CHOOSE YOUR HORIZON</span><h2>A globe. An ocean.<br>A sky full of places.</h2><button data-entry="explore">Open globe selector ↗</button></div><div class="world-destinations">${worlds.map(([id, label, asset]) => `<button data-entry-world="${id}"><img src="${new URL(`../../assets/textures/ui-thumbnails/${asset}`, import.meta.url).href}" alt=""><strong>${label}</strong></button>`).join('')}</div></section>
     <section class="landing-experiences"><span class="entry-eyebrow">FIND YOUR KIND OF ADVENTURE</span><h2>More than one way to explore.</h2><div class="landing-feature-grid">${[
@@ -277,6 +280,7 @@ export function createPlayerEntry({
     header.classList.remove('entry-menu-open');
     menu.setAttribute('aria-expanded', 'false');
     if (action === 'home') void open();
+    if (action === 'progress') void runtime.openPlayerJourney?.();
     if (action === 'journey') void introduce();
     if (action === 'explore') explore();
     if (action === 'return') {

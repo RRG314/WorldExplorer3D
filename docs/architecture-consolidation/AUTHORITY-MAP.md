@@ -1,5 +1,7 @@
 # Authority, dependencies and lifecycle
 
+November 5 player-journey supplement: [current ownership, cross-device persistence and scoped acceptance](../design/PLAYER-JOURNEY-ACCEPTANCE-20261105.md). The dated device-only progress descriptions below describe the earlier baseline; production availability is separate from the new staging candidate.
+
 This map distinguishes canonical rules from remaining compatibility writers. It does not certify that every feature already obeys a single-writer architecture.
 
 ```mermaid

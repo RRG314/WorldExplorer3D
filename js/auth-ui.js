@@ -1,12 +1,17 @@
 import {
   browserPopupRedirectResolver,
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
   GoogleAuthProvider,
   getRedirectResult,
   onAuthStateChanged,
+  linkWithCredential,
+  linkWithPopup,
+  linkWithRedirect,
   sendPasswordResetEmail,
   signInAnonymously,
   signInWithEmailAndPassword,
+  signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -81,17 +86,24 @@ export async function signInWithGoogle() {
     throw new Error('Missing Firebase config. Set WORLD_EXPLORER_FIREBASE first.');
   }
 
-  if (auth.currentUser) return auth.currentUser;
+  if (auth.currentUser&&!auth.currentUser.isAnonymous) return auth.currentUser;
 
   try {
-    const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+    const result = auth.currentUser?.isAnonymous
+      ? await linkWithPopup(auth.currentUser,provider,browserPopupRedirectResolver)
+      : await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     return result.user;
   } catch (err) {
     const code = String(err && err.code ? err.code : '');
+    if(code==='auth/credential-already-in-use'||code==='auth/email-already-in-use'){
+      const credential=GoogleAuthProvider.credentialFromError(err);
+      if(credential)return (await signInWithCredential(auth,credential)).user;
+    }
     if (code.includes('popup-blocked') || code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
       setAuthRedirectPending(true);
       try {
-        await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
+        if(auth.currentUser?.isAnonymous)await linkWithRedirect(auth.currentUser,provider,browserPopupRedirectResolver);
+        else await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
       } catch (redirectError) {
         setAuthRedirectPending(false);
         throw new Error(friendlyAuthMessage(redirectError));
@@ -175,7 +187,9 @@ export async function signUpWithEmailPassword(email, password, displayName = '')
   }
 
   try {
-    const result = await createUserWithEmailAndPassword(auth, String(email || '').trim(), String(password || ''));
+    const result = auth.currentUser?.isAnonymous
+      ? await linkWithCredential(auth.currentUser,EmailAuthProvider.credential(String(email||'').trim(),String(password||'')))
+      : await createUserWithEmailAndPassword(auth, String(email || '').trim(), String(password || ''));
     if (result.user && displayName) {
       await updateProfile(result.user, { displayName: String(displayName).trim().slice(0, 60) });
     }

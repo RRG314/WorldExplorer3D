@@ -128,6 +128,7 @@ function normalizeCandidate(building, options = {}, index = 0) {
     sourceAuthority: mappedSourceAuthority(explicitSourceId),
     locationId,
     locationLabel,
+    worldOrigin: options.worldOrigin ? { ...options.worldOrigin } : null,
     label: clean(building?.name, `${kind} in ${locationLabel}`),
     address: building?.address && typeof building.address === 'object' ? {
       line1: clean(building.address.line1),
@@ -199,6 +200,8 @@ function normalizeHome(home = {}) {
     sourceBuildingId: clean(home.sourceBuildingId),
     locationId: clean(home.locationId, 'unknown-place'),
     locationLabel: clean(home.locationLabel, 'Saved location'),
+    worldOrigin: home.worldOrigin && [home.worldOrigin.lat,home.worldOrigin.lon].every(Number.isFinite)
+      ? {lat:home.worldOrigin.lat,lon:home.worldOrigin.lon,name:clean(home.worldOrigin.name,home.locationLabel)} : null,
     label: clean(home.label, 'Explorer home'),
     address: home.address && typeof home.address === 'object' ? { ...home.address, source: 'mapped-building-tags' } : null,
     kind: clean(home.kind, 'Home'),

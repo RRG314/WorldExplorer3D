@@ -160,6 +160,7 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
   const previousGroup = active.group;
   try {
     const sceneState = deps.buildInteriorScene(active.definition, {
+      personalWorkspace:!!(active.ownedHome?.personalStarter||active.ownedHome?.workspace),
       activeLevel: nextLevel,
       floorBaseY: active.floorBaseY,
       curatedHome: !!active.ownedHome
@@ -440,7 +441,7 @@ export async function enterInteriorForSupport(support, deps) {
   const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
   if(interiorProgramForDefinition({...definition,support}))definition={...definition,support,label:support.label||definition.label};
   let sceneState;
-  try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome});}
+  try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome,personalWorkspace:!!(ownedHome?.personalStarter||ownedHome?.workspace)});}
   catch(error){setTransientHint(`Interior not ready: ${error.message}`,deps.INTERIOR_NOTICE_MS,deps);return false;}
   const outsideColliders = appCtx.dynamicBuildingColliders.slice();
   appCtx.scene.add(sceneState.group);
@@ -475,7 +476,7 @@ export async function enterInteriorForSupport(support, deps) {
   const entryYaw = Number.isFinite(sceneState.entryYaw) ? sceneState.entryYaw : Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
   walker.angle = entryYaw;
   walker.yaw = entryYaw;
-  walker.pitch = 0;
+  walker.pitch = ownedHome ? -.2 : 0;
   walker.lookYawOffset = 0;
   walker.vy = 0;
   walker._resolvedGroundState = null;

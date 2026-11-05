@@ -14,14 +14,21 @@ export function bindCompanionCareer(runtime, experiences) {
         },
       ];
     },
-    summary: () => {
+    summary: ({companions: savedCompanions}={}) => {
       const v = companionHandlingView(
-        runtime.worldDiscoveryRuntime?.companionRuntime?.snapshot() || { companions }
+        runtime.worldDiscoveryRuntime?.companionRuntime?.snapshot() || { companions: savedCompanions || companions }
       );
       return {
         title: v.title,
         summary: v.summary + ' Next: ' + v.next + '.',
         actionLabel: 'Open companions',
+        stages:[
+          {label:'Meet your first companion',complete:!!v.companion},
+          {label:'Care for your companion',complete:!!v.companion?.care?.lastInteractionAt},
+          {label:'Build trust through fieldwork to level 2',complete:Number(v.companion?.progression?.level)>=2},
+          {label:'Complete and save Recall practice',complete:!!v.companion?.training?.learnedCommands?.includes('recall')},
+          {label:'Choose a safe resting place',complete:v.companion?.residence?.state==='at-home'}
+        ],
       };
     },
     offer: ({ place }) => ({

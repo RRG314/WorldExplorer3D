@@ -7,7 +7,7 @@ export function bindExplorerCareer(
   experiences,
   {
     loadHousing = async () =>
-      (await import('../game/property-ui.js?v=9')).getPersonalHousing().snapshot(),
+      (await import('../game/property-ui.js?v=10')).getPersonalHousing().snapshot(),
   } = {}
 ) {
   let events = [];
@@ -44,7 +44,7 @@ export function bindExplorerCareer(
         },
       ];
     },
-    summary: ({ profile }) => explorerCareerSummary(profile, events),
+    summary: ({ profile, journeyEvents }) => explorerCareerSummary(profile, journeyEvents || events),
     offer: ({ profile, place }) =>
       normalizeOpeningChapter(profile?.openingChapter).schemaVersion !== 1
         ? {

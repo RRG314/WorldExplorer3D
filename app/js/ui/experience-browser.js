@@ -49,14 +49,19 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
   }catch{if(run===revision)message('Starting places could not load. Select the activity to try again.');}
  }
  function close({restoreFocus=true}={}){revision++;if(dialog.open)dialog.close();onLayer(false);if(restoreFocus&&origin?.isConnected)origin.focus({preventScroll:true});}
+ function changeView(next){
+  revision++;view=next;selected=next==='continue'?continuableExperienceId(profile?.activeExperience?.experienceId)||'':'';
+  detailOpen=false;places=[];placeId='';message('');render();
+  if(selected)void select(selected,{focus:false});
+ }
  dialog.addEventListener('close',()=>onLayer(false));dialog.addEventListener('cancel',event=>{if(busy){event.preventDefault();return;}close();});
  dialog.addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation();});
  dialog.addEventListener('click',async event=>{
   const button=event.target.closest('button');if(!button||busy)return;
   if(button.hasAttribute('data-experience-close')){close();return;}
-  if(button.dataset.experienceGroup&&EXPERIENCE_GROUPS.some(item=>item.id===button.dataset.experienceGroup)){group=button.dataset.experienceGroup;detailOpen=false;render();find(`[data-experience-group="${group}"]`)?.focus();return;}
+  if(button.dataset.experienceGroup&&EXPERIENCE_GROUPS.some(item=>item.id===button.dataset.experienceGroup)){revision++;group=button.dataset.experienceGroup;selected='';places=[];placeId='';detailOpen=false;render();find(`[data-experience-group="${group}"]`)?.focus();return;}
   if(button.hasAttribute('data-experience-back')){detailOpen=false;render();scrollPane.scrollTop=returnScroll;list.querySelector(`[data-experience-id="${selected}"]`)?.focus();return;}
-  if(button.dataset.experienceView||button.hasAttribute('data-browse-careers')){view=button.dataset.experienceView||'careers';detailOpen=false;message('');render();return;}
+  if(button.dataset.experienceView||button.hasAttribute('data-browse-careers')){changeView(button.dataset.experienceView||'careers');return;}
   if(button.dataset.experienceId){returnScroll=scrollPane.scrollTop;void select(button.dataset.experienceId);return;}
   if(button.hasAttribute('data-experience-prepare')){const adapter=adapterFor(experienceById(selected));close();await adapter?.prepare?.();return;}
   if(button.hasAttribute('data-experience-journal')){close();onJournal();return;}
@@ -71,9 +76,9 @@ export function createExperienceBrowser({documentRef=document,readContext=()=>({
   }
  });
  dialog.addEventListener('change',async event=>{if(event.target.matches('[data-experience-variant]')){variantId=event.target.value;selections.set(selected,{placeId,variantId});await select(selected,{focus:false});find('[data-experience-variant]')?.focus();}else if(event.target.matches('[data-experience-place]')){placeId=event.target.value;selections.set(selected,{placeId,variantId});render();find('[data-experience-place]')?.focus();}});
- search.addEventListener('input',()=>{detailOpen=false;render();});
+ search.addEventListener('input',()=>{revision++;selected='';places=[];placeId='';detailOpen=false;render();});
  find('.experience-tabs').addEventListener('keydown',event=>{
-  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;const tabs=[...dialog.querySelectorAll('[data-experience-view]')],index=tabs.indexOf(documentRef.activeElement);if(index<0)return;event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;view=tabs[next].dataset.experienceView;detailOpen=false;render();tabs[next].focus();
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;const tabs=[...dialog.querySelectorAll('[data-experience-view]')],index=tabs.indexOf(documentRef.activeElement);if(index<0)return;event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;changeView(tabs[next].dataset.experienceView);tabs[next].focus();
  });
  return Object.freeze({
   async open(options={}){origin=documentRef.activeElement;const requested=continuableExperienceId(options.experienceId);view=options.view||(requested&&experienceById(requested)?.kind!=='career'?'quick':view);selected=requested||(options.view?'':selected);detailOpen=!!options.experienceId;if(!dialog.open)dialog.showModal();onLayer(true);message('');render();const run=++revision;try{profile=await readProfile();if(run!==revision)return;if(view==='continue')selected=continuableExperienceId(profile?.activeExperience?.experienceId)||'';render();if(selected&&(options.experienceId||view==='continue'||detailOpen))await select(selected,{focus:!!options.experienceId});}catch{if(run===revision)message('Your saved progress could not load. Close Activities and try again.');}},

@@ -198,7 +198,11 @@ function requestPromise(request) {
 
 function transactionPromise(transaction) {
   return new Promise((resolve, reject) => {
-    transaction.oncomplete = () => resolve(true);
+    transaction.oncomplete = () => {
+      resolve(true);
+      if(transaction.mode==='readwrite'&&Array.from(transaction.objectStoreNames||[]).some(name=>['profiles','items','fieldGuide','companions','events','receiptOutbox'].includes(name))&&typeof globalThis.CustomEvent==='function')
+        globalThis.dispatchEvent?.(new CustomEvent('we3d:journal-saved'));
+    };
     transaction.onabort = () => reject(transaction.error || new Error('IndexedDB transaction aborted.'));
     transaction.onerror = () => reject(transaction.error || new Error('IndexedDB transaction failed.'));
   });
@@ -1114,26 +1118,69 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     const db=await open();try{const tx=db.transaction('profiles','readonly');const row=await requestPromise(tx.objectStore('profiles').get(id));await transactionPromise(tx);return row?clone(row):null;}finally{db.close();}
   }
 
-  async function exportData() {
+  async function exportData(options={}) {
     const db = await open();
     try {
       await ensureCharacterMigration(db);
-      const names = ['profiles','items','fieldGuide','companions','events'];
+      const names = ['profiles','items','fieldGuide','companions','events',...(options.ownerUid?['receiptOutbox']:[])];
       const tx = db.transaction(names, 'readonly');
       const rows = await Promise.all(names.map(name => requestPromise(tx.objectStore(name).getAll())));
       await transactionPromise(tx);
       const media=researchMediaProfileRows(rows[0]);
-      return {schemaVersion:media.length?RESEARCH_MEDIA_BACKUP_VERSION:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), researchMedia:media, portalTrail:portalTrailProfileRows(rows[0]), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4]};
+      return {schemaVersion:media.length?RESEARCH_MEDIA_BACKUP_VERSION:DISCOVERY_DB_VERSION, exportedAt:Date.now(), profile:rows[0].find(p=>p.id===PROFILE_ID), albums:rows[0].filter(p=>p.id===THREE_VIEWS.albumId), researchMedia:media, portalTrail:portalTrailProfileRows(rows[0]), items:rows[1], fieldGuide:rows[2], companions:rows[3], events:rows[4],
+        ...(options.ownerUid?{receiptOutbox:rows[5].filter(row=>row.ownerUid===options.ownerUid)}:{})};
     } finally { db.close(); }
   }
 
-  async function rollbackLastImport() {
+  function journeyArchiveId(key) {
+    if(typeof key!=='string'||!key||key.length>512||/[\u0000-\u001f\u007f]/.test(key))throw new TypeError('Invalid journey recovery identity.');
+    return 'private-journey:'+key;
+  }
+  async function writeJourneyRecovery(key,value) {
+    const db=await open();
+    try{
+      const tx=db.transaction(['migrationBackups'],'readwrite');
+      tx.objectStore('migrationBackups').put({id:journeyArchiveId(key),schemaVersion:1,savedAt:Date.now(),value:clone(value)});
+      await transactionPromise(tx);
+    }finally{db.close();}
+  }
+  async function readJourneyRecovery(key) {
+    const db=await open();
+    try{
+      const tx=db.transaction(['migrationBackups'],'readonly');
+      const row=await requestPromise(tx.objectStore('migrationBackups').get(journeyArchiveId(key)));
+      await transactionPromise(tx);if(row&&row.schemaVersion!==1)throw Error('Your journey recovery copy needs a newer World Explorer. It has been kept.');return row?clone(row.value):null;
+    }finally{db.close();}
+  }
+  async function prepareJourneyImport(data) {
+    const accepted=validateJournalBackup(data);
+    await verifyResearchMediaRecords(accepted.researchMedia);
+    await prepareDocumentaryMedia(accepted.profile.threeViews,accepted.albums?.[0]);
+    return accepted;
+  }
+  async function restoreJourneyReceipts(rows,ownerUid){
+    const db=await open();let tx;
+    try{
+      tx=db.transaction(['items','receiptOutbox',JOURNAL_ORDER_STORE],'readwrite');
+      const outbox=tx.objectStore('receiptOutbox');
+      for(const row of await requestPromise(outbox.getAll()))if(row.ownerUid===ownerUid){outbox.delete(row.id);tx.objectStore(JOURNAL_ORDER_STORE).delete(['receiptOutbox',row.id]);}
+      for(const row of rows){
+        const item=await requestPromise(tx.objectStore('items').get(row.instanceId));
+        if(row.ownerUid!==ownerUid||row.payload?.expectedOwnerUid!==ownerUid||!item||item.claimId!==row.payload.claimId||item.catalogId!==row.payload.catalogId)throw Error('The receipt recovery does not match its account and saved item.');
+        if(!item.serverItemId){outbox.put(clone(row));putJournalOrder(tx,'receiptOutbox',row);}
+      }
+      await transactionPromise(tx);
+    }catch(error){try{tx?.abort();}catch{}throw error;}finally{db.close();}
+  }
+
+  async function rollbackLastImport(options={}) {
     const db = await open();
     let transactionToAbort;
     try {
       const tx = transactionToAbort = db.transaction(JOURNAL_TRANSACTION_STORES, 'readwrite');
       const backup = await requestPromise(tx.objectStore('migrationBackups').get(JOURNAL_IMPORT_BACKUP_ID));
       if (!backup?.stores) { await transactionPromise(tx); return false; }
+      if(typeof backup.previousOwnerUid==='string'&&backup.previousOwnerUid!==String(options.ownerUid??''))throw Error('Sign into the account that owns this previous Journal before restoring it. Your current save is kept.');
       for (const name of JOURNAL_STORES) {
         const store = tx.objectStore(name); store.clear();
         for (const row of backup.stores[name] || []) store.put(clone(row));
@@ -1148,7 +1195,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     } finally { db.close(); }
   }
 
-  async function importData(data = {}) {
+  async function importData(data = {},options={}) {
     data = validateJournalBackup(data);
     await verifyResearchMediaRecords(data.researchMedia);
     await prepareDocumentaryMedia(data.profile.threeViews, data.albums?.[0]);
@@ -1158,8 +1205,17 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       const transaction = transactionToAbort = db.transaction(JOURNAL_TRANSACTION_STORES, 'readwrite');
       const previousRows = await Promise.all(JOURNAL_STORES.map(name => requestPromise(transaction.objectStore(name).getAll())));
       const previous = Object.fromEntries(JOURNAL_STORES.map((name,index)=>[name,previousRows[index]]));
+      const formerImport=previous.migrationBackups.find(row=>row.id===JOURNAL_IMPORT_BACKUP_ID);
       previous.migrationBackups = previous.migrationBackups.filter(row=>row.id!==JOURNAL_IMPORT_BACKUP_ID);
-      transaction.objectStore('migrationBackups').put({id:JOURNAL_IMPORT_BACKUP_ID, backedUpAt:Date.now(), stores:previous});
+      if(formerImport&&typeof options.previousOwnerUid==='string'){
+        const id=journeyArchiveId('pre-sync-import:'+options.previousOwnerUid);
+        if(!previous.migrationBackups.some(row=>row.id===id)){
+          const retained={id,schemaVersion:1,savedAt:Date.now(),value:formerImport};
+          previous.migrationBackups.push(retained);transaction.objectStore('migrationBackups').put(retained);
+        }
+      }
+      transaction.objectStore('migrationBackups').put({id:JOURNAL_IMPORT_BACKUP_ID, backedUpAt:Date.now(), stores:previous,
+        ...(typeof options.previousOwnerUid==='string'?{previousOwnerUid:options.previousOwnerUid}:{})});
       const pendingStore = transaction.objectStore('receiptOutbox');
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
@@ -1227,6 +1283,10 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     applyTrustedReceipt,
     collect,
     exportData,
+    writeJourneyRecovery,
+    readJourneyRecovery,
+    prepareJourneyImport,
+    restoreJourneyReceipts,
     getCharacterMigrationBackup,
     getProfile,
     hasClaim,
@@ -1261,6 +1321,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
 function createMemoryDiscoveryProfileStore(seed = {}) {
   let beforeImport = null;
+  const journeyRecovery=new Map();
   let legacyProfileBackup = seed.profile && !seed.profile.characterState ? clone(seed.profile) : null;
   let profile = normalizeProfile(seed.profile);
   let photoAlbum = clone(seed.albums?.find(a=>a.id===THREE_VIEWS.albumId)||emptyPhotoAlbum());
@@ -1578,7 +1639,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       });
       return true;
     },
-    async exportData() {
+    async exportData(options={}) {
       return {
         schemaVersion: researchMedia.size?RESEARCH_MEDIA_BACKUP_VERSION:DISCOVERY_DB_VERSION,
         profile: clone(profile),
@@ -1588,11 +1649,29 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
         items: [...items.values()].map(clone),
         fieldGuide: [...guide.values()].map(clone),
         companions: [...companions.values()].map(clone),
-        events: [...events.values()].map(clone)
+        events: [...events.values()].map(clone),
+        ...(options.ownerUid?{receiptOutbox:[...outbox.values()].filter(row=>row.ownerUid===options.ownerUid).map(clone)}:{})
       };
     },
-    async rollbackLastImport() {
+    async writeJourneyRecovery(key,value){journeyRecovery.set(key,clone(value));},
+    async readJourneyRecovery(key){return clone(journeyRecovery.get(key))||null;},
+    async prepareJourneyImport(data){
+      const accepted=validateJournalBackup(data);
+      await verifyResearchMediaRecords(accepted.researchMedia);
+      await prepareDocumentaryMedia(accepted.profile.threeViews,accepted.albums?.[0]);
+      return accepted;
+    },
+    async restoreJourneyReceipts(rows,ownerUid){
+      for(const row of rows){
+        const item=items.get(row.instanceId);
+        if(row.ownerUid!==ownerUid||row.payload?.expectedOwnerUid!==ownerUid||!item||item.claimId!==row.payload.claimId||item.catalogId!==row.payload.catalogId)throw Error('The receipt recovery does not match its account and saved item.');
+      }
+      for(const [id,row] of outbox)if(row.ownerUid===ownerUid)outbox.delete(id);
+      for(const row of rows)if(!items.get(row.instanceId).serverItemId)outbox.set(row.id,clone(row));
+    },
+    async rollbackLastImport(options={}) {
       if (!beforeImport) return false;
+      if(typeof beforeImport.previousOwnerUid==='string'&&beforeImport.previousOwnerUid!==String(options.ownerUid??''))throw Error('Sign into the account that owns this previous Journal before restoring it. Your current save is kept.');
       photoAlbum=clone(beforeImport.photoAlbum);
       profile = clone(beforeImport.profile); legacyProfileBackup = clone(beforeImport.legacyProfileBackup);
       for (const [name,map] of Object.entries({items,guide,companions,events,claims,outbox,portalRows,researchMedia})) {
@@ -1600,11 +1679,11 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       }
       beforeImport = null; return true;
     },
-    async importData(data = {}) {
+    async importData(data = {},options={}) {
       data = validateJournalBackup(data);
       await verifyResearchMediaRecords(data.researchMedia);
     await prepareDocumentaryMedia(data.profile.threeViews, data.albums?.[0]);
-      beforeImport = clone({profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows],researchMedia:[...researchMedia]});
+      beforeImport = clone({previousOwnerUid:options.previousOwnerUid,profile, photoAlbum, legacyProfileBackup, items:[...items], guide:[...guide], companions:[...companions], events:[...events], claims:[...claims], outbox:[...outbox],portalRows:[...portalRows],researchMedia:[...researchMedia]});
       const importedByInstance = new Map(data.items.map(item=>[item.instanceId,item]));
       const importedByClaim = new Map(data.items.filter(item=>item.claimId).map(item=>[item.claimId,item]));
       for (const [id,row] of outbox) {

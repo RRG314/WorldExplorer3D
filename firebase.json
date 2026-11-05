@@ -117,6 +117,7 @@
       }
     ],
     "rewrites": [
+      {"source":"/syncExplorerJourney","function":"syncExplorerJourney"},
       {"source":"/getRacingService","function":"getRacingService"},
       {"source":"/getRacingRecords","function":"getRacingRecords"},
       {"source":"/getRacingCatalog","function":"getRacingCatalog"},
@@ -478,7 +479,8 @@
     "source": "functions",
     "predeploy": [
       "npm run build:shared-expedition-engine",
-      "node scripts/build-weekly-room-model.mjs"
+      "node scripts/build-weekly-room-model.mjs",
+      "node scripts/build-journey-format.mjs"
     ]
   },
   "firestore": {

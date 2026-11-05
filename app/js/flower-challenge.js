@@ -584,6 +584,7 @@ function setupFlowerChallenge() {
   ui.titlePropertyTabBtn = document.getElementById('leaderboardTabProperty');
   ui.titleDeFlockTabBtn = document.getElementById('leaderboardTabDeFlock');
   ui.titleRacingTabBtn = document.getElementById('leaderboardTabRacing');
+  ui.titleCareersTabBtn = document.getElementById('leaderboardTabCareers');
   ui.racingFilters = document.getElementById('racingRecordFilters');
   ui.racingSource = document.getElementById('racingRecordSource');
   ui.racingCourse = document.getElementById('racingRecordCourse');
@@ -605,6 +606,7 @@ function setupFlowerChallenge() {
 
   hydratePlayerName();
   ui.titleRacingTabBtn?.addEventListener('click',()=>void setChallengeLeaderboardView('racing'));
+  ui.titleCareersTabBtn?.addEventListener('click',()=>void setChallengeLeaderboardView('careers'));
   updateTitleSelectedLocation();
   bindTitleLocationWatchers();
   bindFlowerActionMenu();

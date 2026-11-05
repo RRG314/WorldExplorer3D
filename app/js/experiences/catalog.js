@@ -26,7 +26,7 @@ const careers = [
 ];
 export const CAREER_EXPERIENCES = Object.freeze(careers.map(([id,label,assignment,adapterId,summary]) => Object.freeze({
   id:`career:${id}`,kind:'career',label,assignment,adapterId,summary,...careerAvailability(id),
-  persistence:'Your Journal and career progress save in this browser.'
+  persistence:'Your Journal and career progress save on this device. Sign in and choose your account save to continue across devices.'
 })));
 const quick = [
   ['racing','Road racing','Choose an event, prepare your car or create a track.'],
@@ -37,9 +37,9 @@ const quick = [
   ['deflock','DeFlock Hunt','Explore mapped camera locations and complete the hunt.']
 ];
 export const QUICK_EXPERIENCES = Object.freeze([
-  Object.freeze({id:'activity:harbor-run',kind:'activity',label:'Harbor Run delivery',assignment:'Harbor Run',adapterId:'pilot',summary:'Plan a road delivery, load the field case and bring your equipment home safely.',persistence:'Your delivery and cargo progress save in your Journal in this browser.'}),
+  Object.freeze({id:'activity:harbor-run',kind:'activity',label:'Harbor Run delivery',assignment:'Harbor Run',adapterId:'pilot',summary:'Plan a road delivery, load the field case and bring your equipment home safely.',persistence:'Your delivery and cargo progress save in your Journal. Your account save can keep that journey across devices.'}),
   ...quick.map(([mode,label,summary])=>Object.freeze({id:`game:${mode}`,kind:'game',label,assignment:label,adapterId:'game',mode,summary,persistence:'Results save in your Journal. Online rankings require a successful upload.'})),
-  ...ACTIVITY_TEMPLATES.map(row=>Object.freeze({id:`route:${row.id}`,kind:'route',label:row.label,assignment:row.label,adapterId:'route',templateId:row.id,summary:'Choose a local route, review its checkpoints and follow the marked course.',persistence:'Your created routes and Journal save in this browser.'}))
+  ...ACTIVITY_TEMPLATES.map(row=>Object.freeze({id:`route:${row.id}`,kind:'route',label:row.label,assignment:row.label,adapterId:'route',templateId:row.id,summary:'Choose a local route, review its checkpoints and follow the marked course.',persistence:'Your created routes and Journal save with your journey. Sign in to continue across devices.'}))
 ]);
 export const EXPERIENCES=Object.freeze([...CAREER_EXPERIENCES,...QUICK_EXPERIENCES]);
 const byId=new Map(EXPERIENCES.map(row=>[row.id,row]));

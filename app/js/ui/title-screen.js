@@ -427,7 +427,7 @@ function initTitleScreenUi({
       } else if (typeof appCtx.loadRoads === 'function') {
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
-        const loaded = await appCtx.loadRoads();
+        const loaded = appCtx.resumeCurrentEarthWorld?.() || await appCtx.loadRoads();
         if (!isEarthWorldUsable(appCtx, loaded)) return false;
         // loadRoads publishes the world and applies its final arrival once.
         // Do not run a second title-layer spawn over that resolved surface.
@@ -655,6 +655,7 @@ function initTitleScreenUi({
   let launchMeasurement = null;
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
+    if(appCtx.canStartPlayerJourney?.()===false){appCtx.openJourneySync?.();return false;}
     const voyageResume=pendingOceanResume;pendingOceanResume=null;
     const oceanResumeGuard=pendingOceanResumeGuard;pendingOceanResumeGuard=null;
     const forcedLaunchMode = pendingForcedLaunchMode;
@@ -782,7 +783,7 @@ function initTitleScreenUi({
     void appCtx.ensureStarCatalogLoaded?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
-    const earthLoadResult = await appCtx.loadRoads();
+    const earthLoadResult = appCtx.resumeCurrentEarthWorld?.() || await appCtx.loadRoads();
     if (!isEarthWorldUsable(appCtx, earthLoadResult)) {
       appCtx.gameStarted=false;
       appCtx.hideLoad?.();

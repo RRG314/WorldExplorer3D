@@ -166,8 +166,22 @@ export function getPersonalHousing() {return ensureHousing();}
 export function getPersonalHomeCandidates() {
   const location=runtimeLocation();
   return makeHomeCandidates((appCtx.buildings||[]).filter(b=>/house|residential|apartments|terrace|townhouse|detached|bungalow|dormitory/i.test(b.buildingType||'')),{
-    actor:actorPosition(),locationId:location.id,locationLabel:location.label,worldToGeo,radius:1800,limit:80
+    actor:actorPosition(),locationId:location.id,locationLabel:location.label,worldToGeo,worldOrigin:{lat:location.lat,lon:location.lon,name:location.label},radius:1800,limit:80
   });
+}
+export function personalHomeOffers(){
+  if(appCtx.getEnv?.()!=='EARTH'||appCtx.worldLoading||!appCtx.gameStarted)return [];
+  const view=ensureHousing().snapshot();
+  return getPersonalHomeCandidates().filter(home=>home.mappedResidential&&home.sharedEligible&&
+    !view.homes.some(owned=>owned.id===home.id)&&getNavigationTargetForDestination(home).support?.enterable)
+    .sort((a,b)=>Number(b.price<=view.credits)-Number(a.price<=view.credits)||a.price-b.price||a.distance-b.distance).slice(0,8);
+}
+export function buyPersonalHome(id){
+  if(appCtx.activeInterior||appCtx.worldLoading||appCtx.getEnv?.()!=='EARTH')return {ok:false,reason:'Visit the entrance on Earth before buying.'};
+  const offer=personalHomeOffers().find(home=>home.id===id);
+  if(!offer)return {ok:false,reason:'This home is no longer available. Refresh the nearby homes.'};
+  if(propertyDistance(offer)>PROPERTY_INTERACTION_RADIUS)return {ok:false,reason:'Visit this home before buying it.'};
+  return ensureHousing().buy(offer);
 }
 export function routeToPersonalHome(home) {
   if (!home || home.locationId!==runtimeLocation().id) return false;

@@ -49,7 +49,7 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
   const insideHome=()=>home&&ctx.activeInterior?.ownedHome?.id===home.id&&Number(ctx.activeInterior.activeLevel||0)===0&&ctx.getCurrentTravelMode?.()==='walk';
   const workspace=()=>normalizeWorkspace(home?.workspace);
   const workspaceEligible=()=>!!home||personalWorkspaceEligible(profile,lunarReports);
-  function reloadHome(){const view=housing.snapshot();home=view.homes.find(h=>h.id===view.starterHomeId)||view.homes.find(h=>h.workspace)||null;return view;}
+  function reloadHome(){const view=housing.snapshot();home=view.homes.find(h=>h.id===view.starterHomeId)||view.homes.find(h=>h.workspace)||view.homes.find(h=>h.id===view.primaryHomeId)||null;return view;}
   function supportFor(candidate){
     const building=ctx.buildings?.find(b=>String(b.sourceBuildingId||b.sourceFeatureId||b.id)===candidate.sourceBuildingId);
     return building?resolveBuildingEntrySupport(building):null;
@@ -84,10 +84,10 @@ export function createPersonalHomeRuntime(state,dependencies={}) {
     if(!loaded)body='<p>Reading your saved home…</p>';
     else if(!workspaceEligible())body='<p>Complete First Bearings, a research study or the Racer career to choose your included personal workspace.</p>';
     else if(!home){
-      body='<p>Choose a local workspace for your research. This is your own game interior, saved on this device. It does not reserve a real address or a shared property. One workspace is included; no purchase or account is needed.</p>'+button('find','Find nearby workspaces');
+      body='<p>Choose a local workspace for your research. This is your own game interior, saved with your journey. It does not reserve a real address or a shared property. One workspace is included; no purchase or account is needed.</p>'+button('find','Find nearby workspaces');
       body+=offers.map((o,i)=>`<article class="discoveryDeliveryOffer"><strong>${escape(o.label)}</strong><small>${Math.round(o.distance)} m · ${o.area} m² mapped footprint · personal workspace</small><div class="discoveryPhotoActions">${button(`route:${i}`,'Show walking route')}${button(`claim:${i}`,'Choose at entrance')}</div></article>`).join('');
     }else{
-      body=`<p><strong>${escape(home.label)}</strong> · ${escape(home.locationLabel)}. Your local workspace and belongings stay on this device.</p><div class="discoveryPhotoActions">${button('route','Route home')}${button('enter','Enter workspace',!outdoors())}${button('primary',v.primaryHomeId===home.id?'Return destination set':'Set as return destination',v.primaryHomeId===home.id)}</div>`;
+      body=`<p><strong>${escape(home.label)}</strong> · ${escape(home.locationLabel)}. Your local workspace and belongings save with your journey.</p><div class="discoveryPhotoActions">${button('route','Route home')}${button('enter','Enter workspace',!outdoors())}${button('primary',v.primaryHomeId===home.id?'Return destination set':'Set as return destination',v.primaryHomeId===home.id)}</div>`;
       if(insideHome()){
         body+=`<p>Make a Useful Place${profile.homeAchievements?.maker?' · Maker badge earned':''}. Place the desk and chair, try a turn, then undo a change. Walk to the left side of the desk to review a saved record.</p>`;
         body+=`<label>Reuse a saved design <input type="file" accept="application/json,.json" data-home-import${busy?' disabled':''}></label>`;

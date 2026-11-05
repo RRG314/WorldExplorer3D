@@ -13,7 +13,15 @@ import { initMobileControls } from "./ui/mobile-controls.js?v=90";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=3";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=124";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=125";
+import {createPlayerJourney} from './ui/player-journey.js';
+import {projectCareerPortfolio} from './experiences/career-portfolio.js';
+import {createHomeReturn} from './campaign/home-return.js';
+import {createJourneySync} from './player/journey-sync.js';
+import {createJourneySyncView} from './ui/journey-sync-view.js';
+import {getCurrentUser,observeAuth} from '../../js/auth-ui.js?v=56';
+import {readFirebaseConfig} from '../../js/firebase-init.js?v=58';
+import {postProtectedFunction} from '../../js/function-api.js?v=3';
 import { captureEnvironmentSession, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 import { createEarthReturnAction } from './travel/earth-return.js';
 import {bindSurfaceRecoveryControls} from './ui/recovery-controls.js';
@@ -165,6 +173,77 @@ function setupUI() {
     updateControlsModeUI,
     isTouchPreferredClient
   });
+  const housingModule=()=>import('./game/property-ui.js?v=10');
+  let homeCommands=null;
+  async function homes(){
+    const owner=await housingModule();
+    if(!homeCommands){const navigation=await import('./game/navigation-ui.js?v=2');homeCommands=createHomeReturn({runtime:appCtx,getHousing:owner.getPersonalHousing,travelToPlace:experiences.travelToPlace,resolveEntrance:home=>{
+      const building=appCtx.buildings?.find(row=>String(row.sourceBuildingId||row.sourceFeatureId||row.id)===home.sourceBuildingId);
+      return building?navigation.getNavigationTargetForDestination(building):null;
+    }});}
+    return owner;
+  }
+  async function readJourney(){
+    const store=await experiences.getStore(),owner=await homes();
+    const [profile,companions]=await Promise.all([store.getProfile(),store.listCompanions()]);
+    const {harborJourneyEventIds}=await import('./campaign/lunar-homecoming.js');
+    const journeyEvents=await store.getEventsById(harborJourneyEventIds);
+    const [{lunarStudyEventIds},{createDestinationMissionStore}]=await Promise.all([import('./planetary/lunar-study-records.js'),import('./universe/mission-authority.js?v=3')]);
+    const planetaryView={ready:true,events:await store.getEventsById(lunarStudyEventIds),ledger:createDestinationMissionStore().load()};
+    const housing=owner.getPersonalHousing().snapshot();
+    const workspace=housing.homes.find(h=>h.id===housing.starterHomeId)?.workspace||housing.homes.find(h=>h.workspace)?.workspace;
+    const portfolio=projectCareerPortfolio({profile,summaryFor:experiences.careerSummary,context:{companions,workspace,journeyEvents,planetaryView}});
+    const garage=appCtx.getVehicleGarage?.();
+    return {profile,portfolio,housing,offers:owner.personalHomeOffers(),carLabel:garage?.vehicles?.[garage.selectedId]?.label};
+  }
+  const journey=createPlayerJourney({runtime:appCtx,read:readJourney,
+    openCareer:id=>{if(!appCtx.gameStarted)titleUi.getPlayerEntry()?.explore();return experiences.open(id?{experienceId:id}:{view:'careers'});},
+    openGarage:async()=>{const {openVehicleGarage}=await import('./ui/vehicle-garage.js');openVehicleGarage();},
+    personalize:()=>{if(appCtx.gameStarted)goToMainMenu();return titleUi.getPlayerEntry()?.introduce();},
+    freeRoam:async()=>{
+      const store=await experiences.getStore();
+      const {applyCareerFocus}=await import('./character/journey-preferences.js');
+      await store.saveProfile(current=>applyCareerFocus(current,null));
+      experiences.cancelEntry();appCtx.stopGameplayPlugin?.('free-exploration',{resumeFree:true});
+      if(!appCtx.gameStarted)titleUi.getPlayerEntry()?.explore();
+    },
+    homeReturn:async home=>{await homes();return homeCommands.returnHome(home);},
+    visitHome:async home=>{await homes();return homeCommands.visit(home);},
+    buyHome:async id=>(await homes()).buyPersonalHome(id),
+    setPrimary:async id=>(await homes()).getPersonalHousing().setPrimary(id),
+    openWorkspace:async()=>{const owner=await homes(),home=owner.getPersonalHousing().snapshot().primaryHome;if(home)await homeCommands.returnHome(home);return appCtx.openWorldDiscoverySection?.('today');},
+    onJournal:()=>{if(!appCtx.gameStarted)titleUi.getPlayerEntry()?.explore();return openExplorerSection('profile');},
+    onBackup:()=>{if(!appCtx.gameStarted)titleUi.getPlayerEntry()?.explore();return openExplorerSection('profile');},
+    onLeaderboard:async()=>{if(!appCtx.gameStarted)titleUi.getPlayerEntry()?.explore();await appCtx.ensureFlowerChallengeReady?.();return appCtx.openLeaderboardView?.('careers');},
+    onSync:()=>appCtx.openJourneySync?.(),
+    chooseHomeTown:()=>{if(appCtx.gameStarted)goToMainMenu();else titleUi.getPlayerEntry()?.explore();},
+    onLayer:open=>{if(open){appCtx.closeFlowerChallengeTitlePanel?.();appCtx.screenLayout?.setPanelLayer('game-menu',false);experiences.close({restoreFocus:false});closeAllFloatMenus();}appCtx.screenLayout?.setPanelLayer('player-journey',open);appCtx.setPauseReason?.('player-journey',open&&appCtx.gameStarted);},
+    onFocus:()=>worldFocus.requestWorldFocus()
+  });
+  appCtx.openPlayerJourney=()=>journey.open();
+  appCtx.readCareerPortfolio=async()=>(await readJourney()).portfolio;
+  document.addEventListener('click',event=>{if(event.target.closest?.('[data-open-player-journey]'))void journey.open();});
+  let journeySync;
+  const syncView=createJourneySyncView({onAction:action=>journeySync.act(action),onLayer:open=>{
+    appCtx.screenLayout?.setPanelLayer('journey-sync',open);appCtx.setPauseReason?.('journey-sync',open&&appCtx.gameStarted);
+  }});
+  journeySync=createJourneySync({
+    projectId:readFirebaseConfig()?.projectId||'unconfigured',
+    isPlaying:()=>appCtx.gameStarted===true,
+    getOwnerUid:()=>{const user=getCurrentUser();return user&&!user.isAnonymous?user.uid:'';},
+    getStore:experiences.getStore,
+    getBackpackStore:async()=>{const {ensurePlayerBackpackInventory}=await import('./urban-sandbox/equipment-model.js?v=10');ensurePlayerBackpackInventory(appCtx);return appCtx.playerBackpackStore;},
+    send:(input,options)=>postProtectedFunction('/syncExplorerJourney',input,{...options,label:'Account save',forceRefreshToken:false,
+      timeoutMs:input.action==='head'?15000:input.action==='commit'?120000:45000}),
+    beforeRestore:async()=>{journey.close({focus:false});experiences.close({restoreFocus:false});appCtx.toggleWorldDiscoveryJournal?.(false);if(appCtx.gameStarted)goToMainMenu();},
+    onState:state=>syncView.update(state)
+  });
+  appCtx.canStartPlayerJourney=()=>journeySync.canPlay();
+  appCtx.openJourneySync=()=>syncView.open();
+  appCtx.getJourneySyncStatus=()=>journeySync.snapshot();
+  journeySync.start();
+  const stopJourneyAuth=observeAuth(()=>void journeySync.ownerChanged());
+  window.addEventListener('pagehide',event=>{if(!event.persisted){stopJourneyAuth();journeySync.dispose();syncView.dispose();}});
   const setTitleLaunchMode = typeof titleUi.setTitleLaunchMode === 'function' ? titleUi.setTitleLaunchMode : null;
   shareUi = initShareUi({
     bindTouchFriendlyPress,
@@ -198,7 +277,7 @@ function setupUI() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     appCtx.stopLiveGpsMode?.({ reason: 'main-menu' });
     appCtx.stopGameplayPlugin?.('main-menu', { resumeFree: false });
-    prepareTitleEnvironment();
+    const previousTitleEnvironment=prepareTitleEnvironment();
     appCtx.hideLoad?.();
     appCtx.gameStarted = false;appCtx.clearPauseReasons?.();appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
@@ -224,10 +303,9 @@ function setupUI() {
     updateControlsModeUI();
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     if (typeof appCtx.refreshFlowerLeaderboard === 'function') appCtx.refreshFlowerLeaderboard();
-    // Starting Earth from the title always recompiles the selected location.
-    // Keeping the previous fixed world behind that screen only retains its JS
-    // graph and WebGL buffers, which can make Chrome report >1 GB for an idle tab.
-    appCtx.releaseEarthWorldForTitle?.();
+    // Immediate return can reuse the one ready city for 45 seconds. The world
+    // owner expires that lease and retains the original idle-memory safeguard.
+    if(previousTitleEnvironment.previousEnv!=='EARTH'||!appCtx.retainEarthWorldForTitle?.())appCtx.releaseEarthWorldForTitle?.();
     appCtx.hideLoad?.();
   }
 

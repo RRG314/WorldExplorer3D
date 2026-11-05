@@ -42,7 +42,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   function getLeaderboardStorageKey(challengeType) {
     const type = normalizeChallengeType(challengeType);
-    if (type === 'racing') return null;
+    if (type === 'racing' || type === 'careers') return null;
     if (type === 'painttown') return LOCAL_PAINT_LEADERBOARD_KEY;
     if (type === 'fishing') return LOCAL_FISHING_LEADERBOARD_KEY;
     if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
@@ -53,7 +53,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   function getLeaderboardCollection(challengeType) {
     const type = normalizeChallengeType(challengeType);
-    if (type === 'racing') return null;
+    if (type === 'racing' || type === 'careers') return null;
     if (type === 'painttown') return FIREBASE_PAINT_COLLECTION;
     if (type === 'fishing') return FIREBASE_FISHING_COLLECTION;
     if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
@@ -185,7 +185,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   async function readRemoteLeaderboard(challengeType = 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
-    if (normalizedType === 'racing') return null;
+    if (normalizedType === 'racing' || normalizedType === 'careers') return null;
     const ready = await ensureFirebase();
     if (!ready || !challengeState.firebase) return null;
 
@@ -214,7 +214,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   async function writeRemoteLeaderboard(challengeType, entry) {
     const normalizedType = normalizeChallengeType(challengeType);
-    if (normalizedType === 'racing') return false;
+    if (normalizedType === 'racing' || normalizedType === 'careers') return false;
     const ready = await ensureFirebase();
     if (!ready || !challengeState.firebase) return false;
 
@@ -320,9 +320,10 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (ui.titlePropertyTabBtn) ui.titlePropertyTabBtn.classList.toggle('active', normalizedType === 'property');
     if (ui.titleDeFlockTabBtn) ui.titleDeFlockTabBtn.classList.toggle('active', normalizedType === 'deflock');
     if (ui.titleRacingTabBtn) ui.titleRacingTabBtn.classList.toggle('active', normalizedType === 'racing');
+    if (ui.titleCareersTabBtn) ui.titleCareersTabBtn.classList.toggle('active', normalizedType === 'careers');
     if(ui.titlePanel?.classList.contains('open'))ui.titlePanel.querySelector('.flowerLeaderboardTab.active')?.scrollIntoView({block:'nearest',inline:'nearest'});
     if (ui.racingFilters) ui.racingFilters.hidden=normalizedType!=='racing';
-    if (ui.titleNameInput) ui.titleNameInput.hidden=normalizedType==='racing';
+    if (ui.titleNameInput) ui.titleNameInput.hidden=normalizedType==='racing'||normalizedType==='careers';
     if (ui.titleStartBtn) {
       const flowerView = normalizedType === 'flower';
       ui.titleStartBtn.style.display = flowerView ? '' : 'none';
@@ -337,6 +338,21 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (ui.status) {
       ui.status.textContent = `Loading ${definition.label}…`;
       ui.status.classList.remove('error', 'ok');
+    }
+    if(normalizedType==='careers'){
+      renderLeaderboard([]);
+      if(ui.titleHint)ui.titleHint.textContent=definition.resultDisclosure;
+      const owner=getSignedInUser?.()?.uid||'',current=()=>sequence===refreshSequence&&(getSignedInUser?.()?.uid||'')===owner;
+      try{
+        const {renderCareerMilestones}=await import('../leaderboards/career-view.js');
+        const portfolio=await appCtx.readCareerPortfolio?.();
+        if(!current())return null;
+        if(!portfolio)throw Error('Career portfolio is still preparing.');
+        renderCareerMilestones(ui,portfolio);
+        if(ui.status){ui.status.textContent=appCtx.getJourneySyncStatus?.()?.status==='saved'?'Career milestones · synced account journey':'Career milestones · saved on this device';ui.status.dataset.backend='Personal Journal';}
+        return portfolio.careers;
+      }catch{if(current()){renderLeaderboard([]);if(ui.status)ui.status.textContent='Your career milestones could not load. Your Journal is kept. Try Refresh.';}return null;}
+      finally{if(current()&&ui.titleRefreshBtn){ui.titleRefreshBtn.disabled=false;ui.titleRefreshBtn.removeAttribute('aria-busy');}}
     }
     if(normalizedType==='racing'){
       renderLeaderboard([]);
@@ -403,7 +419,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   function storeLocalResult(challengeType, entry) {
     const normalizedType = normalizeChallengeType(challengeType);
-    if (normalizedType === 'racing') return false;
+    if (normalizedType === 'racing' || normalizedType === 'careers') return false;
     const current = readLocalLeaderboard(normalizedType);
     current.push(entry);
     writeLocalLeaderboard(

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination, navigationDestinationSnapshot } from "./navigation-ui.js?v=2";
 import { escapeHtml, escapeJsString, toFiniteNumber } from "./ui-utils.js?v=1";
-import { closeModal, updatePropertyPanel } from "./property-ui.js?v=9";
+import { closeModal, updatePropertyPanel } from "./property-ui.js?v=10";
 
 export function toggleHistoric() {
   appCtx.historicMode = !appCtx.historicMode;

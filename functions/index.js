@@ -954,6 +954,7 @@ async function deleteDiscoveryTradesForUser(uid) {
 async function deleteUserData(uid) {
   if (!uid) return;
   await require('./capture-account-cleanup').cleanupCaptureAccount({db,bucket:admin.storage().bucket(),uid,FieldValue});
+  await require('./journey-authority').createJourneyAuthority({db,bucket:admin.storage().bucket()}).cleanup(uid);
 
   const userRef = db.collection('users').doc(uid);
   const creatorProfileRef = db.collection(CREATOR_PROFILES_COLLECTION).doc(uid);
@@ -2191,6 +2192,25 @@ exports.commitExplorerVehicleAction = functions.region('us-central1').runWith({ 
     if(/^(vehicle_|invalid_vehicle_|not_enough_credits)/.test(reason))return res.status(reason==='vehicle_garage_changed'?409:422).json({error:reason,reason});
     console.error('[commitExplorerVehicleAction] failed:',error);
     return res.status(500).json({error:'Your garage could not be saved. Please try again.'});
+  }
+});
+
+let personalJourneyAuthority;
+exports.syncExplorerJourney = functions.region('us-central1').runWith({invoker:'public',timeoutSeconds:120,memory:'512MB'}).https.onRequest(async (req,res)=>{
+  res.set('Cache-Control','private, no-store, max-age=0');
+  if(setCors(req,res))return;
+  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+  const auth=await verifyAuth(req,res);if(!auth)return;
+  if(!await verifyAppCheck(req,res))return;
+  const input=req.body||{};
+  if(input.expectedOwnerUid!==auth.uid)return res.status(403).json({error:'Your account changed. Reopen your saved journey.',reason:'journey_owner_changed'});
+  try{
+    personalJourneyAuthority ||= require('./journey-authority').createJourneyAuthority({db,bucket:admin.storage().bucket()});
+    return res.status(200).json(await personalJourneyAuthority.handle(auth.uid,input));
+  }catch(error){
+    if(Number.isInteger(error.status)&&error.status>=400&&error.status<600)return res.status(error.status).json({error:'Your account journey could not complete this action.',reason:error.reason});
+    console.error('[syncExplorerJourney] private save operation failed:',String(error.code||error.name||'unknown').slice(0,80));
+    return res.status(503).json({error:'Your account journey could not be reached. Your device save is kept.',reason:'journey_service_unavailable'});
   }
 });
 

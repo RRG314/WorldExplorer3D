@@ -16,7 +16,7 @@ export function createFlowerLeaderboardView(deps = {}) {
 function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
   if (!raw || typeof raw !== 'object') return null;
   const challenge = normalizeChallengeType(forcedChallengeType || raw.challenge || raw.challengeType);
-  if (challenge === 'racing') return null;
+  if (challenge === 'racing' || challenge === 'careers') return null;
   const player = sanitizePlayerName(raw.player || raw.displayName || raw.name || 'Explorer');
   const location = String(raw.location || 'Unknown Location').slice(0, 80);
   const lat = Number(raw.lat);
@@ -122,7 +122,7 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
 
 function readLocalLeaderboard(challengeType = 'flower') {
   const normalizedType = normalizeChallengeType(challengeType);
-  if (normalizedType === 'racing') return [];
+  if (normalizedType === 'racing' || normalizedType === 'careers') return [];
   try {
     const raw = localStorage.getItem(getLeaderboardStorageKey(normalizedType));
     if (!raw) return [];
@@ -139,7 +139,7 @@ function readLocalLeaderboard(challengeType = 'flower') {
 
 function writeLocalLeaderboard(challengeType, entries) {
   const normalizedType = normalizeChallengeType(challengeType);
-  if (normalizedType === 'racing') return false;
+  if (normalizedType === 'racing' || normalizedType === 'careers') return false;
   try {
     localStorage.setItem(
       getLeaderboardStorageKey(normalizedType),

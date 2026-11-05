@@ -200,7 +200,8 @@
     "verify:community-safety:rules": "node --test --test-concurrency=1 tests/community-safety-rules.test.mjs",
     "verify:community-safety:browser": "node scripts/verification/community-safety-emulators.mjs",
     "verify:mobile-web-controls": "node scripts/verification/mobile-web-controls-current.mjs",
-    "verify:start-hub-layout": "node scripts/verification/start-hub-layout-current.mjs"
+    "verify:start-hub-layout": "node scripts/verification/start-hub-layout-current.mjs",
+    "build:journey-format": "node scripts/build-journey-format.mjs"
   },
   "repository": {
     "type": "git",

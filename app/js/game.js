@@ -59,7 +59,7 @@ import {
   togglePropertyFilters,
   toggleRealEstate,
   updatePropertyPanel
-} from "./game/property-ui.js?v=9";
+} from "./game/property-ui.js?v=10";
 import {
   closeHistoricPanel,
   createHistoricCard,

@@ -1,0 +1,58 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {createFieldworkQaSession} from './fieldwork-qa-session.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
+const output=path.resolve(`output/verification/player-journey-20261105/ui-${Date.now()}`),base='http://127.0.0.1:4192/app/';
+const qa=await createFieldworkQaSession({output,careerId:'geology',maximumDurationMs:180000});
+const {page,report}=qa;
+report.scope='Actual native source UI and genuine accepted Geologist save. No world load, actor placement or accepted domain methods replayed.';
+try{
+ await configureStagingAppCheck(page,base,{proxyGeospatial:false});
+ await page.goto(base);
+ await page.locator('#playerEntryScreen').waitFor({state:'visible',timeout:90000});
+ await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');window.__journeyUiContext=ctx;window.__journeyUiReady=()=>ctx.canStartPlayerJourney?.()===true;});
+ await page.waitForFunction(()=>__journeyUiReady(),null,{timeout:30000});
+ const backup=JSON.parse(await fs.readFile('output/verification/cinematic-app-20261105/journey-1793890040223/qa-fieldwork-backup.json','utf8'));
+ await page.evaluate(async backup=>{const {createIndexedDbDiscoveryProfileStore}=await import('/app/js/discovery/profile-store.js?v=5');window.__journeyUiStore=createIndexedDbDiscoveryProfileStore();await __journeyUiStore.importData(backup);},backup);
+ const before=await page.evaluate(()=>__journeyUiStore.exportData());
+ await page.locator('#playerEntryScreen [data-entry=progress]').click();
+ await page.waitForFunction(()=>document.querySelectorAll('#playerJourney .journey-careers>article').length===19&&document.getElementById('playerJourney').getAttribute('aria-busy')==='false');
+ await page.screenshot({path:path.join(output,'journey-desktop.png')});
+ await page.setViewportSize({width:390,height:844});
+ assert.equal(await page.evaluate(()=>{const r=document.getElementById('playerJourney').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;}),true);
+ await page.screenshot({path:path.join(output,'journey-phone.png')});
+ await page.locator('#playerJourney [data-journey=leaderboard]').click();
+ await page.waitForFunction(()=>document.querySelectorAll('.career-board-row').length===19);
+ assert.equal(await page.locator('.career-board-summary').isVisible(),true);
+ await page.screenshot({path:path.join(output,'career-milestones-phone.png')});
+ await page.locator('#leaderboardCloseBtn').click();
+ await page.setViewportSize({width:1280,height:800});
+ await page.locator('#globeSelectorBackBtn').click();
+ await page.locator('#playerEntryScreen [data-entry=careers]').first().click();
+ await page.locator('#experienceBrowser[open]').waitFor();
+ await page.locator('[data-experience-id="career:racer"]').click();
+ await page.locator('[data-experience-place]').selectOption('daytona-tri-oval');
+ await page.locator('[data-experience-view=continue]').click();
+ await page.waitForFunction(()=>document.querySelector('.experience-detail .experience-eyebrow')?.textContent==='Geologist');
+ for(let n=0;n<3;n++){
+  await page.locator('[data-experience-view=careers]').click();
+  await page.locator('[data-experience-id="career:geologist"]').click();
+  await page.locator('[data-experience-id="career:racer"]').click();
+  await page.locator('[data-experience-view=continue]').click();
+  await page.waitForFunction(()=>document.querySelector('.experience-detail .experience-eyebrow')?.textContent==='Geologist');
+ }
+ await page.screenshot({path:path.join(output,'continue-keeps-geologist.png')});
+ await page.locator('[data-experience-close]').click();
+ await page.locator('#globeSelectorBackBtn').click();
+ await page.locator('#playerEntryScreen [data-entry=progress]').click();
+ await page.waitForFunction(()=>document.getElementById('playerJourney')?.getAttribute('aria-busy')==='false');
+ await page.locator('#playerJourney [data-journey=sync]').click();
+ await page.locator('#journeySync[open]').waitFor();
+ await page.screenshot({path:path.join(output,'guest-account-save.png')});
+ const after=await page.evaluate(()=>__journeyUiStore.exportData());
+ assert.deepEqual(after.events,before.events);assert.deepEqual(after.items,before.items);assert.deepEqual(after.profile.characterState,before.profile.characterState);
+ assert.equal(after.profile.activeExperience.experienceId,'career:geologist');
+ report.scope='Actual native source UI, genuine accepted Geo/Racer save, 19 portfolio projections, changed Continue/reselection path and personal board; no world load or accepted field methods replayed.';
+ await qa.succeed();
+}catch(error){await qa.fail(error);process.exitCode=1;}finally{await qa.close();}
