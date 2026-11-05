@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>One Explorer · Design review</title>
+    <link rel="icon" href="../../favicon.svg" />
+    <link rel="stylesheet" href="../../styles/world-explorer-tokens.css" />
+    <link rel="stylesheet" href="preview.css" />
+  </head>
+  <body>
+    <div class="review-bar">
+      <a href="README.md">WORLD EXPLORER / DESIGN REVIEW</a
+      ><span>Interactive concept · no game saves changed</span
+      ><a href="FINAL_ARCHITECTURE_RECOMMENDATION.md">Read recommendation ↗</a>
+    </div>
+    <header class="review-controls" aria-label="Design comparison">
+      <label
+        >Progression model<select id="model">
+          <option value="A">A · Starting career + open world</option>
+          <option value="B">B · Classless specializations</option>
+          <option value="C" selected>C · Career-guided sandbox</option>
+          <option value="D">D · Professions + qualifications</option>
+        </select></label
+      >
+      <label
+        >First session<select id="intro">
+          <option value="A">A · Choose career first</option>
+          <option value="B" selected>B · Learn once, choose after</option>
+          <option value="C">C · Explore first</option>
+        </select></label
+      >
+      <label
+        >Composition<select id="composition">
+          <option value="field">Field · cinematic</option>
+          <option value="atlas">Atlas · map and route</option>
+          <option value="desk">Desk · journal and tools</option>
+        </select></label
+      >
+      <label
+        >Display<select id="device">
+          <option value="desktop">Desktop</option>
+          <option value="phone">Phone</option>
+        </select></label
+      >
+      <button id="nativeBtn">Run native prototypes</button
+      ><button id="resetBtn">Reset preview</button>
+    </header>
+    <p id="comparison" class="comparison"></p>
+    <div class="app-frame" id="frame" data-device="desktop" data-composition="field">
+      <div class="application" id="application">
+        <header class="app-header">
+          <button class="brand" data-screen="start" aria-label="World Explorer home">
+            <span>◎</span> WORLD EXPLORER <em>3D</em>
+          </button>
+          <div class="header-end">
+            <span class="device-save">◉ Device Journal</span
+            ><button id="menuBtn" aria-label="Open navigation" aria-expanded="false">☰</button>
+          </div>
+        </header>
+        <nav id="nav" aria-label="Explorer navigation" hidden></nav>
+        <main id="view" tabindex="-1"></main>
+        <footer class="app-footer">
+          <span id="identityLabel">ONE EXPLORER · FREE EXPLORATION</span
+          ><button data-screen="controls">Controls & accessibility</button
+          ><button data-screen="journal">Open Journal ↗</button>
+        </footer>
+      </div>
+    </div>
+    <aside class="review-note">
+      <strong>What is real here?</strong> The career list, backgrounds and imagery come from the
+      app. Screens are clickable design simulations. “Preview result” changes only this page’s
+      memory. The native prototypes separately execute original character, entry, Journal, Backpack
+      and room-policy code with disposable controlled fixtures. They do not complete fieldwork,
+      create an account, join a live room or award connected items.
+    </aside>
+    <dialog id="nativeDialog">
+      <header>
+        <h2>Native source prototypes</h2>
+        <button id="closeNative" aria-label="Close native results">×</button>
+      </header>
+      <p>Controlled contracts, separate from simulated player screens. No live writes.</p>
+      <div id="nativeResults" aria-live="polite"></div>
+    </dialog>
+    <script type="module" src="preview.js"></script>
+  </body>
+</html>
