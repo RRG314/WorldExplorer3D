@@ -256,6 +256,9 @@ function showPrompt(stage, config = {}) {
   runtime.actionBtn.textContent = config.actionLabel || '';
   runtime.skipBtn.hidden = config.contextual === true;
   runtime.card.dataset.tutorialStage = stage;
+  // Guided Start, Continue, Replay and the Learning toggle already record
+  // explicit consent. Keep unsolicited ambient cards quiet in the TRAIL HUD.
+  runtime.card.dataset.guidanceRequested = String(runtime.state.mobileHintsConsent === true);
   runtime.card.hidden = false;
   setExpanded(config.expanded === true);
   tutorialTelemetry('we3d_tutorial_step', { action: 'presented', step_id: stage });

@@ -173,6 +173,20 @@ body:not(:has(#floatMenuContainer.show)) :is(#explorerGameHeader, #explorerOppor
 #tutorialHintCard {
   display: none !important;
 }
+#tutorialHintCard[data-guidance-requested='true']:not([hidden]) {
+  display: block !important;
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  #tutorialHintCard[data-guidance-requested='true'] {
+    top: max(100px, calc(env(safe-area-inset-top) + 92px));
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(420px, calc(100vw - 280px));
+    max-height: calc(100dvh - 240px);
+  }
+}
 #hud {
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
