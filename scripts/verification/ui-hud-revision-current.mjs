@@ -52,6 +52,8 @@ try {
           frame: { x: s.x, y: s.y, width: s.width, height: s.height },
           canvas: { x: r.x, y: r.y, width: r.width, height: r.height },
           buffer: { width: c.width, height: c.height },
+          destinationTop: document.querySelector('.globe-destination-bar').getBoundingClientRect()
+            .top,
         };
       });
       assert.ok(Math.abs(shape.canvas.y - shape.frame.y) <= 2, 'canvas begins inside its frame');
@@ -64,6 +66,10 @@ try {
           shape.buffer.width / shape.buffer.height - shape.canvas.width / shape.canvas.height
         ) < 0.03,
         'projection matches visible frame'
+      );
+      assert.ok(
+        shape.canvas.y + shape.canvas.height <= shape.destinationTop + 1,
+        'canvas clears the actual destination strip'
       );
       const icons = await page
         .locator('.globe-destination-bar .destination-thumb')
@@ -98,7 +104,13 @@ try {
     await page.evaluate(() => (document.documentElement.dataset.we3dTextScale = '100'));
     await page.locator('#globeSelectorStartBtn').click();
     await page.evaluate(async () => {
-      globalThis.hudQA = (await import('/app/js/shared-context.js?v=55')).ctx;
+      globalThis.hudQA = (
+        await import(
+          (globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix ||
+            document.documentElement.dataset.runtimeModulePrefix ||
+            '') + '/app/js/shared-context.js?v=55'
+        )
+      ).ctx;
     });
     await page.waitForFunction(
       () => hudQA.gameStarted && !hudQA.worldLoading && !hudQA.titleLaunchPending,
@@ -201,7 +213,9 @@ try {
     await page.locator('#explorerGameMenu [data-explorer-target="quickWeatherMode"]').click();
     assert.notEqual(await page.evaluate(() => hudQA.weatherMode || 'live'), weatherBefore);
     await page.locator('#explorerGameMenuBtn').click();
-    if (!(await page.locator('#explorerGameMenu .explorer-menu-world').getAttribute('open')))
+    if (
+      (await page.locator('#explorerGameMenu .explorer-menu-world').getAttribute('open')) === null
+    )
       await page.locator('#explorerGameMenu .explorer-menu-world summary').click();
     await page.locator('#explorerGameMenu [data-explorer-target="quickTimeOfDay"]').click();
     assert.equal(await page.evaluate(() => hudQA.hasPauseReason('game_menu')), false);

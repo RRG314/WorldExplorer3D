@@ -34,7 +34,14 @@ try {
     await page.goto(base + '/app/?diagnostics=1');
     await page.locator('#globeSelectorStartBtn').waitFor({ state: 'visible', timeout: 60000 });
     await page.evaluate(
-      async () => (window.menuCtx = (await import('/app/js/shared-context.js?v=55')).ctx)
+      async () =>
+        (window.menuCtx = (
+          await import(
+            (globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix ||
+              document.documentElement.dataset.runtimeModulePrefix ||
+              '') + '/app/js/shared-context.js?v=55'
+          )
+        ).ctx)
     );
     await page
       .locator(

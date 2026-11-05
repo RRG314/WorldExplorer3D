@@ -828,6 +828,12 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-panel-host .loc-grid { grid-template-columns: 1fr; }
 }
 
+/* The short-window destination strip shares the stage row. Keep the renderer
+   above that real 72px reservation instead of drawing the globe behind it. */
+@media (min-width: 621px) and (max-height: 520px) {
+  #globeSelectorCanvas { height: calc(100% - 72px); bottom: 72px; }
+}
+
 /* The overlay keeps its viewport bounds across responsive grids and touch. */
 @media (max-width: 900px), (pointer: coarse) {
   .globe-hub-overlay {

@@ -29,7 +29,14 @@ try {
   await page.locator('#globeSelectorStartBtn').click();
   await page.screenshot({ path: path.join(output, 'loading-controls.png') });
   await page.evaluate(
-    async () => (globalThis.visitQA = (await import('/app/js/shared-context.js?v=55')).ctx)
+    async () =>
+      (globalThis.visitQA = (
+        await import(
+          (globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix ||
+            document.documentElement.dataset.runtimeModulePrefix ||
+            '') + '/app/js/shared-context.js?v=55'
+        )
+      ).ctx)
   );
   await Promise.race([
     page.waitForFunction(
