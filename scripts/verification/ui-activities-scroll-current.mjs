@@ -19,7 +19,12 @@ try {
     await page.locator('.globe-app-rail [data-globe-destination="games"]').click();
     const browser=page.locator('#experienceBrowser');await browser.waitFor({state:'visible'});
     assert.equal(await browser.locator('[data-experience-id]').count(),20);
-    if(await browser.getAttribute('data-detail')==='true')await browser.locator('[data-experience-back]').click();
+    // Reopening retains the last choice after the asynchronous profile read.
+    // Wait for that native brief before returning to the list.
+    if(await browser.locator('[data-experience-id].selected').count()){
+      await browser.locator('.experience-detail h3').waitFor({state:'visible'});
+      await browser.locator('[data-experience-back]').click();
+    }
     const pane=browser.locator('.experience-list-pane');
     assert.equal(await pane.evaluate(e=>getComputedStyle(e).overflowY),'auto');
     await pane.hover();await page.mouse.wheel(0,500);
