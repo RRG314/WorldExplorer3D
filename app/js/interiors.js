@@ -1,3 +1,4 @@
+import {attachBusinessAssets,disposeBusinessAssets} from './interiors/business-scene.js';
 import {resolveAquariumInterior} from './interiors/aquarium-content.js';
 import { resolveCernInterior } from './interiors/cern-content.js';
 import { attachCern, disposeCern } from './interiors/cern-runtime.js';
@@ -91,6 +92,8 @@ const interiorRuntimeDeps = {
     isCurrent: (candidate) => appCtx.activeInterior === candidate && candidate.group?.parent === appCtx.scene
   }),
   disposeCuratedHomeFurnishing,
+  attachBusinessAssets: active => attachBusinessAssets(THREE,active,{isCurrent:current=>appCtx.activeInterior===current}),
+  disposeBusinessAssets,
   attachCommunityInteriorRepresentation: (active) => attachCommunityInteriorRepresentation(appCtx, active),
   findOwnedHomeForInteriorSupport: (support) => findOwnedHomeForInteriorSupport(
     support,

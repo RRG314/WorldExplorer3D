@@ -5,6 +5,7 @@ import {worldToGeo,geoToWorld} from '../app/js/config.js';
 import {resolveMapView,worldToLatLon} from '../app/js/map/tiles.js';
 import {drawEarthBaseLayers} from '../app/js/map/earth-base.js';
 import {drawEarthMarkerLayers} from '../app/js/map/earth-markers.js';
+import {normalizePoi} from '../app/js/poi/semantic-authority.js';
 
 test('caller-owned geographic and screen outputs preserve independent legacy results and polar authority',()=>{
  const original=ctx.LOC;
@@ -26,12 +27,14 @@ test('caller-owned geographic and screen outputs preserve independent legacy res
  }finally{ctx.LOC=original;}
 });
 
-test('water and POI painters use bounded projection destinations without changing any canvas command',()=>{
+test('water and admitted POI painters use bounded projection destinations without changing any canvas command',()=>{
  const image=globalThis.Image;globalThis.Image=class{set src(_) {}};
- const original=ctx.LOC;
+ const original={...ctx};
  Object.assign(ctx,{LOC:{lat:39.2904,lon:-76.6122},car:{x:0,z:0},minimapZoom:15,largeMapZoom:14,mapLayers:{},linearFeatures:[],roads:[],customTrack:[],checkpoints:[],gameMode:'free',showPOIs:{},isPOIVisible:()=>true,
   waterAreas:[{pts:[{x:-20,z:0},{x:10,z:30},{x:20,z:0}]}],waterways:[{pts:[{x:-80,z:0},{x:0,z:-20},{x:70,z:60}],width:4}],
-  pois:Array.from({length:100},(_,i)=>({x:i-50,z:i%7,type:'fixture',icon:'X',color:0x223344}))});
+  pois:Array.from({length:100},(_,i)=>({sourceFeatureId:`node:${i+1}`,tags:{amenity:'cafe'},x:i-50,z:i%7,type:'amenity=cafe',icon:'X',color:0x223344}))});
+ ctx.poiLifecycle={byId:new Map(ctx.pois.map((poi,i)=>{const record=normalizePoi(poi);return[record.id,{...record,buildingAssociation:{sourceBuildingId:`way:${i+1}`,enterable:true}}];}))};
+ ctx.buildingEntranceByBuilding=new Map(ctx.pois.map((poi,i)=>[`way:${i+1}`,{approachX:poi.x+2,approachZ:poi.z+1}]));
  try{
   for(const isLarge of [false,true]){
    const size=isLarge?800:150,view=resolveMapView(size,size,isLarge),destinations=new Set();let reuseCalls=0;
@@ -45,7 +48,7 @@ test('water and POI painters use bounded projection destinations without changin
    };
    assert.deepEqual(paint(true),paint(false));assert.equal(reuseCalls,106);assert.equal(destinations.size,2);
   }
- }finally{ctx.LOC=original;globalThis.Image=image;}
+ }finally{Object.assign(ctx,original);globalThis.Image=image;}
 });
 
 

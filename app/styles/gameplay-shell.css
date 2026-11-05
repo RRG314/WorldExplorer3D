@@ -1,0 +1,526 @@
+/* Gameplay composition: one compact status, a real map and one optional menu.
+   Original controls and the shared layout/input owners supply all behaviour. */
+#floatMenuContainer.show {
+  display: contents !important;
+}
+#mainMenuBtn,
+.hudUtilityActions {
+  display: none !important;
+}
+#explorerGameHeader,
+body.space-flight-active #explorerGameHeader {
+  position: fixed;
+  inset: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) auto auto;
+  display: block;
+  width: 48px;
+  min-height: 0;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  z-index: 10020;
+}
+#explorerGameMenuBtn,
+#explorerOpportunitiesBtn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-radius-control);
+  color: var(--wx-text);
+  background: var(--wx-panel-solid);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#explorerGameMenuBtn svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+#explorerGameMenu {
+  box-sizing: border-box;
+  position: fixed;
+  inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom)) auto;
+  margin: 0;
+  width: min(360px, calc(100vw - 16px));
+  max-width: none;
+  max-height: calc(100dvh - 16px);
+  height: max-content;
+  overflow: auto;
+  padding: 16px;
+  color: var(--wx-text);
+  background: var(--wx-panel-solid);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-radius-panel);
+  box-shadow: var(--wx-shadow-panel);
+  font: 500 var(--wx-type-control) / 1.4 var(--wx-font-ui);
+}
+#explorerGameMenu::backdrop {
+  background: rgb(0 0 0 / 30%);
+}
+#explorerGameMenu header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+#explorerGameMenu h2 {
+  margin: 0;
+  font: 400 calc(1.6rem * var(--wx-text-scale)) / 1.2 var(--wx-font-display);
+}
+#explorerGameMenu button,
+#explorerGameMenu summary {
+  min-width: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+#explorerGameMenuClose {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 26px;
+  cursor: pointer;
+}
+#explorerGameMenu .explorer-global-navigation,
+#explorerGameMenu .explorer-context-actions,
+#explorerGameMenu .explorer-menu-support {
+  position: static;
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  overflow: visible;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--wx-line-soft);
+  background: transparent;
+}
+#explorerGameMenu
+  :is(nav, .explorer-context-actions, .explorer-menu-support, .explorer-menu-world)
+  button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--wx-radius-control);
+  cursor: pointer;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#explorerGameMenu button:hover {
+  background: var(--wx-selected);
+}
+#explorerGameMenu summary {
+  padding: 12px;
+  cursor: pointer;
+}
+#explorerGameMenu #weatherPanel {
+  padding: 8px 12px;
+  font-size: var(--wx-type-meta);
+}
+#explorerGameMenu .explorer-menu-tip {
+  margin: 14px 0 0;
+  color: var(--wx-muted);
+  font-size: var(--wx-type-meta);
+}
+body.space-flight-active #explorerGameMenu .explorer-context-actions,
+body:is(.space-flight-active, .solid-world-active) #explorerGameMenu .explorer-menu-world {
+  display: none;
+}
+body:is(.game-panel-layer-open, .game-activity-layer-open)
+  :is(#explorerGameHeader, #explorerOpportunitiesBtn),
+body.start-hub-open :is(#explorerGameHeader, #explorerOpportunitiesBtn),
+body:is(.panel-vr-open, .panel-vr-setup-open) :is(#explorerGameHeader, #explorerOpportunitiesBtn) {
+  display: none !important;
+}
+body:not(:has(#floatMenuContainer.show)) :is(#explorerGameHeader, #explorerOpportunitiesBtn) {
+  display: none;
+}
+#explorerOpportunitiesBtn {
+  position: fixed;
+  z-index: 120;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+}
+#explorerOpportunitiesBtn span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font: 700 14px/1 var(--wx-font-ui);
+}
+#discoveryContextPrompt,
+#tutorialHintCard {
+  display: none !important;
+}
+#hud {
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  right: auto;
+  width: auto;
+  height: auto;
+  gap: 6px;
+  grid-template-columns: max-content;
+  grid-template-rows: auto auto;
+}
+#hudBox {
+  grid-column: 1;
+  grid-row: 1;
+  box-sizing: border-box;
+  width: min(260px, calc(100vw - 84px));
+  max-height: none;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--wx-line-soft);
+}
+#hudBox.compact {
+  display: none;
+}
+#hudToggleBtn,
+#hudClockDisplay {
+  display: none !important;
+}
+#hudHeader {
+  display: block;
+  padding: 0;
+  min-width: 0;
+}
+#hudSpeedBlock {
+  display: block;
+}
+#hud #speed {
+  font: 400 calc(1.75rem * var(--wx-text-scale)) / 1 var(--wx-font-display);
+}
+#hud .hud-label {
+  font: 500 calc(0.625rem * var(--wx-text-scale)) / 1.3 var(--wx-font-ui);
+  margin-top: 3px;
+}
+#hudDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+#hud #street {
+  font: 600 calc(0.75rem * var(--wx-text-scale)) / 1.3 var(--wx-font-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#hud #locationLine {
+  display: none;
+}
+#hud #conditionLabel {
+  font: 500 calc(0.625rem * var(--wx-text-scale)) / 1.3 var(--wx-font-ui);
+}
+#hud #conditionBar {
+  height: 3px;
+  margin: 0;
+}
+#hud .indicators {
+  margin: 0;
+  font-size: calc(0.625rem * var(--wx-text-scale));
+}
+#hudMap {
+  grid-row: 2;
+  grid-column: 1;
+  width: 144px;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: visible;
+}
+#hudMap .hudMapVisual {
+  display: block;
+  width: 100%;
+}
+#hudMap #minimap {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border: 1px solid var(--wx-line-soft);
+  box-sizing: border-box;
+}
+#minimapZoomControls {
+  display: none;
+}
+#hud #coords {
+  display: flex;
+  justify-content: end;
+  gap: 6px;
+  padding: 3px 5px;
+  font: 500 9px/1.2 var(--wx-font-ui);
+}
+#coordsText {
+  display: none;
+}
+#hudUtilities {
+  position: fixed;
+  top: 72px;
+  right: 12px;
+  bottom: auto;
+  margin: 0;
+  width: min(260px, calc(100vw - 24px));
+  height: auto;
+  max-height: calc(100dvh - 160px);
+}
+#hudStatusPanels {
+  width: 100%;
+}
+.loadingShortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: start;
+  gap: 12px 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--wx-line-soft);
+  font: 500 var(--wx-type-meta) / 1.5 var(--wx-font-ui);
+}
+.loadingShortcuts strong,
+.loadingShortcuts small {
+  flex-basis: 100%;
+}
+.loadingShortcuts kbd {
+  padding: 3px 6px;
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-radius-control);
+  color: var(--wx-action);
+  font: inherit;
+}
+@media (max-width: 700px), (pointer: coarse) {
+  #hudMap {
+    width: 108px;
+  }
+  #hudBox {
+    padding: 8px 10px;
+  }
+  #explorerOpportunitiesBtn {
+    bottom: max(188px, calc(env(safe-area-inset-bottom) + 178px));
+    right: max(12px, env(safe-area-inset-right));
+  }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  #hud {
+    grid-template-columns: max-content max-content;
+    grid-template-rows: auto;
+  }
+  #hudMap {
+    grid-row: 1;
+    grid-column: 2;
+    width: 96px;
+  }
+  #hudBox {
+    width: min(240px, calc(100vw - 220px));
+  }
+}
+/* Optional world prompts are opened deliberately with the quiet indicator. */
+#urbanVehiclePrompt {
+  display: none !important;
+}
+body.context-details-open :is(#urbanVehiclePrompt.show, #discoveryContextPrompt.show) {
+  display: flex !important;
+  position: fixed;
+  left: auto;
+  top: auto;
+  right: 12px;
+  bottom: 66px;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(280px, calc(100dvh - 110px));
+  box-sizing: border-box;
+  overflow: auto;
+  transform: none;
+  animation: none;
+  transition: none;
+}
+@media (max-width: 700px), (pointer: coarse) {
+  body.context-details-open :is(#urbanVehiclePrompt.show, #discoveryContextPrompt.show) {
+    bottom: 238px;
+  }
+}
+#gameShareFloatBtn {
+  display: none !important;
+}
+#gameShareMenu {
+  inset: 72px 12px auto auto;
+  bottom: auto;
+  left: auto;
+  max-width: calc(100vw - 24px);
+}
+#hud .hud-label {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+}
+#hud .hud-label > span {
+  margin-left: 0 !important;
+}
+#hud .indicators .ind:not(.on) {
+  display: none;
+}
+#hud .indicators:not(:has(.ind.on)) {
+  display: none;
+}
+#hudMap {
+  position: relative;
+}
+#hud #coords {
+  position: absolute;
+  inset: auto 0 0;
+  order: initial;
+  width: 100%;
+  height: 20px;
+  min-height: 0;
+  margin: 0;
+  flex-wrap: nowrap;
+  box-sizing: border-box;
+  align-items: end;
+  justify-content: end;
+  padding: 2px 4px;
+  background: rgb(0 0 0 / 70%);
+  pointer-events: none;
+}
+#hud #coords a {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 36px;
+  padding: 0;
+  font: inherit;
+  pointer-events: auto;
+}
+#mobileTouchControls {
+  --mobile-bottom: max(16px, calc(16px + env(safe-area-inset-bottom)));
+}
+@media (max-width: 700px), (pointer: coarse) {
+  #explorerOpportunitiesBtn {
+    bottom: max(16px, env(safe-area-inset-bottom));
+    right: calc(50% - 22px);
+  }
+}
+
+#explorerOpportunitiesBtn {
+  right: auto;
+  bottom: auto;
+  left: calc(100vw - 56px);
+  top: calc(100dvh - 56px);
+}
+
+/* Clear both legacy anchors: coarse desktop layouts used to stretch this
+   short interaction hint between a top AND a bottom edge over the whole view. */
+#interiorPrompt {
+  inset: auto 12px 68px auto;
+  transform: none;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+  height: auto;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: var(--wx-radius-control);
+}
+@media (pointer: coarse) {
+  #interiorPrompt {
+    bottom: max(310px, calc(33dvh + 64px));
+    max-width: min(240px, calc(100vw - 24px));
+  }
+}
+@media (max-height: 560px) and (pointer: coarse) {
+  #interiorPrompt {
+    inset: 12px 72px auto auto;
+    max-width: min(240px, calc(100vw - 450px));
+  }
+}
+@layer interface {
+  #explorerGameMenu #weatherPanel {
+    display: block !important;
+  }
+  #hudMap[data-hud-map-layout='full'] #coords {
+    display: flex !important;
+  }
+}
+
+/* Mission controls are deliberate details too. Their original nodes, handlers
+   and controllers remain mounted; a quiet view is the default while moving. */
+body:not(.context-details-open)
+  :is(#researchDeckControls, #solidWorldPanel, .solarSystemTravelBar, #spaceFlightHUD) {
+  display: none !important;
+}
+body.space-flight-active:not(.start-hub-open):not(.game-panel-layer-open):not(
+    .game-activity-layer-open
+  )
+  #explorerOpportunitiesBtn {
+  display: grid !important;
+  z-index: 10020;
+}
+body.context-details-open :is(#researchDeckControls, #solidWorldPanel) {
+  top: 72px;
+  right: 12px;
+  left: auto;
+  bottom: auto;
+  width: min(320px, calc(100vw - 24px));
+  max-height: calc(100dvh - 344px);
+  overflow: auto;
+  box-sizing: border-box;
+}
+body.context-details-open #hudUtilities {
+  width: min(320px, calc(100vw - 24px));
+  max-height: calc(100dvh - 344px);
+}
+body.context-details-open #hudUtilities :is(#researchDeckControls, #solidWorldPanel) {
+  width: 100%;
+}
+body.context-details-open #spaceFlightHUD {
+  top: 72px;
+  right: 12px;
+  max-width: calc(60vw - 24px);
+  max-height: calc(100dvh - 310px);
+  overflow: auto;
+}
+body.context-details-open .solarSystemTravelBar {
+  top: 72px;
+  left: 12px;
+  width: min(190px, calc(40vw - 12px));
+  max-height: calc(100dvh - 310px);
+  overflow: auto;
+}
+.solarSystemTravelBar .ssToggleBtn {
+  overflow-wrap: anywhere;
+}
+@media (max-height: 560px) {
+  body.context-details-open #hudUtilities {
+    max-height: calc(100dvh - 180px);
+  }
+  body.context-details-open
+    :is(#researchDeckControls, #solidWorldPanel, #spaceFlightHUD, .solarSystemTravelBar) {
+    max-height: calc(100dvh - 180px);
+  }
+}

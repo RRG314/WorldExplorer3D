@@ -272,7 +272,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   inset: 0;
   background: color-mix(in srgb, var(--wx-panel-solid) 76%, transparent);
 }
-#globeSelectorCanvas { position: relative; z-index: 1; }
+#globeSelectorCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
 .globe-selector-basemap-controls,
 .globe-selector-basemap-attribution { z-index: 3; }
 .globe-selector-zoom-controls { z-index: 3; }
@@ -499,7 +499,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   letter-spacing: 0;
   overflow: visible;
 }
-.globe-destination-bar button:not(#globeSelectorSpaceBtn) {
+.globe-destination-bar button {
   width: 70px;
   height: 70px;
   aspect-ratio: 1 / 1;
@@ -525,20 +525,11 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .destination-thumb.moon { background-image: url('../assets/textures/ui-thumbnails/moon.jpg'); background-position: 38% 50%; }
 .destination-thumb.mars { background-image: url('../assets/textures/ui-thumbnails/mars.jpg'); background-position: 42% 50%; }
 .globe-destination-bar button .destination-thumb.space {
-  width: 76px;
-  aspect-ratio: auto;
-  border-radius: 8px;
-  clip-path: none;
   background-image: url('../assets/textures/ui-thumbnails/space.jpg');
-  background-size: contain;
+  background-size: cover;
 }
-#globeSelectorSpaceBtn {
-  width: auto;
-  height: auto;
-  aspect-ratio: auto;
-  border-radius: 0;
-}
-.destination-thumb.ocean { background-image: url('../assets/textures/ui-thumbnails/ocean.png'); background-position: 40% 58%; }
+#globeSelectorSpaceBtn { position: static; inset: auto; width: 70px; height: 70px; aspect-ratio: 1; border-radius: 50%; }
+.destination-thumb.ocean { background-image: url('../assets/textures/ui-thumbnails/ocean-gameplay-20261104.png'); background-position: center; }
 .globe-destination-bar button:hover .destination-thumb,
 .globe-destination-bar button.active .destination-thumb {
   border-color: var(--hub-blue);

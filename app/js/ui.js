@@ -21,6 +21,7 @@ import {mountTesterInvitation} from './ui/tester-invitation.js';
 import {bindWorldFocusControls} from './ui/world-focus.js';
 import {bindControlPanel} from './ui/control-panel.js';
 import {getScreenLayoutService} from './ui/screen-layout.js?v=3';
+import {bindGameMenu} from './ui/game-menu.js';
 import {bindWorkspaceNavigation} from './ui/workspace-navigation.js';
 import {isPlanetarySurfaceActive} from './planetary/traversal-capabilities.js?v=1';
 import {resolveControlState} from './transport/control-state.js';
@@ -186,6 +187,7 @@ function setupUI() {
     }
   }
   const worldFocus = bindWorldFocusControls(appCtx, closeAllFloatMenus);
+  bindGameMenu(appCtx,{requestWorldFocus:worldFocus.requestWorldFocus});
   bindWorkspaceNavigation(document,{onBlocked:message=>appCtx.showToast?.(message),resolveExploreTarget:()=>appCtx.spaceFlight?.active?'universeToggle':null});
   bindRacingUI({openCareerJourney:()=>experiences.open({experienceId:'career:racer'}),closeMenus:closeAllFloatMenus,requestWorldFocus:worldFocus.requestWorldFocus,chooseDestination:()=>{goToMainMenu();titleUi.selectGameMode('racing');}});
   bindControlPanel(appCtx, {updateMode: updateControlsModeUI, clearHeld: clearVirtualHeldInputs, requestWorldFocus: worldFocus.requestWorldFocus});

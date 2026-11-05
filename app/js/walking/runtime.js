@@ -1,4 +1,4 @@
-import {setWalkingNearClip} from './near-camera.js';
+import {setWalkingNearClip, walkingInteriorCeiling} from './near-camera.js';
 import {activeActorPose} from '../transport/actor-contract.js?v=6';
 import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -202,11 +202,10 @@ function createWalkingRuntimeHelpers({
 
     if (state.view === 'overhead' && !tunnelEnvelope.inside) {
       const terrainY = getWalkGroundY(walker.x, walker.z, 0);
-      const ship = appCtx.activeInterior?.environmentKind === 'expedition-ship';
-      const height = ship
-        ? Math.max(2.8, Number(appCtx.activeInterior.ceilingY || 3.6) - terrainY - 0.24)
-        : 45;
-      const offsetBack = ship ? 0 : 8;
+      const ceiling = walkingInteriorCeiling(appCtx.activeInterior, terrainY);
+      const contained = Number.isFinite(ceiling);
+      const height = contained ? ceiling - terrainY : 45;
+      const offsetBack = contained ? 0 : 8;
 
       camera.position.set(
         walker.x - Math.sin(cameraYaw) * offsetBack,
@@ -214,7 +213,7 @@ function createWalkingRuntimeHelpers({
         walker.z - Math.cos(cameraYaw) * offsetBack
       );
 
-      const lookAhead = ship ? 0.35 : 15;
+      const lookAhead = contained ? 0.35 : 15;
       camera.lookAt(
         walker.x + Math.sin(cameraYaw) * lookAhead,
         terrainY,
@@ -292,7 +291,8 @@ function createWalkingRuntimeHelpers({
     }
     resolvedCamX = collisionSafeCamera.x;
     resolvedCamZ = collisionSafeCamera.z;
-    camera.position.set(resolvedCamX, collisionSafeCamera.y, resolvedCamZ);
+    const ceiling = walkingInteriorCeiling(activeInterior, getWalkGroundY(walker.x, walker.z, 0));
+    camera.position.set(resolvedCamX, Number.isFinite(ceiling) ? Math.min(ceiling, collisionSafeCamera.y) : collisionSafeCamera.y, resolvedCamZ);
 
     if (state.characterMesh && state.view === 'third') {
       // When a tight corridor forces the camera almost onto the avatar, hide

@@ -61,7 +61,7 @@ export function bindWorkspaceNavigation(documentRef=globalThis.document,{onBlock
   function targetFor(button){
     const section=sections.find(item=>item.target===button.dataset.explorerTarget);
     if(section&&documentRef.body?.classList.contains('start-hub-open'))return documentRef.querySelector(`.globe-app-rail [data-globe-destination="${section.globe}"]`);
-    if(section?.id==='explore'){const contextual=resolveExploreTarget();if(contextual)return documentRef.getElementById(contextual);}
+    if(section?.id==='explore'||button.dataset.explorerTarget==='hudMapOpenBtn'){const contextual=resolveExploreTarget();if(contextual)return documentRef.getElementById(contextual);}
     return documentRef.getElementById(button.dataset.explorerTarget);
   }
   function reflect(){

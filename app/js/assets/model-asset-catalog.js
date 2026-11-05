@@ -251,11 +251,11 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     ['workspace-chair','SchoolChair_01','School Chair 01 by Ethan Place',5072]
   ].map(([id,source,attribution,triangles])=>Object.freeze({
     schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id,label:attribution,
-    url:`/app/assets/models/interiors/personal-workspace/${id}.glb`,roles:Object.freeze(['personal-workspace-furnishing','ship-interior-furnishing']),
+    url:`/app/assets/models/interiors/personal-workspace/${id}.glb`,roles:Object.freeze(['personal-workspace-furnishing','ship-interior-furnishing','business-interior-furnishing']),
     license:'CC0-1.0',sourceUrl:`https://polyhaven.com/a/${source}`,attribution,
     sourceUpAxis:'y',collisionPolicy:'personal-workspace-validated-furniture-envelopes',
     instancePolicy:Object.freeze({geometry:'clone',materials:'clone'}),
-    budgets:Object.freeze({bytes:500000,triangles,textureEdgePixels:1024,maxInstances:8})
+    budgets:Object.freeze({bytes:500000,triangles,textureEdgePixels:1024,maxInstances:id==='workspace-chair'?24:12})
   })),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,

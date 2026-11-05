@@ -1,3 +1,5 @@
+import {interiorProgramForDefinition} from '../poi/interior-program.js';
+import {addBusinessFixtures} from './business-scene.js';
 import {addAquariumFixtures} from './aquarium-scene.js';
 import { buildCernInterior } from './cern-scene.js';
 import {addGalleryFixtures} from './gallery-scene.js';
@@ -483,6 +485,7 @@ function buildInteriorLevelScene(definition, options = {}) {
     layoutKind: options.connectorLayout
       ? 'multi_floor_core'
       : featurePlan.layoutKind || (effectiveMode === 'mapped' ? 'mapped' : 'open_plan'),
+    businessMaterials: {wallMaterial,accentWallMaterial},
     wallHeight,
     suppressionRadius: Math.min(180, Math.hypot(lightBounds.width, lightBounds.depth) * 0.5 + 14),
     entryPoint: {
@@ -752,6 +755,7 @@ export function buildInteriorScene(definition, options = {}) {
   const footprint = buildingFootprintPoints(building);
   const bounds = footprintBounds(footprint);
   const floorPlan = deriveInteriorFloorPlan(definition, bounds);
+  const businessProgram = options.curatedHome ? '' : interiorProgramForDefinition(definition);
   const requestedActiveLevel = finiteNumber(options.activeLevel, 0);
   const activeLevel = Math.max(0, Math.min(floorPlan.floorCount - 1, Math.round(requestedActiveLevel)));
   const loadedLevels = [...loadedInteriorLevels(floorPlan, activeLevel)];
@@ -764,11 +768,12 @@ export function buildInteriorScene(definition, options = {}) {
     levelStates = loadedLevels.map((level) => {
       const state = buildInteriorLevelScene(floorDefinition(definition, level), {
         suppressLights: level !== activeLevel,
-        suppressPartitions: options.curatedHome === true,
+        suppressPartitions: options.curatedHome === true || (!!businessProgram && definition.mode !== 'mapped'),
         connectorLayout: connector,
         storyHeight: floorPlan.storyHeight,
         floorBaseY: Number.isFinite(options.floorBaseY) ? Number(options.floorBaseY) : undefined
       });
+      if(businessProgram)addBusinessFixtures(THREE,state,definition,businessProgram);
       state.group.name = `interior:${definition.key}:floor:${level}`;
       state.group.userData.floorId = interiorFloorIdentity(floorPlan, level).id;
       state.walkSurfaces.forEach((surface) => { surface.floorLevel = level; });

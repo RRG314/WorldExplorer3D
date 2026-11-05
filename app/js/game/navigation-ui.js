@@ -1,3 +1,4 @@
+import {playablePoiTarget} from './poi-map-visibility.js';
 import {exteriorApproach} from '../interiors/exterior-approach.js';
 import {resolveControlState} from '../transport/control-state.js';
 import {activeActorPose} from '../transport/actor-contract.js?v=6';
@@ -34,6 +35,7 @@ export function updateNearbyPOI() {
   let closest = null;
   let minDist = Infinity;
   appCtx.pois.forEach((poi) => {
+    if(!appCtx.isPOIVisible(poi.type,poi))return;
     const dx = poi.x - appCtx.car.x;
     const dz = poi.z - appCtx.car.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
@@ -254,7 +256,9 @@ export function navigateToPOI(x, z, label = 'Destination') {
   if (!actor || !Number.isFinite(x) || !Number.isFinite(z)) return false;
   appCtx.selectedProperty = null;
   appCtx.selectedHistoric = null;
-  return createNavigationRoute(actor.x, actor.z, x, z, true, {label, owner: 'poi'});
+  const poi=appCtx.pois?.find(p=>p.x===x&&p.z===z);
+  const target=poi&&playablePoiTarget(poi,appCtx.poiLifecycle,appCtx.buildingEntranceByBuilding);
+  return createNavigationRoute(actor.x, actor.z, target?.x??x, target?.z??z, true, {label, owner: 'poi'});
 }
 
 export function clearNavigation(owner = null) {

@@ -1,3 +1,5 @@
+import {selectPoiTenancy} from './poi/interior-program.js';
+import {canonicalPoiId} from './poi/semantic-authority.js?v=3';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { canContainWalkableInterior } from './interiors/entry-eligibility.js';
 const DEFAULT_DESTINATION_MATCH_RADIUS = 42;
@@ -338,13 +340,14 @@ function resolveSupportRecord(building, options = {}) {
   const publishedEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
   const exteriorEntrance = publishedEntrance && distanceToFootprint(publishedEntrance.x,publishedEntrance.z,building).dist<=3 ? publishedEntrance : null;
   const poiTenancies = appCtx.poiTenanciesByBuilding?.get?.(key) || [];
+  const tenancy = selectPoiTenancy(poiTenancies,{destinationId:destination?canonicalPoiId(destination):'',navigation:appCtx.getNavigationDestination?.(),world:appCtx._worldLoadSequence,entrance:exteriorEntrance});
   const originPoint = destination && Number.isFinite(destination.x) && Number.isFinite(destination.z) ?
     { x: Number(destination.x), z: Number(destination.z) } :
     exteriorEntrance ? { x: exteriorEntrance.x, z: exteriorEntrance.z } : center;
 
   return {
     key,
-    label: options.label || poiTenancies[0]?.source?.name || buildingLabel(destination || building),
+    label: options.label || tenancy?.source?.name || buildingLabel(destination || building),
     enterable: true,
     synthetic: !!building.syntheticInteriorOnly,
     building,
@@ -357,7 +360,7 @@ function resolveSupportRecord(building, options = {}) {
     exteriorEntrance,
     capturedExteriorEntry: appCtx.communityRealityCaptureEntryBuildings?.has?.(key) === true,
     poiTenancies,
-    interiorArchetype: String(poiTenancies[0]?.semantic?.interiorArchetype || ''),
+    interiorArchetype: String(tenancy?.semantic?.interiorArchetype || ''),
     allowMappedData: !building.syntheticInteriorOnly,
     allowGeneratedInterior: true
   };
@@ -373,6 +376,11 @@ function resolveDestinationBuilding(destination, options = {}) {
     appCtx.getNearbyBuildings(x, z, matchRadius + 10) :
     (Array.isArray(appCtx.buildings) ? appCtx.buildings : []);
 
+  const sourcePoi = destination.sourceFeatureId ? destination :
+    (appCtx.pois || []).find(p=>p.x===x&&p.z===z&&(!destination.name||p.name===destination.name));
+  const associatedId = sourcePoi && appCtx.poiLifecycle?.byId?.get?.(canonicalPoiId(sourcePoi))?.buildingAssociation?.sourceBuildingId;
+  const associated = associatedId && nearby.find(b=>buildingKey(b)===associatedId&&isEnterableBuildingCandidate(b));
+  if(associated)return {building:associated,score:-Infinity,footprintHit:distanceToFootprint(x,z,associated)};
   let best = null;
   for (let i = 0; i < nearby.length; i++) {
     const building = nearby[i];

@@ -1,4 +1,4 @@
-import { isPoiMapLayerVisible } from './game/poi-map-visibility.js';
+import { isPoiMapLayerVisible, playablePoiTarget } from './game/poi-map-visibility.js';
 import {createGameResultController} from './gameplay/result-controller.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { clearPolice, spawnPolice, updatePolice } from "./game/police.js?v=2";
@@ -36,6 +36,7 @@ import {
   describeDestinationEntrySupport,
   getNavigationTargetForDestination,
   navigateToPOI,
+  navigationDestinationSnapshot,
   renderInteriorLegend,
   toggleAllGameElements,
   toggleAllLayers,
@@ -69,8 +70,8 @@ import {
 } from "./game/historic-ui.js?v=2";
 import { escapeHtml, escapeJsString, formatPrice, toFiniteNumber } from "./game/ui-utils.js?v=1";
 
-function isPOIVisible(poiType) {
-  return isPoiMapLayerVisible(poiType, appCtx.mapLayers);
+function isPOIVisible(poiType, poi = null) {
+  return isPoiMapLayerVisible(poiType, appCtx.mapLayers) && (!poi || !!playablePoiTarget(poi, appCtx.poiLifecycle, appCtx.buildingEntranceByBuilding));
 }
 
 function showMapInfo(type, data) {
@@ -138,7 +139,7 @@ function showMapInfo(type, data) {
     content.innerHTML = `
       <div style="margin-bottom:12px">
         <div style="font-size:16px;font-weight:bold;color:var(--wx-action);margin-bottom:6px">${safeName}</div>
-        <div style="font-size:11px;opacity:0.8">${escapeHtml(data.category || 'POI')}</div>
+        <div style="font-size:11px;opacity:0.8">Playable interior · ${escapeHtml(data.category || 'Place')}</div>
       </div>
       <div style="margin-bottom:12px;font-size:10px"><div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div></div>
       <button onclick="navigateToPOI(${safeX}, ${safeZ}, '${safeNameJs}'); closeMapInfo();" style="width:100%;background:var(--wx-equipped-surface);color:var(--wx-text);border:none;border-radius:6px;padding:10px;font-family:var(--wx-font-ui);font-weight:bold;cursor:pointer;font-size:11px">🧭 NAVIGATE HERE</button>
@@ -196,6 +197,7 @@ Object.assign(appCtx, {
   formatPrice,
   getActiveGameplayLeaderboard,
   getGameplayRegistrySnapshot,
+  getNavigationDestination: navigationDestinationSnapshot,
   hideResult,
   isPOIVisible,
   loadPropertiesAtCurrentLocation,

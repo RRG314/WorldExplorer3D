@@ -44,8 +44,8 @@ export function createGlobeSelectorScene(options = {}) {
   let savedFavoriteMaterial = null;
   let favoriteMarkerNodes = [];
   let basemapTiles = null;
-  let cameraDistance = 2.8;
-  let targetCameraDistance = 2.8;
+  let cameraDistance = 3.2;
+  let targetCameraDistance = 3.2;
   let pointerActive = false;
   let pointerDragDistance = 0;
   let pointerDownX = 0;
@@ -137,6 +137,8 @@ export function createGlobeSelectorScene(options = {}) {
     const height = Math.max(1, Math.floor(bounds?.height || canvas.clientHeight || 1));
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
+    // Fit the globe to the shorter frame axis while preserving user zoom.
+    camera.fov = 2 * Math.atan(Math.tan(21 * Math.PI / 180) * Math.max(1, height / width)) * 180 / Math.PI;
     camera.updateProjectionMatrix();
     applyMarkerScales();
     updateZoomUi();

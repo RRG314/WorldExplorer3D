@@ -1,3 +1,4 @@
+import {interiorProgramForDefinition} from '../poi/interior-program.js';
 import { disposeThreeViewsHome } from '../campaign/three-views-home.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
@@ -121,6 +122,9 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
 }
 
 function applyInteriorSceneState(active, sceneState) {
+  active.businessProgram = sceneState.businessProgram;
+  active.businessModelPlacements = sceneState.businessModelPlacements;
+  active.businessFixturePlan = sceneState.businessFixturePlan;
   active.mode = sceneState.mode;
   active.group = sceneState.group;
   active.walkSurfaces = sceneState.walkSurfaces;
@@ -163,11 +167,13 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
     deps.disposeGallery?.(active);
     disposeThreeViewsHome(active);
     deps.disposeCuratedHomeFurnishing?.(active);
+    deps.disposeBusinessAssets?.(active);
     appCtx.scene.add(sceneState.group);
     appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
     applyInteriorSceneState(active, sceneState);
     disposeObject3D(previousGroup);
     void deps.attachCuratedHomeFurnishing?.(active);
+    void deps.attachBusinessAssets?.(active);
     resetInteriorInteractionCache();
     return true;
   } finally {
@@ -432,6 +438,7 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
+  if(interiorProgramForDefinition({...definition,support}))definition={...definition,support,label:support.label||definition.label};
   let sceneState;
   try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome});}
   catch(error){setTransientHint(`Interior not ready: ${error.message}`,deps.INTERIOR_NOTICE_MS,deps);return false;}
@@ -531,6 +538,7 @@ export async function enterInteriorForSupport(support, deps) {
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
   if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent && !definition.facilityContent && !definition.cernContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachBusinessAssets?.(appCtx.activeInterior);
   void deps.attachCern?.(appCtx.activeInterior);
   void deps.attachKennedy?.(appCtx.activeInterior);
   void deps.attachGallery?.(appCtx.activeInterior);
@@ -600,6 +608,7 @@ export function clearActiveInterior(options = {}, deps) {
   deps.disposeCern?.(active);
   disposeThreeViewsHome(active);
   deps.disposeCuratedHomeFurnishing?.(active);
+  deps.disposeBusinessAssets?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;

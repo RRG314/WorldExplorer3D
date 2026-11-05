@@ -470,6 +470,7 @@ export const currentContractTests = [
   'tests/far-terrain-buffer-lifetime-current.test.mjs',
   'tests/region-build-current.test.mjs',
   'tests/functional-poi-semantics-current.test.mjs',
+  'tests/business-interior-current.test.mjs',
   'tests/graphics-call-evidence-current.test.mjs',
   'tests/ground-reconstruction-current.test.mjs',
   'tests/home-property-current.test.mjs',

@@ -492,6 +492,7 @@
       "getActiveGameplayLeaderboard",
       "getGameResultSnapshot",
       "getGameplayRegistrySnapshot",
+      "getNavigationDestination",
       "hideResult",
       "isPOIVisible",
       "loadPropertiesAtCurrentLocation",
