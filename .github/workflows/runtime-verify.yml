@@ -42,7 +42,7 @@ jobs:
         run: npm ci --prefix services/racing
 
       - name: Validate release records
-        run: npm run verify:release-scope && npm run audit:release-claims
+        run: npm run verify:release-scope && npm run audit:release-claims && node scripts/sync-public-gallery.mjs --check
 
       - name: Bounded pull-request verification
         run: npm run verify:pr
@@ -97,7 +97,7 @@ jobs:
         run: python -m pip install -r scripts/ground-datum-requirements.txt
 
       - name: Validate release records
-        run: npm run verify:release-scope && npm run audit:release-claims
+        run: npm run verify:release-scope && npm run audit:release-claims && node scripts/sync-public-gallery.mjs --check
 
       - name: Stable source and component checks
         run: npm run verify:pr

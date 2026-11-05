@@ -2,6 +2,9 @@
 
 Choose a place, make a home, and find a path of your own. This update brings a new cinematic interface and a connected personal journey across your devices.
 
+<!-- public-gallery:drone -->
+![Baltimore at dusk in World Explorer 3D 5.7, viewed in Drone mode](assets/gallery/5.7/drone-13189f8a014d.jpg)
+
 ## Start your journey
 
 Create your explorer, choose a starting car, and begin a career or free exploration. The interactive globe still lets you choose anywhere on Earth, with the Moon, Mars, Ocean and Space a step away. Location search, world selection and returning to a saved place fit into the same flow.

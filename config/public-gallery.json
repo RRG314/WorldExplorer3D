@@ -1,9 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "5.6.1",
-  "capturedAt": "2026-10-14T15:24:09.503Z",
-  "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
-  "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/",
+  "version": "5.7.0",
   "landingGallery": [
     "walking",
     "driving",
@@ -33,7 +30,8 @@
       "sha256": "7a23d5f7d4a774a4b94702edf571936d2f04cc317e44706c271726618385809b",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:09:03.404Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "walking",
@@ -45,7 +43,8 @@
       "sha256": "a8119ad855de5604ef191a3c38010c0d46210fda21c4354c2104c291953a1801",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:10:20.206Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "driving",
@@ -57,19 +56,20 @@
       "sha256": "1b41f3116f8336a3924916873d2de3eb17bf0fba89b4a9ac79e2670bda0a6afb",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:10:22.662Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "drone",
       "title": "See the city from above",
-      "alt": "Drone view over mapped downtown Baltimore buildings and streets",
-      "file": "assets/gallery/5.6/drone-cf7691b9c943.webp",
+      "alt": "Baltimore at dusk in World Explorer 3D 5.7, viewed in Drone mode",
+      "file": "assets/gallery/5.7/drone-13189f8a014d.jpg",
       "width": 1600,
       "height": 900,
-      "sha256": "cf7691b9c9438974259964d5632cd9a3563dec13b7471162a26a2737077ad9ba",
-      "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
-      "capturedAt": "2026-10-14T15:10:28.067Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "sha256": "13189f8a014d8c5d7600a25577393f91831f21bbbdf3a85c021f2acaf5d02f2f",
+      "sourceBuild": "5.7.0 source preview",
+      "capturedAt": "2026-11-05",
+      "provenance": "Gameplay captured through Baltimore location selection and Drone travel mode."
     },
     {
       "id": "flight",
@@ -81,7 +81,8 @@
       "sha256": "f22b1898aa927c4334ca214fd889ce0fc9367ebce3c467ee877c6421bfb4346e",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:10:39.235Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "research-deck",
@@ -93,7 +94,8 @@
       "sha256": "40e79f50319d9f6cbb765bac2f3cbc502986d2ab23cc4846b76e91dcfbf4ee35",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:10:58.671Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "diving",
@@ -105,7 +107,8 @@
       "sha256": "e47bc4881b7d4c6f0d5d6570919b35d1deb0e8b46d221b151a74b1ce164d976b",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:14:17.840Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "ship-interior",
@@ -117,7 +120,8 @@
       "sha256": "2070577970ce7a7621cbe639cdb6c934e2fefb8baad50085e43ff46c2efb19a0",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:14:56.944Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "space",
@@ -129,7 +133,8 @@
       "sha256": "fd854981b14d30187aef6c4353c5cd06b84b82f810d33c051ccfc8fcd8396513",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:14:51.504Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "live-earth",
@@ -141,7 +146,8 @@
       "sha256": "7326f212d1de746fa990de700a8c426d6bb5bc7b9e58979aabec14e8446f626b",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:09:14.513Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "world-entry-phone",
@@ -153,7 +159,8 @@
       "sha256": "7c32425471bd42b4484b93ef7501b8b7479e8736f74c7b5e5bafdeedc88c9d9c",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:09:04.018Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "diver-phone",
@@ -165,7 +172,8 @@
       "sha256": "b0416e195c087054a72a24cb54b38ca310af1c889a03e305f0ff738bbe8c2aea",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:14:18.588Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "research-interior",
@@ -177,7 +185,8 @@
       "sha256": "cf113dcb53039d555e1e4dab37e8c2bf73e11a7e52dbbbd546f31f4f65917bcb",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:11:17.874Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "research-map",
@@ -189,7 +198,8 @@
       "sha256": "76bc4c68afc2a97196fabe1dc4352bd3735e01dc23dde308b87b19aeb2e987ea",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:12:04.087Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "research-vessel",
@@ -201,7 +211,8 @@
       "sha256": "4d75a690222122d7cf281b4e6c3132743ced9972c426de8bdf9330b3c90200be",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:13:58.400Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "submarine",
@@ -213,7 +224,8 @@
       "sha256": "7a6f4eab54d5c1d1daa642b7bc66560d43c677816f87d99a63edb48eeb69ddac",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:14:15.944Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "aquarium-overlook",
@@ -225,7 +237,8 @@
       "sha256": "7211b39156904c7fd0e51b79f67310d80ccb5b7a02db34dfd60bcfa2f2627a38",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:23:43.116Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "aquarium",
@@ -237,7 +250,8 @@
       "sha256": "2481f37f6e786e5aebae97e6f81083270edb047a8aeab133b538ea1aec0ce1f0",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:24:09.503Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     },
     {
       "id": "museum",
@@ -249,8 +263,10 @@
       "sha256": "ec196f05eadc07953700c63b56dc05e83743bf7c146a0342946ba4f810c7ef51",
       "sourceBuild": "5.6.1+2d1cd2c82bbb.bc28b7fd5f3f8789.staging",
       "capturedAt": "2026-10-14T15:21:09.081Z",
-      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene."
+      "provenance": "Normal-input browser runtime capture; no synthetic camera or test-only scene.",
+      "sourceUrl": "https://we3d-staging-20260712--ship-review-1011-pb8x1l4l.web.app/app/"
     }
   ],
-  "reviewScope": "Mixed reviewed gameplay captures: each image records its own build; final candidate recapture remains pending."
+  "reviewScope": "First-party gameplay captures. Each image retains its capture version and date; earlier scenes remain available alongside the 5.7 city view.",
+  "updatedAt": "2026-11-05"
 }

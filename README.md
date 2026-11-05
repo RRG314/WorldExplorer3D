@@ -19,8 +19,6 @@ signed-in devices. Free exploration and the interactive globe remain available
 from the start. Each location opens a bounded playable area; optional continuous
 exploration brings surrounding terrain and buildings with you.
 
-![Exploring Baltimore by drone in World Explorer 3D 5.7](assets/gallery/5.7/drone-13189f8a014d.jpg)
-
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
@@ -60,9 +58,9 @@ starting point. Detailed streets, interiors and activities remain in the selecte
 district. Turn traveling scenery on or off in Graphics settings.
 
 <!-- public-gallery:start -->
-![Drone view over mapped downtown Baltimore buildings and streets](assets/gallery/5.6/drone-cf7691b9c943.webp)
+![Baltimore at dusk in World Explorer 3D 5.7, viewed in Drone mode](assets/gallery/5.7/drone-13189f8a014d.jpg)
 
-*In-game views of city travel, ocean research, space and places to visit.*
+*The city view shows 5.7. Additional gameplay scenes were captured in 5.6.*
 
 | Explore on foot | Drive the city |
 | :--: | :--: |
