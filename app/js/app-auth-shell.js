@@ -1,4 +1,4 @@
-import { isGooglePlay, distributionUrl } from '../../js/distribution.js?v=1';
+import { isStoreEdition, distributionUrl } from '../../js/distribution.js?v=2';
 import { hasFirebaseConfig } from '../../js/firebase-init.js?v=58';
 import {
   observeAuth,
@@ -147,7 +147,7 @@ function renderState(state, user) {
   } else if (plan === 'supporter') {
     setProStatus('Supporter account benefits active. Core play, map access, and multiplayer remain open to everyone.');
   } else {
-    setProStatus('All core play, M map access, and signed-in multiplayer are free.' + (isGooglePlay ? '' : ' Donations are optional.'));
+    setProStatus('All core play, M map access, and signed-in multiplayer are free.' + (isStoreEdition ? '' : ' Donations are optional.'));
   }
 
   updateAuthOverlayVisibility();
@@ -294,7 +294,7 @@ if (!hasFirebaseConfig()) {
 if (new URLSearchParams(window.location.search).get('startTrial') === '1') {
   const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
   window.history.replaceState({}, '', distributionUrl(cleanUrl));
-  setAuthStatus('Sign in to use multiplayer.' + (isGooglePlay ? '' : ' Donations are optional in Account.'));
+  setAuthStatus('Sign in to use multiplayer.' + (isStoreEdition ? '' : ' Donations are optional in Account.'));
 }
 
 observeAuth(async (user) => {

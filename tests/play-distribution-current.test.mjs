@@ -100,3 +100,29 @@ test('installed app names agree with the saved Google Play listing', async () =>
   assert.equal(manifest.name, 'World Explorer 3D'); assert.equal(manifest.short_name, 'World Explorer 3D');
   assert.match(strings, /name="app_name">World Explorer 3D</);
 });
+
+
+test('App Store edition keeps its marker and blocks web checkout without hiding account reads', async () => {
+  const p = page({ href: 'https://worldexplorer3d.io/app/?distribution=app-store&launch=moon' });
+  assert.equal(p.distribution.isGooglePlay, false);
+  assert.equal(p.distribution.isAppStore, true);
+  assert.equal(p.distribution.isStoreEdition, true);
+  const next = page({ href: 'https://worldexplorer3d.io/account/', storage: p.storage });
+  assert.equal(next.distribution.isAppStore, true);
+  assert.equal(new URL(p.distribution.url('../account/')).searchParams.get('distribution'), 'app-store');
+  const { api, requests } = await billing(p);
+  await assert.rejects(api.redirectToCheckout('pro'), /Purchases are unavailable/);
+  await assert.rejects(api.redirectToPortal(), /Purchases are unavailable/);
+  assert.equal(requests.length, 0);
+  await api.getAccountOverview();
+  assert.equal(requests[0][0], '/getAccountOverview');
+});
+
+test('App Store links retain context with storage denied and cannot be inherited from another site', () => {
+  const p = page({ href: 'https://worldexplorer3d.io/app/?distribution=app-store', storageFails: true });
+  const link = { href: 'https://worldexplorer3d.io/about/download.html', hasAttribute: () => false };
+  p.listeners.get('click')({ target: { closest: () => link } });
+  assert.equal(new URL(link.href).searchParams.get('distribution'), 'app-store');
+  assert.equal(page({ storageFails: true, referrer: link.href }).distribution.isAppStore, true);
+  assert.equal(page({ referrer: 'https://other.example/?distribution=app-store' }).distribution.isStoreEdition, false);
+});

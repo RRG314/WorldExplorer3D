@@ -69,6 +69,19 @@ import Vision
         XCTAssertTrue(app.buttons["Connect your Explorer account"].waitForExistence(timeout: 10))
         capture("portal-account-device")
     }
+    func testGamePresentationReturnsToPortal() throws {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["The Living Portal"].waitForExistence(timeout: 15))
+        app.buttons["Open game"].tap()
+        let close = app.buttons["Close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 20))
+        capture("game-contained-browser")
+        close.tap()
+        XCTAssertTrue(app.staticTexts["The Living Portal"].waitForExistence(timeout: 10))
+        app.buttons["Your Trail"].tap()
+        XCTAssertTrue(app.staticTexts["Your Exploration Trail"].waitForExistence(timeout: 5))
+        capture("game-return-to-trail")
+    }
     func testHomeScreenWidget() throws {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.staticTexts["The Living Portal"].waitForExistence(timeout: 15))

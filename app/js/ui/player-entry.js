@@ -210,7 +210,7 @@ export function createPlayerEntry({
         ''
       )}</div><button data-entry="careers">Browse all careers & activities ↗</button></section>
     <section class="landing-create"><img src="${image('research-interior-cf113dcb5303.webp')}" alt="Actual research interior gameplay"><div><span class="entry-eyebrow">MAKE SOMETHING WORTH RETURNING TO</span><h2>A place of your own.<br>A journey to share.</h2><p>Build a workspace, create a route or track, keep an album, and meet other Explorers in shared rooms.</p><div class="entry-actions"><button class="entry-primary" data-entry="create">Create & build</button><button data-entry="together">Explore together</button></div></div></section>
-    <footer class="player-entry-footer"><button data-entry="journal">Open Journal</button><button data-entry="settings">Settings & accessibility</button><a href="../account/">Your account</a><a href="../legal/privacy">Privacy</a><a href="../legal/terms">Terms</a></footer>`;
+    <footer class="player-entry-footer"><button data-entry="journal">Open Journal</button><button data-entry="settings">Settings & accessibility</button><a href="../account/">Your account</a><a href="../about/download.html">Get the app</a><a href="../legal/privacy">Privacy</a><a href="../legal/terms">Terms</a></footer>`;
   }
   function hideLanding() {
     landing.hidden = true;

@@ -2,6 +2,7 @@ import SwiftUI
 import WidgetKit
 import BackgroundTasks
 import UIKit
+import SafariServices
 
 @MainActor final class PortalAppModel: ObservableObject {
     @Published var document = PortalDocument()
@@ -9,6 +10,7 @@ import UIKit
     @Published var message = ""
     @Published var section = "discover"
     @Published var openedDestination: String?
+    @Published var gameDestination: PortalGameDestination?
     let store: PortalStore?
     let account: PortalAccount?
     init() {
@@ -38,9 +40,10 @@ import UIKit
             .sorted { max($0.savedAt, max($0.investigatedAt, $0.visitedAt)) > max($1.savedAt, max($1.investigatedAt, $1.visitedAt)) }
     }
     func openGame(_ path: String = "/app/") {
-        guard let url = URL(string: path, relativeTo: PortalContract.origin)?.absoluteURL, url.scheme == "https", url.host == PortalContract.origin.host, url.path == "/app/", url.user == nil, url.password == nil else { return }
-        UIApplication.shared.open(url)
+        guard let destination = PortalGameDestination(path: path) else { return }
+        gameDestination = destination
     }
+
     func route(_ url: URL) {
         guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false), parts.scheme == PortalContract.callbackScheme, parts.user == nil, parts.password == nil, parts.port == nil, parts.fragment == nil else { return }
         if parts.host == "portal-connect" { section = "account"; account?.receive(url); return }
@@ -58,6 +61,44 @@ import UIKit
     }
 }
 
+
+
+// The hosted game retains its browser, authentication and save owners.
+// Account callbacks stay native; only validated game routes open this view.
+struct PortalGameDestination: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+    init?(path: String) {
+        guard let candidate = URL(string: path, relativeTo: PortalContract.origin)?.absoluteURL,
+              candidate.scheme == "https", candidate.host == PortalContract.origin.host,
+              candidate.port == PortalContract.origin.port, candidate.path == "/app/",
+              candidate.user == nil, candidate.password == nil,
+              var parts = URLComponents(url: candidate, resolvingAgainstBaseURL: false) else { return nil }
+        var query = (parts.queryItems ?? []).filter { $0.name != "distribution" }
+        query.append(URLQueryItem(name: "distribution", value: "app-store"))
+        parts.queryItems = query
+        guard let marked = parts.url else { return nil }
+        url = marked
+    }
+}
+
+private struct PortalGameView: UIViewControllerRepresentable {
+    let url: URL
+    let onClose: () -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(onClose: onClose) }
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let controller = SFSafariViewController(url: url)
+        controller.delegate = context.coordinator
+        controller.dismissButtonStyle = .close
+        return controller
+    }
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
+    final class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        let onClose: () -> Void
+        init(onClose: @escaping () -> Void) { self.onClose = onClose }
+        func safariViewControllerDidFinish(_ controller: SFSafariViewController) { onClose() }
+    }
+}
 
 struct PortalRootView: View {
     @ObservedObject var model: PortalAppModel
@@ -84,6 +125,9 @@ struct PortalRootView: View {
             .navigationDestination(for: String.self) { id in PortalPlaceView(model: model, id: id) }
             .sheet(item: Binding(get: { model.openedDestination.map { PortalOpenedPlace(id: $0) } }, set: { model.openedDestination = $0?.id })) { item in
                 NavigationStack { PortalPlaceView(model: model, id: item.id).toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { model.openedDestination = nil } } } }
+            }
+            .fullScreenCover(item: $model.gameDestination) { destination in
+                PortalGameView(url: destination.url) { model.gameDestination = nil }.ignoresSafeArea()
             }
             .task { await model.account?.bootstrap(); model.reload(); PortalBackground.schedule() }
             .onChange(of: scenePhase) { _, phase in

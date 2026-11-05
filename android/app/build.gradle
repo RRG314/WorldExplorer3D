@@ -9,8 +9,8 @@ android {
         // systems whose browser can no longer receive current releases.
         minSdk 29
         targetSdk 36
-        versionCode 4
-        versionName '5.6.1-test.4'
+        versionCode 5
+        versionName '5.7.0'
         resValue 'string', 'provider_authority', 'io.worldexplorer3d.app.fileprovider'
         buildConfigField 'String', 'PORTAL_ORIGIN', '"https://worldexplorer3d.io"'
         buildConfigField 'String', 'PORTAL_API_ORIGIN', '"https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net"'

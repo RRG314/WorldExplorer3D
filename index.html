@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="./js/distribution-context.js?v=1"></script>
-  <link rel="stylesheet" href="./styles/distribution.css?v=1">
+  <script src="./js/distribution-context.js?v=2"></script>
+  <link rel="stylesheet" href="./styles/distribution.css?v=2">
   <meta name="google-site-verification" content="shLyPQ38xkcLHOYNLJr-1u-UXOYnO8XTZrXiW-HmeJw" />
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,7 +13,7 @@
   <link rel="manifest" href="./app/manifest.webmanifest">
   <link rel="apple-touch-icon" href="./app/assets/icons/app-192-v1.png">
   <script defer src="./app/install-support.js"></script>
-  <script defer src="./js/app-install.js?v=1"></script>
+  <script defer src="./js/app-install.js?v=2"></script>
   <meta property="og:type" content="website">
   <meta property="og:title" content="World Explorer 3D">
   <meta property="og:description" content="Explore real places by land, sea, air and space. A world sandbox in your browser.">
@@ -44,7 +44,7 @@
       <a href="#expedition">The experience</a>
       <a href="#gameplay">Current gameplay</a>
       <a href="#world">The world</a>
-      <a href="#install">Get the app</a>
+      <a href="./about/download.html">Get the app</a>
       <a href="#faq">FAQ</a>
     </nav>
     <div class="masthead-actions">
@@ -70,7 +70,7 @@
           <div class="cta-row">
             <a class="btn btn-primary" id="landingPrimaryCta" href="./app/">Start exploring — free</a>
             <button class="btn btn-secondary" id="landingSecondaryCta" type="button">Explore with friends</button>
-            <a class="btn btn-secondary" href="#install">Get the app</a>
+            <a class="btn btn-secondary" href="./about/download.html">Get the app</a>
           </div>
           <ul class="hero-notes" aria-label="Access details">
             <li>Runs in your browser</li>
@@ -121,9 +121,10 @@
           <div class="cta-row">
             <button class="btn btn-primary" id="installAppBtn" type="button" hidden aria-controls="installSteps" aria-describedby="installStatus">Show install steps</button>
             <a class="btn btn-secondary" href="./app/">Open the game</a>
+            <a class="btn btn-secondary" href="./about/download.html">Device downloads</a>
           </div>
           <p id="installStatus" class="install-status" role="status" aria-live="polite">Choose your device below for installation steps.</p>
-          <p class="install-note">Use the same browser for your existing local saves. Some devices keep installed-app data separate. In the game, open Journal → Profile → Data and backup before switching browsers or installing.</p>
+          <p class="install-note">Sign in and check your account save before switching devices. Guest progress stays on this device; use Journal → Profile → Data and backup to keep a copy.</p>
         </div>
       </div>
       <div id="installSteps" class="install-steps" tabindex="-1" aria-label="Installation steps">
@@ -431,7 +432,7 @@
           return;
         }
 
-        const { redirectToCheckout } = await import('./js/billing.js?v=59');
+        const { redirectToCheckout } = await import('./js/billing.js?v=60');
         await redirectToCheckout(plan);
       } catch (err) {
         console.error('[landing] Donation checkout failed:', err);

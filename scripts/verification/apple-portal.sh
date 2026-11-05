@@ -85,7 +85,7 @@ xcrun simctl bootstatus "$APPLE_SIMULATOR" -b > "$APPLE_PRIVATE/boot.log" 2>&1
 # Keep the array nonempty: macOS Bash 3.2 treats an empty array as unset under -u.
 APPLE_JOURNEY=(-parallel-testing-enabled NO)
 if test "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" = true; then APPLE_JOURNEY+=(-only-testing:PortalTests/PortalWidgetLayoutTests -only-testing:PortalUITests/PortalUITests/testHomeScreenWidget); fi
-if test "${WE3D_PORTAL_APPLE_APP_ONLY:-false}" = true; then APPLE_JOURNEY+=(-only-testing:PortalUITests/PortalUITests/testOfflineLearningTrailAndRotation); fi
+if test "${WE3D_PORTAL_APPLE_APP_ONLY:-false}" = true; then APPLE_JOURNEY+=(-only-testing:PortalTests/PortalGameRouteTests -only-testing:PortalUITests/PortalUITests/testGamePresentationReturnsToPortal); fi
 APPLE_UI_STATUS=0
 printf '%s\n' 'Apple phase: run only the requested current native UI journey'
 xcodebuild test-without-building -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Debug -destination "id=$APPLE_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/we3d-apple-derived" -resultBundlePath "$APPLE_PRIVATE/Portal.xcresult" "${APPLE_JOURNEY[@]}" CODE_SIGN_IDENTITY=- > "$APPLE_PRIVATE/test.log" 2>&1 || APPLE_UI_STATUS=$?
@@ -112,7 +112,7 @@ fi
 python3 - "$APPLE_UI_STATUS" "$APPLE_LIVE_STATUS" "${WE3D_PORTAL_APPLE_WIDGET_ONLY:-false}" "${WE3D_PORTAL_APPLE_APP_ONLY:-false}" <<'PY'
 import json,sys
 from pathlib import Path
-Path('apple-portal-evidence/journey-status.json').write_text(json.dumps({'uiExitCode':int(sys.argv[1]),'uiScope':'Native app learning, Trail, rotation and account only' if sys.argv[4]=='true' else 'Home Screen widget only' if sys.argv[3]=='true' else 'Native app and Home Screen widget','nativeSDKExitCode':None if sys.argv[2]=='not-requested' else int(sys.argv[2]),'scope':'Owned iOS simulator. Controlled HTTP browser role and temporary debug attestation for requested SDK check. Not physical iPhone, App Attest, TestFlight or headset acceptance.'},indent=2)+'\n')
+Path('apple-portal-evidence/journey-status.json').write_text(json.dumps({'uiExitCode':int(sys.argv[1]),'uiScope':'Contained game presentation, route boundary and return to native Trail' if sys.argv[4]=='true' else 'Home Screen widget only' if sys.argv[3]=='true' else 'Native app and Home Screen widget','nativeSDKExitCode':None if sys.argv[2]=='not-requested' else int(sys.argv[2]),'scope':'Owned iOS simulator. Controlled HTTP browser role and temporary debug attestation for requested SDK check. Not physical iPhone, App Attest, TestFlight or headset acceptance.'},indent=2)+'\n')
 PY
 test "$APPLE_UI_STATUS" = 0
 test "$APPLE_LIVE_STATUS" = not-requested || test "$APPLE_LIVE_STATUS" = 0

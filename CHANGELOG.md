@@ -2,6 +2,17 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.7.0] - 2026-11-05
+
+- New cinematic Home, guided explorer setup and career/free exploration entry, with the original interactive globe and all five destinations.
+- Nineteen ready careers, clear Coming soon entries, saved assignments, achievements and Journal progression.
+- Starter home purchase and precise return, including a furnished explorable refuge.
+- Private account saves across devices, explicit conflicting-save choices and recovery; guest backups retained.
+- Faster return to the currently loaded city, less crowded gameplay controls and improved globe/mobile layouts.
+- Device installation page, updated mobile packages and private-save disclosure.
+
+[Release notes](RELEASE_NOTES_5.7.0.md).
+
 ## Coherent careers and world UI — deployed 2026-11-04
 
 - Connect all twenty retained careers through a shared Activities entry, finite

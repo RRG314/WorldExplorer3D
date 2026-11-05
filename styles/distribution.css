@@ -1,3 +1,4 @@
-[data-play-only] { display: none !important; }
-html[data-distribution="google-play"] [data-web-purchase] { display: none !important; }
+[data-play-only], [data-app-store-only] { display: none !important; }
+html:is([data-distribution="google-play"], [data-distribution="app-store"]) :is([data-web-purchase], [data-web-only]) { display: none !important; }
 html[data-distribution="google-play"] [data-play-only] { display: revert !important; }
+html[data-distribution="app-store"] [data-app-store-only] { display: revert !important; }

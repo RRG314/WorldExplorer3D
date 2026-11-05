@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="../js/distribution-context.js?v=1"></script>
-  <link rel="stylesheet" href="../styles/distribution.css?v=1">
+  <script src="../js/distribution-context.js?v=2"></script>
+  <link rel="stylesheet" href="../styles/distribution.css?v=2">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Account Center · World Explorer</title>
@@ -1017,8 +1017,8 @@
       redirectToPortal,
       updateAccountProfile,
       deleteAccount
-    } from '../js/billing.js?v=59';
-    import { isGooglePlay, distributionUrl } from '../js/distribution.js?v=1';
+    } from '../js/billing.js?v=60';
+    import { isStoreEdition, distributionUrl } from '../js/distribution.js?v=2';
     import {
       ensureOwnCreatorProfile,
       getCreatorProfile
@@ -1596,7 +1596,7 @@
       } else if (state.plan === 'trial') {
         planDetail.textContent = 'Legacy trial state detected. Multiplayer is open while signed in.';
       } else {
-        planDetail.textContent = 'Free plan: full gameplay, M map access, and multiplayer access while signed in.' + (isGooglePlay ? '' : ' Donations are optional.');
+        planDetail.textContent = 'Free plan: full gameplay, M map access, and multiplayer access while signed in.' + (isStoreEdition ? '' : ' Donations are optional.');
       }
 
       extrasLabel.textContent = 'Worlds';

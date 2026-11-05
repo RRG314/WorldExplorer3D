@@ -20,7 +20,7 @@ function cacheKey(request){
   return url.href;
 }
 self.addEventListener('install',event=>event.waitUntil((async()=>{
-  const cache=await caches.open(CACHE);await cache.addAll(['./','./portal.css','../styles/world-explorer-tokens.css?v=3','../styles/distribution.css?v=1']);await self.skipWaiting();
+  const cache=await caches.open(CACHE);await cache.addAll(['./','./portal.css','../styles/world-explorer-tokens.css?v=3','../styles/distribution.css?v=2']);await self.skipWaiting();
 })()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
   for(const name of await caches.keys())if(name.startsWith('we3d-living-portal-')&&name!==CACHE)await caches.delete(name);
