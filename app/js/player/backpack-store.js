@@ -120,7 +120,7 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
       if ((latest?.migration?.saveGeneration || '') !== (lastMigration?.saveGeneration || '')) return false;
       // A Journal projection contains items/slots but not equipment ammo. Keep
       // the latest small equipment state when replacing that full projection.
-      const normalized = normalizeBackpackState({...lastControls,...snapshot, housing: settings.housing ?? housing, commerce: settings.commerce ?? commerce, commerceDeliveries: settings.commerceDeliveries ?? commerceDeliveries}, {
+      const normalized = normalizeBackpackState({...lastControls,...snapshot, housing: Object.hasOwn(settings,'housing')?settings.housing:housing, commerce: Object.hasOwn(settings,'commerce')?settings.commerce:commerce, commerceDeliveries: settings.commerceDeliveries ?? commerceDeliveries}, {
         sourceVersion: settings.sourceVersion ?? snapshot.migration?.sourceVersion ?? lastMigration?.sourceVersion,
         migratedAt: settings.migratedAt ?? snapshot.migration?.migratedAt ?? lastMigration?.migratedAt,
         backupAvailable: storage.getItem?.(BACKPACK_BACKUP_KEY) != null
@@ -271,6 +271,17 @@ function createLocalBackpackStore(storage = globalThis.localStorage) {
     migrationSnapshot() { return lastMigration ? { ...lastMigration } : null; },
     rollbackMigration,
     save(snapshot) { return saveNormalized(snapshot); },
+    // Complete personal-state restore through the same compare-and-swap and
+    // single Backpack commit as gameplay. The sync coordinator archives and
+    // validates all owners before invoking this, then reloads those owners.
+    restoreJourneySnapshot(snapshot) {
+      if(!snapshot||snapshot.schemaVersion!==BACKPACK_STORAGE_SCHEMA_VERSION||!Array.isArray(snapshot.items))return false;
+      if(snapshot.housing&&(snapshot.housing.schemaVersion!==2||!Array.isArray(snapshot.housing.homes)))return false;
+      if(snapshot.commerce&&(snapshot.commerce.schemaVersion!==4||!Number.isSafeInteger(snapshot.commerce.credits)||snapshot.commerce.credits<0))return false;
+      const complete={...snapshot,revision:snapshot.revision??0,equippedInstanceId:snapshot.equippedInstanceId??null,
+        hotbar:Array.isArray(snapshot.hotbar)?snapshot.hotbar:Array(6).fill(null),ammo:snapshot.ammo||{},quantities:snapshot.quantities||{}};
+      return saveNormalized(complete,{housing:snapshot.housing??null,commerce:snapshot.commerce??null,commerceDeliveries:snapshot.commerceDeliveries||{}});
+    },
     saveControls(snapshot) {
       if (!storage?.setItem || !lastMigration?.saveGeneration || !session.writable() || blocked) return false;
       try {

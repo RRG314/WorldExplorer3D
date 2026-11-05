@@ -12,9 +12,9 @@ export function summarizeReceiptState(items, rows, ownerUid) {
   });
 }
 
-export function discoverySaveMessage({ durable, signedIn, receipts = {}, backpackSaved = true, online = true }) {
+export function discoverySaveMessage({ durable, signedIn, receipts = {}, backpackSaved = true, online = true,journeySync = null }) {
   if (!durable) return 'Session only — browser storage is unavailable. Download a backup before leaving.';
-  const lines = ['Journal saved on this device. Everyone using this browser profile shares this local Journal.'];
+  const lines = [journeySync?.message||'Journal saved on this device. Everyone using this browser profile shares this local Journal.'];
   if (signedIn) {
     lines.push(`${receipts.acknowledged || 0} collected-item ${receipts.acknowledged === 1 ? 'receipt' : 'receipts'} acknowledged by your account.`);
     if (receipts.pending) lines.push(`${receipts.pending} waiting to upload${online ? '; retrying automatically' : '; reconnect to retry'}.`);
@@ -22,7 +22,8 @@ export function discoverySaveMessage({ durable, signedIn, receipts = {}, backpac
   } else lines.push('Sign in for receipts on future collected items. Existing guest records stay local.');
   if (receipts.deviceOnly) lines.push(`${receipts.deviceOnly} collected items are device-only.`);
   if (!backpackSaved) lines.push('Backpack copy could not be saved. Collected items remain in the Journal and will be restored when storage is available.');
-  lines.push('Observations and the full Journal are not backed up to your account.');
+  if(!journeySync)lines.push('Observations and the full Journal are not backed up to your account.');
+  else if(!journeySync.ownerUid)lines.push('Choose your account save after signing in to continue your full journey on other devices.');
   return lines.join(' ');
 }
 

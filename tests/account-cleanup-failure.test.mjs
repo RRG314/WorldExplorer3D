@@ -21,7 +21,7 @@ for(const operation of ['deleteDocsByQuery','updateDocsByQuery']) {
 test('user deletion propagates failure instead of continuing to identity deletion',async()=>{
  const error=new Error('profile delete failed');
  const doc=()=>({collection:()=>({}),delete:async()=>{throw error;}});
- const scope={require:()=>({cleanupCaptureAccount:async()=>{}}),admin:{storage:()=>({bucket:()=>({})})},FieldValue:{},CREATOR_PROFILES_COLLECTION:'creatorProfiles',
+ const scope={require:name=>name==='./journey-authority'?{createJourneyAuthority:()=>({cleanup:async()=>{}})}:{cleanupCaptureAccount:async()=>{}},admin:{storage:()=>({bucket:()=>({})})},FieldValue:{},CREATOR_PROFILES_COLLECTION:'creatorProfiles',
  db:{collection:()=>({doc,where:()=>({get:async()=>({docs:[]})})}),collectionGroup:()=>({where:()=>({})})},deleteDocsByQuery:async()=>{},releaseWorldPropertiesForUser:async()=>{},deleteDiscoveryTradesForUser:async()=>{}};
  vm.createContext(scope);vm.runInContext(source.slice(source.indexOf('async function deleteUserData'),source.indexOf('\nfunction timestampToMillis')),scope);
  await assert.rejects(scope.deleteUserData('owner'),e=>e===error);
@@ -37,4 +37,11 @@ test('every account cleanup collection-group equality query has a deployed index
   const override=config.fieldOverrides.find(row=>row.collectionGroup===group&&row.fieldPath===field);
   assert.ok(override?.indexes.some(index=>index.queryScope==='COLLECTION_GROUP'&&index.order==='ASCENDING'),`${group}.${field} requires a collection-group equality index`);
  }
+});
+
+test('private journey cleanup failure preserves identity deletion boundary',async()=>{
+ const error=new Error('private save unavailable');let userLookups=0;
+ const scope={require:name=>name==='./journey-authority'?{createJourneyAuthority:()=>({cleanup:async()=>{throw error;}})}:{cleanupCaptureAccount:async()=>{}},admin:{storage:()=>({bucket:()=>({})})},db:{collection(){userLookups++;}},FieldValue:{}};
+ vm.createContext(scope);vm.runInContext(source.slice(source.indexOf('async function deleteUserData'),source.indexOf('\nfunction timestampToMillis')),scope);
+ await assert.rejects(scope.deleteUserData('owner'),e=>e===error);assert.equal(userLookups,0);
 });

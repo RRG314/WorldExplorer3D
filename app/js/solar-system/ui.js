@@ -480,8 +480,8 @@ export function updateProximityHUD(ctx) {
     indicator.id = 'ssProximity';
     indicator.style.cssText =
       'position:fixed;top:50%;left:50%;transform:translate(-50%,-120px);' +
-      'background:rgba(10,10,30,0.85);border:1px solid #667eea;border-radius:8px;' +
-      'padding:8px 16px;color:#fff;font-family:Orbitron,sans-serif;font-size:12px;' +
+      "background:color-mix(in srgb, var(--wx-panel-solid) 85%, transparent);border:1px solid var(--wx-action);border-radius:8px;" +
+      "padding:8px 16px;color:var(--wx-text);font-family:var(--wx-font-ui);font-size:12px;" +
       'z-index:10001;display:none;text-align:center;pointer-events:none;';
     document.body.appendChild(indicator);
   }
@@ -491,29 +491,29 @@ export function updateProximityHUD(ctx) {
     const distText = Math.floor(closestDist);
     if (closestDist < threshold) {
       indicator.innerHTML =
-        '<span style="color:#10b981;font-weight:700;">' + closestName +
+        "<span style=\"color:var(--wx-success);font-weight:700;\">" + closestName +
         '</span><br><span style="font-size:10px;opacity:0.8;">Click to inspect</span>';
     } else {
       indicator.innerHTML =
-        '<span style="color:#fbbf24;">' + closestName +
+        "<span style=\"color:var(--wx-warning);\">" + closestName +
         '</span> <span style="font-size:10px;opacity:0.7;">' + distText + ' km</span>';
     }
     if (inBelt) {
-      indicator.innerHTML += '<br><span style="font-size:9px;color:#a08060;opacity:0.8;">ASTEROID BELT REGION</span>';
+      indicator.innerHTML += "<br><span style=\"font-size:9px;color:var(--wx-warning);opacity:0.8;\">ASTEROID BELT REGION</span>";
     }
     if (inKuiperBelt) {
-      indicator.innerHTML += '<br><span style="font-size:9px;color:#7aa6d8;opacity:0.85;">KUIPER BELT REGION</span>';
+      indicator.innerHTML += "<br><span style=\"font-size:9px;color:var(--wx-action);opacity:0.85;\">KUIPER BELT REGION</span>";
     }
     indicator.style.display = 'block';
   } else if (inBelt) {
     indicator.innerHTML =
-      '<span style="color:#a08060;font-weight:600;">ASTEROID BELT</span>' +
+      "<span style=\"color:var(--wx-warning);font-weight:600;\">ASTEROID BELT</span>" +
       '<br><span style="font-size:10px;opacity:0.7;">' + ctx.ASTEROID_BELT.innerAU.toFixed(1) +
       ' - ' + ctx.ASTEROID_BELT.outerAU.toFixed(1) + ' AU from Sun</span>';
     indicator.style.display = 'block';
   } else if (inKuiperBelt) {
     indicator.innerHTML =
-      '<span style="color:#7aa6d8;font-weight:600;">KUIPER BELT</span>' +
+      "<span style=\"color:var(--wx-action);font-weight:600;\">KUIPER BELT</span>" +
       '<br><span style="font-size:10px;opacity:0.7;">' + ctx.KUIPER_BELT.innerAU.toFixed(1) +
       ' - ' + ctx.KUIPER_BELT.outerAU.toFixed(1) + ' AU from Sun</span>';
     indicator.style.display = 'block';

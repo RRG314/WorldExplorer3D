@@ -1,3 +1,4 @@
+import {playablePoiTarget} from '../game/poi-map-visibility.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
 const PROPERTY_MARKER_HIT_RADIUS = 10;
@@ -120,8 +121,8 @@ function bindLargeMapCanvasInteractions() {
         appCtx.pois,
         clickPoint,
         POI_MARKER_HIT_RADIUS,
-        (poi) => appCtx.worldToScreenLarge(poi.x, poi.z),
-        (poi) => appCtx.isPOIVisible(poi.type)
+        (poi) => {const p=playablePoiTarget(poi,appCtx.poiLifecycle,appCtx.buildingEntranceByBuilding);return appCtx.worldToScreenLarge(p?.x??poi.x,p?.z??poi.z);},
+        (poi) => appCtx.isPOIVisible(poi.type, poi)
       );
       if (poiHit) {
         appCtx.showMapInfo('poi', poiHit);

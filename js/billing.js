@@ -1,5 +1,5 @@
 import { getReturnUrlBase, postProtectedFunction } from './function-api.js?v=3';
-import { assertWebPurchasesAvailable } from './distribution.js?v=1';
+import { assertWebPurchasesAvailable } from './distribution.js?v=2';
 
 export async function createCheckoutSession(plan) {
   assertWebPurchasesAvailable();

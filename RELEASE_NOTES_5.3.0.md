@@ -97,5 +97,4 @@ bridges, tunnels and incomplete map coverage still need location-specific work.
 The portable-core, Rust/Wasm, TypeScript and action-system investigations include
 prototypes and benchmarks. They are not a replacement game engine, a new
 server-authoritative movement system, or a promise of complete PvP support.
-See [release status](docs/RELEASE_INTEGRATION_STATUS.md) and
-[the roadmap](ROADMAP.md) for validation and continuing work.
+See [known limitations](KNOWN_ISSUES.md) and [the roadmap](ROADMAP.md) for continuing work.

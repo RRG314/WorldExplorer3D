@@ -51,7 +51,7 @@ import './hud.js?v=106';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=81';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=180';
+import { setupUI } from './ui.js?v=181';
 import { initAccessibility } from './ui/accessibility.js?v=4';
 
 let _booted = false;
@@ -237,7 +237,7 @@ function scheduleTutorialInit() {
             if (started) return;
             started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=15');
+                const mod = await import('./tutorial/tutorial.js?v=16');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);

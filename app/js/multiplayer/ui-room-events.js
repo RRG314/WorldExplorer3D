@@ -1,4 +1,4 @@
-import { distributionUrl } from '../../../js/distribution.js?v=1';
+import { distributionUrl } from '../../../js/distribution.js?v=2';
 import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=56';
 import {
   blockPlayer,

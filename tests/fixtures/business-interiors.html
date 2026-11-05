@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Business interior native presentation fixture</title>
+    <style>
+      body {
+        margin: 0;
+        background: #222;
+        color: #fff;
+        font: 14px system-ui;
+      }
+      canvas {
+        display: block;
+      }
+      nav {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        gap: 8px;
+        z-index: 2;
+        background: #202125;
+        padding: 8px;
+      }
+      button,
+      select {
+        min-height: 44px;
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <label
+        >Native room
+        <select id="program"></select></label
+      ><button id="next-program">Next room</button><span id="status"></span>
+    </nav>
+    <script src="/app/vendor/three/build/three.min.js"></script>
+    <script src="/app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+    <script type="module">
+      import { ctx } from '/app/js/shared-context.js?v=55';
+      import { buildInteriorScene } from '/app/js/interiors/scene-builder.js';
+      import {
+        attachBusinessAssets,
+        disposeBusinessAssets,
+      } from '/app/js/interiors/business-scene.js';
+      import { disposeThreeObjectTree as disposeObject3D } from '/app/js/engine/webgl-lifecycle.js?v=2';
+      import { modelAssetCacheSnapshot } from '/app/js/assets/model-asset-runtime.js?v=16';
+      const programs = [
+        'food-service',
+        'hotel-lobby',
+        'medical-service',
+        'automotive-service',
+        'banking',
+        'postal',
+        'education',
+        'library',
+        'civic-service',
+        'visitor-gallery',
+        'office',
+        'general-retail',
+      ];
+      const select = document.getElementById('program');
+      select.innerHTML = programs.map((p) => `<option>${p}</option>`).join('');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xc5c9cc);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.8;
+      document.body.append(renderer.domElement);
+      const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.04, 120);
+      let active;
+      ctx.METERS_PER_WORLD_UNIT = 1;
+      ctx.Walk = { state: { walker: { x: 0, z: -6, y: 1.7 } }, CFG: { eyeHeight: 1.7 } };
+      window.ready = '';
+      async function build(program) {
+        window.ready = '';
+        select.disabled = true;
+        document.getElementById('next-program').disabled = true;
+        if (active) {
+          disposeBusinessAssets(active);
+          active.group.parent?.remove(active.group);
+          disposeObject3D(active.group);
+        }
+        const building = {
+          sourceBuildingId: 'fixture:business',
+          buildingType: 'retail',
+          minX: -8,
+          maxX: 8,
+          minZ: -7,
+          maxZ: 7,
+          centerX: 0,
+          centerZ: 0,
+          baseY: 0,
+          height: 3.5,
+          bodyHeightMeters: 3.5,
+          levels: 1,
+          pts: [
+            { x: -8, z: -7 },
+            { x: 8, z: -7 },
+            { x: 8, z: 7 },
+            { x: -8, z: 7 },
+          ],
+        };
+        const definition = {
+          key: 'fixture:business',
+          label: program,
+          mode: 'generated',
+          building,
+          support: { building, entryAnchor: { x: 0, z: -6.5 }, interiorArchetype: program },
+          selectedLevel: 0,
+          features: [],
+          entrances: [],
+        };
+        active = buildInteriorScene(definition, { floorBaseY: 0 });
+        scene.add(active.group);
+        ctx.activeInterior = active;
+        await attachBusinessAssets(THREE, active, { isCurrent: (a) => a === active });
+        camera.position.set(active.entryPoint.x, active.entryPoint.y, active.entryPoint.z);
+        camera.lookAt(2, 1.2, 3);
+        renderer.render(scene, camera);
+        window.ready = program;
+        select.disabled = false;
+        document.getElementById('next-program').disabled = false;
+        document.getElementById('status').textContent =
+          `${active.businessFixturePlan.length} fixtures · ${active.businessAssetAttachment?.instances.length || 0} licensed models`;
+      }
+      select.onchange = () => void build(select.value);
+      document.getElementById('next-program').onclick = () => {
+        select.selectedIndex = (select.selectedIndex + 1) % programs.length;
+        void build(select.value);
+      };
+      window.businessFixture = {
+        programs,
+        snapshot: () => ({
+          program: window.ready,
+          fixtures: active.businessFixturePlan,
+          colliders: active.dynamicColliders.length,
+          leases: active.businessAssetAttachment?.instances.length || 0,
+          cache: modelAssetCacheSnapshot(),
+          scope:
+            'Actual native room builder with controlled footprint, admission tested separately',
+        }),
+        dispose: () => {
+          disposeBusinessAssets(active);
+          disposeObject3D(active.group);
+          active.group.parent?.remove(active.group);
+          active = null;
+          ctx.activeInterior = null;
+        },
+      };
+      window.render_game_to_text = () => JSON.stringify(window.businessFixture.snapshot());
+      window.advanceTime = () => renderer.render(scene, camera);
+      await build(programs[0]);
+    </script>
+  </body>
+</html>

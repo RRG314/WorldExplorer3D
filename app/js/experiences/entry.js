@@ -18,6 +18,7 @@ export function createExperienceIntent({experienceId,place=null,resumeId='',reco
 }
 export function experienceOffer(entry,{adapter,place=null,profile=null}={}){
  if(!entry)return {state:'unavailable',label:'Choose an activity',reason:'Select an activity to see its details.',enabled:false};
+ if(entry.kind==='career'&&entry.releaseStatus!=='ready')return {state:'unavailable',label:'Coming soon',reason:entry.releaseReason||'This career is still in development.',enabled:false};
  if(!adapter)return {state:'unavailable',label:'Unavailable',reason:'This activity is not available. Choose another activity.',enabled:false};
  const result=adapter.offer?.({entry,place,profile})||{state:place?'ready':'needs-place',label:place?'Begin':'Choose a place',enabled:true};
  return Object.freeze({...result,enabled:result.enabled===true});
@@ -31,6 +32,7 @@ export function createExperienceEntry({resolveAdapter,launchPlace,readWorldIdent
   async start(input){
    const intent=createExperienceIntent(input),run=++generation;pending=intent;
    const entry=experienceById(intent.experienceId),adapter=resolveAdapter(entry.adapterId,entry);
+   if(entry.kind==='career'&&entry.releaseStatus!=='ready')return false;
    if(!adapter||intent.recoveryAction&&!adapter.recoveryActions?.includes(intent.recoveryAction))return false;
    const before=readWorldIdentity();
    const transportTravel=typeof adapter.travel==='function';

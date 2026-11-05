@@ -1,5 +1,5 @@
 import {completeAirportTransfer} from './airport-transfer.js';
-import { searchPlaces } from '../places/place-search.js?v=4';
+import { searchPlaces } from '../places/place-search.js?v=5';
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
@@ -10,23 +10,23 @@ function installStyles() {
   const style = document.createElement('style');
   style.id = 'airportHubStyles';
   style.textContent = `
-    .airport-hub{border:1px solid rgba(151,216,229,.36);border-radius:20px;padding:0;background:linear-gradient(155deg,#101c24 0%,#0b141b 100%);color:#edf8f9;width:min(720px,calc(100vw - 28px));max-height:min(780px,calc(100vh - 28px));box-shadow:0 24px 80px rgba(0,0,0,.62);font:500 15px/1.45 system-ui,sans-serif;overflow:hidden}
-    .airport-hub::backdrop{background:rgba(2,8,13,.72);backdrop-filter:blur(5px)}
-    .airport-hub__head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px 17px;border-bottom:1px solid rgba(151,216,229,.16)}
-    .airport-hub__eyebrow{display:block;color:#8bdbe7;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}
-    .airport-hub h2{font-size:24px;line-height:1.1;margin:0}.airport-hub p{margin:5px 0 0;color:#aec0c7}.airport-hub button,.airport-hub input{font:inherit}
-    .airport-hub__close{border:0;background:rgba(255,255,255,.08);color:#fff;width:38px;height:38px;border-radius:12px;cursor:pointer;font-size:21px}
+    .airport-hub{border:1px solid color-mix(in srgb, var(--wx-action) 36%, transparent);border-radius:20px;padding:0;background:linear-gradient(155deg,var(--wx-panel-solid) 0%,var(--wx-panel-solid) 100%);color:var(--wx-text);width:min(720px,calc(100vw - 28px));max-height:min(780px,calc(100vh - 28px));box-shadow:0 24px 80px rgba(0,0,0,.62);font:500 15px/1.45 var(--wx-font-ui);overflow:hidden}
+    .airport-hub::backdrop{background:color-mix(in srgb, var(--wx-panel-solid) 72%, transparent);backdrop-filter:blur(5px)}
+    .airport-hub__head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px 17px;border-bottom:1px solid color-mix(in srgb, var(--wx-action) 16%, transparent)}
+    .airport-hub__eyebrow{display:block;color:var(--wx-action);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}
+    .airport-hub h2{font-size:24px;line-height:1.1;margin:0}.airport-hub p{margin:5px 0 0;color:var(--wx-text)}.airport-hub button,.airport-hub input{font:inherit}
+    .airport-hub__close{border:0;background:color-mix(in srgb, var(--wx-panel-soft) 8%, transparent);color:var(--wx-text);width:38px;height:38px;border-radius:12px;cursor:pointer;font-size:21px}
     .airport-hub__body{padding:20px 24px 24px;overflow:auto;max-height:calc(100vh - 150px)}
-    .airport-hub__mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:rgba(255,255,255,.045);padding:5px;border-radius:14px;margin-bottom:18px}
-    .airport-hub__mode button{border:1px solid transparent;background:transparent;color:#afbec5;padding:11px;border-radius:10px;cursor:pointer}.airport-hub__mode button[aria-pressed=true]{background:#d8f1f2;color:#122129;font-weight:800}
-    .airport-hub__local{display:none;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:15px 16px;background:rgba(91,184,202,.1);border:1px solid rgba(120,213,226,.2);border-radius:14px;margin-bottom:18px}.airport-hub__local.show{display:grid}
-    .airport-hub__local strong{display:block}.airport-hub__local small{color:#a8bac1}.airport-hub__primary{border:0;border-radius:11px;background:#8ce2e8;color:#102027;font-weight:850;padding:11px 16px;cursor:pointer}
-    .airport-hub__label{display:block;font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#b9c8cd;margin:0 0 7px}
-    .airport-hub__search{display:grid;grid-template-columns:1fr auto;gap:8px}.airport-hub__search input{min-width:0;background:#111f28;color:#fff;border:1px solid #38515e;border-radius:12px;padding:12px 13px;outline:none}.airport-hub__search input:focus{border-color:#87dce6;box-shadow:0 0 0 3px rgba(135,220,230,.12)}
-    .airport-hub__search button{border:1px solid #54717c;background:#1c303a;color:#fff;border-radius:12px;padding:0 17px;cursor:pointer;font-weight:750}
-    .airport-hub__status{min-height:22px;color:#9fb0b7;font-size:13px;margin:8px 2px 10px}
-    .airport-hub__results{display:grid;gap:8px}.airport-hub__result{display:grid;grid-template-columns:1fr auto;gap:12px;text-align:left;border:1px solid rgba(142,190,201,.18);background:rgba(255,255,255,.035);color:#eef8fa;border-radius:13px;padding:12px 14px;cursor:pointer}.airport-hub__result:hover,.airport-hub__result.selected{border-color:#76d6df;background:rgba(98,208,219,.12)}.airport-hub__result span{display:block}.airport-hub__result small{display:block;color:#9fb0b7;margin-top:2px}.airport-hub__result b{color:#9ce3e9;font-size:12px;align-self:center}
-    .airport-hub__footer{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:18px;padding-top:17px;border-top:1px solid rgba(151,216,229,.14)}.airport-hub__footer small{color:#91a5ad}.airport-hub__travel{border:0;border-radius:12px;background:#e17d4d;color:#15110d;font-weight:900;padding:12px 18px;cursor:pointer}.airport-hub__travel:disabled{opacity:.4;cursor:not-allowed}
+    .airport-hub__mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:color-mix(in srgb, var(--wx-panel-soft) 5%, transparent);padding:5px;border-radius:14px;margin-bottom:18px}
+    .airport-hub__mode button{border:1px solid transparent;background:transparent;color:var(--wx-text);padding:11px;border-radius:10px;cursor:pointer}.airport-hub__mode button[aria-pressed=true]{background:var(--wx-selected);color:var(--wx-text);font-weight:800}
+    .airport-hub__local{display:none;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:15px 16px;background:color-mix(in srgb, var(--wx-selected) 10%, transparent);border:1px solid color-mix(in srgb, var(--wx-action) 20%, transparent);border-radius:14px;margin-bottom:18px}.airport-hub__local.show{display:grid}
+    .airport-hub__local strong{display:block}.airport-hub__local small{color:var(--wx-text)}.airport-hub__primary{border:0;border-radius:11px;background:var(--wx-selected);color:var(--wx-text);font-weight:850;padding:11px 16px;cursor:pointer}
+    .airport-hub__label{display:block;font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--wx-text);margin:0 0 7px}
+    .airport-hub__search{display:grid;grid-template-columns:1fr auto;gap:8px}.airport-hub__search input{min-width:0;background:var(--wx-panel-solid);color:var(--wx-text);border:1px solid var(--wx-line);border-radius:12px;padding:12px 13px;outline:none}.airport-hub__search input:focus{border-color:var(--wx-action);box-shadow:0 0 0 3px rgba(135,220,230,.12)}
+    .airport-hub__search button{border:1px solid var(--wx-line);background:var(--wx-panel-solid);color:var(--wx-text);border-radius:12px;padding:0 17px;cursor:pointer;font-weight:750}
+    .airport-hub__status{min-height:22px;color:var(--wx-muted);font-size:13px;margin:8px 2px 10px}
+    .airport-hub__results{display:grid;gap:8px}.airport-hub__result{display:grid;grid-template-columns:1fr auto;gap:12px;text-align:left;border:1px solid color-mix(in srgb, var(--wx-action) 18%, transparent);background:color-mix(in srgb, var(--wx-panel-soft) 4%, transparent);color:var(--wx-text);border-radius:13px;padding:12px 14px;cursor:pointer}.airport-hub__result:hover,.airport-hub__result.selected{border-color:var(--wx-action);background:color-mix(in srgb, var(--wx-selected) 12%, transparent)}.airport-hub__result span{display:block}.airport-hub__result small{display:block;color:var(--wx-muted);margin-top:2px}.airport-hub__result b{color:var(--wx-action);font-size:12px;align-self:center}
+    .airport-hub__footer{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:18px;padding-top:17px;border-top:1px solid color-mix(in srgb, var(--wx-action) 14%, transparent)}.airport-hub__footer small{color:var(--wx-action)}.airport-hub__travel{border:0;border-radius:12px;background:var(--wx-panel-soft);color:var(--wx-text);font-weight:900;padding:12px 18px;cursor:pointer}.airport-hub__travel:disabled{opacity:.4;cursor:not-allowed}
     @media(max-width:600px){.airport-hub{width:calc(100vw - 16px);max-height:calc(100vh - 16px);border-radius:16px}.airport-hub__head{padding:17px 17px 14px}.airport-hub__body{padding:16px 17px 20px}.airport-hub h2{font-size:21px}.airport-hub__local{grid-template-columns:1fr}.airport-hub__search{grid-template-columns:1fr}.airport-hub__search button{padding:11px}.airport-hub__footer{align-items:stretch;flex-direction:column}.airport-hub__travel{width:100%}}
   `;
   document.head.appendChild(style);

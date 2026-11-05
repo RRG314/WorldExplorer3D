@@ -39,7 +39,7 @@ export function createHarborRunRuntime(state, dependencies = {}) {
   const selectedIntent = (p) =>
     p.activeExperience?.schemaVersion === 1 &&
     p.activeExperience.definitionVersion === 1 &&
-    p.activeExperience.experienceId === 'career:expedition-pilot';
+    ['career:expedition-pilot','activity:harbor-run'].includes(p.activeExperience.experienceId);
   const deliveryOffers = () =>
     selectedId === 'return-case'
       ? [
@@ -628,7 +628,7 @@ export function createHarborRunRuntime(state, dependencies = {}) {
         ['pickup', 'driving', 'unload'].includes(jobs.jobs['return-case']?.phase)
       )
         throw Error('Continue your field case return first.');
-      state.ui?.setCareerFocus?.({ sectionId: 'discoveryHarborRun', title: 'Expedition pilot' });
+      state.ui?.setCareerFocus?.({ sectionId: 'discoveryHarborRun', title: 'Harbor Run delivery' });
       ctx.openWorldDiscoverySection?.('today');
       renderKey = '';
       render();

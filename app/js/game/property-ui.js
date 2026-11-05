@@ -166,8 +166,22 @@ export function getPersonalHousing() {return ensureHousing();}
 export function getPersonalHomeCandidates() {
   const location=runtimeLocation();
   return makeHomeCandidates((appCtx.buildings||[]).filter(b=>/house|residential|apartments|terrace|townhouse|detached|bungalow|dormitory/i.test(b.buildingType||'')),{
-    actor:actorPosition(),locationId:location.id,locationLabel:location.label,worldToGeo,radius:1800,limit:80
+    actor:actorPosition(),locationId:location.id,locationLabel:location.label,worldToGeo,worldOrigin:{lat:location.lat,lon:location.lon,name:location.label},radius:1800,limit:80
   });
+}
+export function personalHomeOffers(){
+  if(appCtx.getEnv?.()!=='EARTH'||appCtx.worldLoading||!appCtx.gameStarted)return [];
+  const view=ensureHousing().snapshot();
+  return getPersonalHomeCandidates().filter(home=>home.mappedResidential&&home.sharedEligible&&
+    !view.homes.some(owned=>owned.id===home.id)&&getNavigationTargetForDestination(home).support?.enterable)
+    .sort((a,b)=>Number(b.price<=view.credits)-Number(a.price<=view.credits)||a.price-b.price||a.distance-b.distance).slice(0,8);
+}
+export function buyPersonalHome(id){
+  if(appCtx.activeInterior||appCtx.worldLoading||appCtx.getEnv?.()!=='EARTH')return {ok:false,reason:'Visit the entrance on Earth before buying.'};
+  const offer=personalHomeOffers().find(home=>home.id===id);
+  if(!offer)return {ok:false,reason:'This home is no longer available. Refresh the nearby homes.'};
+  if(propertyDistance(offer)>PROPERTY_INTERACTION_RADIUS)return {ok:false,reason:'Visit this home before buying it.'};
+  return ensureHousing().buy(offer);
 }
 export function routeToPersonalHome(home) {
   if (!home || home.locationId!==runtimeLocation().id) return false;
@@ -285,7 +299,7 @@ function homeSummaryCard(home, view, options = {}) {
 function renderHome(view) {
   if (!view.homes.length) {
     return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌂</span><h3>Choose your first home</h3>
-      <p>A home gives you a saved place and, as the feature expands, a place for finds from Earth, the ocean, and space.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>
+      <p>Keep a place to return to and organize your collection, building projects and journeys.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>
       ${view.authRequired ? '<section class="propertyHowItWorks"><strong>Sign in when you are ready to choose</strong><p>You can explore and compare buildings as a guest. A free account keeps ownership, your Explorer wallet, storage, and shared play connected wherever you return.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>' : ''}
       <section class="propertyHowItWorks"><strong>One Explorer Wallet</strong><p>Property and mapped-place purchases use the same account balance. Your first property deed is free; later purchases use market-scale values. Items stay in the same Backpack until you move them into home storage.</p></section>`;
   }
@@ -343,7 +357,7 @@ function storageItem(item, homeId, carried = false) {
 
 function renderStorage(view) {
   const home = view.primaryHome || view.homes[0];
-  if (!home) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">▣</span><h3>Home storage needs a home</h3><p>Choose a nearby property first. Connected home storage will open after account-backed Backpack transfers are ready.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>`;
+  if (!home) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">▣</span><h3>Home storage needs a home</h3><p>Choose a nearby home to view its storage. Your current items stay in your Backpack.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>`;
   if (view.shared) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">▣</span><h3>Home storage is being connected</h3><p>Your Backpack remains available, but moving items into a connected home will open only when every transfer can be saved safely to your account.</p><button type="button" data-property-view="home">Back to My Properties</button></section>`;
   const carried = appCtx.playerBackpackInventory?.snapshot?.().items?.filter((item) => item.catalogId !== 'hands' && item.equipped !== true && !item.verbs?.includes('equip') && item.category !== 'field-tool') || [];
   const used = home.storage.reduce((sum, item) => sum + Number(item.quantity || 0), 0);

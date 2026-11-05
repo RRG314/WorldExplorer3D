@@ -1,24 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="./js/distribution-context.js?v=1"></script>
-  <link rel="stylesheet" href="./styles/distribution.css?v=1">
+  <script src="./js/distribution-context.js?v=2"></script>
+  <link rel="stylesheet" href="./styles/distribution.css?v=2">
   <meta name="google-site-verification" content="shLyPQ38xkcLHOYNLJr-1u-UXOYnO8XTZrXiW-HmeJw" />
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>World Explorer 3D | Explore Real Places in Your Browser</title>
   <meta name="description" content="Explore real places in a free 3D browser sandbox. Walk, drive and fly, record discoveries, and explore oceans and space. No download required.">
-  <meta name="theme-color" content="#070b0e">
+  <meta name="theme-color" content="#111020">
   <meta name="apple-mobile-web-app-title" content="World Explorer 3D">
   <link rel="manifest" href="./app/manifest.webmanifest">
   <link rel="apple-touch-icon" href="./app/assets/icons/app-192-v1.png">
   <script defer src="./app/install-support.js"></script>
-  <script defer src="./js/app-install.js?v=1"></script>
+  <script defer src="./js/app-install.js?v=2"></script>
   <meta property="og:type" content="website">
   <meta property="og:title" content="World Explorer 3D">
   <meta property="og:description" content="Explore real places by land, sea, air and space. A world sandbox in your browser.">
   <meta property="og:url" content="https://worldexplorer3d.io/">
-  <meta property="og:image" data-gallery-social="drone" content="https://worldexplorer3d.io/assets/gallery/5.6/drone-cf7691b9c943.webp">
+  <meta property="og:image" data-gallery-social="drone" content="https://worldexplorer3d.io/assets/gallery/5.7/drone-13189f8a014d.jpg">
   <meta property="og:image:alt" content="An in-game view over downtown Baltimore">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
@@ -28,6 +28,9 @@
   <link rel="stylesheet" href="./styles/landing.css?v=5">
   <script src="./js/firebase-project-config.js"></script>
   <script type="module" src="./js/site-analytics.js?v=1"></script>
+  <link rel="stylesheet" href="styles/world-explorer-tokens.css?v=4">
+  <link rel="stylesheet" href="styles/product-web.css?v=1">
+  <script type="module" src="/app/js/ui/product-page-preferences.js?v=1"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -41,7 +44,7 @@
       <a href="#expedition">The experience</a>
       <a href="#gameplay">Current gameplay</a>
       <a href="#world">The world</a>
-      <a href="#install">Get the app</a>
+      <a href="./about/download.html">Get the app</a>
       <a href="#faq">FAQ</a>
     </nav>
     <div class="masthead-actions">
@@ -61,13 +64,13 @@
     <section class="hero" aria-labelledby="landingHeroHeadline">
       <div class="hero-grid">
         <div class="hero-copy">
-          <span class="hero-brand" id="landingHeroBrand">A playable world built from real places</span>
-          <h1 id="landingHeroHeadline"><span class="hero-headline">Explore real places in a 3D browser sandbox.</span></h1>
-          <p class="lead" id="landingHeroLead">Start with a walk through Baltimore, or choose a place of your own. Drive its streets, fly above the city, and keep discoveries in your Journal. Oceans, space, building and shared exploration are there when you are ready.</p>
+          <span class="hero-brand" id="landingHeroBrand">World Explorer 3D</span>
+          <h1 id="landingHeroHeadline"><span class="hero-headline">The real world. Your next adventure.</span></h1>
+          <p class="lead" id="landingHeroLead">Pick a place and see where it takes you. Explore real cities and wild places, drive real roads, build a home, or start a career. Go your own way or bring friends along—from familiar streets to the ocean floor and beyond Earth. Start anywhere. Make the journey your own.</p>
           <div class="cta-row">
-            <a class="btn btn-primary" id="landingPrimaryCta" href="./app/">Start exploring — free</a>
-            <button class="btn btn-secondary" id="landingSecondaryCta" type="button">Explore with friends</button>
-            <a class="btn btn-secondary" href="#install">Get the app</a>
+            <a class="btn btn-primary" id="landingPrimaryCta" href="./app/">Enter World Explorer</a>
+            <a class="btn btn-secondary" id="landingDiscoverCta" href="#expedition">Discover what you can do</a>
+            <a class="btn btn-secondary" href="./about/download.html">Get the app</a>
           </div>
           <ul class="hero-notes" aria-label="Access details">
             <li>Runs in your browser</li>
@@ -79,13 +82,12 @@
             <span class="community-count-label">explorers have joined</span>
           </div>
           <p class="perf-note" id="landingPerformanceNote">Desktop is recommended for the highest detail. Phones have touch controls. Large locations can take over a minute to load.</p>
-          <p class="status" id="multiplayerStatus" aria-live="polite"></p>
         </div>
 
         <div class="hero-media">
           <div class="hero-coordinate">Baltimore · in-game view</div>
           <figure class="hero-frame">
-            <img data-gallery="drone" fetchpriority="high" src="assets/gallery/5.6/drone-cf7691b9c943.webp" width="1600" height="900" alt="Drone view over mapped downtown Baltimore buildings and streets">
+            <img data-gallery="drone" fetchpriority="high" src="assets/gallery/5.7/drone-13189f8a014d.jpg" width="1600" height="900" alt="Drone view over mapped downtown Baltimore at dusk">
             <figcaption class="hero-caption">
               <strong>Real mapped city, water, terrain, and skyline in one world.</strong>
               <span>Downtown Baltimore</span>
@@ -118,9 +120,10 @@
           <div class="cta-row">
             <button class="btn btn-primary" id="installAppBtn" type="button" hidden aria-controls="installSteps" aria-describedby="installStatus">Show install steps</button>
             <a class="btn btn-secondary" href="./app/">Open the game</a>
+            <a class="btn btn-secondary" href="./about/download.html">Device downloads</a>
           </div>
           <p id="installStatus" class="install-status" role="status" aria-live="polite">Choose your device below for installation steps.</p>
-          <p class="install-note">Use the same browser for your existing local saves. Some devices keep installed-app data separate. In the game, open Journal → Profile → Data and backup before switching browsers or installing.</p>
+          <p class="install-note">Sign in and check your account save before switching devices. Guest progress stays on this device; use Journal → Profile → Data and backup to keep a copy.</p>
         </div>
       </div>
       <div id="installSteps" class="install-steps" tabindex="-1" aria-label="Installation steps">
@@ -202,7 +205,7 @@
           <figcaption><strong>Drive the city</strong><span>Follow mapped streets and find a new route</span></figcaption>
         </figure>
         <figure>
-          <img data-gallery="drone" loading="lazy" src="assets/gallery/5.6/drone-cf7691b9c943.webp" width="1600" height="900" alt="Drone view over mapped downtown Baltimore buildings and streets">
+          <img data-gallery="drone" loading="lazy" src="assets/gallery/5.7/drone-13189f8a014d.jpg" width="1600" height="900" alt="Drone view over mapped downtown Baltimore at dusk">
           <figcaption><strong>Survey by drone</strong><span>See the city from above</span></figcaption>
         </figure>
         <figure>
@@ -273,6 +276,8 @@
           <p>Build rooms and objects, contribute reviewed world edits, preserve memories, and explore together through multiplayer.</p>
         </article>
       </div>
+      <div class="cta-row"><button class="btn btn-secondary" id="landingSecondaryCta" type="button">Explore with friends</button></div>
+      <p class="status" id="multiplayerStatus" aria-live="polite"></p>
     </section>
 
     <section class="section" id="access">
@@ -428,7 +433,7 @@
           return;
         }
 
-        const { redirectToCheckout } = await import('./js/billing.js?v=59');
+        const { redirectToCheckout } = await import('./js/billing.js?v=60');
         await redirectToCheckout(plan);
       } catch (err) {
         console.error('[landing] Donation checkout failed:', err);

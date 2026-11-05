@@ -86,7 +86,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
     if(!blocked){notice?.remove();notice=noticeText=retryButton=null;return;}
     if(!notice&&typeof document!=='undefined'){
       notice=document.createElement('div');notice.setAttribute('role','status');notice.dataset.transportReadiness='true';
-      notice.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:2000;padding:8px 14px;background:#10202ee8;color:white;border-radius:8px;font:14px sans-serif';
+      notice.style.cssText="position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:2000;padding:8px 14px;background:color-mix(in srgb, var(--wx-panel-solid) 91%, transparent);color:white;border-radius:8px;font:14px sans-serif";
       noticeText=document.createElement('span');notice.append(noticeText);
       retryButton=document.createElement('button');retryButton.textContent='Retry roads';retryButton.style.cssText='margin-left:10px;min-height:44px';
       retryButton.onclick=retry;

@@ -1,3 +1,4 @@
+import {poiInteriorProgram} from './interior-program.js';
 const POI_SCHEMA_VERSION = 1;
 const POI_GENERATOR_VERSION = 1;
 
@@ -91,6 +92,7 @@ function sourceTags(input = {}) {
     amenity: lower(tags.amenity || (mappedKey === 'amenity' ? mappedValue : '')),
     shop: lower(tags.shop || (mappedKey === 'shop' ? mappedValue : '')),
     healthcare: lower(tags.healthcare || input.healthcare),
+    office: lower(tags.office || (mappedKey === 'office' ? mappedValue : '')),
     leisure: lower(tags.leisure || (mappedKey === 'leisure' ? mappedValue : '')),
     tourism: lower(tags.tourism || (mappedKey === 'tourism' ? mappedValue : '')),
     emergency: lower(tags.emergency || (mappedKey === 'emergency' ? mappedValue : '')),
@@ -133,7 +135,7 @@ function classifyPoi(input = {}) {
     familyLabels: [...families].map((family) => FAMILY_LABELS[family]),
     capabilities: [...capabilities],
     primaryCapability,
-    interiorArchetype: primaryCapability ? CAPABILITY_REGISTRY[primaryCapability].interiorArchetype : '',
+    interiorArchetype: primaryCapability ? CAPABILITY_REGISTRY[primaryCapability].interiorArchetype : poiInteriorProgram(tags),
     functional: capabilities.size > 0,
     informationalReason
   });

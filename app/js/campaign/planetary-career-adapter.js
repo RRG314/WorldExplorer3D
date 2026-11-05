@@ -76,8 +76,8 @@ export function bindPlanetaryCareer(
         },
       ];
     },
-    summary: ({ profile, variantId }) => {
-      const context = sameProfile(profile) ? { ...view } : { ready: false },
+    summary: ({ profile, variantId, planetaryView }) => {
+      const context = planetaryView ? {...planetaryView} : sameProfile(profile) ? { ...view } : { ready: false },
         live = runtime.getDestinationMissionSnapshot?.();
       context.environment = runtime.getEnv?.();
       if (live?.destinationId === 'moon' && live.activeMissionId)

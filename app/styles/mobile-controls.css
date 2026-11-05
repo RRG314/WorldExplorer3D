@@ -107,11 +107,13 @@
 /* Large text gets a two-column action deck rather than broken words in small
    slots. It is the same controls and bindings, above the two thumb pads. */
 @media(max-width:480px){
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-walking #mobileActionStack,
   html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack.has-pack-action,
   html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack.has-equipment-action{
     left:var(--mobile-edge);right:var(--mobile-edge);width:auto;grid-template-columns:repeat(2,minmax(0,1fr));
     bottom:calc(var(--mobile-bottom) + 150px);
   }
+  html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-walking #mobileActionStack{flex-direction:row}
   html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack .mobilePackAction,
   html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls #mobileActionStack #mobileEquipmentUse{width:100%}
   html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) #mobileTouchControls.mode-walking #mobileLookPad{bottom:var(--mobile-bottom)}

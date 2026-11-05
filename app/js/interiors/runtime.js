@@ -1,3 +1,4 @@
+import {interiorProgramForDefinition} from '../poi/interior-program.js';
 import { disposeThreeViewsHome } from '../campaign/three-views-home.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
@@ -121,6 +122,9 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
 }
 
 function applyInteriorSceneState(active, sceneState) {
+  active.businessProgram = sceneState.businessProgram;
+  active.businessModelPlacements = sceneState.businessModelPlacements;
+  active.businessFixturePlan = sceneState.businessFixturePlan;
   active.mode = sceneState.mode;
   active.group = sceneState.group;
   active.walkSurfaces = sceneState.walkSurfaces;
@@ -156,6 +160,7 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
   const previousGroup = active.group;
   try {
     const sceneState = deps.buildInteriorScene(active.definition, {
+      personalWorkspace:!!(active.ownedHome?.personalStarter||active.ownedHome?.workspace),
       activeLevel: nextLevel,
       floorBaseY: active.floorBaseY,
       curatedHome: !!active.ownedHome
@@ -163,11 +168,13 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
     deps.disposeGallery?.(active);
     disposeThreeViewsHome(active);
     deps.disposeCuratedHomeFurnishing?.(active);
+    deps.disposeBusinessAssets?.(active);
     appCtx.scene.add(sceneState.group);
     appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
     applyInteriorSceneState(active, sceneState);
     disposeObject3D(previousGroup);
     void deps.attachCuratedHomeFurnishing?.(active);
+    void deps.attachBusinessAssets?.(active);
     resetInteriorInteractionCache();
     return true;
   } finally {
@@ -277,8 +284,8 @@ function openElevatorFloorPicker(active, deps, interaction) {
   picker.id = 'interiorElevatorFloorPicker';
   picker.setAttribute('role', 'dialog');
   picker.setAttribute('aria-label', 'Choose an elevator floor');
-  picker.style.cssText = 'position:fixed;left:50%;bottom:max(92px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10020;width:min(360px,calc(100vw - 24px));max-height:min(56vh,430px);overflow:auto;padding:14px;border:1px solid rgba(148,197,255,.65);border-radius:12px;background:rgba(8,18,28,.96);box-shadow:0 18px 50px rgba(0,0,0,.45);color:#f8fafc;font:500 13px Inter,sans-serif;';
-  picker.innerHTML = `<div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:10px;"><div><strong style="display:block;font:700 16px Orbitron,sans-serif;">Elevator</strong><span style="display:block;margin-top:3px;color:#b8c7d9;">Choose a floor</span></div><button type="button" data-elevator-close aria-label="Close elevator controls" style="border:0;background:transparent;color:#fff;font-size:22px;line-height:1;cursor:pointer;">×</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">${choices.map((choice) => `<button type="button" data-elevator-level="${choice.level}" ${choice.current ? 'disabled aria-current="true"' : ''} style="min-height:46px;padding:9px 10px;border:1px solid ${choice.current ? '#64748b' : '#60a5fa'};border-radius:8px;background:${choice.current ? 'rgba(71,85,105,.55)' : 'rgba(30,64,175,.5)'};color:#fff;font:700 12px Inter,sans-serif;cursor:${choice.current ? 'default' : 'pointer'};">${choice.direction === 'up' ? '↑ ' : choice.direction === 'down' ? '↓ ' : '• '}${escapeHtml(choice.label)}${choice.current ? ' · Here' : ''}</button>`).join('')}</div>`;
+  picker.style.cssText = "position:fixed;left:50%;bottom:max(92px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10020;width:min(360px,calc(100vw - 24px));max-height:min(56vh,430px);overflow:auto;padding:14px;border:1px solid color-mix(in srgb, var(--wx-action) 65%, transparent);border-radius:12px;background:color-mix(in srgb, var(--wx-panel-solid) 96%, transparent);box-shadow:0 18px 50px rgba(0,0,0,.45);color:var(--wx-text);font:500 13px var(--wx-font-ui);";
+  picker.innerHTML = `<div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:10px;"><div><strong style="display:block;font:700 16px var(--wx-font-ui);">Elevator</strong><span style="display:block;margin-top:3px;color:var(--wx-action);">Choose a floor</span></div><button type="button" data-elevator-close aria-label="Close elevator controls" style="border:0;background:transparent;color:var(--wx-text);font-size:22px;line-height:1;cursor:pointer;">×</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">${choices.map((choice) => `<button type="button" data-elevator-level="${choice.level}" ${choice.current ? 'disabled aria-current="true"' : ''} style="min-height:46px;padding:9px 10px;border:1px solid ${choice.current ? '#64748b' : '#60a5fa'};border-radius:8px;background:${choice.current ? 'rgba(71,85,105,.55)' : 'rgba(30,64,175,.5)'};color:var(--wx-text);font:700 12px var(--wx-font-ui);cursor:${choice.current ? 'default' : 'pointer'};">${choice.direction === 'up' ? '↑ ' : choice.direction === 'down' ? '↓ ' : '• '}${escapeHtml(choice.label)}${choice.current ? ' · Here' : ''}</button>`).join('')}</div>`;
   picker.querySelector('[data-elevator-close]')?.addEventListener('click', () => closeElevatorFloorPicker(active));
   picker.querySelectorAll('[data-elevator-level]').forEach((button) => {
     button.addEventListener('click', () => travelByElevator(active, Number(button.dataset.elevatorLevel), deps));
@@ -432,8 +439,9 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
+  if(interiorProgramForDefinition({...definition,support}))definition={...definition,support,label:support.label||definition.label};
   let sceneState;
-  try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome});}
+  try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome,personalWorkspace:!!(ownedHome?.personalStarter||ownedHome?.workspace)});}
   catch(error){setTransientHint(`Interior not ready: ${error.message}`,deps.INTERIOR_NOTICE_MS,deps);return false;}
   const outsideColliders = appCtx.dynamicBuildingColliders.slice();
   appCtx.scene.add(sceneState.group);
@@ -468,7 +476,7 @@ export async function enterInteriorForSupport(support, deps) {
   const entryYaw = Number.isFinite(sceneState.entryYaw) ? sceneState.entryYaw : Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
   walker.angle = entryYaw;
   walker.yaw = entryYaw;
-  walker.pitch = 0;
+  walker.pitch = ownedHome ? -.2 : 0;
   walker.lookYawOffset = 0;
   walker.vy = 0;
   walker._resolvedGroundState = null;
@@ -531,6 +539,7 @@ export async function enterInteriorForSupport(support, deps) {
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
   if (!definition.communityRealityCapture && !definition.curatedContent && !definition.aquariumContent && !definition.facilityContent && !definition.cernContent) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachBusinessAssets?.(appCtx.activeInterior);
   void deps.attachCern?.(appCtx.activeInterior);
   void deps.attachKennedy?.(appCtx.activeInterior);
   void deps.attachGallery?.(appCtx.activeInterior);
@@ -600,6 +609,7 @@ export function clearActiveInterior(options = {}, deps) {
   deps.disposeCern?.(active);
   disposeThreeViewsHome(active);
   deps.disposeCuratedHomeFurnishing?.(active);
+  deps.disposeBusinessAssets?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;

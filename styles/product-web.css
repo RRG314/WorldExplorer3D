@@ -1,0 +1,124 @@
+/* TRAIL's shared web shell: account, Portal, capture, public and legal pages.
+   Local layouts and action owners remain in their existing styles/modules. */
+:root {
+  --page: var(--wx-bg);
+  --surface: var(--wx-panel-solid);
+  --surface-raised: var(--wx-panel-soft);
+  --bg: var(--wx-bg);
+  --bg-2: var(--wx-panel-solid);
+  --panel: var(--wx-panel);
+  --panel-2: var(--wx-panel-soft);
+  --ink: var(--wx-text);
+  --text: var(--wx-text);
+  --muted: var(--wx-muted);
+  --faint: var(--wx-muted);
+  --line: var(--wx-line-soft);
+  --line-strong: var(--wx-line);
+  --border: var(--wx-line-soft);
+  --accent: var(--wx-action);
+  --accent-2: var(--wx-action-hover);
+  --field: var(--wx-action);
+  --field-dark: var(--wx-action-text);
+  --world: var(--wx-success);
+  --world-dark: var(--wx-equipped-surface);
+  --blue: var(--wx-info);
+  --gold: var(--wx-warning);
+  --ok: var(--wx-success);
+  --warn: var(--wx-danger);
+  --danger: var(--wx-danger);
+}
+html { background: var(--wx-bg); color: var(--wx-text); }
+body {
+  color: var(--wx-text); background: var(--wx-page-wash);
+  font-family: var(--wx-font-ui); -webkit-font-smoothing: antialiased;
+}
+body::before { background: none; }
+body :is(h1,h2,h3) { color: var(--wx-text); font-family: var(--wx-font-display); font-weight: 400; letter-spacing: -.035em; }
+body h1 { font-weight: 350; }
+body :is(button,input,select,textarea) { font-family: var(--wx-font-ui); accent-color: var(--wx-action); }
+body a { color: var(--wx-action); overflow-wrap: anywhere; }
+body :is(p,li) { overflow-wrap: anywhere; }
+body :is(button,.button,.btn) { min-height: 44px; padding: 10px 18px; border: 1px solid var(--wx-line); background: var(--wx-panel-soft); color: var(--wx-text); font-size: var(--wx-type-control); line-height: 1.4; }
+body :is(button,.button,.btn,.top a,.account-link) { border-radius: var(--wx-radius-control); }
+body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select,textarea) {
+  border-radius: var(--wx-radius-panel); background: var(--wx-input); color: var(--wx-text); border-color: var(--wx-line);
+}
+body :is(button,a,input,select,textarea,summary):focus-visible { outline: 3px solid var(--wx-focus); outline-offset: 3px; }
+body :is(button,.button,.btn):disabled { opacity: .6; cursor: default; }
+body :is(.card,.panel,.destination,.account-card,.tester-card,.install-card,.feature-card,.gallery-card,.capability-card,.support-card) {
+  background: var(--wx-panel); border-color: var(--wx-line-soft); border-radius: var(--wx-radius-panel);
+  color: var(--wx-text); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur));
+}
+body :is(.primary,.btn-primary,button.primary) { background: var(--wx-action); color: var(--wx-action-text); border-color: var(--wx-action); }
+body :is(.primary,.btn-primary,button.primary):hover { background: var(--wx-action-hover); }
+body :is(.muted,.meta,.subtitle,.intro p,.section-intro,.card p) { color: var(--wx-muted); }
+body :is(.landing-masthead,.site-header) {
+  background: var(--wx-panel); border-color: var(--wx-line-soft); backdrop-filter: blur(var(--wx-glass-blur));
+}
+.landing-masthead .landing-brand, .brand { color: var(--wx-text); font-weight: 500; letter-spacing: .055em; }
+.brand-mark { border-radius: 50%; color: var(--wx-action); border-color: var(--wx-action); background: var(--wx-input); }
+.hero-title { font-weight: 350; letter-spacing: -.055em; }
+.hero-title :is(span,em) { color: var(--wx-action); }
+.section-kicker,.eyebrow { color: var(--wx-action); }
+body dialog { background: var(--wx-panel); color: var(--wx-text); border-color: var(--wx-line-soft); border-radius: var(--wx-radius-panel); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+body dialog::backdrop { background: rgb(0 0 0 / 72%); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (forced-colors: active) {
+  body, body :is(.card,.panel,dialog) { background: Canvas; color: CanvasText; border-color: CanvasText; backdrop-filter: none; }
+  body :is(button,a,input,select,textarea,summary):focus-visible { outline-color: Highlight; }
+}
+
+/* Product navigation and content use one display hierarchy. */
+body .landing-brand, body :is(.eyebrow,.section-kicker,.hero-brand,.journey-number,.hero-label,.hero-context) { font-family: var(--wx-font-ui); }
+body .masthead-actions .nav-launch { color: var(--wx-action-text); background: var(--wx-action); border-color: var(--wx-action); border-radius: var(--wx-radius-control); }
+body .hero-frame { overflow: hidden; border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); }
+body .hero-frame::after { border-radius: var(--wx-radius-panel); }
+body .hero-caption { border-color: var(--wx-line-soft); }
+body .account-shell { align-content: start; align-items: start; gap: 24px; padding: 16px; }
+body .account-rail { top: 16px; height: calc(100dvh - 32px); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-panel); background: var(--wx-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+body .account-shell > .wrap { width: 100%; margin: 0; padding: 24px 24px 48px 0; }
+body .account-brand strong { font: 400 calc(1.5rem * var(--wx-text-scale))/1.2 var(--wx-font-display); letter-spacing: -.035em; text-transform: none; }
+body .account-shell .top h1 { font: 350 calc(clamp(2rem,4vw,3.5rem) * var(--wx-text-scale))/1.1 var(--wx-font-display); letter-spacing: -.045em; text-transform: none; }
+body .account-nav { gap: 8px; }
+body .account-nav button { background: transparent; color: var(--wx-muted); border: 1px solid transparent; border-radius: var(--wx-radius); }
+body .account-nav button.active { background: var(--wx-selected); color: var(--wx-text); border-color: var(--wx-line-soft); }
+body .account-nav strong { font-size: var(--wx-type-control); font-weight: 500; }
+body .account-nav span { font-size: var(--wx-type-meta); line-height: 1.5; }
+body .account-shell .panel { border-radius: var(--wx-radius-panel); background: var(--wx-panel); border-color: var(--wx-line-soft); }
+body .account-shell .top a { font-size: var(--wx-type-control); }
+@media(max-width:980px) {
+ body .account-shell { gap: 0; padding: 8px; }
+ body .account-rail { position: static; top: auto; height: auto; padding: 16px; border-radius: var(--wx-radius-panel); }
+ body .account-shell > .wrap { padding: 24px 8px; }
+ body .account-brand { padding-bottom: 12px; }
+ body .account-nav button { border-radius: var(--wx-radius-control); }
+}
+
+body .account-shell #authPrompt, body .account-view { border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); background: var(--wx-panel); }
+body .account-view :is(.status-item,.identity-card,.creator-card,.plan) { border-radius: var(--wx-radius); background: var(--wx-panel-soft); }
+body .account-section-heading h2, body .section-title { font-family: var(--wx-font-display); font-weight: 400; text-transform: none; letter-spacing: -.025em; }
+body .about-hero h1 { font-weight: 350; }
+
+/* Cinematic editorial hierarchy, shared with the in-world shell. */
+body :is(h1,h2,h3), body .account-shell .top h1, body .account-brand strong,
+body .account-section-heading h2, body .section-title {
+ font-family: var(--wx-font-display); font-weight: 500; letter-spacing: .015em; text-transform: uppercase;
+}
+body .hero-title { letter-spacing: .015em; line-height: 1.02; }
+body .hero-title :is(span,em) { color: var(--wx-text); }
+body .section-kicker, body .eyebrow { color: var(--wx-action); letter-spacing: .12em; }
+body .hero-frame, body .journey-card, body .feature-card { border-radius: var(--wx-radius-panel); }
+body .account-rail, body .account-shell .panel { backdrop-filter: none; }
+body .account-brand strong { font-size: calc(1.875rem * var(--wx-text-scale)); }
+body .account-shell .top h1 { font-size: calc(clamp(2.5rem,5vw,4rem) * var(--wx-text-scale)); }
+body :is(h1,h2,h3) { min-width: 0; overflow-wrap: anywhere; }
+body .account-shell .top > div { min-width: 0; }
+
+body { font-size: var(--wx-type-body); }
+body .hero h1 { font-size: calc(clamp(43px,4.8vw,66px) * var(--wx-text-scale)); }
+html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) body :is(p,label,li,.hint,.sub,.meta) { font-size: var(--wx-type-body); line-height: 1.6; }
+html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) body :is(input,select,textarea) { font-size: var(--wx-type-control); }
+
+/* Large text gets the full reading width rather than a narrow hero column. */
+html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) .hero-grid { grid-template-columns: minmax(0,1fr); gap: 32px; align-items: start; }
+html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) .hero-copy { max-width: none; }

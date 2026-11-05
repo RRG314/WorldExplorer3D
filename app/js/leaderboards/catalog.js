@@ -1,4 +1,10 @@
 const LEADERBOARD_CATALOG = Object.freeze({
+  careers:Object.freeze({
+    id:'careers',icon:'◆',label:'My career milestones',scope:'Personal Journal',
+    resultDisclosure:'Your saved career progress. Online race results and community rankings have their own boards.',
+    objective:'Complete assignments and continue their follow-on studies.',
+    empty:'Choose a career or begin First Bearings. Progress appears after actual saved work.'
+  }),
   racing: Object.freeze({
     id:'racing',icon:'⚑',label:'My racing times',scope:'This device • Practice',
     resultDisclosure:'Personal bests for each car setup. These are not verified online rankings.',

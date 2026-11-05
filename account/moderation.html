@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="../js/distribution-context.js?v=1"></script>
-  <link rel="stylesheet" href="../styles/distribution.css?v=1">
+  <script src="../js/distribution-context.js?v=2"></script>
+  <link rel="stylesheet" href="../styles/distribution.css?v=2">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>World Explorer Moderation Redirect</title>
@@ -13,22 +13,25 @@
       min-height: 100vh;
       display: grid;
       place-items: center;
-      background: linear-gradient(180deg, #11233a, #05101d);
-      color: #edf6ff;
-      font-family: system-ui, sans-serif;
+      background: linear-gradient(180deg, var(--wx-panel-solid), var(--wx-panel-solid));
+      color: var(--wx-text);
+      font-family: var(--wx-font-ui);
     }
 
     .card {
       width: min(560px, 92vw);
       padding: 24px;
       border-radius: 20px;
-      border: 1px solid rgba(163, 197, 224, 0.2);
-      background: rgba(8, 22, 40, 0.9);
+      border: 1px solid color-mix(in srgb, var(--wx-action) 20%, transparent);
+      background: color-mix(in srgb, var(--wx-panel-solid) 90%, transparent);
       text-align: center;
     }
 
-    a { color: #5ad0ff; }
+    a { color: var(--wx-action); }
   </style>
+  <link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=4">
+  <link rel="stylesheet" href="../styles/product-web.css?v=1">
+  <script type="module" src="/app/js/ui/product-page-preferences.js?v=1"></script>
 </head>
 <body>
   <div class="card">

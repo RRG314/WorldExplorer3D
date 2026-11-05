@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Specialist station presentation</title>
+<style>@layer legacy,interface;body{margin:24px;background:var(--wx-bg);color:var(--wx-text);font-family:var(--wx-font-ui)}</style>
+<link rel="stylesheet" href="/styles/world-explorer-tokens.css"><link rel="stylesheet" href="/styles/world-explorer-components.css"><link rel="stylesheet" href="/app/styles/experiences.css"><link rel="stylesheet" href="/app/styles/product-shell.css">
+<p>Controlled initial model and original native station. Presentation only; no observation, instrument, save or career completion.</p><button id="worldFocusTarget" class="wx-button">World focus target</button>
+<script type="module">
+const career=new URLSearchParams(location.search).get('career')||'mining';
+const definitions={mining:['mining','miningHarness','createMiningUI'],accelerator:['accelerator','acceleratorHarness','createAcceleratorUI'],cartography:['cartography','cartographyHarness','createCartographyUI']};
+const [name,harness,create]=definitions[career];
+const helpers=await import(`/tests/helpers/${name}-study.mjs`),views=await import(`/app/js/campaign/${name}-ui.js`),h=helpers[harness]();
+if(career==='cartography')h.accept();
+const tools={snapshot:()=>({window:null}),reading:()=>null,guide(){},start(){throw Error('Presentation fixture cannot operate instruments');}};
+const runtime={Walk:{state:{walker:{x:0,z:0}}},getEnv:()=> 'EARTH',screenLayout:{setPanelLayer(){}},setPauseReason(){},stopGameplayPlugin(){}};
+const ui=views[create]({runtime,getState:()=>h.state,tools,near:(_,asDistance)=>asDistance?0:true,atTargetSite:()=>true,isInside:()=>true,onTravel(){},save:()=>{throw Error('Read-only station presentation');},onJournal(){},onNext(){},requestWorldFocus:()=>document.querySelector('#worldFocusTarget').focus()});
+ui.update();ui.open();window.ready=true;
+window.render_game_to_text=()=>JSON.stringify({scope:'Controlled initial model/native UI only. No career procedure, observation or durable completion.',career,phase:h.state.active.phase});
+window.advanceTime=async()=>{};
+</script></html>

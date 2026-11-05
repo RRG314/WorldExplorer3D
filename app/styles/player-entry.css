@@ -1,0 +1,987 @@
+/* Cinematic entry; scoped to its native screens. Existing worlds and workspaces
+   retain the shared TRAIL tokens and their original layout/lifecycle owners. */
+#globeSelectorScreen .globe-selector-stage {
+  background: radial-gradient(ellipse at center, #243b43, #0b131a 73%);
+}
+#globeSelectorScreen .globe-selector-stage::before {
+  display: none;
+}
+#globeSelectorBackBtn:not([hidden]) {
+  display: block;
+}
+#playerEntryScreen,
+#playerIntroduction {
+  color: var(--wx-text);
+  background: #18211e;
+  font: calc(15px * var(--wx-text-scale, 1)) / 1.5 var(--wx-font-ui);
+}
+#playerEntryScreen *,
+#playerIntroduction * {
+  box-sizing: border-box;
+}
+#playerEntryScreen[hidden] {
+  display: none !important;
+}
+#playerEntryScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+body.player-entry-open {
+  overflow: hidden;
+}
+body.player-entry-open #titleScreen,
+body:has(#playerIntroduction[open]) #titleScreen {
+  visibility: hidden;
+}
+#playerEntryScreen button,
+#playerIntroduction button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #617068;
+  border-radius: 3px;
+  color: #f2f4eb;
+  background: #26332c;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#playerEntryScreen button:hover,
+#playerIntroduction button:hover {
+  background: #354438;
+}
+#playerEntryScreen button:focus-visible,
+#playerEntryScreen a:focus-visible,
+#playerIntroduction :is(button, input):focus-visible {
+  outline: 3px solid var(--wx-action);
+  outline-offset: 3px;
+}
+#playerEntryScreen h1,
+#playerIntroduction h1,
+#playerEntryScreen h2,
+#playerIntroduction h2 {
+  margin: 0;
+  font: 400 calc(clamp(38px, 5vw, 72px) * var(--wx-text-scale, 1)) / 1.03 var(--wx-font-display);
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+#playerEntryScreen h3,
+#playerIntroduction h3 {
+  margin: 0;
+  font: 700 calc(20px * var(--wx-text-scale, 1)) / 1.3 var(--wx-font-ui);
+}
+#playerEntryScreen p,
+#playerIntroduction p {
+  margin: 0;
+}
+#playerEntryScreen .entry-primary,
+#playerIntroduction .primary {
+  color: var(--wx-action-text);
+  background: var(--wx-action);
+  border-color: var(--wx-action);
+  font-weight: 700;
+}
+#playerEntryScreen button.entry-primary:hover,
+#playerIntroduction button.primary:hover {
+  background: #ffad7e;
+  color: var(--wx-action-text);
+  border-color: #ffad7e;
+}
+#playerEntryScreen .entry-eyebrow,
+#playerIntroduction .eyebrow {
+  display: block;
+  color: #ffb587;
+  font: 700 calc(11px * var(--wx-text-scale, 1)) / 1.5 var(--wx-font-ui);
+  letter-spacing: 0.12em;
+}
+#playerEntryScreen small,
+#playerIntroduction small {
+  color: #c4d1c8;
+}
+.player-entry-header {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 10px clamp(16px, 4vw, 64px);
+  min-height: 76px;
+  border-bottom: 1px solid #506156;
+  background: #16211d;
+}
+.player-entry-header.entry-menu-open nav {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  position: absolute;
+  right: 16px;
+  top: 100%;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 120px);
+  overflow: auto;
+  padding: 12px;
+  background: #16211d;
+  border: 1px solid #617068;
+  box-shadow: 0 16px 28px #0008;
+}
+#playerEntryScreen .entry-menu-open nav button {
+  text-align: left;
+  white-space: normal;
+}
+#playerEntryScreen h1,
+#playerEntryScreen h2,
+#playerIntroduction h1,
+#playerIntroduction h2 {
+  overflow-wrap: anywhere;
+}
+#playerIntroduction .intro-career-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#playerIntroduction .intro-bottom {
+  flex-wrap: wrap;
+}
+#playerIntroduction .gender-choices button {
+  flex-wrap: wrap;
+}
+@media (max-width: 1100px) {
+  .player-entry-header nav {
+    display: none;
+  }
+}
+:root[data-we3d-text-scale='200'] .player-entry-header {
+  flex-wrap: wrap;
+}
+:root[data-we3d-text-scale='200'] .player-entry-header nav {
+  display: none;
+}
+:root[data-we3d-text-scale='200'] #playerIntroduction .intro-progress li strong {
+  display: none;
+}
+@media (max-width: 700px) {
+  :root[data-we3d-text-scale='200'] #playerEntryScreen .entry-brand {
+    font-size: 0;
+  }
+  :root[data-we3d-text-scale='200'] #playerEntryScreen .entry-brand em {
+    font-size: 0;
+  }
+  :root[data-we3d-text-scale='200'] #playerEntryScreen .entry-brand span {
+    font-size: calc(26px * var(--wx-text-scale, 1));
+  }
+}
+.player-entry-header nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+#playerEntryScreen .player-entry-header button {
+  background: transparent;
+  border-color: transparent;
+}
+#playerEntryScreen .entry-brand {
+  font-size: calc(15px * var(--wx-text-scale, 1));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  padding: 0;
+}
+.entry-brand span,
+.entry-brand em {
+  color: var(--wx-action);
+  font-style: normal;
+}
+.entry-brand span {
+  font-size: calc(26px * var(--wx-text-scale, 1));
+}
+.player-entry-header a {
+  color: inherit;
+  text-decoration: none;
+  font-size: calc(13px * var(--wx-text-scale, 1));
+  white-space: nowrap;
+}
+#playerEntryScreen .landing-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: min(760px, calc(100dvh - 76px));
+  overflow: hidden;
+  background: #25362e;
+}
+#playerEntryScreen .landing-hero > img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 56%;
+  transform: scale(1.17);
+}
+#playerEntryScreen .landing-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, #0f191cf5, #122027ad 45%, #12212618 90%);
+}
+#playerEntryScreen .landing-hero-copy {
+  max-width: 850px;
+  padding: clamp(32px, 6vw, 84px) clamp(22px, 5vw, 80px);
+  display: grid;
+  gap: 25px;
+}
+#playerEntryScreen .landing-hero h1 {
+  font-size: calc(clamp(48px, 6vw, 90px) * var(--wx-text-scale, 1));
+}
+#playerEntryScreen .landing-hero p {
+  max-width: 550px;
+  line-height: 1.7;
+  font-size: calc(17px * var(--wx-text-scale, 1));
+  color: #e2e8df;
+}
+.entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+#playerEntryScreen .entry-personalize {
+  justify-self: start;
+  background: transparent;
+  padding: 0;
+  border: 0;
+  text-decoration: underline;
+  font-size: calc(13px * var(--wx-text-scale, 1));
+}
+.landing-image-credit {
+  position: absolute;
+  bottom: 18px;
+  right: 22px;
+  font-size: calc(10px * var(--wx-text-scale, 1));
+  color: #e3e9e4;
+}
+#playerEntryScreen .landing-worlds {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 40px;
+  align-items: center;
+  padding: 44px clamp(22px, 5vw, 80px);
+  border-block: 1px solid #4d6052;
+}
+#playerEntryScreen .landing-worlds h2 {
+  font-size: calc(clamp(30px, 3vw, 46px) * var(--wx-text-scale, 1));
+  margin: 12px 0 20px;
+}
+#playerEntryScreen .world-destinations {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+#playerEntryScreen .world-destinations button {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 8px;
+}
+#playerEntryScreen .world-destinations img {
+  width: clamp(42px, 6vw, 90px);
+  height: clamp(42px, 6vw, 90px);
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #84998a;
+}
+#playerEntryScreen .world-destinations strong {
+  font-size: calc(13px * var(--wx-text-scale, 1));
+}
+#playerEntryScreen .landing-experiences {
+  padding: 50px clamp(22px, 5vw, 80px);
+}
+#playerEntryScreen .landing-experiences h2 {
+  font-size: calc(clamp(34px, 4vw, 55px) * var(--wx-text-scale, 1));
+  margin: 12px 0 30px;
+}
+#playerEntryScreen .landing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-bottom: 28px;
+}
+#playerEntryScreen .landing-feature {
+  display: grid;
+  grid-template-columns: 42% 1fr;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+}
+#playerEntryScreen .landing-feature > img {
+  width: 100%;
+  height: 100%;
+  min-height: 250px;
+  object-fit: cover;
+}
+#playerEntryScreen .landing-feature > span {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: 26px;
+}
+#playerEntryScreen .landing-feature strong {
+  font: 400 calc(30px * var(--wx-text-scale, 1)) / 1.1 var(--wx-font-display);
+  text-transform: uppercase;
+}
+#playerEntryScreen .landing-feature p {
+  color: #c4d1c8;
+  font-size: calc(14px * var(--wx-text-scale, 1));
+}
+#playerEntryScreen .landing-feature em {
+  color: #ffb587;
+  font-size: calc(12px * var(--wx-text-scale, 1));
+  font-style: normal;
+}
+#playerEntryScreen .landing-create {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #23332a;
+  border-block: 1px solid #586e5d;
+}
+#playerEntryScreen .landing-create > img {
+  width: 100%;
+  height: 100%;
+  max-height: 560px;
+  object-fit: cover;
+}
+#playerEntryScreen .landing-create > div {
+  padding: 50px clamp(24px, 5vw, 76px);
+  display: grid;
+  align-content: center;
+  gap: 24px;
+}
+#playerEntryScreen .landing-create h2 {
+  font-size: calc(clamp(34px, 4vw, 56px) * var(--wx-text-scale, 1));
+}
+.player-entry-footer {
+  padding: 24px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.player-entry-footer a {
+  color: inherit;
+  font-size: calc(13px * var(--wx-text-scale, 1));
+}
+#playerIntroduction {
+  padding: 0;
+  width: min(1380px, calc(100vw - 32px));
+  height: min(940px, calc(100dvh - 32px));
+  max-width: none;
+  max-height: none;
+  border: 1px solid #6b7e6d;
+  border-radius: 4px;
+  overflow: hidden;
+}
+#playerIntroduction > div {
+  height: 100%;
+  min-height: 0;
+}
+#playerIntroduction .intro-sequence {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+#playerIntroduction .intro-progress {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 26px;
+  background: #142019;
+  border-bottom: 1px solid #586d5a;
+}
+#playerIntroduction .intro-progress ol {
+  display: flex;
+  justify-content: center;
+  flex: 1;
+  gap: 24px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+#playerIntroduction .intro-progress li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #acbfaf;
+  font-size: calc(12px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .intro-progress li > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #7d9480;
+  border-radius: 50%;
+}
+#playerIntroduction .intro-progress li[aria-current] {
+  color: #ffb587;
+}
+#playerIntroduction .intro-progress li[aria-current] > span {
+  background: var(--wx-action);
+  color: var(--wx-action-text);
+  border-color: var(--wx-action);
+}
+#playerIntroduction .intro-step-count {
+  font-size: calc(12px * var(--wx-text-scale, 1));
+  color: #adbfaf;
+}
+#playerIntroduction .intro-split {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+#playerIntroduction .intro-showroom {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #192320;
+}
+#playerIntroduction .showroom-label {
+  position: absolute;
+  z-index: 1;
+  top: 26px;
+  left: 28px;
+  right: 28px;
+  pointer-events: none;
+}
+#playerIntroduction .showroom-label h2 {
+  font-size: calc(30px * var(--wx-text-scale, 1));
+  margin-top: 10px;
+}
+#playerIntroduction .intro-model {
+  position: absolute;
+  inset: 0;
+}
+#playerIntroduction .intro-model canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+  outline-offset: -4px;
+}
+#playerIntroduction .model-status {
+  position: absolute;
+  top: 50%;
+  left: 24px;
+  right: 24px;
+  text-align: center;
+  color: #dae6de;
+  pointer-events: none;
+}
+#playerIntroduction .showroom-tools {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#playerIntroduction .showroom-tools > span {
+  margin-right: auto;
+  font-size: calc(11px * var(--wx-text-scale, 1));
+  color: #bfd0c1;
+}
+#playerIntroduction .model-credit {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 18px;
+  font-size: calc(10px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .intro-choices {
+  padding: 36px clamp(24px, 4vw, 58px);
+  border-left: 1px solid #536a55;
+  display: grid;
+  align-content: center;
+  gap: 22px;
+  min-height: 0;
+  overflow-y: auto;
+}
+#playerIntroduction .intro-choices h1 {
+  font-size: calc(clamp(40px, 4.5vw, 66px) * var(--wx-text-scale, 1));
+}
+#playerIntroduction .intro-choices > p {
+  color: #d0dbc9;
+}
+#playerIntroduction .intro-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: calc(13px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .intro-name > span {
+  margin-left: auto;
+}
+#playerIntroduction .intro-name input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  color: inherit;
+  background: #111d15;
+  border: 1px solid #819883;
+  border-radius: 3px;
+  font: inherit;
+}
+#playerIntroduction fieldset {
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+#playerIntroduction legend {
+  margin-bottom: 10px;
+  font-size: calc(13px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .gender-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+#playerIntroduction .gender-choices button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  position: relative;
+}
+#playerIntroduction .gender-choices button > span {
+  font-size: calc(24px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .gender-choices i {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-style: normal;
+}
+#playerIntroduction button[aria-pressed='true'] {
+  border: 2px solid var(--wx-action);
+  background: #354030;
+}
+#playerIntroduction .intro-hint {
+  padding-left: 14px;
+  border-left: 2px solid #90ac91;
+  font-size: calc(12px * var(--wx-text-scale, 1));
+  color: #c2d1c1;
+}
+#playerIntroduction .intro-bottom {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 26px;
+  background: #142019;
+  border-top: 1px solid #627363;
+}
+#playerIntroduction .intro-bottom p {
+  flex: 1;
+  text-align: center;
+  font-size: calc(12px * var(--wx-text-scale, 1));
+  color: #b9c8bc;
+}
+#playerIntroduction .intro-bottom button {
+  min-height: 48px;
+}
+#playerIntroduction button:disabled {
+  cursor: default;
+  color: #a1b1a4;
+  border-color: #526257;
+}
+#playerIntroduction .intro-careers {
+  padding: 30px clamp(20px, 4vw, 60px);
+  display: block;
+  gap: 24px;
+  min-height: 0;
+  overflow: auto;
+}
+#playerIntroduction .intro-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 24px;
+}
+#playerIntroduction .intro-section-heading h1 {
+  font-size: calc(clamp(38px, 4vw, 58px) * var(--wx-text-scale, 1));
+}
+#playerIntroduction .intro-section-heading p {
+  color: #c4d1c8;
+  max-width: 440px;
+}
+#playerIntroduction .chip-row {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  padding: 4px;
+  flex-shrink: 0;
+  min-height: 52px;
+  margin-bottom: 20px;
+}
+#playerIntroduction .chip-row button {
+  white-space: nowrap;
+}
+#playerIntroduction .intro-career-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+#playerIntroduction .intro-career-choice {
+  display: flex;
+  text-align: left;
+  padding: 12px;
+  gap: 12px;
+  align-items: center;
+}
+#playerIntroduction .intro-career-choice img,
+#playerIntroduction .intro-career-symbol {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  flex: none;
+}
+#playerIntroduction .intro-career-symbol {
+  display: grid;
+  place-items: center;
+  font-size: calc(28px * var(--wx-text-scale, 1));
+  background: #354b3a;
+}
+#playerIntroduction .intro-career-copy {
+  display: grid;
+  gap: 6px;
+}
+#playerIntroduction .intro-career-copy small {
+  font-size: calc(11px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .selection-mark {
+  margin-left: auto;
+  color: #ffb587;
+}
+#playerIntroduction .intro-selection {
+  border: 1px solid #667e68;
+  padding: 18px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+}
+#playerIntroduction .intro-selection p {
+  font-size: calc(12px * var(--wx-text-scale, 1));
+  color: #c4d1c8;
+}
+#playerIntroduction .intro-car-list {
+  display: grid;
+  gap: 10px;
+}
+#playerIntroduction .intro-car-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+}
+#playerIntroduction .intro-car-list button > span:first-child {
+  display: grid;
+  gap: 5px;
+}
+#playerIntroduction .intro-car-list small {
+  font-size: calc(11px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .intro-departure {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  overflow: auto;
+}
+#playerIntroduction .departure-image {
+  position: relative;
+  min-height: 430px;
+}
+#playerIntroduction .departure-image img {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+}
+#playerIntroduction .departure-image > span {
+  position: absolute;
+  bottom: 18px;
+  left: 22px;
+  padding: 8px;
+  font-size: calc(10px * var(--wx-text-scale, 1));
+  background: #13231ae6;
+}
+#playerIntroduction .departure-copy {
+  padding: 32px;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+#playerIntroduction .departure-copy h1 {
+  font-size: calc(clamp(38px, 4vw, 58px) * var(--wx-text-scale, 1));
+}
+#playerIntroduction .departure-copy > p {
+  color: #c4d1c8;
+}
+#playerIntroduction .departure-summary {
+  display: grid;
+  gap: 8px;
+}
+#playerIntroduction .departure-summary button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  text-align: left;
+  gap: 4px;
+}
+#playerIntroduction .departure-summary small {
+  grid-column: 1/-1;
+  font-size: calc(10px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .departure-summary button > span {
+  font-size: calc(11px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .departure-location,
+#playerIntroduction .first-assignment {
+  border: 1px solid #627963;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+#playerIntroduction .first-assignment small {
+  font-size: calc(11px * var(--wx-text-scale, 1));
+}
+#playerIntroduction .intro-guided {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: calc(13px * var(--wx-text-scale, 1));
+  min-height: 44px;
+}
+.player-entry-status {
+  position: relative;
+  z-index: 4;
+  padding: 14px 22px;
+  background: #2d432d;
+  color: #f4f4e8;
+  margin: 0;
+}
+.player-entry-status:empty {
+  display: none;
+}
+#playerIntroduction:has(.player-entry-status:not(:empty)) > div {
+  height: calc(100% - 66px);
+}
+.experience-browser .experience-release-label {
+  font-size: calc(11px * var(--wx-text-scale, 1));
+  color: var(--wx-action);
+}
+.experience-browser .experience-card[data-release-status='coming-soon'],
+#playerIntroduction [data-release-status='coming-soon'] {
+  cursor: default;
+  color: #afbbb2;
+  background: #1d2720;
+  border-color: #46574a;
+}
+.experience-browser .experience-card[data-release-status='coming-soon'] img,
+#playerIntroduction [data-release-status='coming-soon'] img {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+.experience-browser .experience-card[data-release-status='coming-soon'] .experience-release-label {
+  color: #bdc8c0;
+}
+@media (max-width: 1000px) {
+  #playerIntroduction .intro-career-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  #playerEntryScreen .landing-feature {
+    grid-template-columns: 1fr;
+  }
+  #playerEntryScreen .landing-feature > img {
+    height: 200px;
+    min-height: 0;
+  }
+  #playerEntryScreen .landing-worlds {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+}
+@media (max-width: 700px) {
+  .player-entry-header {
+    min-height: 64px;
+    padding: 8px 16px;
+    gap: 12px;
+  }
+  .player-entry-header nav {
+    display: none;
+  }
+  #playerEntryScreen .entry-brand {
+    font-size: calc(11px * var(--wx-text-scale, 1));
+  }
+  .player-entry-header a {
+    margin-left: auto;
+    font-size: calc(11px * var(--wx-text-scale, 1));
+  }
+  #playerEntryScreen .landing-hero {
+    min-height: calc(100dvh - 64px);
+  }
+  #playerEntryScreen .landing-hero-copy {
+    padding: 42px 22px;
+    gap: 22px;
+  }
+  #playerEntryScreen .landing-hero h1 {
+    font-size: calc(clamp(45px, 10vw, 66px) * var(--wx-text-scale, 1));
+  }
+  #playerEntryScreen .landing-hero p {
+    font-size: calc(15px * var(--wx-text-scale, 1));
+  }
+  #playerEntryScreen .landing-feature-grid,
+  #playerEntryScreen .landing-create {
+    grid-template-columns: 1fr;
+  }
+  #playerEntryScreen .landing-create > img {
+    max-height: 260px;
+  }
+  #playerEntryScreen .world-destinations {
+    gap: 2px;
+  }
+  #playerEntryScreen .world-destinations button {
+    padding: 4px;
+  }
+  #playerIntroduction {
+    inset: 0;
+    margin: 0;
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+  #playerIntroduction .intro-progress {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+  #playerIntroduction .intro-progress ol {
+    gap: 10px;
+  }
+  #playerIntroduction .intro-progress li strong,
+  #playerIntroduction .intro-step-count {
+    display: none;
+  }
+  #playerIntroduction .intro-split,
+  #playerIntroduction .intro-departure {
+    display: block;
+    overflow-y: auto;
+  }
+  #playerIntroduction .intro-showroom {
+    height: 310px;
+    min-height: 310px;
+  }
+  #playerIntroduction .showroom-label {
+    top: 20px;
+    left: 22px;
+  }
+  #playerIntroduction .showroom-label h2 {
+    font-size: calc(24px * var(--wx-text-scale, 1));
+  }
+  #playerIntroduction .intro-choices {
+    padding: 28px 22px;
+    border-left: 0;
+    border-top: 1px solid #536a55;
+    gap: 20px;
+  }
+  #playerIntroduction .intro-choices h1 {
+    font-size: calc(44px * var(--wx-text-scale, 1));
+  }
+  #playerIntroduction .intro-bottom {
+    padding: 12px 16px;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  #playerIntroduction .intro-bottom p {
+    display: none;
+  }
+  #playerIntroduction .intro-bottom button {
+    font-size: calc(12px * var(--wx-text-scale, 1));
+    padding-inline: 12px;
+  }
+  #playerIntroduction .intro-section-heading {
+    display: block;
+  }
+  #playerIntroduction .intro-section-heading h1 {
+    margin-bottom: 16px;
+  }
+  #playerIntroduction .intro-careers {
+    padding: 24px 18px;
+  }
+  #playerIntroduction .intro-career-grid {
+    grid-template-columns: 1fr;
+  }
+  #playerIntroduction .intro-selection > span {
+    display: none;
+  }
+  #playerIntroduction .departure-image {
+    min-height: 230px;
+  }
+  #playerIntroduction .departure-copy {
+    padding: 26px 22px;
+  }
+}
+@media (min-width: 701px) and (max-height: 600px) {
+  #playerIntroduction .intro-choices {
+    align-content: start;
+  }
+  #playerIntroduction .showroom-label {
+    top: 12px;
+  }
+  #playerIntroduction .showroom-label h2 {
+    display: none;
+  }
+  #playerIntroduction .showroom-tools {
+    bottom: 24px;
+  }
+  #playerIntroduction .model-credit {
+    bottom: 6px;
+    font-size: calc(8px * var(--wx-text-scale, 1));
+  }
+}
+@media (max-height: 600px) {
+  #playerIntroduction {
+    width: 100vw;
+    height: 100dvh;
+    inset: 0;
+    margin: 0;
+    border: 0;
+  }
+  #playerIntroduction .intro-progress {
+    padding: 8px 16px;
+  }
+  #playerIntroduction .intro-bottom {
+    padding: 10px 16px;
+  }
+  #playerIntroduction .intro-bottom p {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #playerEntryScreen *,
+  #playerIntroduction * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -16,13 +16,16 @@ used to open places and contributions. Rendering internals are not a public API.
 Changing a renderer or reorganizing modules does not by itself require a major
 release. An intended migration must be tested before compatibility is claimed.
 
-## Next release
+## Platform versions
 
-Production currently runs **5.4.0**. The next update is **5.5.0**: compatible
-features and substantial improvements to Earth coverage, transport, ocean
-journeys, public environmental data and runtime ownership. A 6.0 release is not
-justified because the intended save, room and supported-link contracts remain.
-The 5.5 artifact is a candidate until verification and deployment complete.
+The public release number is **5.7.0** for web, Android and iPhone/iPad. A first
+Apple release can use the same public version as the existing game. Store
+availability is listed separately on the download page.
+
+Android uses an increasing `versionCode`; Apple uses an increasing
+`CFBundleVersion`. These build numbers are independent of the public version.
+They must increase for a replacement store upload, even when its public version
+is unchanged.
 
 `package.json` and the root package-lock entries own the product version.
 The packaging process adds the commit, content hash and target environment.

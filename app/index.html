@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-  <script src="../js/distribution-context.js?v=1"></script>
-  <link rel="stylesheet" href="../styles/distribution.css?v=1">
+  <script src="../js/distribution-context.js?v=2"></script>
+  <link rel="stylesheet" href="../styles/distribution.css?v=2">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
@@ -15,10 +15,10 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 </script>
 <style>
 .unsupported-file-launch body>*:not(#fileLaunchError){display:none!important}
-#fileLaunchError{display:none;min-height:100vh;box-sizing:border-box;padding:48px 24px;background:#071821;color:#eef7f8;font:16px/1.55 Inter,system-ui,sans-serif}
+#fileLaunchError{display:none;min-height:100vh;box-sizing:border-box;padding:48px 24px;background:var(--wx-panel-solid);color:var(--wx-text);font:16px/1.55 var(--wx-font-ui)}
 .unsupported-file-launch #fileLaunchError{display:grid!important;place-content:center;text-align:center}
-#fileLaunchError strong{font:700 24px/1.2 Poppins,system-ui,sans-serif}
-#fileLaunchError code{display:block;margin-top:14px;color:#7dd3fc}
+#fileLaunchError strong{font:700 24px/1.2 var(--wx-font-ui)}
+#fileLaunchError code{display:block;margin-top:14px;color:var(--wx-action)}
 </style>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
@@ -29,15 +29,15 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=3">
-<link rel="stylesheet" href="../styles/world-explorer-components.css?v=2">
+<link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=4">
+<link rel="stylesheet" href="../styles/world-explorer-components.css?v=3">
 <link rel="stylesheet" href="styles/title-shell.css?v=98">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=142">
 <link rel="stylesheet" href="styles/block-builder.css?v=9">
 <link rel="stylesheet" href="styles/universe.css?v=10">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=40">
-<link rel="stylesheet" href="styles/start-hub.css?v=24">
+<link rel="stylesheet" href="styles/start-hub.css?v=26">
 <link rel="stylesheet" href="styles/experiences.css?v=1">
 <link rel="stylesheet" href="styles/navigation.css?v=3">
 <link rel="stylesheet" href="styles/discovery.css?v=21">
@@ -52,6 +52,10 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/map-explorer.css?v=5">
 <link rel="stylesheet" href="styles/accessibility.css?v=5">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
+<link rel="stylesheet" href="styles/product-shell.css?v=2">
+<link rel="stylesheet" href="styles/player-entry.css?v=1">
+<link rel="stylesheet" href="styles/player-journey.css?v=1">
+<link rel="stylesheet" href="styles/gameplay-shell.css?v=3">
 </head>
 <body>
 <!-- Initial loading and recovery are available before any game module. -->
@@ -65,6 +69,15 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
       <progress id="loadProgress" max="100" aria-label="World loading progress" aria-describedby="loadText loadProgressNote"></progress>
       <p id="loadProgressNote">Progress follows loading steps. Some steps take longer than others.</p>
       <a id="loadRetry" href="" hidden class="wx-button wx-button--quiet">Reload and try again</a>
+    </div>
+    <div class="loadingShortcuts" aria-label="Quick keyboard controls">
+      <strong>Quick controls</strong>
+      <span><kbd data-keyboard-actions="move_forward move_left move_backward move_right">W / A / S / D</kbd> Move</span>
+      <span><kbd data-keyboard-actions="traversal_mode">F</kbd> Switch travel mode</span>
+      <span><kbd data-keyboard-actions="interact">E</kbd> Interact / enter</span>
+      <span><kbd data-keyboard-actions="map">M</kbd> Map</span>
+      <span><kbd data-keyboard-actions="camera">C</kbd> Change camera</span>
+      <small>Touch controls appear on phones. More controls are in the menu.</small>
     </div>
     <noscript><p>JavaScript is required to start World Explorer. Enable it for this site, then reload.</p></noscript>
     <div id="loadTip" class="loadingTip" role="group" aria-label="Things to try in World Explorer">
@@ -217,7 +230,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <input type="text" id="locationSearch" placeholder="Try: Seattle, Tokyo, Paris France">
 <button class="search-btn" id="locationSearchBtn">🔍</button>
 </div>
-<div id="locationSearchStatus" style="font-size:11px;margin-top:6px;min-height:16px;color:#6b7280">
+<div id="locationSearchStatus" style="font-size:11px;margin-top:6px;min-height:16px;color:var(--wx-muted)">
 Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, TX"
 </div>
 </div>
@@ -230,7 +243,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <input type="number" id="customLat" placeholder="Latitude (e.g. 39.2904)" step="0.0001">
 <input type="number" id="customLon" placeholder="Longitude (e.g. -76.6122)" step="0.0001">
 </div>
-<div style="font-size:11px;margin-top:6px;color:#6b7280">Right-click on Google Maps and copy coordinates</div>
+<div style="font-size:11px;margin-top:6px;color:var(--wx-muted)">Right-click on Google Maps and copy coordinates</div>
 </div>
 </div>
 <div class="loc-grid">
@@ -518,6 +531,7 @@ Continue ocean exploration beyond the dive site
 <button id="leaderboardTabProperty" class="flowerLeaderboardTab" type="button">⌂ Property</button>
 <button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
 <button id="leaderboardTabRacing" class="flowerLeaderboardTab" type="button">⚑ Racing</button>
+<button id="leaderboardTabCareers" class="flowerLeaderboardTab" type="button">◆ My careers</button>
 </div>
 <div id="racingRecordFilters" class="racing-record-filters" hidden><label>Results<select id="racingRecordSource"><option value="practice">My practice</option><option value="online">Online races</option></select></label><label>Course<select id="racingRecordCourse"></select></label><label>Car setup<select id="racingRecordSetup"></select></label></div>
 <div class="flowerChallengeRow">
@@ -591,7 +605,7 @@ Continue ocean exploration beyond the dive site
     <section>
       <h3>Software, fonts &amp; assets</h3>
       <p>Marine coral forms: <a href="https://3d.si.edu/corals" target="_blank" rel="noopener noreferrer">Smithsonian Institution, National Museum of Natural History</a>, CC0 1.0. Museum scans were simplified, scaled and recolored for authored habitat. They are not observations of living colonies at the game coordinates.</p>
-      <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License.</p>
+      <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License. Anton by The Anton Project Authors — SIL Open Font License 1.1 (<a href="../assets/fonts/anton/OFL.txt" target="_blank" rel="noopener">license</a>).</p>
       <p>Vegetation: <a href="https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d" target="_blank" rel="noopener noreferrer">Low poly vegetation for games</a> by denoises; <a href="https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5" target="_blank" rel="noopener noreferrer">Bush</a> by lev26. Ship surface maps and computer-room equipment: <a href="https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27" target="_blank" rel="noopener noreferrer">Sci-Fi Computer Room</a> by Michael V. Adapted for the game under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.</p>
       <p>Vehicle Assembly Building and crawler models: <a href="https://github.com/nasa/NASA-3D-Resources" target="_blank" rel="noopener noreferrer">NASA 3D Resources</a>, adapted for this independent reconstruction. <a href="/app/assets/models/nasa/LICENSE.txt" target="_blank" rel="noopener noreferrer">Source and usage notes</a>. No NASA endorsement is implied.</p>
       <p>NASA, ESA, JPL-Caltech, USGS Astrogeology, LROC, Wikimedia contributors, ambientCG, and Poly Haven assets retain the credits and terms documented in the attribution index.</p>
@@ -629,7 +643,8 @@ Continue ocean exploration beyond the dive site
   <button class="active" type="button" data-globe-destination="location"><span>◎</span>Explore</button>
   <button type="button" data-globe-destination="games"><span>⌖</span>Activities</button>
   <button type="button" data-globe-destination="journal"><span>▤</span>Journal</button>
-  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Community</button>
+  <button type="button" data-globe-destination="create"><span>◇</span>Create</button>
+  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Together</button>
 </nav>
 <div class="globe-selector-top">
 <div class="globe-hub-search">
@@ -675,7 +690,7 @@ Continue ocean exploration beyond the dive site
   <button id="globeMobileLocationSearchBtn" type="button">Search</button>
 </div>
 <div class="globe-search-feedback">
-<div id="globeLocationSearchStatus" role="status" aria-live="polite" style="font-size:12px;min-height:16px;color:#64748b">Search for a place or choose one from the globe.</div>
+<div id="globeLocationSearchStatus" role="status" aria-live="polite" style="font-size:12px;min-height:16px;color:var(--wx-action)">Search for a place or choose one from the globe.</div>
 <div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 </div>
 <section class="globe-first-journey" aria-label="Start or return">
@@ -737,8 +752,9 @@ Continue ocean exploration beyond the dive site
   <a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
 </nav>
 </div>
+<div class="globe-selector-map">
 <div class="globe-selector-stage">
-<canvas id="globeSelectorCanvas"></canvas>
+<canvas id="globeSelectorCanvas" aria-label="Choose a place on the globe" aria-describedby="globeSelectorGestureHint"></canvas>
 <div class="globe-selector-basemap-controls" role="group" aria-label="Globe map style">
   <button id="globeSelectorMapBasemapBtn" type="button" aria-pressed="false">Map</button>
   <button id="globeSelectorSatelliteBasemapBtn" class="active" type="button" aria-pressed="true">Satellite</button>
@@ -746,17 +762,22 @@ Continue ocean exploration beyond the dive site
 <div class="globe-selector-zoom-controls" role="group" aria-label="Globe zoom controls">
   <button id="globeSelectorZoomInBtn" type="button" aria-label="Zoom in">+</button>
   <button id="globeSelectorZoomOutBtn" type="button" aria-label="Zoom out">−</button>
-  <output id="globeSelectorScaleReadout" aria-live="polite">Global view</output>
+  </div>
 </div>
+<footer class="globe-map-footer">
+<div class="globe-map-meta">
 <a id="globeSelectorBasemapAttribution" class="globe-selector-basemap-attribution" href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Imagery © Esri and contributors</a>
-<div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
+<output id="globeSelectorScaleReadout" aria-live="polite">Global view</output>
 </div>
+<div id="globeSelectorGestureHint" class="globe-selector-hint" hidden>Drag to rotate · Scroll or pinch to zoom · Tap or click to pick. Quick Start explains the controls.</div>
 <div class="globe-destination-bar" aria-label="World destinations">
   <button id="globeSelectorEarthBtn" class="active" type="button" title="Explore Earth" aria-label="Explore Earth"><span class="destination-thumb earth" aria-hidden="true"></span></button>
   <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
   <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
   <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
   <button id="globeSelectorOceanBtn" type="button" title="Board a research vessel at eligible ocean coordinates" aria-label="Board a research vessel at eligible ocean coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
+</div>
+</footer>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="globeHubOverlayTitle" tabindex="-1">
   <header class="globe-hub-overlay-header">
@@ -768,6 +789,16 @@ Continue ocean exploration beyond the dive site
   </header>
   <div id="globeHubPanelHost" class="globe-hub-panel-host"></div>
   <div id="globeHubFooterHost" class="globe-hub-footer-host"></div>
+</section>
+<section id="explorerCreateHub" class="explorer-create-hub" hidden aria-labelledby="explorerCreateHeading">
+  <div class="explorer-workspace-intro"><span class="explorer-eyebrow">Make it yours</span><h2 id="explorerCreateHeading">Create a place. Shape a journey.</h2><p>Build in the world, design a race, or bring a real place into World Explorer.</p></div>
+  <p class="explorer-create-location">World projects start at <strong id="explorerCreatePlace">your selected place</strong>. Change it on the globe before you begin.</p>
+  <div class="explorer-create-grid">
+    <article><span class="explorer-tool-symbol" aria-hidden="true">◇</span><h3>Build with Blocks</h3><p>Place, rotate and edit blocks in your selected world. Your existing local builds and room sharing stay available.</p><button type="button" class="wx-button wx-button--primary" data-create-start="blocks">Build in this place</button></article>
+    <article><span class="explorer-tool-symbol" aria-hidden="true">⌁</span><h3>Design a race</h3><p>Use existing roads from above, record a driven route, or create a clean layout on open ground. Preview and validate it in Racing.</p><button type="button" class="wx-button wx-button--primary" data-create-start="tracks">Open Racing &amp; tracks</button></article>
+    <article><span class="explorer-tool-symbol" aria-hidden="true">▧</span><h3>Capture your place</h3><p>Use your own building photos and measurements. Keep a draft, edit its shape and submit an improvement for review.</p><a class="wx-button" href="./capture.html">Open Reality Capture</a><a class="wx-button wx-button--quiet" href="./survey.html">Open Survey</a></article>
+  </div>
+  <p id="explorerCreateStatus" role="status" aria-live="polite"></p>
 </section>
 </div>
 </div>
@@ -786,11 +817,7 @@ Continue ocean exploration beyond the dive site
 <div id="speed">0</div>
 <div class="hud-label"><span id="speedUnitLabel">MPH</span> <span style="margin-left:6px"><span id="limitLabel">LIMIT</span> <span id="limit">--</span></span></div>
 </div>
-<div id="weatherPanel">
-<div id="weatherLine"></div>
-<div id="weatherTimeLine"></div>
-<div id="weatherMetaLine"></div>
-</div>
+
 </div>
 <div id="hudClockDisplay"></div>
 <div id="hudDetails">
@@ -1112,21 +1139,21 @@ Continue ocean exploration beyond the dive site
 <canvas id="largeMapCanvas" width="800" height="800"></canvas>
 <div id="mapExplorerHint">Drag to explore · use +/− to zoom · tap a marker for details</div>
 <button id="mapClose" type="button" aria-label="Close world map">Close</button>
-<button id="mapLegend" style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:10px 20px;cursor:pointer;border-radius:6px">Map layers</button>
-<div id="legendPanel" style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;max-width:340px;display:none;max-height:calc(100% - 40px);overflow-y:auto;z-index:200">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
+<button id="mapLegend" style="position:absolute;bottom:20px;left:20px;background:color-mix(in srgb, var(--wx-panel-solid) 80%, transparent);border:2px solid var(--wx-success);color:var(--wx-success);font-family:var(--wx-font-ui);font-size:12px;padding:10px 20px;cursor:pointer;border-radius:6px">Map layers</button>
+<div id="legendPanel" style="position:absolute;top:20px;left:20px;background:color-mix(in srgb, var(--wx-panel-solid) 95%, transparent);border:2px solid var(--wx-success);color:var(--wx-success);font-family:var(--wx-font-ui);border-radius:12px;padding:16px;max-width:340px;display:none;max-height:calc(100% - 40px);overflow-y:auto;z-index:200">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--wx-success);padding-bottom:8px">
     <div style="font-size:14px;font-weight:bold">MAP LAYERS</div>
-    <button id="legendCloseBtn" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
+    <button id="legendCloseBtn" type="button" aria-label="Close map layers" style="background:transparent;border:none;color:var(--wx-success);font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
   </div>
 
-  <div style="margin-bottom:12px;padding:8px;background:rgba(0,255,200,0.1);border-radius:6px">
+  <div style="margin-bottom:12px;padding:8px;background:color-mix(in srgb, var(--wx-equipped-surface) 10%, transparent);border-radius:6px">
     <div style="font-size:10px;margin-bottom:6px;opacity:0.8">Choose what appears on the map.</div>
-    <button id="legendShowAllBtn" style="background:#0fc;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;margin-right:6px;font-family:Orbitron;font-weight:bold">Show All</button>
-    <button id="legendHideAllBtn" style="background:#f36;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;font-family:Orbitron;font-weight:bold">Hide All</button>
+    <button id="legendShowAllBtn" style="background:var(--wx-equipped-surface);color:var(--wx-text);border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;margin-right:6px;font-family:var(--wx-font-ui);font-weight:bold">Show All</button>
+    <button id="legendHideAllBtn" style="background:var(--wx-panel-soft);color:var(--wx-text);border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;font-family:var(--wx-font-ui);font-weight:bold">Hide All</button>
   </div>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterProperties" checked style="cursor:pointer">
       <label for="filterProperties" style="cursor:pointer">Properties</label>
     </summary>
@@ -1138,7 +1165,7 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterNavigation" checked style="cursor:pointer">
       <label for="filterNavigation" style="cursor:pointer">Active route</label>
     </summary>
@@ -1149,19 +1176,19 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterInteriors" checked style="cursor:pointer">
       <label for="filterInteriors" style="cursor:pointer">Enterable buildings</label>
     </summary>
     <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
       <div id="enterableBuildingsStatus" style="margin-bottom:6px">Open the legend to scan nearby enterable buildings.</div>
-      <div style="margin-bottom:6px;color:#8ef9ff">Press <strong>E</strong> near a listed building to enter or exit.</div>
+      <div style="margin-bottom:6px;color:var(--wx-action)">Press <strong>E</strong> near a listed building to enter or exit.</div>
       <div id="enterableBuildingsList" style="display:grid;gap:4px"></div>
     </div>
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterActivities" checked style="cursor:pointer">
       <label for="filterActivities" style="cursor:pointer">Activities</label>
     </summary>
@@ -1173,7 +1200,7 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterPOIsAll" checked style="cursor:pointer">
       <label for="filterPOIsAll" style="cursor:pointer">Places</label><small>14 types</small>
     </summary>
@@ -1238,7 +1265,7 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff">Memories</summary>
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:var(--wx-action)">Memories</summary>
     <div style="font-size:11px;line-height:1.5;padding-left:24px;opacity:0.95">
       <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
         <input type="checkbox" id="filterMemoryPins" checked style="cursor:pointer">
@@ -1259,7 +1286,7 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterGameElementsAll" checked style="cursor:pointer">
       <label for="filterGameElementsAll" style="cursor:pointer">Games and routes</label>
     </summary>
@@ -1280,7 +1307,7 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterPolice" checked style="cursor:pointer">
       <label for="filterPolice" style="cursor:pointer">Police vehicles</label>
     </summary>
@@ -1291,7 +1318,7 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterRoads" checked style="cursor:pointer">
       <label for="filterRoads" style="cursor:pointer">Roads</label>
     </summary>
@@ -1302,7 +1329,7 @@ Continue ocean exploration beyond the dive site
   </details>
 
   <div style="margin-bottom:12px" hidden>
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:var(--wx-action);display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterPaths" style="cursor:pointer">
       <label for="filterPaths" style="cursor:pointer">PATH OVERLAY</label>
     </div>
@@ -1313,7 +1340,7 @@ Continue ocean exploration beyond the dive site
     </div>
   </div>
 
-  <div style="font-size:9px;opacity:0.6;margin-top:12px;padding-top:8px;border-top:1px solid #0fc">
+  <div style="font-size:9px;opacity:0.6;margin-top:12px;padding-top:8px;border-top:1px solid var(--wx-success)">
     Data: OpenStreetMap contributors<br>
     Click any map element for details & directions<br>
     <span style="color:#0f8;font-weight:bold">Right-click map to teleport to location</span>
@@ -1321,10 +1348,10 @@ Continue ocean exploration beyond the dive site
 </div>
 
 <!-- Map Click Info Panel -->
-<div id="mapInfoPanel" style="position:absolute;top:20px;right:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;width:280px;display:none;max-height:calc(100% - 40px);overflow-y:auto">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
+<div id="mapInfoPanel" style="position:absolute;top:20px;right:20px;background:color-mix(in srgb, var(--wx-panel-solid) 95%, transparent);border:2px solid var(--wx-success);color:var(--wx-success);font-family:var(--wx-font-ui);border-radius:12px;padding:16px;width:280px;display:none;max-height:calc(100% - 40px);overflow-y:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--wx-success);padding-bottom:8px">
     <div style="font-size:14px;font-weight:bold" id="mapInfoTitle">Location Info</div>
-    <button id="mapInfoCloseBtn" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
+    <button id="mapInfoCloseBtn" type="button" aria-label="Close location details" style="background:transparent;border:none;color:var(--wx-success);font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
   </div>
   <div id="mapInfoContent" style="font-size:11px;line-height:1.6"></div>
 </div>
@@ -1332,28 +1359,65 @@ Continue ocean exploration beyond the dive site
 <div id="mapControlDock">
 <button id="mapSatelliteToggle" type="button" aria-label="Toggle satellite map" title="Satellite">🛰️</button>
 <button id="mapRoadsToggle" class="active" type="button" aria-label="Toggle road overlay" title="Roads">🛣️</button>
-<button id="mapPathsToggle" hidden style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
+<button id="mapPathsToggle" hidden style="background:color-mix(in srgb, var(--wx-panel-solid) 80%, transparent);border:2px solid var(--wx-success);color:var(--wx-success);font-family:var(--wx-font-ui);font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
 <span aria-hidden="true"></span>
 <button id="mapZoomIn" type="button" aria-label="Zoom map in">+</button>
 <button id="mapZoomOut" type="button" aria-label="Zoom map out">−</button>
 <div id="zoomLevel" aria-live="polite">Z 14</div>
 </div>
 </div>
-<div id="navigationHud" style="position:fixed;top:100px;left:20px;background:rgba(0,255,136,0.9);border:2px solid #00ff88;border-radius:12px;padding:16px;color:#000;font-family:'Poppins',sans-serif;z-index:100;display:none;min-width:180px;box-shadow:0 4px 20px rgba(0,255,136,0.4)">
+<div id="navigationHud" style="position:fixed;top:100px;left:20px;background:color-mix(in srgb, var(--wx-equipped-surface) 90%, transparent);border:2px solid var(--wx-success);border-radius:12px;padding:16px;color:var(--wx-text);font-family:var(--wx-font-ui);z-index:100;display:none;min-width:180px;box-shadow:0 4px 20px rgba(0,255,136,0.4)">
 <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;opacity:0.8">🧭 Navigation</div>
 <div id="navDestination" style="font-size:14px;font-weight:700;margin-bottom:8px">Destination</div>
 <div id="navDistance" style="font-size:24px;font-weight:700;margin-bottom:4px">--m</div>
 <div id="navDirection" style="font-size:32px;text-align:center;margin-top:8px">↑</div>
 </div>
 <div id="police">💔 0/3</div>
-<div id="poiInfo" style="position:fixed;top:20px;right:20px;background:rgba(0,0,0,0.85);border:2px solid #0fc;border-radius:12px;padding:16px;color:#0fc;font-family:Orbitron;z-index:100;display:none;min-width:200px;box-shadow:0 4px 20px rgba(0,255,200,0.3)">
+<div id="poiInfo" style="position:fixed;top:20px;right:20px;background:color-mix(in srgb, var(--wx-panel-solid) 85%, transparent);border:2px solid var(--wx-success);border-radius:12px;padding:16px;color:var(--wx-success);font-family:var(--wx-font-ui);z-index:100;display:none;min-width:200px;box-shadow:0 4px 20px rgba(0,255,200,0.3)">
 <div id="poiIcon" style="font-size:32px;text-align:center;margin-bottom:8px">🏫</div>
 <div id="poiName" style="font-size:14px;font-weight:bold;text-align:center;margin-bottom:4px">School</div>
 <div id="poiCategory" style="font-size:11px;text-align:center;opacity:0.8;margin-bottom:8px">Education</div>
-<div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid rgba(0,255,200,0.3)">50m ahead</div>
+<div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid color-mix(in srgb, var(--wx-success) 30%, transparent)">50m ahead</div>
 </div>
 <nav class="floatMenuContainer" id="floatMenuContainer" aria-label="Game destinations">
 <button id="returnToWorldBtn" class="gameFocusReturn" type="button">Return to world controls · Escape</button>
+<div id="explorerGameHeader" class="explorer-game-header">
+  <button id="explorerGameMenuBtn" type="button" aria-label="Open game menu" aria-controls="explorerGameMenu" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+</div>
+<dialog id="explorerGameMenu" aria-labelledby="explorerGameMenuTitle">
+  <header><h2 id="explorerGameMenuTitle">World Explorer</h2><button id="explorerGameMenuClose" type="button" aria-label="Close game menu">×</button></header>
+  <button type="button" data-open-player-journey>Your journey · home, careers &amp; achievements</button>
+  <nav class="explorer-global-navigation" aria-label="Main sections">
+    <button type="button" data-explorer-target="exploreBtn">◎ Explore</button>
+    <button type="button" data-explorer-target="fActivities">⌖ Activities</button>
+    <button type="button" data-explorer-target="fExplorerJournal">▤ Journal</button>
+    <button type="button" data-explorer-target="realEstateFloatBtn">◇ Create</button>
+    <button type="button" data-explorer-target="communityBtn">♙ Together</button>
+  </nav>
+  <div class="explorer-context-actions" role="group" aria-label="Travel and equipment">
+    <button type="button" data-explorer-target="travelBtn">◈ Travel</button>
+    <button type="button" data-explorer-target="backpackBtn">▣ Kit</button>
+  </div>
+  <details class="explorer-menu-world"><summary>Weather &amp; time</summary>
+<div id="weatherPanel">
+<div id="weatherLine"></div>
+<div id="weatherTimeLine"></div>
+<div id="weatherMetaLine"></div>
+</div>
+    <button type="button" data-explorer-target="quickTimeOfDay">☀ Time of day</button>
+    <button type="button" data-explorer-target="quickWeatherMode">☁ Weather</button>
+  </details>
+  <div class="explorer-menu-support" role="group" aria-label="Game options">
+    <button type="button" id="explorerGameMenuActivity">Current activity &amp; nearby actions</button>
+    <button type="button" data-explorer-target="hudMapOpenBtn">Map</button>
+    <button type="button" data-explorer-target="gameShareFloatBtn">Share this experience</button>
+    <button type="button" data-explorer-target="hudToggleBtn">Show / hide travel status</button>
+    <button type="button" data-explorer-target="controlsBarBtn">Controls &amp; settings</button>
+    <button type="button" data-explorer-target="mainMenuBtn">Return to the globe</button>
+  </div>
+  <p class="explorer-menu-tip"><kbd data-keyboard-actions="traversal_mode">F</kbd> switch travel mode · <kbd data-keyboard-actions="interact">E</kbd> interact · <kbd data-keyboard-actions="map">M</kbd> map</p>
+</dialog>
+<button id="explorerOpportunitiesBtn" type="button" aria-label="Current activity and nearby actions" title="Current activity and nearby actions" aria-controls="urbanVehiclePrompt discoveryContextPrompt researchDeckControls solidWorldPanel spaceFlightHUD ssToggleContainer" aria-expanded="false"><span aria-hidden="true">!</span></button>
 <!-- Stable player goals. Detailed controls stay inside their owning panels. -->
 <div class="floatMenu" id="exploreMenu">
 <button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" aria-controls="exploreChoices" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
@@ -1402,7 +1466,7 @@ Continue ocean exploration beyond the dive site
 
 <div class="floatMenu" id="backpackMenu">
 <button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" aria-controls="backpackChoices" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
-<div class="floatItems" id="backpackChoices" role="group" aria-label="Backpack" data-menu-title="BACKPACK"><h2 class="floatMenuTitle">Backpack</h2>
+<div class="floatItems" id="backpackChoices" role="group" aria-label="Kit" data-menu-title="KIT"><h2 class="floatMenuTitle">Kit</h2>
 <div class="floatItem" id="fBackpack">🎒 Items &amp; Quick Slots</div>
 <div class="floatItem" id="fExplorerJournal">≡ Journal</div>
 <div class="floatItem" id="fExplorerGuide">▤ Field Guide</div>
@@ -1412,7 +1476,7 @@ Continue ocean exploration beyond the dive site
 
 <div class="floatMenu" id="communityMenu">
 <button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" aria-controls="communityChoices" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
-<div class="floatItems" id="communityChoices" role="group" aria-label="Community" data-menu-title="COMMUNITY"><h2 class="floatMenuTitle">Community</h2>
+<div class="floatItems" id="communityChoices" role="group" aria-label="Together" data-menu-title="TOGETHER"><h2 class="floatMenuTitle">Together</h2>
 <div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
 <div class="floatItem" id="fCommunityBoard">◎ Rankings</div>
 <div class="floatItem" id="fMemoryFlower">🌸 Leave a Memory Marker</div>
@@ -1433,8 +1497,9 @@ Continue ocean exploration beyond the dive site
 
 <div class="floatMenu" id="realEstateMenu">
 <button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Build &amp; Home" aria-expanded="false" aria-controls="realEstateChoices" data-mobile-label="Build &amp; Home"><span class="btnIcon">⌂</span><span class="btnText">Build &amp; Home</span></button>
-<div class="floatItems" id="realEstateChoices" role="group" aria-label="Build &amp; Home" data-menu-title="BUILD &amp; HOME"><h2 class="floatMenuTitle">Build &amp; Home</h2>
+<div class="floatItems" id="realEstateChoices" role="group" aria-label="Create" data-menu-title="CREATE"><h2 class="floatMenuTitle">Create</h2>
 <div class="floatItem" id="fQuickBuild">🧱 Build with Blocks</div>
+<button class="floatItem" id="fCreateRace" type="button" data-explorer-target="fRacing">⌁ Design a race</button>
 <div class="floatItem" id="fRealEstate">⌂ Homes &amp; Property</div>
 </div>
 </div>
@@ -1554,7 +1619,7 @@ Continue ocean exploration beyond the dive site
   <button id="activityRunStopBtn" type="button">Stop</button>
 </div>
 
-<button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
+<button class="mainMenuBtn" id="mainMenuBtn" type="button" aria-label="Return to the globe">🏠 Main Menu</button>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
 <div id="flowerActionMenu" aria-label="Flower Actions">
 <button id="flowerActionMemoryBtn" class="flowerActionOption" type="button">🌸 Place Memory Flower</button>
@@ -1794,5 +1859,5 @@ Continue ocean exploration beyond the dive site
 <!-- Real Estate System -->
 <script type="module" data-startup-critical src="js/app-shell-fragments.js?v=93"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" data-startup-critical src="js/bootstrap.js?v=624"></script>
+<script type="module" data-startup-critical src="js/bootstrap.js?v=625"></script>
 </body></html>

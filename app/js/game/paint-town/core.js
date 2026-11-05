@@ -157,12 +157,12 @@ function ensurePaintTownHud() {
   hud.style.maxWidth = "88vw";
   hud.style.padding = "8px 10px";
   hud.style.borderRadius = "12px";
-  hud.style.border = "1px solid rgba(220, 38, 38, 0.45)";
-  hud.style.background = "rgba(10, 15, 28, 0.86)";
+  hud.style.border = "1px solid color-mix(in srgb, var(--wx-danger) 45%, transparent)";
+  hud.style.background = "color-mix(in srgb, var(--wx-panel-solid) 86%, transparent)";
   hud.style.backdropFilter = "blur(6px)";
   hud.style.boxShadow = "0 10px 24px rgba(0, 0, 0, 0.35)";
-  hud.style.color = "#f8fafc";
-  hud.style.fontFamily = "'Poppins', sans-serif";
+  hud.style.color = "var(--wx-text)";
+  hud.style.fontFamily = "var(--wx-font-ui)";
   hud.style.fontSize = "11px";
   hud.style.lineHeight = "1.35";
   hud.style.display = "none";
@@ -268,10 +268,10 @@ export function updatePaintTownHud(message = "", options = {}) {
     const restoreToggleFocus = hud.contains(document.activeElement);
     if (!state.hudExpanded) {
       hud.innerHTML =
-        `<button type="button" data-paint-toggle="open" aria-expanded="false" style="display:flex;align-items:center;gap:12px;width:100%;background:transparent;border:0;color:#f8fafc;padding:0;margin:0;font:inherit;cursor:pointer">` +
+        `<button type="button" data-paint-toggle="open" aria-expanded="false" style="display:flex;align-items:center;gap:12px;width:100%;background:transparent;border:0;color:var(--wx-text);padding:0;margin:0;font:inherit;cursor:pointer">` +
         `<span data-paint-time style="font-weight:700"></span>` +
         `<span data-paint-count style="font-weight:700"></span>` +
-        `<span style="margin-left:auto;color:#cbd5e1;font-size:12px">▾</span></button>`;
+        `<span style="margin-left:auto;color:var(--wx-text);font-size:12px">▾</span></button>`;
     } else {
       const colorButtons = PAINT_TOWN_COLORS.map(entry =>
         `<button type="button" data-paint-color="${normalizePaintColorHex(entry.hex)}" title="${entry.name}" aria-label="${entry.name}" style="width:20px;height:20px;border-radius:999px;background:${normalizePaintColorHex(entry.hex)};cursor:pointer;padding:0"></button>`
@@ -282,12 +282,12 @@ export function updatePaintTownHud(message = "", options = {}) {
       hud.innerHTML =
         `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">` +
         `<div style="font-weight:700;color:#fecaca">🟥 Paint the Town</div>` +
-        `<button type="button" data-paint-toggle="close" aria-expanded="true" style="margin-left:auto;border:1px solid rgba(148,163,184,0.6);background:rgba(15,23,42,0.45);color:#e2e8f0;border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer">Collapse</button></div>` +
+        `<button type="button" data-paint-toggle="close" aria-expanded="true" style="margin-left:auto;border:1px solid color-mix(in srgb, var(--wx-action) 60%, transparent);background:color-mix(in srgb, var(--wx-panel-solid) 45%, transparent);color:var(--wx-text);border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer">Collapse</button></div>` +
         `<div style="font-weight:600"><span data-paint-time></span> • <span data-paint-count></span></div>` +
         `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px">${toolButtons}</div>` +
         `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px"><span style="font-size:11px;color:#cbd5e1">Color:</span>${colorButtons}<span data-paint-color-name style="font-size:11px;color:#cbd5e1"></span></div>` +
-        `<div data-paint-gun-help style="margin-top:6px;color:#cbd5e1;font-size:11px">Press Ctrl (Control) to fire paintballs. Gun shots arc with gravity, so aim higher for far targets.</div>` +
-        `<div data-paint-hint style="margin-top:4px;color:#cbd5e1;font-size:11px"></div>`;
+        `<div data-paint-gun-help style="margin-top:6px;color:var(--wx-text);font-size:11px">Press Ctrl (Control) to fire paintballs. Gun shots arc with gravity, so aim higher for far targets.</div>` +
+        `<div data-paint-hint style="margin-top:4px;color:var(--wx-text);font-size:11px"></div>`;
     }
     hud.dataset.paintLayout = layout;
     if (restoreToggleFocus) hud.querySelector('[data-paint-toggle]')?.focus({ preventScroll: true });
@@ -311,14 +311,14 @@ export function updatePaintTownHud(message = "", options = {}) {
       button.setAttribute('aria-pressed', String(active));
       const label = id === 'touch' ? (rules.paintTouchMode === 'roof' ? 'Touch (Roof)' : 'Touch') : 'Paintball Gun';
       if (button.textContent !== label) button.textContent = label;
-      button.style.border = active ? '1px solid #f8fafc' : '1px solid rgba(148,163,184,0.55)';
-      button.style.background = active ? 'rgba(30,64,175,0.45)' : 'rgba(15,23,42,0.45)';
-      button.style.color = enabled ? '#e2e8f0' : '#64748b';
+      button.style.border = active ? "1px solid var(--wx-line-soft)" : "1px solid color-mix(in srgb, var(--wx-action) 55%, transparent)";
+      button.style.background = active ? "color-mix(in srgb, var(--wx-selected) 45%, transparent)" : "color-mix(in srgb, var(--wx-panel-solid) 45%, transparent)";
+      button.style.color = enabled ? "var(--wx-text)" : "var(--wx-action)";
       button.style.cursor = enabled ? 'pointer' : 'not-allowed';
     }
     for (const button of hud.querySelectorAll('[data-paint-color]')) {
       const active = normalizePaintColorHex(state.playerColorHex) === button.dataset.paintColor;
-      button.style.border = active ? '2px solid #f8fafc' : '1px solid rgba(248,250,252,0.35)';
+      button.style.border = active ? "2px solid var(--wx-line-soft)" : "1px solid color-mix(in srgb, var(--wx-line-soft) 35%, transparent)";
       button.setAttribute('aria-pressed', String(active));
     }
   }

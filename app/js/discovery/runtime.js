@@ -1,3 +1,4 @@
+import {personalCareerAchievements} from '../campaign/career-achievements.js';
 import {bindJournalBackupExport} from './journal-backup-ui.js';
 import {companionHandlingMarkup} from '../campaign/companion-handling.js';
 import {explorerCareerView,explorerJourneyMarkup} from '../campaign/explorer-career.js';
@@ -6,34 +7,34 @@ import {DOCUMENTARY_STORY,documentaryJournalRecords} from '../campaign/documenta
 import {setJournalMarkup} from './journal-record-dom.js';
 import {pilotReportMarkup} from '../campaign/pilot-report.js';
 import {workspaceReportMarkup} from '../campaign/engineering-workspace.js';
-import { miningCareerBadge } from '../campaign/mining-career.js';
-import { acceleratorCareerBadge } from '../campaign/accelerator-career.js';
+
+
 import { miningReportMarkup } from '../campaign/mining-report.js';
 import { acceleratorReportMarkup } from '../campaign/accelerator-report.js';
-import {astronomyCareerBadge} from '../campaign/astronomy-career.js';
+
 import {astronomyReportMarkup} from '../campaign/astronomy-report.js';
-import {cartographyCareerBadge} from '../campaign/cartography-career.js';
+
 import {lunarStudyEventIds,mergeLunarJournalRecords} from '../planetary/lunar-study-records.js';
 import {planetaryReportMarkup} from '../campaign/planetary-report.js';
 import {cartographyReportMarkup} from '../campaign/cartography-report.js';
-import {meteorologyCareerBadge} from '../campaign/meteorology-career.js';
+
 import {meteorologyReportMarkup} from '../campaign/meteorology-report.js';
-import {hydrologyCareerBadge} from '../campaign/hydrology-career.js';
+
 import {hydrologyReportMarkup} from '../campaign/hydrology-report.js';
-import {marineBiologyCareerBadge} from '../campaign/marine-biology-career.js';
+
 import {marineBiologyReportMarkup} from '../campaign/marine-biology-report.js';
-import {oceanographyCareerBadge} from '../campaign/oceanography-career.js';
+
 import {oceanographyReportMarkup,oceanographyConclusion} from '../campaign/oceanography-report.js';
-import {botanyCareerBadge} from '../campaign/botany-career.js';
+
 import {botanyReportMarkup,botanyArchiveMarkup} from '../campaign/botany-report.js';
-import {wildlifeCareerBadge} from '../campaign/wildlife-career.js';
+
 import {wildlifeReportMarkup,wildlifeArchiveMarkup} from '../campaign/wildlife-report.js';
-import {palaeontologyCareerBadge} from '../campaign/palaeontology-career.js';
+
 import {palaeontologyReportMarkup,palaeontologyArchiveMarkup,showResearchPhoto} from '../campaign/palaeontology-report.js';
-import {geologyCareerBadge} from '../campaign/geology-career.js';
-import {archaeologyCareerBadge} from '../campaign/archaeology-career.js';
+
+
 import {archaeologyReportMarkup} from '../campaign/archaeology-report.js';
-import {soloRacerBadge} from '../campaign/solo-racer.js';
+
 import {setDomText} from '../ui/dom-state.js?v=1';
 import {journalReturnDestination,returnToJournalRecord} from './journal-return.js';
 import {closeJourneyJournal} from './journey-journal.js';
@@ -41,14 +42,14 @@ import { harborJourneyEventIds, lunarCampaignBadges } from '../campaign/lunar-ho
 import {investigationBadges} from '../campaign/coastal-investigation.js';
 import { researchStarter, availableResearchStarters, starterAcceptsActivity } from '../campaign/research-starters.js';
 import { createPersonalHomeRuntime } from '../campaign/personal-home-runtime.js';
-import { homeAchievementBadges } from '../campaign/home-achievements.js';
+
 import { createThreeViewsRuntime } from '../campaign/three-views-runtime.js';
-import { threeViewsBadge } from '../campaign/three-views.js';
+
 import { createHarborRunRuntime } from '../campaign/harbor-run-runtime.js';
-import { harborRunBadge } from '../campaign/harbor-run.js';
+
 import { projectDiscoveryItemsToBackpack } from './backpack-projection.js?v=1';
 import { discoverySaveMessage } from './save-status.js?v=1';
-import { normalizeOpeningChapter, openingChapterBadge } from '../campaign/first-bearings.js?v=1';
+import { normalizeOpeningChapter } from '../campaign/first-bearings.js?v=1';
 import { createDiscoveryReceiptSync } from './receipt-outbox.js?v=1';
 import { hydrateDiscoveryReceipts } from './receipt-hydration.js?v=1';
 import { ambientNotices } from '../ui/ambient-notices.js';
@@ -734,7 +735,8 @@ function createDiscoveryUi(state) {
       if (request !== refreshSequence || elements.panel?.dataset.journeyJournalOwner) return;
       if (ownerUid === state.appCtx.getAccountUserId?.()) elements.saveStatus.textContent = discoverySaveMessage({
         durable: state.profileStore.type === 'IndexedDbDiscoveryProfileStore', signedIn: !!ownerUid,
-        receipts, backpackSaved: state.appCtx.discoveryBackpackSaved !== false, online: globalThis.navigator?.onLine !== false
+        receipts, backpackSaved: state.appCtx.discoveryBackpackSaved !== false, online: globalThis.navigator?.onLine !== false,
+        journeySync:state.appCtx.getJourneySyncStatus?.()||null
       });
     }
     if (elements.journalRegion) {
@@ -864,7 +866,7 @@ function createDiscoveryUi(state) {
         .sort((left, right) => Number(right[1].xp) - Number(left[1].xp));
       const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
       const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
-      const badges = [...(progress.badgeAwards || []), ...lunarCampaignBadges(profile,investigationEvents), ...investigationBadges(investigationEvents), ...homeAchievementBadges(profile), ...[acceleratorCareerBadge(profile.researchCareers?.accelerator),miningCareerBadge(profile.researchCareers?.mining),astronomyCareerBadge(profile.researchCareers?.astronomy),cartographyCareerBadge(profile.researchCareers?.cartography),meteorologyCareerBadge(profile.researchCareers?.meteorology),hydrologyCareerBadge(profile.researchCareers?.hydrology),oceanographyCareerBadge(profile.researchCareers?.oceanography),marineBiologyCareerBadge(profile.researchCareers?.['marine-biology']),botanyCareerBadge(profile.researchCareers?.botany),wildlifeCareerBadge(profile.researchCareers?.wildlife),palaeontologyCareerBadge(profile.researchCareers?.palaeontology),archaeologyCareerBadge(profile.researchCareers?.archaeology),geologyCareerBadge(profile.researchCareers?.geology),soloRacerBadge(profile.soloRacer), openingChapterBadge(profile.openingChapter), harborRunBadge(profile.harborRun), threeViewsBadge(profile.threeViews)].filter(Boolean)];
+      const badges = [...(progress.badgeAwards || []), ...lunarCampaignBadges(profile,investigationEvents), ...investigationBadges(investigationEvents), ...personalCareerAchievements(profile)];
       const activeCompanion = ownedCompanions.find((entry) => entry.active);
       const background = definitionById(BACKGROUND_DEFINITIONS, profile.characterState?.backgroundId) || BACKGROUND_DEFINITIONS[0];
       const strengths = ATTRIBUTE_DEFINITIONS.map((definition) => ({
@@ -1098,7 +1100,7 @@ function createDiscoveryUi(state) {
   listen(elements.undoImport, 'click', async () => {
     if (!globalThis.confirm?.('Undo the last Journal restore? This returns to the local records saved immediately before that restore and reloads the app.')) return;
     try {
-      if (await state.profileStore.rollbackLastImport()) globalThis.location?.reload();
+      if (await state.profileStore.rollbackLastImport({ownerUid:state.appCtx.getJourneySyncStatus?.()?.ownerUid??state.appCtx.getAccountUserId?.()})) globalThis.location?.reload();
       else if (elements.backupStatus) elements.backupStatus.textContent = 'There is no Journal restore to undo on this device.';
     } catch (error) {
       if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The previous Journal could not be recovered.';
@@ -1495,7 +1497,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   if (!appCtx || snapshot?.type !== 'WorldSnapshot' || !request?.id) return null;
   if (!globalThis.indexedDB && !appCtx.discoveryProfileStore) return null;
   if (snapshot.requestId !== request.id || appCtx.worldPublication?.sequence !== snapshot.sequence) return null;
-  const personalHousing = await import('../game/property-ui.js?v=9');
+  const personalHousing = await import('../game/property-ui.js?v=10');
   if (appCtx.worldPublication?.sequence !== snapshot.sequence) return null;
   closeJourneyJournal(appCtx);
   disposeWorldDiscoveryRuntime(appCtx, 'replacement');

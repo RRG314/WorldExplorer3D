@@ -1,4 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import {isEarthWorldUsable} from './earth-core/world-readiness.js';
+import {createTitleReturnLease} from './world/title-return-lease.js';
 import {
   classifyWorldSurfaceProfile,
 } from "./surface-rules.js?v=18";
@@ -287,9 +289,25 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   worldLinePointsFromLonLat
 });
 
+let publishedReturnSignature='';
+const titleReturnLease=createTitleReturnLease({
+  read:()=>({ready:appCtx.getEnv?.()===appCtx.ENV?.EARTH&&isEarthWorldUsable(appCtx),
+    publication:appCtx.worldPublication,signature:getWorldLoadSignature(),publishedSignature:publishedReturnSignature,
+    started:appCtx.gameStarted&&!appCtx.titleLaunchPending,loading:appCtx.worldLoading||appCtx.titleLaunchPending,liveGps:appCtx.gameMode==='livegps'}),
+  release:()=>releaseEarthWorldForTitle({reason:'title_return_expired'})
+});
+function retainEarthWorldForTitle(){return titleReturnLease.retain();}
+function resumeCurrentEarthWorld(){
+  if(!titleReturnLease.claim())return null;
+  const publication=appCtx.worldPublication;
+  return {state:'published',requestId:publication.requestId,sequence:publication.sequence,resumed:true};
+}
 async function loadRoads(retryPass = 0) {
+  titleReturnLease.clear();
+  const signature=getWorldLoadSignature();
   try {
     const result = await loadOsmRoads(retryPass);
+    if(isEarthWorldUsable(appCtx,result)&&signature===getWorldLoadSignature())publishedReturnSignature=signature;
     void appCtx.refreshWaterEnvironmentEvidence?.(false);
     return result;
   } finally {
@@ -315,6 +333,7 @@ async function refreshAuthoritativeMapData() {
 }
 
 function releaseEarthWorldForTitle(options = {}) {
+  titleReturnLease.clear();publishedReturnSignature='';
   const reason = options.reason || 'title_screen_release';
   const before = Object.freeze({
     roads: Number(appCtx.roads?.length || 0),
@@ -461,6 +480,8 @@ Object.assign(appCtx, {
   refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
   releaseEarthWorldForTitle,
+  retainEarthWorldForTitle,
+  resumeCurrentEarthWorld,
   resolveRoadSpawn,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,

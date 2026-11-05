@@ -32,6 +32,7 @@ export function createGlobeSelectorScene(options = {}) {
   let scene = null;
   let camera = null;
   let renderer = null;
+  let canvasResizeObserver = null;
   let globeRoot = null;
   let earthMesh = null;
   let markerMesh = null;
@@ -43,8 +44,8 @@ export function createGlobeSelectorScene(options = {}) {
   let savedFavoriteMaterial = null;
   let favoriteMarkerNodes = [];
   let basemapTiles = null;
-  let cameraDistance = 2.8;
-  let targetCameraDistance = 2.8;
+  let cameraDistance = 3.2;
+  let targetCameraDistance = 3.2;
   let pointerActive = false;
   let pointerDragDistance = 0;
   let pointerDownX = 0;
@@ -131,11 +132,13 @@ export function createGlobeSelectorScene(options = {}) {
 
   function ensureSize() {
     if (!renderer || !camera) return;
-    const bounds = stage?.getBoundingClientRect();
+    const bounds = canvas?.getBoundingClientRect() || stage?.getBoundingClientRect();
     const width = Math.max(1, Math.floor(bounds?.width || canvas.clientWidth || 1));
     const height = Math.max(1, Math.floor(bounds?.height || canvas.clientHeight || 1));
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
+    // Fit the globe to the shorter frame axis while preserving user zoom.
+    camera.fov = 2 * Math.atan(Math.tan(21 * Math.PI / 180) * Math.max(1, height / width)) * 180 / Math.PI;
     camera.updateProjectionMatrix();
     applyMarkerScales();
     updateZoomUi();
@@ -519,9 +522,17 @@ export function createGlobeSelectorScene(options = {}) {
     raycaster = new THREE.Raycaster();
     sceneReady = true;
     ensureSize();
+    // Fonts, controls and reserved space can resize the canvas after the window event.
+    // This belongs to the existing selector renderer's creation/disposal boundary.
+    if (canvas && typeof ResizeObserver === 'function') {
+      canvasResizeObserver = new ResizeObserver(() => { ensureSize(); renderFrame(); });
+      canvasResizeObserver.observe(canvas);
+    }
   }
 
   function destroy() {
+    canvasResizeObserver?.disconnect();
+    canvasResizeObserver = null;
     stopRenderLoop();
     pointerActive = false;
     activePointers.clear();

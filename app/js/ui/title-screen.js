@@ -1,3 +1,4 @@
+import { createPlayerEntry } from './player-entry.js';
 import { requestGuidedJourney, consumeGuidedJourney, readReturnPlace } from '../tutorial/entry-journey.js';
 import {createPortalGameEntry} from '../portal/game-entry.js';
 import { createLaunchMeasurement } from '../platform/launch-telemetry.js';
@@ -8,7 +9,7 @@ import { resolveCoordinateSurfaceEvidence } from './globe-selector/helpers.js?v=
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=94";
+import { createGlobeSelector } from "./globe-selector.js?v=95";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { markFirstPlayReady } from '../runtime/workload-policy.js?v=1';
@@ -22,6 +23,7 @@ import {
 function initTitleScreenUi({
   openActivities,
   openJournal,
+  getProfileStore,
   lastLocationStorageKey,
   shareExperienceStatus,
   perfSettingsStatus,
@@ -66,6 +68,7 @@ function initTitleScreenUi({
   let pendingOceanResumeGuard = null;
   let titleLaunchMode = 'earth';
   let globeSelector = null;
+  let playerEntry = null;
   let skipGlobeGateOnce = false;
   let geolocationBusy = false;
   let liveGpsLaunchBusy = false;
@@ -272,7 +275,7 @@ function initTitleScreenUi({
   const setTitleUseMyLocationStatus = (message = '', color = '#6b7280') => {
     if (!(titleUseMyLocationStatus instanceof HTMLElement)) return;
     titleUseMyLocationStatus.textContent = message || '';
-    titleUseMyLocationStatus.style.color = color || '#6b7280';
+    titleUseMyLocationStatus.style.color = color || "var(--wx-muted)";
   };
   const setLocationEntryLabel = (button, label) => {
     if (!button) return;
@@ -355,6 +358,7 @@ function initTitleScreenUi({
     });
   };
   const runLiveGpsExplore = async () => {
+    if(playerEntry?.isChoosingPlace()){globeSelector?.setSearchStatus?.('Finish your Explorer setup before starting continuous Live GPS.');return false;}
     if (liveGpsLaunchBusy) return false;
     selectLiveGpsMode();
     setLiveGpsLaunchBusy(true);
@@ -408,10 +412,14 @@ function initTitleScreenUi({
   globeLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
 
   globeSelector = createGlobeSelector({
+    canGoBack: () => appCtx.gameStarted === true || !!playerEntry,
+    backLabel: () => appCtx.gameStarted ? 'Return to world' : playerEntry?.isChoosingPlace() ? 'Back to your Explorer' : 'Home',
+    startLabel: () => playerEntry?.isChoosingPlace() ? 'Use this starting place' : 'Explore',
     onOpen: () => { refreshReturnPlace(); emitTutorialEvent('opened_globe_selector'); },
     onUseMyLocation: () => runUseMyLocation('globe'),
-    onBack: () => customPanel?.classList.remove('show'),
+    onBack: () => { customPanel?.classList.remove('show'); if(!appCtx.gameStarted)playerEntry?.backFromGlobe(); },
     onStartHere: async (selection = null) => {
+      if(playerEntry?.acceptPlaceSelection(selection))return true;
       emitTutorialEvent('location_selected', selection || {});
       setTitleLocationMode('custom');
       if (!appCtx.gameStarted) {
@@ -419,7 +427,7 @@ function initTitleScreenUi({
       } else if (typeof appCtx.loadRoads === 'function') {
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
-        const loaded = await appCtx.loadRoads();
+        const loaded = appCtx.resumeCurrentEarthWorld?.() || await appCtx.loadRoads();
         if (!isEarthWorldUsable(appCtx, loaded)) return false;
         // loadRoads publishes the world and applies its final arrival once.
         // Do not run a second title-layer spawn over that resolved surface.
@@ -431,6 +439,7 @@ function initTitleScreenUi({
       return false;
     },
     onOceanShortcut: async (selection = null, launchContext = {}) => {
+      if(playerEntry?.acceptEnvironmentSelection('ocean',selection))return true;
       if(launchContext.isCurrent?.()===false)return false;
       if (!selection || !Number.isFinite(Number(selection.lat)) || !Number.isFinite(Number(selection.lon))) {
         return false;
@@ -460,6 +469,7 @@ function initTitleScreenUi({
       });
     },
     onMoonShortcut: async () => {
+      if(playerEntry?.acceptEnvironmentSelection('moon'))return true;
       if (!appCtx.gameStarted) {
         setLaunchMode('moon');
         return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'moon' });
@@ -469,6 +479,7 @@ function initTitleScreenUi({
       return false;
     },
     onSpaceShortcut: async () => {
+      if(playerEntry?.acceptEnvironmentSelection('space'))return true;
       if (!appCtx.gameStarted) {
         setLaunchMode('space');
         return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'space' });
@@ -483,6 +494,7 @@ function initTitleScreenUi({
     globeSelector,
     onEarthMode: () => setTitleLocationMode('custom'),
     onLaunchMode: (mode) => {
+      if(playerEntry?.acceptEnvironmentSelection(mode))return;
       setLaunchMode(mode);
       void appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: mode }).catch((error) => {
         console.error(`[title] ${mode} launch failed:`, error);
@@ -490,7 +502,21 @@ function initTitleScreenUi({
     },
     primeMultiplayerUi,
     onActivities:openActivities,
-    onJournal:openJournal
+    onJournal:openJournal,
+    onCreate:async kind=>{
+      if (!['blocks','tracks'].includes(kind)) return false;
+      selectTitleGameMode('free');
+      const started=await globeSelector.startHere();
+      if (!started || !appCtx.gameStarted || appCtx.getEnv?.()!=='EARTH') return false;
+      if (kind==='blocks') {
+        if (typeof appCtx.openBlockBuilder!=='function') return false;
+        appCtx.openBlockBuilder();
+      } else {
+        if (typeof appCtx.startGameplayPlugin!=='function') return false;
+        await appCtx.startGameplayPlugin('racing');
+      }
+      return true;
+    }
   });
 
   appCtx.globeSelector = globeSelector;
@@ -629,6 +655,7 @@ function initTitleScreenUi({
   let launchMeasurement = null;
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
+    if(appCtx.canStartPlayerJourney?.()===false){appCtx.openJourneySync?.();return false;}
     const voyageResume=pendingOceanResume;pendingOceanResume=null;
     const oceanResumeGuard=pendingOceanResumeGuard;pendingOceanResumeGuard=null;
     const forcedLaunchMode = pendingForcedLaunchMode;
@@ -756,7 +783,7 @@ function initTitleScreenUi({
     void appCtx.ensureStarCatalogLoaded?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
-    const earthLoadResult = await appCtx.loadRoads();
+    const earthLoadResult = appCtx.resumeCurrentEarthWorld?.() || await appCtx.loadRoads();
     if (!isEarthWorldUsable(appCtx, earthLoadResult)) {
       appCtx.gameStarted=false;
       appCtx.hideLoad?.();
@@ -910,11 +937,42 @@ function initTitleScreenUi({
     titleStartButton.setAttribute('aria-busy', runtimeReady ? 'false' : 'true');
   }
 
-  // The hub owns the complete pre-game UI. Shared links pre-populate it; they
-  // do not bypass it. Leaving both titleScreen and globeSelectorScreen hidden
-  // produced a blank sky/ground shell for every lat/lon share URL.
+  playerEntry = createPlayerEntry({
+    runtime:appCtx,getStore:getProfileStore,getGlobe:()=>globeSelector,
+    onActivities:openActivities,onJournal:openJournal,
+    readReturn:refreshReturnPlace,onReturn:()=>startEntry(false),
+    onHub:section=>{
+      const destination={together:'multiplayer',settings:'settings',create:'create',moon:'moon',mars:'mars',space:'space',ocean:'ocean'}[section];
+      const worldButton={moon:'globeSelectorMoonBtn',mars:'globeSelectorMarsBtn',space:'globeSelectorSpaceBtn'}[section];
+      if(worldButton){document.getElementById(worldButton)?.click();return;}
+      if(section==='ocean'){globeSelector.setSearchStatus('Choose an ocean point, then select Ocean, or open the Coral Shelf research voyage.');document.getElementById('globeSelectorOceanBtn')?.focus();return;}
+      document.querySelector(`#globeSelectorScreen [data-globe-destination="${destination}"]`)?.click();
+    },
+    onBeginWorld:async(place,guided,draft)=>{
+      const mode=place?.world||'earth';
+      if(mode==='earth'&&place){globeSelector.setSelection(place.lat,place.lon,{...place,focus:false});setTitleLocationMode('custom');}
+      if(mode==='earth'&&guided)requestGuidedJourney();
+      if(mode==='ocean'){globeSelector.open();globeSelector.setSelection(place.lat,place.lon,{...place,focus:false});return globeSelector.startOcean();}
+      const started=await appCtx.triggerTitleStart({bypassCustomGate:true,launchMode:mode});
+      if(started&&mode==='earth'&&draft?.vehicleId){
+        const current=appCtx.getVehicleGarage?.();
+        if(current?.vehicles?.[draft.vehicleId]&&current.selectedId!==draft.vehicleId){
+          const result=await appCtx.selectPersonalVehicle?.(draft.vehicleId);
+          if(result?.ok)resetTitleEarthTravelMode('introduction_vehicle_ready');
+          else appCtx.showToast?.('Your selected car is in the Garage. Choose a clear road before driving it.');
+        }
+      }
+      return started;
+    }
+  });
+  window.addEventListener('pagehide',event=>{if(!event.persisted)playerEntry?.dispose();});
   if (!appCtx.gameStarted) {
-    window.requestAnimationFrame(() => globeSelector.open());
+    // Shared/Portal arrivals keep their original location review. Ordinary
+    // entry starts at the cinematic home, with an unrestricted globe one click away.
+    window.requestAnimationFrame(() => {
+      if(portalEntry.intent||sharedExperienceParams)globeSelector.open();
+      else void playerEntry.open();
+    });
   }
 
   return {
@@ -922,6 +980,7 @@ function initTitleScreenUi({
     getTitleLaunchMode: () => titleLaunchMode,
     setTitleLaunchMode: (mode) => setLaunchMode(mode),
     getGlobeSelector: () => globeSelector,
+    getPlayerEntry:()=>playerEntry,
     primeMultiplayerUi,
     isTouchPreferredClient
   };

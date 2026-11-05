@@ -1,3 +1,4 @@
+import { documentThemeCss } from '../ui/document-theme.js';
 import { targetFromIntersection } from '../interaction/world-click-router.js?v=4';
 import { capturePresentation } from '../runtime/renderer-owners.js';
 import { earthCoordinateFrame } from '../earth-core/coordinate-frame.js?v=1';
@@ -128,5 +129,5 @@ export function createWorldPhotoCapture(ctx,{systemId='campaign.photo-shutter',o
 export function photoAlbumHtml(state,album){
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   for(const photo of album.photos)validateAlbumPhoto(photo);
-  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escape(state.subject.name)} · World Explorer album</title><style>body{max-width:1000px;margin:40px auto;padding:0 20px;background:#101a22;color:#e9f1f6;font:16px system-ui}img{max-width:100%;height:auto}figure{margin:28px 0}figcaption{padding:8px 0}</style><h1>${escape(state.subject.name)}</h1><p>${escape(state.regionLabel)} · Three views from World Explorer. In-game photographs; not real-world camera images.</p>${album.photos.map(p=>`<figure><img src="${p.dataUrl}" alt="${escape(p.kind)} view"><figcaption>${escape(p.kind)}</figcaption></figure>`).join('')}`;
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escape(state.subject.name)} · World Explorer album</title><style>${documentThemeCss()}body{max-width:1000px;margin:40px auto;padding:0 20px;background:var(--wx-panel-solid,#fff);color:var(--wx-text,#111);font:calc(1rem * var(--wx-text-scale,1))/1.5 var(--wx-font-ui,Arial,sans-serif)}img{max-width:100%;height:auto}figure{margin:28px 0}figcaption{padding:8px 0}h1{font-family:var(--wx-font-display,Arial,sans-serif);font-weight:500}</style><h1>${escape(state.subject.name)}</h1><p>${escape(state.regionLabel)} · Three views from World Explorer. In-game photographs; not real-world camera images.</p>${album.photos.map(p=>`<figure><img src="${p.dataUrl}" alt="${escape(p.kind)} view"><figcaption>${escape(p.kind)}</figcaption></figure>`).join('')}`;
 }

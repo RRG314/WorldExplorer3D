@@ -19,7 +19,7 @@
 
   function isInstalled() {
     return installed || navigator.standalone === true || standalone.matches || minimal.matches ||
-      window.WorldExplorerDistribution?.isGooglePlay === true;
+      window.WorldExplorerDistribution?.isStoreEdition === true || window.WorldExplorerDistribution?.isGooglePlay === true;
   }
   function render(message) {
     const added = isInstalled();

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { resolvePrimaryPlace } from './places/place-search.js?v=4';
+import { resolvePrimaryPlace } from './places/place-search.js?v=5';
 import {isEarthWorldUsable} from './earth-core/world-readiness.js';
 // input.js - Keyboard handling, track recording, city switching
 // ============================================================================
@@ -441,7 +441,7 @@ async function searchLocation() {
   const status = document.getElementById('locationSearchStatus');
   if (!input || !status) return null;
   const result = await searchAndTravelToLocation(input.value, { statusElement: status });
-  status.style.color = result ? '#059669' : '#dc2626';
+  status.style.color = result ? "var(--wx-success)" : "var(--wx-danger)";
   return result;
 }
 Object.assign(appCtx, {

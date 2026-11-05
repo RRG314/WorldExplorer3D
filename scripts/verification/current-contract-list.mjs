@@ -1,5 +1,14 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/journey-authority-current.test.mjs',
+  'tests/journey-sync-current.test.mjs',
+  'tests/auth-journey-upgrade-current.test.mjs',
+  'tests/player-journey-release-current.test.mjs',
+  'tests/home-fixtures-current.test.mjs',
+  'tests/player-introduction-current.test.mjs',
+  'tests/geospatial-gateway-route-current.test.mjs',
+  'tests/nova-presentation-current.test.mjs',
+  'tests/document-theme-current.test.mjs',
   'tests/walking-close-camera-current.test.mjs',
   'tests/journal-backup-ui-current.test.mjs',
   'tests/companion-handling-current.test.mjs',
@@ -468,6 +477,7 @@ export const currentContractTests = [
   'tests/far-terrain-buffer-lifetime-current.test.mjs',
   'tests/region-build-current.test.mjs',
   'tests/functional-poi-semantics-current.test.mjs',
+  'tests/business-interior-current.test.mjs',
   'tests/graphics-call-evidence-current.test.mjs',
   'tests/ground-reconstruction-current.test.mjs',
   'tests/home-property-current.test.mjs',

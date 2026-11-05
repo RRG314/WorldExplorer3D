@@ -1,0 +1,409 @@
+/* TRAIL composition. Existing elements, action IDs and panel owners are retained. */
+  html, body, button, input, select, textarea { font-family: var(--wx-font-ui); }
+  button, input, select, textarea { accent-color: var(--wx-action); }
+  button { text-transform: none; letter-spacing: normal; }
+  :is(button, input, select, textarea, summary, a):focus-visible {
+    outline: 3px solid var(--wx-focus); outline-offset: 3px;
+  }
+  ::selection { background: var(--wx-action); color: var(--wx-action-text); }
+  .experience-browser {
+    --experience-bg: var(--wx-bg); --experience-panel: var(--wx-panel-soft);
+    --experience-text: var(--wx-text); --experience-muted: var(--wx-muted);
+    --experience-line: var(--wx-line-soft); --experience-accent: var(--wx-action);
+    font-family: var(--wx-font-ui);
+  }
+  .experience-browser::backdrop { background: rgb(0 0 0 / 66%); }
+  .experience-browser .experience-actions .experience-primary,
+  .experience-browser .experience-tabs button[aria-selected="true"] { color: var(--wx-action-text); }
+  .experience-browser .experience-card.selected { background: var(--wx-selected); }
+  .experience-browser:not(.research-station) { width: min(1200px,calc(100vw - 40px)); height: min(900px,calc(100dvh - 40px)); }
+  .experience-browser:not(.research-station)[data-detail="false"] .experience-body { grid-template-columns: minmax(0,1fr); }
+  .experience-browser:not(.research-station)[data-detail="false"] .experience-detail { display: none; }
+  .experience-intro h3 { margin: 4px 0 10px; font: 350 calc(2.25rem * var(--wx-text-scale))/1.15 var(--wx-font-display); letter-spacing: -.04em; }
+  .experience-intro p { margin: 0 0 20px; color: var(--wx-muted); line-height: 1.6; max-width: 70ch; }
+  .experience-groups { display: flex; gap: 6px; flex: none; overflow-x: auto; padding: 4px 2px 16px; }
+  .experience-browser .experience-groups button { flex: none; padding: 8px 14px; white-space: nowrap; border-radius: var(--wx-radius-control); font-size: var(--wx-type-meta); background: transparent; }
+  .experience-browser .experience-groups button[aria-pressed="true"] { color: var(--wx-action-text); background: var(--wx-action); border-color: var(--wx-action); }
+  .experience-list { flex: 1; min-height: 0; }
+  .experience-browser:not(.research-station) .experience-list-pane { overflow-y: auto; overscroll-behavior: contain; }
+  .experience-browser:not(.research-station) .experience-list { flex: none; overflow: visible; }
+  .experience-intro { flex: none; }
+  .experience-browser[data-detail="false"] .experience-list { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+  .experience-browser .experience-card { border-radius: var(--wx-radius-panel); padding: 0 0 18px; overflow: hidden; align-content: start; height: 100%; gap: 6px; background: var(--wx-panel-soft); border-color: var(--wx-line-soft); }
+  .experience-card img { display: block; width: 100%; height: 130px; object-fit: cover; margin-bottom: 8px; }
+  .experience-card > :is(span,strong,small) { margin-inline: 18px; }
+  .experience-card > strong { font: 400 calc(1.375rem * var(--wx-text-scale))/1.3 var(--wx-font-display); letter-spacing: -.025em; }
+  .experience-card > small { font-size: var(--wx-type-control); }
+  .experience-card .experience-card-symbol { display: grid; place-items: center; height: 130px; margin: 0 0 8px; background: radial-gradient(ellipse at top left,var(--wx-selected),var(--wx-input)); color: var(--wx-action); font: 300 48px/1 var(--wx-font-display); }
+  .experience-tile { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+  .experience-image-credit { padding: 0 8px 6px; color: var(--wx-muted); font-size: calc(.6875rem * var(--wx-text-scale)); line-height: 1.4; }
+  .experience-image-credit a { color: inherit; text-decoration: underline; text-underline-offset: .2em; }
+  .experience-browser[data-detail="true"] .experience-intro { display: none; }
+  .experience-browser[data-detail="true"] .experience-card { padding: 14px 0; }
+  .experience-browser[data-detail="true"] .experience-card :is(img,.experience-card-symbol),
+  .experience-browser[data-detail="true"] .experience-image-credit { display: none; }
+  .experience-back { display: block; align-self: start; }
+  .experience-detail h3 { font-family: var(--wx-font-display); font-weight: 350; letter-spacing: -.035em; }
+  .experience-tabs { margin: 0 20px; }
+  .experience-list-pane { padding: 24px; }
+  #discoveryPanel { inset: max(88px,calc(var(--wx-masthead-height,76px) + 12px)) 24px 24px; width: min(1200px,calc(100vw - 48px)); margin-inline: auto; }
+  body.start-hub-open #discoveryPanel { top: 142px; width: calc(100vw - 48px); }
+  #urbanEquipment { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); max-height: calc(100dvh - var(--wx-masthead-height,76px) - 36px); }
+  .urbanEquipmentHead h2 { font-weight: 350; letter-spacing: -.035em; }
+  :is(dialog, .floatItems, .globe-hub-overlay, .globe-selector-side, .hud-box,
+      #discoveryPanel, #urbanEquipment, .mp-card, .room-panel, .loadingCard,
+      .expeditionPanel, .universe-navigator) {
+    border-radius: var(--wx-radius-panel);
+    box-shadow: var(--wx-shadow-panel);
+  }
+  :is(dialog, .floatItems, .hud-box, #discoveryPanel, #urbanEquipment,
+      .expeditionPanel, .universe-navigator) {
+    background: var(--wx-panel);
+    backdrop-filter: blur(var(--wx-glass-blur));
+    border-color: var(--wx-line-soft);
+    color: var(--wx-text);
+  }
+  dialog::backdrop { background: rgb(0 0 0 / 66%); backdrop-filter: blur(5px); }
+  :is(.experience-header h2, .controls-panel-header h2, .urbanEquipmentHead h2,
+      .mp-title, .expeditionHeader h2, #discoveryPanelTitle, .vehicle-garage h2,
+      .racing-hub h2, #globeHubOverlayTitle) {
+    font-family: var(--wx-font-display); font-weight: 400; letter-spacing: -.035em;
+  }
+  :is(.experience-header, .discoveryHead, .urbanEquipmentHead, .controls-panel-header,
+      .expeditionHeader, .globe-hub-overlay-head) { border-color: var(--wx-line-soft); }
+  :is(.experience-tabs, .discoveryTabs, .urbanBackpackFilters, .mp-workspace-nav) {
+    gap: 6px; padding: 6px; border-radius: var(--wx-radius-control);
+    background: var(--wx-input); border: 1px solid var(--wx-line-soft);
+  }
+  :is(.experience-tabs, .discoveryTabs, .urbanBackpackFilters, .mp-workspace-nav) button {
+    border-radius: var(--wx-radius-control); border-color: transparent;
+  }
+  :is(.experience-tabs button[aria-selected="true"], .mp-workspace-nav button.active) {
+    color: var(--wx-action-text); background: var(--wx-action);
+  }
+  :is(.experience-card, .vehicle-garage-row, .mp-section, .urbanEquipmentItem,
+      .discoveryCard, .discoveryStoryCard, .racing-event-card) {
+    border-radius: var(--wx-radius); border-color: var(--wx-line-soft);
+  }
+  .wx-button, .experience-browser button, .vehicle-garage button,
+  .expeditionPanel button, .mp-btn, #globeSelectorScreen button,
+  #pauseScreen button, #resultScreen button, .startBtn {
+    border-radius: var(--wx-radius-control);
+  }
+  :is(.experience-browser, .vehicle-garage, .expeditionPanel) :is(input, select, textarea) {
+    border-radius: var(--wx-radius-panel);
+  }
+
+  /* The globe stays live and interactive. Its tools float beside the scene. */
+  #globeSelectorScreen { background: var(--wx-page-wash); }
+  #globeSelectorScreen { --wx-input: var(--hub-input); --wx-action: var(--hub-blue); --wx-action-text: var(--hub-action-text); --wx-selected: var(--hub-active); --wx-focus: var(--hub-blue); }
+  .globe-selector-shell { background: transparent; }
+  .globe-selector-brand { font: 500 .8125rem/1.4 var(--wx-font-ui); letter-spacing: .075em; }
+  .globe-brand-mark { border-width: 1px; }
+  .globe-selector-top, .globe-selector-brand { background: transparent; border-color: transparent; }
+  .globe-hub-search { border-radius: var(--wx-radius-control); overflow: hidden; background: var(--hub-input); }
+  .globe-hub-search input { font-family: var(--wx-font-ui); }
+  .globe-hub-search button { color: var(--hub-blue); background: transparent; font-family: var(--wx-font-ui); }
+  .globe-app-rail { border: 1px solid var(--hub-line); border-radius: var(--wx-radius-control); background: var(--hub-panel); }
+  .globe-app-rail button { border: 0; border-radius: var(--wx-radius-control); font-family: var(--wx-font-ui); text-transform: none; font-weight: 500; }
+  .globe-app-rail button.active { color: var(--hub-action-text); background: var(--hub-blue); border: 0; }
+  .globe-app-rail button.active span { color: inherit; }
+  body.panel-journal-open .globe-app-rail button.active,
+  body.panel-experiences-open .globe-app-rail button.active { color: var(--hub-text); background: transparent; }
+  body.panel-journal-open .globe-app-rail [data-globe-destination="journal"],
+  body.panel-experiences-open .globe-app-rail [data-globe-destination="games"] { color: var(--hub-action-text); background: var(--hub-blue); }
+  .globe-selector-side { border: 1px solid var(--hub-line); background: color-mix(in srgb, var(--hub-panel) 94%, transparent); backdrop-filter: blur(var(--wx-glass-blur)); }
+  .globe-selector-stat-value { font-family: var(--wx-font-display); font-weight: 400; letter-spacing: -.035em; }
+  .globe-selector-stat { border-radius: var(--wx-radius); }
+  :is(.globe-selector-city-item, .globe-location-entry-card, .globe-selector-live-layer,
+      .globe-selector-live-details, .hub-library-grid button, .tester-invitation) { border-radius: var(--wx-radius); }
+  .globe-selector-stage { border: 1px solid var(--hub-line); border-radius: var(--wx-radius-panel); overflow: hidden; }
+  .globe-selector-stage::before { background: rgb(13 7 28 / 70%); }
+  .globe-selector-hint { border-radius: var(--wx-radius-control); }
+  .globe-selector-basemap-controls { background: var(--wx-panel); border-color: var(--wx-line-soft); border-radius: var(--wx-radius-control); }
+  .globe-selector-basemap-controls button { min-height: 44px; color: var(--wx-muted); font-family: var(--wx-font-ui); text-transform: none; }
+  .globe-selector-basemap-controls button.active { color: var(--wx-action-text); background: var(--wx-action); }
+  .globe-selector-zoom-controls button { color: var(--wx-text); background: var(--wx-panel-solid); border-color: var(--wx-line-soft); font-family: var(--wx-font-ui); }
+  #globeSelectorScaleReadout { color: var(--wx-muted); background: var(--wx-panel); border-radius: 10px; }
+  .globe-destination-bar { background: transparent; border: 0; }
+  .globe-hub-overlay { border: 1px solid var(--hub-line); background: var(--hub-panel); overflow: hidden; }
+  .globe-hub-panel-host .tab-content { background: transparent; }
+  #globeSelectorStartBtn { color: var(--hub-action-text); background: var(--hub-blue); box-shadow: 0 6px 24px color-mix(in srgb, var(--hub-blue) 16%, transparent); }
+  body.start-hub-open #appSignInBtn { border-radius: var(--wx-radius-control); text-transform: none; }
+  #globeHubThemeBtn, #globeHubShareBtn, #globeHubFullscreenBtn,
+  .globe-hub-tools button { border-radius: 50%; }
+
+  /* Keep the existing HUD lane budget, collapse and touch owners. */
+  .hud-box { padding: 18px; }
+  #speed { font-family: var(--wx-font-display); font-weight: 300; letter-spacing: -.055em; }
+  #conditionBar, #conditionFill { border-radius: var(--wx-radius-control); }
+  #minimap { border-radius: 50%; }
+  #coords { border-radius: var(--wx-radius); }
+  .hudUtilityActions { padding: 6px; border-radius: var(--wx-radius-control); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); }
+  /* A filter on this ancestor would contain the viewport-fixed masthead and
+     menus inside the small dock. Glass belongs on their individual surfaces. */
+  .floatMenuContainer { padding: 6px; gap: 4px; border-radius: var(--wx-radius-control); background: var(--wx-panel); border-color: var(--wx-line-soft); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .floatBtn { border: 0; border-radius: var(--wx-radius-control); font-weight: 500; }
+  .floatBtn:hover, .floatBtn[aria-expanded="true"] { color: var(--wx-action-text); background: var(--wx-action); border: 0; }
+  .floatItems { padding: 0 14px 14px; }
+  .floatMenuTitle { color: var(--wx-text); font-weight: 400; font-size: calc(1.375rem * var(--wx-text-scale)); letter-spacing: -.025em; }
+  .floatItem { border-radius: var(--wx-radius-panel); border-bottom-color: transparent; margin-top: 3px; font-weight: 500; }
+  .floatItem:hover, .floatItem.on { box-shadow: none; }
+  .loadingCard { border: 1px solid var(--wx-line-soft); padding: 24px; backdrop-filter: blur(var(--wx-glass-blur)); }
+  #loading, #titleScreen { background: var(--wx-page-wash); }
+  #loadTitle { font-weight: 400; letter-spacing: -.025em; }
+  .pauseTitle { font: 300 3rem/1.2 var(--wx-font-display); letter-spacing: -.04em; }
+
+  /* Five stable destinations; Travel and Kit remain contextual original menus. */
+  #floatMenuContainer { min-height: 58px; max-width: 290px; }
+  #floatMenuContainer.show { display: block; }
+  #floatMenuContainer > .floatMenu { display: contents; }
+  #floatMenuContainer > .floatMenu > .floatBtn { display: none; }
+  .explorer-game-header {
+    position: fixed; inset: 0 0 auto; z-index: 120; min-height: 64px;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 10px 160px 10px 24px; box-sizing: border-box;
+    background: var(--wx-panel); border-bottom: 1px solid var(--wx-line-soft);
+    backdrop-filter: blur(var(--wx-glass-blur));
+  }
+  .explorer-wordmark { display: flex; gap: 10px; align-items: center; color: var(--wx-action); font: 500 .875rem/1.4 var(--wx-font-ui); letter-spacing: .07em; white-space: nowrap; }
+  .explorer-wordmark > span { color: var(--wx-text); }
+  .explorer-global-navigation { display: flex; min-width: 0; overflow-x: auto; gap: 4px; padding: 4px; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-control); background: var(--wx-input); }
+  .explorer-global-navigation button, .explorer-context-actions button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-width: 44px; min-height: 44px; padding: 8px 16px; flex: 1 0 auto;
+    color: var(--wx-text); background: transparent; border: 1px solid transparent;
+    border-radius: var(--wx-radius-control); font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui);
+    cursor: pointer; touch-action: manipulation;
+  }
+  .explorer-global-navigation button:hover, .explorer-context-actions button:hover { background: var(--wx-selected); }
+  .explorer-global-navigation button[aria-expanded="true"], .explorer-context-actions button[aria-expanded="true"] { color: var(--wx-action-text); background: var(--wx-action); }
+  .explorer-context-actions { display: flex; gap: 4px; }
+  .explorer-workspace-navigation { display: flex; flex: none; gap: 4px; min-width: 0; margin: 18px 20px 4px; padding: 5px; overflow-x: auto; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-control); background: var(--wx-input); }
+  .explorer-workspace-navigation button { display: inline-flex; flex: 1 0 max-content; align-items: center; justify-content: center; gap: 8px; width: auto; height: auto; min-width: 44px; min-height: 44px; padding: 8px 16px; color: var(--wx-text); background: transparent; border: 1px solid transparent; border-radius: var(--wx-radius-control); font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); cursor: pointer; }
+  .explorer-workspace-navigation button:hover { background: var(--wx-selected); }
+  .explorer-workspace-navigation button[aria-current="page"] { background: var(--wx-action); color: var(--wx-action-text); }
+  .explorer-workspace-navigation button:disabled { opacity: .6; cursor: default; }
+  .urbanEquipmentHead:has(.explorer-workspace-navigation) { flex-wrap: wrap; top: 0; }
+  .urbanEquipmentHead > .explorer-workspace-navigation { flex: 0 0 100%; box-sizing: border-box; order: -1; margin: 0 0 12px; }
+  #urbanEquipment.explorer-workspace-host { top: 24px; max-height: calc(100dvh - 48px); }
+  #discoveryPanel.explorer-workspace-host, body.start-hub-open #discoveryPanel.explorer-workspace-host { top: 24px; bottom: 24px; }
+  .globe-hub-overlay.explorer-workspace-host { grid-row: 2 / 5; grid-template-rows: auto minmax(0,1fr) auto; }
+  .globe-hub-overlay-header:has(.explorer-workspace-navigation) { display: grid; grid-template-columns: minmax(0,1fr) 44px; gap: 12px; }
+  .globe-hub-overlay-header > .explorer-workspace-navigation { grid-column: 1 / -1; margin: 0; }
+  #globeSelectorScreen:has(#globeHubOverlay.explorer-workspace-host:not([hidden])) .globe-app-rail { visibility: hidden; }
+  body:is(.panel-journal-open,.panel-backpack-open,.panel-experiences-open) #hud { visibility: hidden; pointer-events: none; }
+  #hud { top: max(88px, calc(var(--wx-masthead-height,76px) + 12px)); }
+  #mainMenuBtn { z-index: 10022; top: 14px; right: 16px; border-radius: var(--wx-radius-control); font-family: var(--wx-font-ui); }
+  /* Space hides Earth instrumentation through its existing owner. The shared
+     navigation keeps its original action/input ancestry without an Earth dock. */
+  body.space-flight-active #floatMenuContainer.show { display: contents !important; }
+  body.space-flight-active .explorer-game-header { z-index: 10020; }
+  body.space-flight-active .explorer-context-actions { display: none; }
+  body.space-flight-active .floatItems { z-index: 10024; }
+  body:is(.panel-vr-open,.panel-vr-setup-open) #floatMenuContainer.show { display: none !important; }
+  .spaceFlightHud, .solarSystemInfoCard, .solarSystemTravelBar { border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); background: var(--wx-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+  .spaceFlightHud, .solarSystemInfoCard, .solarSystemTravelBar { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); }
+  .solarSystemTravelBar { padding: 8px; gap: 4px; }
+  .solarSystemTravelBar .ssToggleBtn { border-radius: var(--wx-radius-control); }
+  .explorer-eyebrow { color: var(--wx-action); font: 600 var(--wx-type-meta)/1.5 var(--wx-font-ui); letter-spacing: .12em; text-transform: uppercase; }
+  .explorer-workspace-intro h2 { margin: 12px 0; max-width: 18ch; font: 350 calc(clamp(2rem,4vw,3.5rem) * var(--wx-text-scale))/1.08 var(--wx-font-display); letter-spacing: -.045em; }
+  .explorer-workspace-intro p, .explorer-create-location { color: var(--wx-muted); line-height: 1.6; }
+  .explorer-create-location strong { color: var(--wx-text); font-weight: 500; }
+  .explorer-create-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; padding: 16px 0; }
+  .explorer-create-grid article { display: flex; flex-direction: column; align-items: start; gap: 14px; min-width: 0; padding: 24px; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-panel); background: var(--wx-panel-soft); }
+  .explorer-tool-symbol { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--wx-radius-panel); font-size: 32px; color: var(--wx-action); background: var(--wx-input); }
+  .explorer-create-grid h3 { margin: 4px 0 0; font: 400 calc(1.5rem * var(--wx-text-scale))/1.25 var(--wx-font-display); letter-spacing: -.025em; }
+  .explorer-create-grid p { margin: 0 0 auto; color: var(--wx-muted); font-size: var(--wx-type-control); line-height: 1.6; }
+  #explorerCreateHub[hidden] { display: none; }
+  #explorerCreateStatus { min-height: 1.5em; color: var(--wx-warning); }
+  #globeSelectorScreen .globe-first-journey button,
+  #globeSelectorScreen .globe-location-entry-card { border-radius: var(--wx-radius); }
+  .globe-selector-stat-value { font-size: calc(1.5rem * var(--wx-text-scale)); line-height: 1.3; }
+
+  @media (min-width: 1101px) and (pointer: fine) {
+    #globeSelectorScreen .globe-selector-shell {
+      grid-template-columns: minmax(0, 1fr) 370px;
+      grid-template-rows: 76px 66px minmax(0, 1fr) 106px;
+      padding: 0 24px 16px; gap: 0 20px;
+    }
+    .globe-selector-brand { grid-column: 1; grid-row: 1; width: 220px; padding: 0; z-index: 4; }
+    .globe-selector-top { grid-column: 1 / 3; grid-row: 1; padding: 0 0 0 240px; gap: 20px; }
+    .globe-app-rail { grid-column: 1 / 3; grid-row: 2; justify-self: center; align-self: start; flex-direction: row; width: min(720px, 100%); padding: 5px; gap: 5px; box-sizing: border-box; }
+    .globe-app-rail button { flex: 1; min-height: 44px; gap: 8px; padding: 10px 18px; flex-direction: row; font-size: var(--wx-type-control); }
+    .globe-app-rail button span { font-size: 18px; }
+    .globe-selector-map { grid-column: 1; grid-row: 3 / 5; }
+    .globe-selector-side { grid-column: 2; grid-row: 3 / 5; }
+    .globe-hub-overlay { grid-column: 1 / 3; grid-row: 3 / 5; }
+    html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .globe-app-rail {
+      width: 100%; overflow-x: auto; justify-content: start;
+    }
+    html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .globe-app-rail button { flex: 1 0 auto; }
+  }
+  @media (max-width: 1100px), (pointer: coarse) {
+    #floatMenuContainer { max-width: none; border-radius: var(--wx-radius-panel) var(--wx-radius-panel) 0 0; }
+    .explorer-game-header { position: static; padding: 0; min-height: 0; background: transparent; border: 0; backdrop-filter: none; }
+    .explorer-wordmark { display: none; }
+    .explorer-global-navigation { width: 100%; box-sizing: border-box; padding: 0; border: 0; background: transparent; border-radius: 0; }
+    .explorer-global-navigation button { flex: 1 0 58px; min-width: 0; padding: 8px 4px; flex-direction: column; gap: 5px; font-size: var(--wx-type-navigation); }
+    .explorer-global-navigation button > span { font-size: 18px; }
+    .explorer-context-actions { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); padding: 4px; border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-control); background: var(--wx-panel); }
+    .explorer-context-actions button { padding: 8px 12px; font-size: var(--wx-type-meta); }
+    #hud { top: max(76px, calc(env(safe-area-inset-top) + 64px)); }
+    #mainMenuBtn { left: 12px; right: auto; top: 12px; }
+    .floatBtn { font-size: var(--wx-type-navigation); }
+    .explorer-create-grid { grid-template-columns: minmax(0,1fr); }
+    body.space-flight-active .explorer-game-header { position: fixed; inset: auto 0 0; min-height: 68px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); border-radius: var(--wx-radius-panel) var(--wx-radius-panel) 0 0; backdrop-filter: blur(var(--wx-glass-blur)); }
+    body.space-flight-active .spaceFlightMessage { bottom: calc(88px + env(safe-area-inset-bottom)); }
+  }
+  @media (max-width: 900px), (pointer: coarse) {
+    .globe-app-rail { border-radius: var(--wx-radius-panel) var(--wx-radius-panel) 0 0; }
+    .globe-app-rail button { min-height: 66px; }
+    .globe-selector-stage { border-radius: 0 0 28px 28px; }
+    .globe-selector-side { border-radius: var(--wx-radius-panel) var(--wx-radius-panel) 0 0; }
+    .globe-hub-overlay { border-radius: var(--wx-radius-panel) var(--wx-radius-panel) 0 0; }
+    .experience-browser[data-detail="false"] .experience-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    #discoveryPanel, body.start-hub-open #discoveryPanel { inset: 70px 8px calc(var(--wx-navigation-height) + 10px + env(safe-area-inset-bottom)); width: calc(100vw - 16px); }
+    #urbanEquipment { top: 70px; width: calc(100vw - 16px); max-height: calc(100dvh - var(--wx-navigation-height) - 90px); }
+    #urbanEquipment.explorer-workspace-host { top: max(8px,env(safe-area-inset-top)); max-height: calc(100dvh - 16px - env(safe-area-inset-top)); }
+    #discoveryPanel.explorer-workspace-host, body.start-hub-open #discoveryPanel.explorer-workspace-host { top: max(8px,env(safe-area-inset-top)); bottom: max(8px,env(safe-area-inset-bottom)); }
+    .globe-hub-overlay.explorer-workspace-host { bottom: max(8px,env(safe-area-inset-bottom)); }
+    .explorer-workspace-navigation { margin: 12px 12px 4px; }
+    .explorer-workspace-navigation button { padding-inline: 12px; }
+  }
+  @media (max-width: 620px) {
+    .globe-selector-brand { width: 125px; padding-right: 0; gap: 5px; font-size: 9px; letter-spacing: .025em; }
+    .globe-selector-brand strong { display: none; }
+    .globe-destination-bar { min-height: 74px; }
+    .globe-app-rail button { font-size: .6875em; }
+    .experience-browser[data-detail="false"] .experience-list { grid-template-columns: minmax(0,1fr); }
+    .experience-list-pane { padding: 16px; }
+    .experience-tabs { margin-inline: 12px; }
+    .experience-intro h3 { font-size: calc(1.75rem * var(--wx-text-scale)); }
+    .globe-hub-tools button { width: 44px; min-width: 44px; min-height: 44px; }
+    body.start-hub-open #appSignInBtn { width: 44px; min-width: 44px; max-width: 44px; padding: 0; font-size: 0; }
+    body.start-hub-open #appSignInBtn::before { content: '◉'; font: 24px/1 var(--wx-font-ui); }
+    html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) .globe-app-rail { overflow-x: auto; justify-content: start; }
+    html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) .globe-app-rail button { flex: 0 0 auto; min-width: 140px; padding-inline: 18px; }
+    html:is([data-we3d-text-scale="160"],[data-we3d-text-scale="200"]) .explorer-global-navigation button { flex: 0 0 auto; min-width: max-content; padding-inline: 16px; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    :root { --wx-panel: var(--wx-panel-solid); --wx-glass-blur: 0px; }
+  }
+  @media (forced-colors: active) {
+    :is(dialog, .floatItems, .hud-box, .floatMenuContainer, .globe-app-rail) { background: Canvas; color: CanvasText; border: 1px solid CanvasText; backdrop-filter: none; }
+    .floatBtn[aria-expanded="true"], .globe-app-rail button.active { background: Highlight; color: HighlightText; }
+  }
+
+  /* Domain instruments share the shell without covering a foreground workspace. */
+  body.space-flight-active:is(.panel-journal-open,.panel-backpack-open,.panel-experiences-open) :is(#spaceFlightHUD,#ssToggleContainer,#solarSystemScale,#universeNavigator) { visibility: hidden; pointer-events: none; }
+  .universe-navigator { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); max-height: calc(100dvh - var(--wx-masthead-height,76px) - 36px); overflow: auto; box-sizing: border-box; }
+  .universe-heading { background: var(--wx-panel-solid); }
+  .universe-action, .universe-icon-button, .spaceFlightAction, .ssToggleBtn { border-radius: var(--wx-radius-control); min-height: 44px; font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); }
+  .universe-icon-button { min-width: 44px; }
+  .universe-action.primary, .spaceFlightAction.primary { background: var(--wx-action); border-color: var(--wx-action); color: var(--wx-action-text); }
+  .universe-kicker, .universe-field span, .spaceFlightHudHead { font-family: var(--wx-font-ui); font-size: var(--wx-type-meta); }
+  .universe-field select { min-height: 44px; border-radius: var(--wx-radius-panel); }
+  @media (max-width:760px) {
+    .universe-navigator { top: max(12px,env(safe-area-inset-top)); right: 8px; width: calc(100vw - 16px); max-height: calc(100dvh - 100px - env(safe-area-inset-bottom)); }
+  }
+
+  #sfLandBtn { background: var(--wx-action) !important; color: var(--wx-action-text); }
+  #mainMenuBtn { font-size: var(--wx-type-control); }
+  body.space-flight-active:has(#universeNavigator:not([hidden])) #mainMenuBtn { visibility: hidden; }
+  @media (max-width:760px) {
+    #mainMenuBtn { font-size: 0; place-items: center; }
+    #mainMenuBtn.show { display: grid; }
+    #mainMenuBtn::before { font: 26px/1 var(--wx-font-ui); }
+    .solarSystemTravelBar .ssToggleBtn { font-size: var(--wx-type-meta); }
+    .spaceFlightHud:not(.collapsed) { width: min(320px,calc(100vw - 16px)); max-height: calc(100dvh - 180px); }
+    body.space-flight-hud-expanded #ssToggleContainer { visibility: hidden; pointer-events: none; }
+  }
+
+  body:has(#universeNavigator[aria-hidden="false"]) #mainMenuBtn { display: none !important; }
+  #universeToggle { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+
+  #mainMenuBtn { transition: background-color var(--wx-motion-fast), border-color var(--wx-motion-fast); }
+  #vrSetup { border-radius: var(--wx-radius-panel); background: var(--wx-panel); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+  #vrSetup button, #vrEmergencyExit { border-radius: var(--wx-radius-control); }
+
+  body.start-hub-open #mainMenuBtn { display: none !important; }
+  html[data-hub-theme="day"] #globeSelectorScreen { background: radial-gradient(ellipse at 12% 0%,#eed8c5 0%,transparent 58%),var(--hub-bg); }
+  .discoveryProfileHero > div, .discoveryProfileGroup, .discoveryOnlineService,
+  .discoveryRegionalProgress, .discoveryJourneyStory { border-radius: var(--wx-radius); border-color: var(--wx-line-soft); }
+  .discoveryProfileHero > div { padding: 20px; background: var(--wx-panel-soft); }
+  .discoveryProfileHero strong { font: 400 calc(1.5rem * var(--wx-text-scale))/1.3 var(--wx-font-display); letter-spacing: -.025em; }
+  .discoveryProfileGroup, .discoveryOnlineService { padding: 16px; }
+  .discoveryOnlineService summary, .discoveryProfileGroup summary { min-height: 44px; align-content: center; font-weight: 500; }
+
+  #blockBuilderPanel { top: max(88px,calc(var(--wx-masthead-height,76px) + 12px)); width: min(360px,calc(100vw - 32px)); padding: 18px; box-sizing: border-box; max-height: calc(100dvh - var(--wx-masthead-height,76px) - 36px); border-radius: var(--wx-radius-panel); border-color: var(--wx-line-soft); background: var(--wx-panel); box-shadow: var(--wx-shadow-panel); backdrop-filter: blur(var(--wx-glass-blur)); }
+  .blockBuilderHeader { top: -18px; margin: -18px -18px 0; padding: 12px 18px; background: var(--wx-panel-solid); }
+  .blockBuilderHeader strong { font: 400 calc(1.375rem * var(--wx-text-scale))/1.3 var(--wx-font-display); }
+  #blockBuilderPanel button, #blockBuilderPanel a { min-height: 44px; min-width: 44px; border-radius: var(--wx-radius-control); font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); }
+  #blockBuilderPanel .blockBuilderSwatches { grid-template-columns: repeat(4,44px); }
+  #blockBuilderPanel .blockBuilderSwatches button { width: 44px; padding: 0; border-radius: 50%; }
+  #blockBuilderPanel :is(.blockBuilderTruthNote,#editableWorldSelection,#blockBuilderCount,#blockBuilderStatus) { font: 400 var(--wx-type-meta)/1.5 var(--wx-font-ui); border-radius: var(--wx-radius); }
+  @media(max-width:640px) { #blockBuilderPanel { top: auto; left: 8px; right: 8px; bottom: max(8px,env(safe-area-inset-bottom)); width: auto; max-height: min(60dvh,540px); } }
+
+  /* TRAIL: an open cinematic scene with graphite tools and coral actions. */
+  :is(.experience-header h2,.experience-intro h3,.experience-detail h3,.explorer-workspace-intro h2,
+      .explorer-create-grid h3,.urbanEquipmentHead h2,#discoveryPanelTitle,#globeHubOverlayTitle,
+      .vehicle-garage h2,.racing-hub h2,#controlsPanelTitle,.globe-selector-stat-value) {
+    font-family: var(--wx-font-display); font-weight: 500; letter-spacing: .015em; text-transform: uppercase;
+  }
+  .experience-intro h3 { font-size: calc(clamp(2.5rem,4vw,4rem) * var(--wx-text-scale)); line-height: 1.05; }
+  .experience-card > strong { font-family: var(--wx-font-display); font-size: calc(1.625rem * var(--wx-text-scale)); text-transform: uppercase; letter-spacing: .015em; }
+  .globe-selector-stat-value { font-size: calc(clamp(2rem,3.2vw,3rem) * var(--wx-text-scale)); line-height: 1.05; }
+  .explorer-workspace-intro h2 { font-size: calc(clamp(2.5rem,5vw,4.5rem) * var(--wx-text-scale)); line-height: 1.02; max-width: 22ch; }
+  .explorer-create-grid article { border-left: 3px solid var(--wx-action); clip-path: polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,0 100%); }
+  .experience-browser .experience-tabs, .discoveryTabs, .explorer-workspace-navigation { border-radius: var(--wx-radius); }
+  .explorer-wordmark { font-weight: 700; letter-spacing: .08em; }
+  .explorer-global-navigation { background: transparent; border-color: transparent; }
+  .explorer-global-navigation button { text-transform: uppercase; font-size: var(--wx-type-navigation); font-weight: 600; letter-spacing: .06em; }
+  .explorer-game-header { background: linear-gradient(rgb(0 0 0 / 72%),rgb(20 21 25 / 80%)); backdrop-filter: none; border-bottom: 1px solid var(--wx-line-soft); }
+  #speed { font-family: var(--wx-font-display); font-weight: 500; font-size: calc(3.5rem * var(--wx-text-scale)); }
+  #street { font-family: var(--wx-font-display); font-weight: 500; font-size: calc(1.625rem * var(--wx-text-scale)); line-height: 1.1; text-transform: uppercase; letter-spacing: .02em; }
+  .hud-box { border-top: 3px solid var(--wx-action); backdrop-filter: none; }
+  #minimap, .hudMapVisual, #coords { border-radius: var(--wx-radius-panel); }
+  .explorer-tool-symbol { border-radius: var(--wx-radius); background: var(--wx-input); }
+  .explorer-workspace-navigation button[aria-current="page"] { color: var(--wx-action-text); background: var(--wx-action); }
+  .explorer-eyebrow { color: var(--wx-action); }
+  @media(max-width:1100px),(pointer:coarse) {
+    .explorer-game-header { background: transparent; border: 0; }
+    .explorer-global-navigation button { letter-spacing: .02em; font-size: var(--wx-type-navigation); }
+    #speed { font-size: calc(2rem * var(--wx-text-scale)); }
+    #street { font-size: calc(1.25rem * var(--wx-text-scale)); }
+  }
+
+  @media(max-width:1100px),(pointer:coarse) {
+    .explorer-global-navigation button { text-transform: none; letter-spacing: 0; }
+  }
+
+  #blockBuilderPanel { background: var(--wx-panel-solid); }
+  #propertyPanel .panel-title, .blockBuilderHeader strong { font-family: var(--wx-font-display); font-weight: 500; font-size: calc(1.75rem * var(--wx-text-scale)); text-transform: uppercase; letter-spacing: .015em; }
+  #propertyPanel { border-radius: var(--wx-radius-panel); color: var(--wx-text); background: var(--wx-panel); }
+  #propertyPanel p, #propertyPanel small { color: var(--wx-muted); font-size: var(--wx-type-control); line-height: 1.6; }
+  #propertyPanel button, #propertyPanel input, #propertyPanel select { min-width: 44px; min-height: 44px; font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); border-radius: var(--wx-radius-control); }
+  @media(max-width:640px) { #blockBuilderPanel { bottom: max(84px,calc(env(safe-area-inset-bottom) + 78px)); } }
+  :is(h1,h2,h3,.globe-selector-stat-value,.experience-card > strong) { min-width: 0; overflow-wrap: anywhere; }
+
+  #expeditionOverlay { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; border: 0; padding: 16px; box-sizing: border-box; }
+  #expeditionOverlay::backdrop { background: rgb(0 0 0 / 55%); }
+  #expeditionOverlay .expeditionPanel { box-sizing: border-box; width: min(940px,100%); max-height: calc(100dvh - 32px); overflow: auto; border-radius: var(--wx-radius-panel); background: var(--wx-panel-solid); }
+  #expeditionOverlay .expeditionHeader h2 { font: 500 calc(2rem * var(--wx-text-scale))/1.15 var(--wx-font-display); text-transform: uppercase; letter-spacing: .015em; }
+  #expeditionOverlay :is(button,input,select) { min-width: 44px; min-height: 44px; max-width: 100%; box-sizing: border-box; font: 500 var(--wx-type-control)/1.4 var(--wx-font-ui); border-radius: var(--wx-radius-control); }
+  #expeditionOverlay .expeditionIntro { color: var(--wx-muted); font: 400 var(--wx-type-control)/1.6 var(--wx-font-ui); }
+  #expeditionOverlay .expeditionPlannerGrid label { min-width: 0; font: 400 var(--wx-type-control)/1.5 var(--wx-font-ui); }
+  #expeditionOverlay .expeditionPrimary { color: var(--wx-action-text); background: var(--wx-action); }
+  @media(max-width:620px) { #expeditionOverlay { padding: 8px; } #expeditionOverlay .expeditionPanel { max-height: calc(100dvh - 16px); } }
+
+@layer interface {
+  /* Long career names must wrap without moving the modal's reading origin. */
+  .experience-header>div { min-width:0; flex:1; overflow-wrap:anywhere; }
+  .experience-header>button { flex-shrink:0; }
+  .research-station-body,.research-station-actions { min-width:0; }
+  .marine-career h3 { font:400 calc(1.375rem * var(--wx-text-scale))/1.2 var(--wx-font-display); text-transform:uppercase; letter-spacing:.015em; }
+  @media(max-width:700px) {
+    html[data-we3d-text-scale="200"] #hud:has(.marine-career:not([hidden])) #hudUtilities { grid-column:1/-1; grid-row:2; width:100%; margin-top:0; }
+  }
+}

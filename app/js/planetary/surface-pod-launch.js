@@ -259,7 +259,7 @@ function ensureStatus() {
     status = document.createElement('div');
     status.id = 'surfacePodLaunchStatus';
     status.setAttribute('role', 'status');
-    status.style.cssText = 'position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:12000;padding:10px 18px;border:1px solid rgba(111,232,255,.72);border-radius:999px;background:rgba(4,13,23,.88);color:#e9fbff;font:700 12px Inter,sans-serif;letter-spacing:.08em;text-align:center;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.42);';
+    status.style.cssText = "position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:12000;padding:10px 18px;border:1px solid color-mix(in srgb, var(--wx-action) 72%, transparent);border-radius:999px;background:color-mix(in srgb, var(--wx-panel-solid) 88%, transparent);color:var(--wx-text);font:700 12px var(--wx-font-ui);letter-spacing:.08em;text-align:center;pointer-events:none;box-shadow:0 8px 28px rgba(0,0,0,.42);";
     document.body.appendChild(status);
   }
   status.textContent = 'PATHFINDER READY · PRESS SPACE TO LAUNCH · C CHANGES CAMERA';
@@ -293,8 +293,8 @@ function ensureLaunchControls(launch) {
   if (controls) controls.remove();
   controls = document.createElement('div');
   controls.id = 'surfacePodLaunchControls';
-  controls.style.cssText = 'position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));z-index:12001;display:flex;align-items:flex-end;gap:10px;font-family:Inter,sans-serif;';
-  controls.innerHTML = `<div data-surface-pad hidden style="grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,44px);gap:6px"><span></span><button data-surface-key="arrowup" aria-label="Pitch forward">▲</button><span></span><button data-surface-key="arrowleft" aria-label="Turn left">◀</button><button data-surface-key="arrowdown" aria-label="Pitch back">▼</button><button data-surface-key="arrowright" aria-label="Turn right">▶</button></div><div style="display:grid;gap:8px"><button data-surface-camera type="button" style="min-width:112px;min-height:42px;border:1px solid #6fe8ff;border-radius:22px;background:rgba(5,22,36,.9);color:#eafcff;font:700 10px Orbitron,sans-serif">CAMERA</button><button data-surface-launch type="button" style="min-width:112px;min-height:52px;border:1px solid #8ff3ff;border-radius:26px;background:#176987;color:#fff;font:700 11px Orbitron,sans-serif">LAUNCH</button></div>`;
+  controls.style.cssText = "position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));z-index:12001;display:flex;align-items:flex-end;gap:10px;font-family:var(--wx-font-ui);";
+  controls.innerHTML = `<div data-surface-pad hidden style="grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,44px);gap:6px"><span></span><button data-surface-key="arrowup" aria-label="Pitch forward">▲</button><span></span><button data-surface-key="arrowleft" aria-label="Turn left">◀</button><button data-surface-key="arrowdown" aria-label="Pitch back">▼</button><button data-surface-key="arrowright" aria-label="Turn right">▶</button></div><div style="display:grid;gap:8px"><button data-surface-camera type="button" style="min-width:112px;min-height:42px;border:1px solid var(--wx-action);border-radius:22px;background:color-mix(in srgb, var(--wx-panel-solid) 90%, transparent);color:var(--wx-text);font:700 10px Orbitron,sans-serif">CAMERA</button><button data-surface-launch type="button" style="min-width:112px;min-height:52px;border:1px solid var(--wx-action);border-radius:26px;background:var(--wx-selected);color:var(--wx-text);font:700 11px Orbitron,sans-serif">LAUNCH</button></div>`;
   document.body.appendChild(controls);
   const touchClient = (navigator.maxTouchPoints || 0) > 0 || globalThis.matchMedia?.('(hover: none) and (pointer: coarse)').matches === true;
   const pad = controls.querySelector('[data-surface-pad]');

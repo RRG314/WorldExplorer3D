@@ -1,3 +1,4 @@
+import {playablePoiTarget} from '../game/poi-map-visibility.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { getMapReferencePosition } from "./tiles.js?v=5";
 
@@ -112,19 +113,20 @@ function drawPois(ctx, w, h, isLarge, worldToScreen, mx, my) {
   if (appCtx.pois.length <= 0) return;
   const projected = {};
   appCtx.pois.forEach((poi) => {
-    if (!appCtx.isPOIVisible(poi.type)) return;
-
-    const pos = worldToScreen(poi.x, poi.z, projected);
+    if (!appCtx.isPOIVisible(poi.type, poi)) return;
+    const target = playablePoiTarget(poi, appCtx.poiLifecycle, appCtx.buildingEntranceByBuilding);
+    if(!target)return;
+    const pos = worldToScreen(target.x, target.z, projected);
     const dist = Math.sqrt((pos.x - mx) * (pos.x - mx) + (pos.y - my) * (pos.y - my));
     if (!(Math.abs(pos.x - mx) < w / 2 && Math.abs(pos.y - my) < h / 2)) return;
 
     ctx.fillStyle = `#${poi.color.toString(16).padStart(6, "0")}`;
     ctx.strokeStyle = "#fff";
     ctx.lineWidth = isLarge ? 2 : 1;
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, isLarge ? 5 : 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    const doorWidth=isLarge?9:6,doorHeight=isLarge?12:8;
+    ctx.fillRect(pos.x-doorWidth/2,pos.y-doorHeight/2,doorWidth,doorHeight);
+    ctx.strokeRect(pos.x-doorWidth/2,pos.y-doorHeight/2,doorWidth,doorHeight);
+    ctx.fillStyle='#fff';ctx.fillRect(pos.x+1,pos.y,1.5,1.5);
 
     if (isLarge && dist < 200) {
       ctx.font = isLarge ? "16px Arial" : "10px Arial";

@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setWalkingNearClip } from '../app/js/walking/near-camera.js';
+import { setWalkingNearClip, walkingInteriorCeiling } from '../app/js/walking/near-camera.js';
 import { voyageHudLocation } from '../app/js/hud/location-label.js';
+test('indoor camera stays under the occupied floor ceiling while outdoor overhead remains free',()=>{
+  assert.equal(walkingInteriorCeiling(null,20),null);
+  assert.ok(Math.abs(walkingInteriorCeiling({floorPlan:{storyHeight:3.5}},20)-23.26)<1e-9);
+  assert.ok(Math.abs(walkingInteriorCeiling({activeLevel:1,floorPlan:{floors:[{height:3.5},{height:2.8}]}},20)-22.56)<1e-9);
+  assert.ok(Math.abs(walkingInteriorCeiling({ceilingY:24},20)-23.76)<1e-9);
+});
 test('walking close projection changes once and restores the borrowed near plane', () => {
   let updates = 0;
   const camera = {

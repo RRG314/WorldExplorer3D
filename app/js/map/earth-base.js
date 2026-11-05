@@ -3,8 +3,9 @@ import { loadTile } from "./tiles.js?v=5";
 
 const ROAD_MAP_INDEX_CELL_SIZE = 256;
 let roadMapIndex = null;
+let minimapBuildingCache = null;
 
-export function resetRoadMapIndex() { roadMapIndex = null; }
+export function resetRoadMapIndex() { roadMapIndex = null; minimapBuildingCache = null; }
 
 function roadMapIndexIsCurrent(roads) {
   return roadMapIndex?.source === roads &&
@@ -119,7 +120,9 @@ function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
   ctx.fillStyle = "#1a1a1a";
   ctx.fillRect(0, 0, w, h);
 
-  for (let dx = -Math.ceil(tilesWide / 2); dx <= Math.ceil(tilesWide / 2); dx += 1) {
+  // The gameplay minimap draws compiled streets and playable entrances;
+  // raster basemaps contain reference POI labels that are not game actions.
+  if (isLarge) for (let dx = -Math.ceil(tilesWide / 2); dx <= Math.ceil(tilesWide / 2); dx += 1) {
     for (let dy = -Math.ceil(tilesHigh / 2); dy <= Math.ceil(tilesHigh / 2); dy += 1) {
       const tx = centerTileX + dx;
       const ty = centerTileY + dy;
@@ -133,6 +136,12 @@ function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
     }
   }
 
+  if(!isLarge){
+    const ref=view.ref||{},key=`${Math.floor((ref.x||0)/25)}:${Math.floor((ref.z||0)/25)}:${zoom}`;
+    if(minimapBuildingCache?.source!==appCtx.buildings||minimapBuildingCache?.key!==key)minimapBuildingCache={source:appCtx.buildings,key,values:(appCtx.getNearbyBuildings?.(ref.x||0,ref.z||0,400)||[]).slice(0,512)};
+    ctx.fillStyle='#30383b';ctx.strokeStyle='#485156';ctx.lineWidth=.5;
+    for(const b of minimapBuildingCache.values){if(!Array.isArray(b.pts)||b.pts.length<3)continue;ctx.beginPath();b.pts.forEach((p,i)=>{const q=worldToScreen(p.x,p.z);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y);});ctx.closePath();ctx.fill();ctx.stroke();}
+  }
   drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawRoadLayers(ctx, w, h, isLarge, view, worldToScreen);

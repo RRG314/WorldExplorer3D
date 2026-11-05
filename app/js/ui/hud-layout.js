@@ -16,6 +16,13 @@ export function hudMapPresentation(available, visualHeight, coordsHeight, button
   return available >= coordsHeight + buttonHeight + 4 ? 'compact' : 'button';
 }
 
+export function quietIndicatorPlacement(width,height,obstacles=[],size=44) {
+  const right=width-size-12,bottom=height-size-12;
+  const rightTop=Math.min(height,...obstacles.filter(r=>r.top>height*.35&&r.right>right&&r.left<right+size).map(r=>r.top))-size-12;
+  const candidates=[{x:right,y:bottom},{x:right,y:rightTop},{x:width/2-size/2,y:bottom},{x:right,y:72}];
+  return candidates.find(p=>p.x>=8&&p.y>=8&&p.x+size<=width-8&&p.y+size<=height-8&&!obstacles.some(r=>p.x<r.right+6&&p.x+size>r.left-6&&p.y<r.bottom+6&&p.y+size>r.top-6))||null;
+}
+
 // ScreenLayout owns this binding. Resize/mode events refresh two CSS limits;
 // no simulation, frame loop, location state or persistent preference lives here.
 export function bindHudLaneLayout(documentRef, host = globalThis) {
@@ -35,11 +42,19 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     'coords',
     'hudMapOpenBtn',
     'hudStatusPanels',
+    'explorerGameHeader',
+    'explorerOpportunitiesBtn',
   ];
   const nodes = Object.fromEntries(ids.map((id) => [id, documentRef?.getElementById(id)]));
   const toolbar = root?.querySelector?.('.hudUtilityActions');
   const previous = new Map(),
     written = new Map();
+  const documentStyle=documentRef?.documentElement?.style;
+  const oldMastheadHeight=documentStyle?.getPropertyValue('--wx-masthead-height');
+  let writtenMastheadHeight=null;
+  const indicator=nodes.explorerOpportunitiesBtn;
+  const priorIndicator=indicator?{left:indicator.style.left,top:indicator.style.top}:null;
+  let indicatorWrite=null;
   let resizeFrame = null;
   const map = nodes.hudMap,
     visual = map?.querySelector?.('.hudMapVisual'),
@@ -107,7 +122,24 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     written.set(name, text);
   }
   function refresh() {
-    if (!scope.isActive() || !root || !visible(root)) return;
+    if (!scope.isActive() || !root) return;
+    // The same UI layout observer measures the shared masthead even while a
+    // specialist renderer hides Earth's HUD. No frame or gameplay owner added.
+    const masthead=visible(nodes.explorerGameHeader);
+    const mastheadHeight=masthead&&masthead.top<=1?Math.ceil(masthead.bottom):0;
+    if(documentStyle){
+      const value=`${mastheadHeight}px`;
+      if(documentStyle.getPropertyValue('--wx-masthead-height')!==value)documentStyle.setProperty('--wx-masthead-height',value);
+      writtenMastheadHeight=value;
+    }
+    const indicator=nodes.explorerOpportunitiesBtn;
+    if(indicator){
+      const controls=visible(nodes.mobileTouchControls)?[...documentRef.querySelectorAll('#mobileTouchControls button, #mobileMovePad, #mobileLookPad')].map(visible).filter(Boolean):[];
+      const occupied=[...controls,visible(nodes.hudBox),visible(nodes.hudMap),visible(nodes.explorerGameHeader)].filter(Boolean);
+      const point=quietIndicatorPlacement(host.innerWidth,host.innerHeight,occupied);
+      if(point){indicator.style.left=`${Math.round(point.x)}px`;indicator.style.top=`${Math.round(point.y)}px`;indicatorWrite={left:indicator.style.left,top:indicator.style.top};}
+    }
+    if (!visible(root)) return;
     const obstacles = [visible(nodes.floatMenuContainer)].filter(Boolean);
     if (visible(nodes.mobileTouchControls)) {
       for (const id of [
@@ -176,6 +208,11 @@ export function bindHudLaneLayout(documentRef, host = globalThis) {
     if (!event.persisted) scope.dispose('page closed');
   });
   scope.defer(() => {
+    if(indicator&&indicatorWrite)for(const name of ['left','top'])if(indicator.style[name]===indicatorWrite[name])indicator.style[name]=priorIndicator[name];
+    if(documentStyle&&documentStyle.getPropertyValue('--wx-masthead-height')===writtenMastheadHeight){
+      if(oldMastheadHeight)documentStyle.setProperty('--wx-masthead-height',oldMastheadHeight);
+      else documentStyle.removeProperty('--wx-masthead-height');
+    }
     if (toolbar && toolbar.hidden === writtenToolbarHidden) toolbar.hidden = oldToolbarHidden;
     if (statusPanels && statusPanels.hidden === writtenStatusHidden)
       statusPanels.hidden = oldStatusHidden;

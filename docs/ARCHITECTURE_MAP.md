@@ -1,137 +1,54 @@
-# World Explorer 3D Architecture Map
+# Architecture
 
-> Historical September 2026 snapshot. For the October 13 source audit, current boundaries and verification limits, see [architecture consolidation](architecture-consolidation/AUTHORITY-MAP.md). Dated findings below are retained as evidence and are not a current blocker list.
+World Explorer 3D combines a browser game, public/account pages, native companion
+apps and protected shared services. The browser owns rendering and active
+simulation. Backend commands and security rules own protected shared changes.
 
-Updated September 10, 2026 · Source baseline `53452516` · Version 5.2.0.
+## Entry points
 
-September 15 performance audit supplement: current ownership and scheduling (private operator record), verified release/test findings and remaining measurements (private operator record). The dated findings below are historical unless reverified in that report.
+| Source | Responsibility |
+| --- | --- |
+| `index.html`, `about/` | Public site, installation and support |
+| `app/index.html`, `app/js/app-entry.js` | Game startup and destination selection |
+| `app/js/runtime/` | Runtime ownership, lifecycle and scheduling |
+| `app/js/engine/` | Renderer, scene and movement integration |
+| `account/`, `js/auth-ui.js` | Account, access and contribution UI |
+| `functions/` | Authenticated commands, account saves and shared data services |
+| `services/racing/` | Racing service and shared race rules |
+| `android/`, `apple/` | Native app projects and platform integrations |
 
-This map records the September 10 responsibilities and data flow. It replaces accumulated dated rollout notes; earlier detail remains in Git and specialist documents. An architecture boundary describes where responsibility belongs, not proof that every path enforces it correctly. See [system inventory](SYSTEM_INVENTORY.md), [source reference](SYSTEM_INVENTORY_REFERENCE.md) and confirmed audit findings (private operator record).
+## World and feature ownership
 
-## Application overview
+Earth, Ocean and Space use the existing scene lifecycle. Terrain, roads,
+buildings, interiors, vehicles and activities publish through their designated
+owners. Feature UI calls those owners rather than adding another render loop,
+save store, wallet or input controller. Features must release their listeners,
+models, workers and collision registrations when leaving a world.
 
-The product is a browser JavaScript application with a Three.js/WebGL world, supporting public/account pages and Firebase services. The browser owns presentation and active simulation. Protected shared changes go through backend commands or security-rule-controlled database operations. Hosting delivers an artifact; backend deployment is separate.
+The [system guide](SYSTEM_INVENTORY.md) maps the main feature areas. Context
+writes are registered in `config/context-write-allowlist.json`; verification checks
+that registry and the module graph.
 
-```mermaid
-flowchart TD
-  Entry[Public site / destination selection] --> App[World application]
-  App --> Kernel[Runtime kernel / lifecycle / input]
-  Kernel --> Earth[Bounded Earth scene]
-  Kernel --> Other[Ocean / planetary / space environments]
-  App --> Local[Device preferences / drafts / local progress]
-  App --> Account[Account / contributions / review]
-  Account --> Auth[Firebase Authentication]
-  App --> API[Shared function API]
-  Account --> API
-  API --> Server[Cloud Functions: protected commands]
-  Server --> DB[Firestore records]
-  Server --> Media[Storage originals / derivatives]
-  App --> Rules[Direct-client security rules]
-  Rules --> DB
-  Rules --> Media
-  Earth --> Providers[Mapped and environmental data providers]
-  Media --> Earth
-```
+## Persistence and services
 
-### Product entry points and shared services
+Guest progress stays on the device. Signed-in personal journeys use the existing
+Journal and equipment owners with a private account backup and explicit conflict
+recovery. Shared rooms, property, vehicles and competitive results retain their
+own authoritative services. Authentication upgrades preserve the account UID.
 
-`app/index.html` enters through `app/js/app-entry.js` and the module manifest/loader. Public pages, phone capture and account pages have distinct source entry points. Account Center and contribution/review components share functionality, but a complete account/admin usability pass remains open.
+Firebase Authentication and App Check protect service requests. Firestore and
+Storage rules enforce direct-client access. Private media is delivered only
+through authorized access paths. Public Firebase client configuration does not
+grant access to account data.
 
-`runtime/kernel.js`, lifecycle scopes and workload policies coordinate active systems. `engine/` owns scene/WebGL setup and quality. `shared-context.js` is a mutable cross-module object; its wide use makes implicit dependencies a maintenance risk. Gradual explicit interfaces are preferable to a wholesale renderer/framework replacement.
+## Packaging and deployment
 
-### Persistence boundaries
+Canonical source is built by `scripts/hosting-artifact.mjs` into ignored `dist/`.
+The artifact records its source identity, environment, file hashes and runtime
+generations. Staging and production use separate Firebase configurations.
+Production promotion verifies the reviewed package rather than rebuilding it at
+deploy time. Rollback generations are retained for already-open sessions.
 
-localStorage and IndexedDB hold device-local preferences, progress or drafts according to each domain. Firebase Auth is identity. Firestore is structured shared state. Storage is media. The visible scene is an in-memory projection of these sources and provider data. A successful local save is not necessarily cross-device persistence or publication.
-
-## Earth world flow
-
-Destination choice → provider requests → normalized evidence → world compilation → published geometry/semantics → rendering, movement and interaction. Terrain, transport, buildings and POIs must agree on coordinates and stable identity. Changing cities must dispose the previous world and clear location-specific support data before publishing the next one.
-
-Owners include `world/`, `terrain/`, `earth-core/`, `geospatial/`, `structure-semantics/` and `poi/`. Geospatial provider failures and generated fallbacks must retain honest provenance. Earth uses bounded locations rather than continuous planetary streaming.
-
-The Living Portal's development foundation is the read-only
-`earth-core/portal-destination-policy.js`. It separates scoped destination/device
-qualification from current publication readiness and reuses `isEarthWorldUsable`.
-It owns no world, actor, timer, Journal or rewards. Catalog and widget consumers
-are not yet connected. See the cross-device design (private operator record).
-
-### Building exterior presentation flow
-
-Mapped footprint/height/context → compiled building → generated exterior catalog/materials → optional reviewed photo representation. Appearance must not create a competing building identity, collision model or property record. Existing roads, terrain alignment, doors and POIs remain connected to the building authority.
-
-### Community Reality Capture flow
-
-```mermaid
-flowchart LR
-  Building[Select mapped building] --> Draft[Owner draft / phone photos]
-  Draft --> Layout[Facade or room layout / surface placement]
-  Layout --> Revision[Save revision]
-  Revision --> Submit[Submit for review]
-  Submit --> Review[Authorized review]
-  Review --> Published[Approved representation]
-  Published --> World[World refresh / entry / interior]
-```
-
-`reality-capture/capture-session.js` and the local draft store coordinate editing. `home-layout-editor.js`, `layout-drawing.js` and `plan-frame.js` cover the plan; `home-photo-surfaces.js` supports surface selection. `functions/interior-layout.mjs` supplies shared layout compilation. The backend capture modules validate ownership/revisions and derive media; account contribution components and review dialogs expose decisions.
-
-Originals, metadata, revisions, access grants and published representations are separate records. Their states must agree. New interiors begin private; broader access/publication follows explicit visibility and review rules. Runtime entry must consume the saved doorway, geometry, collision and floor/wall/ceiling presentation together. Recent scoped staging work exercised this path; it is not a fresh whole-product or production acceptance result.
-
-Manual editing is the ordinary intended workflow. Optional reconstruction processing remains a development path, not a guarantee that a photo set becomes a complete accurate house. AR session ownership is separate from reconstruction and publication.
-
-## Property and Maryland parcel flow
-
-`real-estate/` resolves virtual property and public addresses; `functions/property-authority.js` authorizes protected changes. Maryland parcel evidence augments this with available parcel context. Ownership/commerce consume existing wallet and property authorities. The product does not transfer real property or certify survey boundaries. Provider failure must preserve the documented fallback behavior.
-
-## Player movement and cameras
-
-`controls/` resolves actions; walking, boat, plane, transport and physics modules consume them. Cameras have mode-specific behavior. Panels, input focus and environment transitions must clear held actions and restore the correct mode. Entering a building connects proximity/permission decisions, saved entrances, spawn direction and walking support; a visible doorway alone is insufficient.
-
-## Character, companions, and urban play
-
-`player/` and `character/` provide condition and explorer models. Discovery/companion state connects to travel. `living-world/` and `urban-sandbox/` manage traffic, pedestrians, reactions, temporary actors, vehicles and supported services. Shared commands use corresponding backend authorities where implemented. Local simulation must not be advertised as authoritative multiplayer state simply because it is visible to one player.
-
-## Economy and resource custody
-
-`economy/connected-wallet-authority.js`, player inventory and backend economy/property/player-state modules separate presentation from protected settlement. Receipts and item identity are needed to prevent duplicate effects and preserve resource custody. Support billing is separate from Explorer Credits. The common request client's retry behavior is an open defect that must be resolved per write endpoint.
-
-## Field exploration and progression
-
-`discovery/`, activity catalogs, fishing, geology, resources and leaderboards connect observations and activities to Journal/Field Guide records. Backend discovery commands protect supported shared receipts/trades. Regional catalog entries are gameplay opportunities, not live occurrence claims. Keep device progress, account profile and shared receipts explicit when documenting persistence.
-
-## Planetary and space environments
-
-`ocean/`, `planetary/`, `space/`, `solar-system/`, `universe/` and `expedition/` have environment-specific lifecycle and movement. Travel must release renderer resources, restore input, and preserve the relevant explorer/cargo/voyage state. Generated expedition command code shares domain behavior with backend authority; generated output should not be edited as handwritten source. Solis Reach/Pathfinder and voyage content remain Expedition Alpha.
-
-## Onboarding, input, and notification authority
-
-Tutorial/current-journey guidance, `interaction/context-router.js`, HUD and accessibility settings coordinate actions and notices. A nearby immediate action should not compete with several unrelated overlays. Account/review status needs clear navigation and a return to the affected building. Implemented settings do not establish screen-reader or physical-phone acceptance.
-
-## Quick Build and persistent Blocks
-
-`block-builder/` and `editable-world/` use existing placement, removal, collision and storage paths. Local Blocks and authenticated room Blocks have different persistence and permission boundaries. They are game-created content, not edits to OpenStreetMap. Relevant parcel checks augment the existing placement rules where supported.
-
-## Multiplayer and backend
-
-`multiplayer/` handles rooms, presence, chat, activities, invitations and supported shared objects. Firestore rules authorize direct client reads/writes; Cloud Functions validate their own protected requests because administrative database access does not inherit client rules.
-
-`functions/index.js` composes domain handlers for accounts, moderation, overlays, geospatial access, discovery, capture and other authorities. See the source reference for modules and rule declarations. Open findings include full-player prejoin disclosure to signed-in code holders, non-atomic client room-capacity checks and incomplete account cleanup. This map does not assert those boundaries are already repaired.
-
-## Data classification
-
-Preserve mapped, observed, forecast, modeled, reference and game-generated distinctions. Source, freshness, units and attribution travel with evidence where available. Gameplay prices, generated store interiors and modeled animals are not verified real-world facts. Privacy-sensitive media and precise shared presence require explicit access boundaries.
-
-## Release shape
-
-Canonical source → environment-selected hosting artifact → manifest/content identity → applicable test evidence → separately authorized deployment/promotion. A source document or configured gate is not a passing execution report. Normal pull-request checks currently omit important suites; the release matrix does not yet close the complete capture/publication and Storage-rule coverage gaps.
-
-The backend targets Node 22; hosting uses esbuild and static assets. Node contract tests, browser tests and Firebase emulators serve different roles. Browser CDN dependencies need an inventory in addition to npm advisory checks. CI dependency setup and the production-default CLI shortcut require repair.
-
-No build, browser, emulator or deployment was run for this documentation update.
-Choose proportionate verification using `CONTRIBUTING.md`; saved candidates are
-bounded by the local tooling safeguard.
-
-Cloud alerting, backups, restore tests and physical-device performance remain operational verification items, not inferred guarantees. Use the repair plan (private operator record) for completion criteria and the evidence ledger (private operator record) for actual results.
-
-### RDT restoration (16 September 2026)
-
-`app/js/rdt.js` again owns depth, deterministic identity and the bounded opt-in noise cache. `procedural-random.js` is a compatibility entry that aliases `worldSeed` to the same `rdtSeed`; it does not maintain a second generator. `reality-capture/rdt-building-index.js` applies occupancy-driven RDT partitioning to exact nearby-building selection, owned and cleared by the capture presentation runtime. It validates coordinate/identity changes before reusing bounds. Rendering, collision, feature eligibility and road elevation remain under their existing owners. The performance-mode label remains the baseline coverage policy; capture diagnostics separately identify `rdt-spatial`. See the restoration audit for measured scope and unresolved world-load acceptance.
+Dependencies and native SDKs are locked. CI verifies source imports, ownership,
+types, component contracts, secrets and public repository boundaries. See
+[Contributing](../CONTRIBUTING.md) and [environment isolation](DEVELOPMENT_ENVIRONMENT_ISOLATION.md).

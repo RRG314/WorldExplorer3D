@@ -1,3 +1,4 @@
+import {canonicalPoiId} from '../poi/semantic-authority.js?v=3';
 // Shared immutable classification: map drawing checks every POI repeatedly.
 // Constructing this table inside the predicate allocates one copy per marker.
 const POI_MAP_CATEGORIES = Object.freeze({
@@ -49,3 +50,16 @@ export function isPoiMapLayerVisible(poiType, mapLayers) {
   return category ? mapLayers[category] : false;
 }
 
+
+// Only a published entrance to an admitted, furnished business is advertised
+// as a playable POI. Reference records remain in the location data/catalog.
+export function playablePoiTarget(poi, lifecycle, entranceByBuilding) {
+  const id=canonicalPoiId(poi);
+  const record=lifecycle?.byId?.get(id);
+  const association=record?.buildingAssociation;
+  if(!record?.semantic?.interiorArchetype||!association?.enterable)return null;
+  const entrance=entranceByBuilding?.get?.(association.sourceBuildingId);
+  if(!entrance)return null;
+  const x=Number(entrance.approachX??entrance.x),z=Number(entrance.approachZ??entrance.z);
+  return Number.isFinite(x)&&Number.isFinite(z)?{x,z,sourceBuildingId:association.sourceBuildingId,program:record.semantic.interiorArchetype,poiId:id}:null;
+}

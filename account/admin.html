@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="../js/distribution-context.js?v=1"></script>
-  <link rel="stylesheet" href="../styles/distribution.css?v=1">
+  <script src="../js/distribution-context.js?v=2"></script>
+  <link rel="stylesheet" href="../styles/distribution.css?v=2">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
@@ -46,7 +46,7 @@
       margin: 0;
       min-height: 100vh;
       color: var(--ink);
-      font-family: 'Barlow', sans-serif;
+      font-family: var(--wx-font-ui);
       background:
         radial-gradient(circle at 16% 12%, rgba(90, 208, 255, 0.14), transparent 32%),
         radial-gradient(circle at 82% 10%, rgba(255, 200, 87, 0.12), transparent 28%),
@@ -100,7 +100,7 @@
 
     .brand-block {
       padding: 10px 8px 14px;
-      border-bottom: 1px solid rgba(163, 197, 224, 0.12);
+      border-bottom: 1px solid color-mix(in srgb, var(--wx-action) 12%, transparent);
     }
 
     .brand-eyebrow {
@@ -112,7 +112,7 @@
     }
 
     .brand-title {
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 28px;
       line-height: 0.95;
       margin: 0 0 8px;
@@ -150,7 +150,7 @@
       gap: 10px;
       margin-bottom: 8px;
       border: 1px solid transparent;
-      background: rgba(9, 22, 41, 0.56);
+      background: color-mix(in srgb, var(--wx-panel-solid) 56%, transparent);
       color: var(--ink);
       border-radius: 14px;
       padding: 12px 12px;
@@ -171,8 +171,8 @@
     }
 
     .nav-btn.active {
-      border-color: rgba(90, 208, 255, 0.55);
-      background: linear-gradient(180deg, rgba(21, 54, 88, 0.92), rgba(10, 24, 42, 0.82));
+      border-color: color-mix(in srgb, var(--wx-action) 55%, transparent);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--wx-selected) 92%, transparent), color-mix(in srgb, var(--wx-panel-solid) 82%, transparent));
       box-shadow: inset 0 0 0 1px rgba(90, 208, 255, 0.18);
     }
 
@@ -187,13 +187,13 @@
       padding: 0 10px;
       font-size: 12px;
       font-weight: 700;
-      background: rgba(2, 12, 22, 0.75);
+      background: color-mix(in srgb, var(--wx-panel-solid) 75%, transparent);
       color: var(--ink);
       flex-shrink: 0;
     }
 
     .sidebar-foot {
-      border-top: 1px solid rgba(163, 197, 224, 0.12);
+      border-top: 1px solid color-mix(in srgb, var(--wx-action) 12%, transparent);
       padding-top: 12px;
       color: var(--muted);
       font-size: 13px;
@@ -226,7 +226,7 @@
 
     .topbar h1 {
       margin: 0;
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: clamp(28px, 4vw, 40px);
       line-height: 1;
     }
@@ -252,7 +252,7 @@
       align-items: center;
       gap: 8px;
       border: 1px solid var(--line-strong);
-      background: rgba(4, 16, 28, 0.72);
+      background: color-mix(in srgb, var(--wx-panel-solid) 72%, transparent);
       border-radius: 999px;
       padding: 10px 14px;
       font-weight: 700;
@@ -312,19 +312,19 @@
 
     .primary-btn {
       background: linear-gradient(135deg, var(--accent), #7df0ff);
-      color: #032137;
+      color: var(--wx-action);
     }
 
     .secondary-btn {
-      background: rgba(8, 24, 43, 0.82);
+      background: color-mix(in srgb, var(--wx-panel-solid) 82%, transparent);
       border-color: var(--line);
       color: var(--ink);
     }
 
     .danger-btn {
-      background: rgba(145, 33, 45, 0.94);
-      border-color: rgba(255, 140, 149, 0.5);
-      color: #fff6f6;
+      background: color-mix(in srgb, var(--wx-panel-soft) 94%, transparent);
+      border-color: color-mix(in srgb, var(--wx-danger) 50%, transparent);
+      color: var(--wx-text);
     }
 
     .ghost-btn {
@@ -367,7 +367,7 @@
 
     .gate-stat strong,
     .metric-value {
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 26px;
       line-height: 1;
     }
@@ -412,15 +412,15 @@
     .notice-card {
       border: 1px solid var(--line);
       border-radius: 16px;
-      background: rgba(4, 16, 28, 0.68);
+      background: color-mix(in srgb, var(--wx-panel-solid) 68%, transparent);
       padding: 14px;
     }
 
-    .metric-card[data-tone="ok"] { border-color: rgba(98, 220, 170, 0.34); }
-    .metric-card[data-tone="warning"] { border-color: rgba(255, 179, 92, 0.34); }
+    .metric-card[data-tone="ok"] { border-color: color-mix(in srgb, var(--wx-success) 34%, transparent); }
+    .metric-card[data-tone="warning"] { border-color: color-mix(in srgb, var(--wx-warning) 34%, transparent); }
 
-    .alert-card[data-severity="success"] { border-color: rgba(98, 220, 170, 0.34); }
-    .alert-card[data-severity="warning"] { border-color: rgba(255, 179, 92, 0.34); }
+    .alert-card[data-severity="success"] { border-color: color-mix(in srgb, var(--wx-success) 34%, transparent); }
+    .alert-card[data-severity="warning"] { border-color: color-mix(in srgb, var(--wx-warning) 34%, transparent); }
 
     .metric-note,
     .alert-card p,
@@ -447,7 +447,7 @@
     .detail-card strong,
     .timeline-card strong,
     .detail-header h3 {
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 18px;
       margin: 0;
     }
@@ -490,29 +490,29 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--muted);
-      background: rgba(3, 13, 24, 0.76);
+      background: color-mix(in srgb, var(--wx-panel-solid) 76%, transparent);
     }
 
     .status-pill[data-status="approved"],
     .status-pill[data-status="published"] {
-      border-color: rgba(98, 220, 170, 0.38);
-      color: #baf1d8;
+      border-color: color-mix(in srgb, var(--wx-success) 38%, transparent);
+      color: var(--wx-success);
     }
 
     .status-pill[data-status="submitted"],
     .status-pill[data-status="pending"] {
-      border-color: rgba(255, 200, 87, 0.38);
-      color: #ffe1a6;
+      border-color: color-mix(in srgb, var(--wx-warning) 38%, transparent);
+      color: var(--wx-warning);
     }
 
     .status-pill[data-status="rejected"] {
-      border-color: rgba(255, 124, 124, 0.4);
-      color: #ffcbcb;
+      border-color: color-mix(in srgb, var(--wx-danger) 40%, transparent);
+      color: var(--wx-danger);
     }
 
     .status-pill[data-status="needs_changes"] {
-      border-color: rgba(255, 179, 92, 0.36);
-      color: #ffd5a3;
+      border-color: color-mix(in srgb, var(--wx-warning) 36%, transparent);
+      color: var(--wx-warning);
     }
 
     .shortcut-row,
@@ -541,7 +541,7 @@
       border: 1px solid var(--line);
       border-radius: 16px;
       padding: 14px;
-      background: linear-gradient(180deg, rgba(15, 38, 67, 0.88), rgba(7, 18, 33, 0.88));
+      background: linear-gradient(180deg, color-mix(in srgb, var(--wx-panel-solid) 88%, transparent), color-mix(in srgb, var(--wx-panel-solid) 88%, transparent));
       color: var(--ink);
       text-align: left;
     }
@@ -592,7 +592,7 @@
       width: 100%;
       border-radius: 12px;
       border: 1px solid var(--line);
-      background: rgba(3, 13, 24, 0.82);
+      background: color-mix(in srgb, var(--wx-panel-solid) 82%, transparent);
       color: var(--ink);
       padding: 11px 12px;
     }
@@ -606,7 +606,7 @@
     select:focus,
     textarea:focus {
       outline: none;
-      border-color: rgba(90, 208, 255, 0.66);
+      border-color: color-mix(in srgb, var(--wx-action) 66%, transparent);
       box-shadow: 0 0 0 3px rgba(90, 208, 255, 0.16);
     }
 
@@ -634,15 +634,15 @@
     .queue-card {
       border: 1px solid var(--line);
       border-radius: 16px;
-      background: rgba(4, 16, 28, 0.62);
+      background: color-mix(in srgb, var(--wx-panel-solid) 62%, transparent);
       padding: 14px;
       cursor: pointer;
     }
 
     .queue-card.selected {
-      border-color: rgba(90, 208, 255, 0.54);
+      border-color: color-mix(in srgb, var(--wx-action) 54%, transparent);
       box-shadow: inset 0 0 0 1px rgba(90, 208, 255, 0.18);
-      background: linear-gradient(180deg, rgba(14, 35, 60, 0.92), rgba(6, 18, 31, 0.88));
+      background: linear-gradient(180deg, color-mix(in srgb, var(--wx-panel-solid) 92%, transparent), color-mix(in srgb, var(--wx-panel-solid) 88%, transparent));
     }
 
     .detail-column {
@@ -652,12 +652,12 @@
     .detail-section {
       border: 1px solid var(--line);
       border-radius: 16px;
-      background: rgba(3, 13, 24, 0.58);
+      background: color-mix(in srgb, var(--wx-panel-solid) 58%, transparent);
       padding: 14px;
     }
 
     .detail-section-title {
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 16px;
       margin-bottom: 12px;
     }
@@ -670,10 +670,10 @@
     }
 
     .capture-review-media { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr); gap: 12px; }
-    .capture-review-canvas { width: 100%; min-height: 320px; display: block; background: #020811; border: 1px solid var(--line); }
+    .capture-review-canvas { width: 100%; min-height: 320px; display: block; background: var(--wx-panel-solid); border: 1px solid var(--line); }
     .capture-photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .capture-photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: 1px solid var(--line); background: #020811; }
-    .capture-footprint { width: 100%; height: 180px; border: 1px solid var(--line); background: #07111f; }
+    .capture-photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: 1px solid var(--line); background: var(--wx-panel-solid); }
+    .capture-footprint { width: 100%; height: 180px; border: 1px solid var(--line); background: var(--wx-panel-solid); }
     .capture-alignment-grid { display: grid; grid-template-columns: repeat(5, minmax(80px, 1fr)); gap: 8px; }
     .capture-alignment-grid label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
 
@@ -708,10 +708,10 @@
     }
 
     .timeline-card {
-      border: 1px solid rgba(163, 197, 224, 0.14);
+      border: 1px solid color-mix(in srgb, var(--wx-action) 14%, transparent);
       border-radius: 14px;
       padding: 12px;
-      background: rgba(7, 20, 36, 0.74);
+      background: color-mix(in srgb, var(--wx-panel-solid) 74%, transparent);
     }
 
     .timeline-card span {
@@ -731,18 +731,18 @@
     }
 
     .empty-card {
-      border: 1px dashed rgba(163, 197, 224, 0.24);
+      border: 1px dashed color-mix(in srgb, var(--wx-action) 24%, transparent);
       border-radius: 16px;
       padding: 20px;
       color: var(--muted);
-      background: rgba(3, 13, 24, 0.44);
+      background: color-mix(in srgb, var(--wx-panel-solid) 44%, transparent);
     }
 
     .form-section {
       border: 1px solid var(--line);
       border-radius: 18px;
       padding: 16px;
-      background: rgba(4, 16, 28, 0.6);
+      background: color-mix(in srgb, var(--wx-panel-solid) 60%, transparent);
     }
 
     .form-section-header {
@@ -755,7 +755,7 @@
 
     .form-section-header h3 {
       margin: 0;
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 18px;
     }
 
@@ -772,10 +772,10 @@
     }
 
     .highlight-editor-card {
-      border: 1px solid rgba(163, 197, 224, 0.14);
+      border: 1px solid color-mix(in srgb, var(--wx-action) 14%, transparent);
       border-radius: 16px;
       padding: 14px;
-      background: rgba(7, 20, 36, 0.78);
+      background: color-mix(in srgb, var(--wx-panel-solid) 78%, transparent);
     }
 
     .highlight-editor-top {
@@ -787,7 +787,7 @@
     }
 
     .highlight-editor-top strong {
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 16px;
     }
 
@@ -800,9 +800,9 @@
       border: 1px solid var(--line);
       border-radius: 20px;
       background:
-        radial-gradient(circle at 20% 18%, rgba(90, 208, 255, 0.12), transparent 30%),
-        radial-gradient(circle at 82% 12%, rgba(255, 200, 87, 0.1), transparent 28%),
-        linear-gradient(180deg, rgba(8, 19, 34, 0.98), rgba(6, 16, 29, 0.98));
+        radial-gradient(circle at 20% 18%, color-mix(in srgb, var(--wx-selected) 12%, transparent), transparent 30%),
+        radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--wx-selected) 10%, transparent), transparent 28%),
+        linear-gradient(180deg, color-mix(in srgb, var(--wx-panel-solid) 98%, transparent), color-mix(in srgb, var(--wx-panel-solid) 98%, transparent));
       padding: 16px;
       display: grid;
       gap: 14px;
@@ -811,14 +811,14 @@
     .site-preview-announcement,
     .site-preview-hero,
     .site-preview-card {
-      border: 1px solid rgba(163, 197, 224, 0.18);
+      border: 1px solid color-mix(in srgb, var(--wx-action) 18%, transparent);
       border-radius: 16px;
-      background: rgba(3, 13, 24, 0.62);
+      background: color-mix(in srgb, var(--wx-panel-solid) 62%, transparent);
       padding: 14px;
     }
 
-    .site-preview-announcement[data-tone="success"] { border-color: rgba(98, 220, 170, 0.34); }
-    .site-preview-announcement[data-tone="warning"] { border-color: rgba(255, 179, 92, 0.34); }
+    .site-preview-announcement[data-tone="success"] { border-color: color-mix(in srgb, var(--wx-success) 34%, transparent); }
+    .site-preview-announcement[data-tone="warning"] { border-color: color-mix(in srgb, var(--wx-warning) 34%, transparent); }
 
     .site-preview-eyebrow,
     .site-preview-section-label,
@@ -833,7 +833,7 @@
     .site-preview-announcement h4,
     .site-preview-hero h3 {
       margin: 0 0 8px;
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 24px;
       line-height: 1.05;
     }
@@ -860,7 +860,7 @@
       align-items: center;
       border-radius: 999px;
       padding: 8px 12px;
-      background: rgba(8, 24, 43, 0.82);
+      background: color-mix(in srgb, var(--wx-panel-solid) 82%, transparent);
       border: 1px solid var(--line);
       color: var(--ink);
       font-size: 13px;
@@ -883,7 +883,7 @@
     .site-preview-card strong {
       display: block;
       margin-bottom: 8px;
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 16px;
     }
 
@@ -897,7 +897,7 @@
 
     .view-head h2 {
       margin: 0;
-      font-family: 'Chakra Petch', sans-serif;
+      font-family: var(--wx-font-ui);
       font-size: 20px;
     }
 
@@ -1016,16 +1016,19 @@
       --ok: #35d272;
       --danger: #ef5b5b;
     }
-    body { background: var(--bg); font-family: Inter, 'Barlow', system-ui, sans-serif; }
+    body { background: var(--bg); font-family: var(--wx-font-ui); }
     body::before { opacity: .22; }
-    .brand-title, .topbar h1, .view-head h2 { font-family: Orbitron, 'Chakra Petch', sans-serif; text-transform: uppercase; }
+    .brand-title, .topbar h1, .view-head h2 { font-family: var(--wx-font-display); font-weight: 400; letter-spacing: .015em; text-transform: uppercase; }
     .nav-btn { border-radius: 2px; }
     .nav-link { text-decoration: none; }
     .primary-btn, .secondary-btn, .danger-btn, input, textarea, select { border-radius: 2px; }
     .analytics-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; }
     .analytics-contract-grid { margin-top: 18px; }
-    .analytics-contract-grid .ops-card strong { display: block; margin: 7px 0; color: var(--ink); font: 600 16px/1.2 Orbitron, sans-serif; }
+    .analytics-contract-grid .ops-card strong { display: block; margin: 7px 0; color: var(--ink); font: 600 16px/1.2 var(--wx-font-ui); }
   </style>
+  <link rel="stylesheet" href="../styles/world-explorer-tokens.css?v=4">
+  <link rel="stylesheet" href="../styles/product-web.css?v=1">
+  <script type="module" src="/app/js/ui/product-page-preferences.js?v=1"></script>
 </head>
 <body>
   <div class="shell">

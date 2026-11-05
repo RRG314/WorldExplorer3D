@@ -94,7 +94,7 @@ async function attachCuratedHomeFurnishing(THREE, active, options = {}) {
   disposeCuratedHomeFurnishing(active);
   // Personal workspaces use individual furniture with the same placement and
   // collision owner. Do not put a second house shell inside that room.
-  if (active.ownedHome.personalStarter || active.ownedHome.workspace) return false;
+  if (active.ownedHome.personalStarter || active.ownedHome.workspace || active.group.userData.fittedHomeFurniture) return false;
   const token = {};
   active.curatedHomeFurnishing = Object.freeze({ status: 'loading', token });
   try {

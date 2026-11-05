@@ -10,7 +10,7 @@ function escapeHtml(value) {
 }
 
 function selectedStyle(isSelected) {
-  return isSelected ? ' style="border-color:#667eea;background:#eef2ff"' : '';
+  return isSelected ? " style=\"border-color:var(--wx-action);background:#eef2ff\"" : '';
 }
 
 export function renderNearbyCityItems(cityList, cities, cityMatchesSelection) {

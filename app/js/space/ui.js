@@ -69,8 +69,8 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
     <div id="sfEnvironment" class="spaceFlightHudEnvironment">Deep space</div>
     <div class="spaceFlightZone">
       <div id="sfZoneLabel" style="font-size:11px;opacity:0.8;margin-bottom:6px;">LANDING ZONE</div>
-      <div style="height:8px;background:rgba(0,0,0,0.3);border-radius:4px;overflow:hidden;">
-        <div id="sfLandingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#10b981,#34d399);transition:width 0.3s;"></div>
+      <div style="height:8px;background:color-mix(in srgb, var(--wx-panel-solid) 30%, transparent);border-radius:4px;overflow:hidden;">
+        <div id="sfLandingBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--wx-equipped-surface),var(--wx-equipped-surface));transition:width 0.3s;"></div>
       </div>
       <div id="sfLandingText" style="font-size:10px;margin-top:4px;opacity:0.7;">Fly closer to land</div>
     </div>
@@ -436,7 +436,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     if (landBtn) {
       landBtn.disabled = !canDock;
       landBtn.style.opacity = canDock ? '1' : '0.7';
-      landBtn.style.background = canDock ? '#10b981' : '#315d9d';
+      landBtn.style.background = canDock ? "var(--wx-equipped-surface)" : "var(--wx-selected)";
       landBtn.textContent = canDock
         ? `DOCK WITH ${starshipName.toUpperCase()}`
         : `APPROACH ${starshipName.toUpperCase()}`;
@@ -463,7 +463,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     if (landBtn) {
       landBtn.disabled = !surveyCanLand;
       landBtn.style.opacity = surveyCanLand ? '1' : '0.7';
-      landBtn.style.background = surveyCanLand ? '#10b981' : '#315d9d';
+      landBtn.style.background = surveyCanLand ? "var(--wx-equipped-surface)" : "var(--wx-selected)";
       landBtn.textContent = supportedSurface
         ? surveyCanLand ? 'LAND ON ' + activeHudBody.name.toUpperCase() : 'APPROACH ' + activeHudBody.name.toUpperCase()
         : universeTarget.targetKind === 'exoplanet'
@@ -477,7 +477,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     if (zoneLabel) zoneLabel.textContent = 'FLIGHT ENVELOPE';
     if (landingBar) {
       landingBar.style.width = `${pressureRatio * 100}%`;
-      landingBar.style.background = 'linear-gradient(90deg,#38bdf8,#f59e0b)';
+      landingBar.style.background = "linear-gradient(90deg,var(--wx-selected),var(--wx-selected))";
     }
     if (landingText) {
       const horizontalSpeed = Math.round(Number(atmosphericExploration.horizontalSpeedMps) || 0);
@@ -488,20 +488,20 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     if (landBtn) {
       landBtn.disabled = false;
       landBtn.style.opacity = '1';
-      landBtn.style.background = '#2563eb';
+      landBtn.style.background = "var(--wx-selected)";
       landBtn.textContent = 'EXIT ATMOSPHERE AND RETURN';
     }
   } else if (atmosphericEntry?.authorized && appCtx.spaceJourney?.phase === 'approach') {
     if (zoneLabel) zoneLabel.textContent = 'ATMOSPHERIC ENTRY';
     if (landingBar) {
       landingBar.style.width = '100%';
-      landingBar.style.background = 'linear-gradient(90deg,#38bdf8,#2563eb)';
+      landingBar.style.background = "linear-gradient(90deg,var(--wx-selected),var(--wx-selected))";
     }
     if (landingText) landingText.textContent = 'Entry corridor ready · this world has no solid surface';
     if (landBtn) {
       landBtn.disabled = false;
       landBtn.style.opacity = '1';
-      landBtn.style.background = '#2563eb';
+      landBtn.style.background = "var(--wx-selected)";
       landBtn.textContent = 'ENTER ' + activeHudBody.name.toUpperCase() + ' ATMOSPHERE';
     }
   } else if (canLand && activeHudBody.landable) {
@@ -509,20 +509,20 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     if (landBtn) {
       landBtn.disabled = false;
       landBtn.style.opacity = '1';
-      landBtn.style.background = '#10b981';
+      landBtn.style.background = "var(--wx-equipped-surface)";
       landBtn.textContent = 'LAND ON ' + activeHudBody.name.toUpperCase();
     }
   } else if (canLand && !activeHudBody.landable) {
     if (landingText) landingText.textContent = 'Orbiting ' + activeHudBody.name + ' (flyby)';
-    if (landingBar) landingBar.style.background = 'linear-gradient(90deg,#fbbf24,#f59e0b)';
+    if (landingBar) landingBar.style.background = "linear-gradient(90deg,var(--wx-selected),var(--wx-selected))";
     if (landBtn) {
       landBtn.disabled = true;
       landBtn.style.opacity = '0.7';
-      landBtn.style.background = '#b45309';
+      landBtn.style.background = "var(--wx-selected)";
       landBtn.textContent = 'ORBITING ' + activeHudBody.name.toUpperCase();
     }
   } else {
-    if (landingBar) landingBar.style.background = 'linear-gradient(90deg,#10b981,#34d399)';
+    if (landingBar) landingBar.style.background = "linear-gradient(90deg,var(--wx-equipped-surface),var(--wx-equipped-surface))";
     if (landingText) {
       landingText.textContent = readout.si ? readout.reason
         : !activeHudBody.landable ? `${activeHudBody.name} · orbital exploration only`
@@ -532,7 +532,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     if (landBtn) {
       landBtn.disabled = true;
       landBtn.style.opacity = '0.5';
-      landBtn.style.background = '#667eea';
+      landBtn.style.background = "var(--wx-selected)";
       landBtn.textContent = 'LANDING NOT YET AVAILABLE';
     }
   }

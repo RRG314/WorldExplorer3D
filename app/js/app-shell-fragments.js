@@ -18,13 +18,13 @@ const APP_SHELL_FRAGMENT_HTML = `
 </div>
 
 <!-- Historic Sites System -->
-<button id="historicBtn" title="Toggle Historic Sites" style="position:fixed;bottom:150px;right:20px;width:56px;height:56px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:50%;color:#ffffff;font-size:24px;cursor:pointer;box-shadow:0 8px 24px rgba(245,158,11,0.4);transition:all 0.2s;z-index:100;display:none">⛩️</button>
-<div id="historicPanel" style="position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:rgba(255,255,255,0.98);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;overflow:hidden;backdrop-filter:blur(10px);flex-direction:column">
-  <div class="panel-header" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+<button id="historicBtn" title="Toggle Historic Sites" style="position:fixed;bottom:150px;right:20px;width:56px;height:56px;background:linear-gradient(135deg,var(--wx-selected),var(--wx-selected));border:none;border-radius:50%;color:var(--wx-text);font-size:24px;cursor:pointer;box-shadow:0 8px 24px rgba(245,158,11,0.4);transition:all 0.2s;z-index:100;display:none">⛩️</button>
+<div id="historicPanel" style="position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:color-mix(in srgb, var(--wx-panel-soft) 98%, transparent);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;overflow:hidden;backdrop-filter:blur(10px);flex-direction:column">
+  <div class="panel-header" style="background:linear-gradient(135deg,var(--wx-selected),var(--wx-selected))">
     <div class="panel-title">Historic Sites</div>
     <button class="panel-close" id="closeHistoricPanelBtn">×</button>
   </div>
-  <div style="padding:12px 16px;background:#fef3c7;font-size:11px;color:#78350f;font-weight:600;border-bottom:2px solid #f59e0b">
+  <div style="padding:12px 16px;background:var(--wx-selected);font-size:11px;color:var(--wx-warning);font-weight:600;border-bottom:2px solid var(--wx-warning)">
     <span id="historicCount">0 Sites</span> • From OpenStreetMap
   </div>
   <div class="panel-content" id="historicList"></div>
@@ -184,8 +184,8 @@ const APP_SHELL_FRAGMENT_HTML = `
   </div>
 </aside>
 
-<div id="debugOverlay" style="position:fixed;top:var(--debug-overlay-top,20px);left:var(--debug-overlay-left,clamp(190px,24vw,470px));background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:8px;z-index:var(--debug-overlay-z,145);display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
-<div id="perfPanel" style="position:fixed;top:var(--perf-panel-top,20px);right:var(--perf-panel-right,180px);background:rgba(2,6,23,0.85);color:#38bdf8;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;z-index:var(--perf-panel-z,145);display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid rgba(56,189,248,0.4);min-width:var(--perf-panel-min-width,260px);max-width:var(--perf-panel-max-width,320px)"></div>
+<div id="debugOverlay" style="position:fixed;top:var(--debug-overlay-top,20px);left:var(--debug-overlay-left,clamp(190px,24vw,470px));background:color-mix(in srgb, var(--wx-panel-solid) 80%, transparent);color:var(--wx-success);font-family:var(--wx-font-instrument);font-size:11px;padding:10px 14px;border-radius:8px;z-index:var(--debug-overlay-z,145);display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
+<div id="perfPanel" style="position:fixed;top:var(--perf-panel-top,20px);right:var(--perf-panel-right,180px);background:color-mix(in srgb, var(--wx-panel-solid) 85%, transparent);color:var(--wx-action);font-family:var(--wx-font-instrument);font-size:11px;padding:10px 12px;border-radius:8px;z-index:var(--perf-panel-z,145);display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid color-mix(in srgb, var(--wx-action) 40%, transparent);min-width:var(--perf-panel-min-width,260px);max-width:var(--perf-panel-max-width,320px)"></div>
 <div id="pauseScreen" role="dialog" aria-modal="true" aria-labelledby="pauseScreenTitle" tabindex="-1"><div class="pauseTitle" id="pauseScreenTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen" role="dialog" aria-modal="true" aria-labelledby="resultTitle" tabindex="-1"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><p id="resultJournalStatus" role="status"></p><button class="pauseBtn" id="resultJournalRetry" hidden>Retry Journal save</button><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen" role="dialog" aria-modal="true" aria-labelledby="caughtScreenTitle" tabindex="-1"><div class="caughtBox"><div class="caughtTitle" id="caughtScreenTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>

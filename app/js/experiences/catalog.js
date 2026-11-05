@@ -1,4 +1,5 @@
 import { ACTIVITY_TEMPLATES } from '../activity-discovery/schema-core.js?v=1';
+import { careerAvailability, orderCareerEntries } from './career-availability.js';
 
 // Display references only. The named runtime adapter rechecks admission when play starts.
 const careers = [
@@ -18,14 +19,14 @@ const careers = [
   ['astronomer','Astronomer',"A Night’s Observing",'astronomy','Align an instrument, compare observations and keep a reproducible log.'],
   ['accelerator-scientist','Accelerator scientist','Collision Lab','accelerator','Steer beams, inspect detector measurements and analyze recorded collisions.'],
   ['field-engineer','Field engineer','Make a Useful Place','engineering','Diagnose a need, build or repair something useful and test the result.'],
-  ['expedition-pilot','Expedition pilot','Harbor Run','pilot','Prepare a route and deliver equipment with care.'],
+  ['expedition-pilot','Expedition pilot','Flight training','pilot','Structured flight assignments are in development. Free flight and Harbor Run road deliveries remain available.'],
   ['documentary-explorer','Documentary explorer','A Place in Three Views','documentary','Tell a visual story with contrasting photographs and a saved album.'],
   ['explorer','Explorer','First Bearings','explorer','Find your bearings, record a discovery and choose your next journey.'],
   ['companion-handler','Companion handler','Exploring Together','companions','Care for a companion, build trust and learn useful field skills together.']
 ];
 export const CAREER_EXPERIENCES = Object.freeze(careers.map(([id,label,assignment,adapterId,summary]) => Object.freeze({
-  id:`career:${id}`,kind:'career',label,assignment,adapterId,summary,
-  persistence:'Your Journal and career progress save in this browser.'
+  id:`career:${id}`,kind:'career',label,assignment,adapterId,summary,...careerAvailability(id),
+  persistence:'Your Journal and career progress save on this device. Sign in and choose your account save to continue across devices.'
 })));
 const quick = [
   ['racing','Road racing','Choose an event, prepare your car or create a track.'],
@@ -36,8 +37,9 @@ const quick = [
   ['deflock','DeFlock Hunt','Explore mapped camera locations and complete the hunt.']
 ];
 export const QUICK_EXPERIENCES = Object.freeze([
+  Object.freeze({id:'activity:harbor-run',kind:'activity',label:'Harbor Run delivery',assignment:'Harbor Run',adapterId:'pilot',summary:'Plan a road delivery, load the field case and bring your equipment home safely.',persistence:'Your delivery and cargo progress save in your Journal. Your account save can keep that journey across devices.'}),
   ...quick.map(([mode,label,summary])=>Object.freeze({id:`game:${mode}`,kind:'game',label,assignment:label,adapterId:'game',mode,summary,persistence:'Results save in your Journal. Online rankings require a successful upload.'})),
-  ...ACTIVITY_TEMPLATES.map(row=>Object.freeze({id:`route:${row.id}`,kind:'route',label:row.label,assignment:row.label,adapterId:'route',templateId:row.id,summary:'Choose a local route, review its checkpoints and follow the marked course.',persistence:'Your created routes and Journal save in this browser.'}))
+  ...ACTIVITY_TEMPLATES.map(row=>Object.freeze({id:`route:${row.id}`,kind:'route',label:row.label,assignment:row.label,adapterId:'route',templateId:row.id,summary:'Choose a local route, review its checkpoints and follow the marked course.',persistence:'Your created routes and Journal save with your journey. Sign in to continue across devices.'}))
 ]);
 export const EXPERIENCES=Object.freeze([...CAREER_EXPERIENCES,...QUICK_EXPERIENCES]);
 const byId=new Map(EXPERIENCES.map(row=>[row.id,row]));
@@ -48,4 +50,4 @@ export const LEGACY_EXPERIENCE_IDS=Object.freeze(Object.fromEntries([
   ['botany','career:botanist'],['palaeontology','career:palaeontologist'],['habitats','career:wildlife-ecologist']
 ]));
 export function resolveExperienceId(id){const key=String(id||'');return experienceById(key)?.id||LEGACY_EXPERIENCE_IDS[key]||null;}
-export function filterExperiences({view='careers',query=''}={}){const needle=String(query).trim().toLowerCase();return EXPERIENCES.filter(row=>(view==='careers'?row.kind==='career':row.kind!=='career')&&(!needle||`${row.label} ${row.assignment} ${row.summary}`.toLowerCase().includes(needle)));}
+export function filterExperiences({view='careers',query=''}={}){const needle=String(query).trim().toLowerCase();return orderCareerEntries(EXPERIENCES.filter(row=>(view==='careers'?row.kind==='career':row.kind!=='career')&&(!needle||`${row.label} ${row.assignment} ${row.summary}`.toLowerCase().includes(needle))));}

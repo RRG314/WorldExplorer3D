@@ -1049,7 +1049,7 @@ function renderPlanner() {
     `<option value="${profile.id}">${profile.name}</option>`
   ).join('');
   root.innerHTML = `
-    <section class="expeditionPanel" role="dialog" aria-modal="true" aria-labelledby="expeditionTitle">
+    <section class="expeditionPanel" aria-labelledby="expeditionTitle">
       <header class="expeditionHeader">
         <div style="min-width:0"><span>SPACE EXPLORER CAMPAIGN</span><h2 id="expeditionTitle" style="max-width:420px">First Light: Proxima</h2><small class="expeditionReleaseStatus">Playable campaign</small></div>
         <button id="expeditionClose" type="button" aria-label="Close Expedition" style="flex:0 0 42px">×</button>
@@ -1932,13 +1932,22 @@ function openExpeditionPlanner(appContext) {
   ensureStylesheet();
   let root = overlay();
   if (!root) {
-    root = document.createElement('div');
+    root = document.createElement('dialog');
     root.id = 'expeditionOverlay';
     root.className = 'expeditionOverlay';
+    root.setAttribute('aria-labelledby', 'expeditionTitle');
+    root.addEventListener('cancel', (event) => { event.preventDefault(); closeExpeditionPlanner(); });
+    root.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.key === 'Escape') { event.preventDefault(); closeExpeditionPlanner(); }
+    });
     document.body.appendChild(root);
   }
+  appContext.clearControlInputState?.('expedition-planner');
   root.hidden = false;
   renderPlanner();
+  if (typeof root.showModal === 'function' && !root.open) root.showModal();
+  else { root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); }
   window.setTimeout(() => root.querySelector('select,button')?.focus(), 0);
   return true;
 }
@@ -1949,7 +1958,7 @@ function closeExpeditionPlanner() {
     localTransitRefreshTimer = 0;
   }
   const root = overlay();
-  if (root) root.hidden = true;
+  if (root) { if (root.open && typeof root.close === 'function') root.close(); root.hidden = true; }
   return true;
 }
 

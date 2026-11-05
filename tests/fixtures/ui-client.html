@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Activities component</title>
+<link rel="stylesheet" href="/styles/world-explorer-tokens.css">
+<link rel="stylesheet" href="/styles/world-explorer-components.css">
+<link rel="stylesheet" href="/app/styles/experiences.css">
+<link rel="stylesheet" href="/app/styles/product-shell.css">
+<style>body{margin:24px;background:var(--wx-page-wash);color:var(--wx-text);font-family:var(--wx-font-ui)}button{min-height:44px}</style>
+<button id="open" class="wx-button" type="button">Open Activities</button>
+<script type="module">
+  import {createExperienceBrowser} from '/app/js/ui/experience-browser.js';
+  const browser=createExperienceBrowser({readProfile:async()=>({}),resolveAdapter:()=>null});
+  document.querySelector('#open').addEventListener('click',()=>browser.open());
+  window.render_game_to_text=()=>JSON.stringify({scope:'Actual native Activities component. Isolated unavailable adapters; no world, account or progress authority.',...browser.snapshot(),careers:document.querySelectorAll('[data-experience-id]').length});
+  window.advanceTime=async()=>{};
+</script>
+</html>

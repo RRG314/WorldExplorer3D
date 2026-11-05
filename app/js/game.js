@@ -1,4 +1,4 @@
-import { isPoiMapLayerVisible } from './game/poi-map-visibility.js';
+import { isPoiMapLayerVisible, playablePoiTarget } from './game/poi-map-visibility.js';
 import {createGameResultController} from './gameplay/result-controller.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { clearPolice, spawnPolice, updatePolice } from "./game/police.js?v=2";
@@ -36,6 +36,7 @@ import {
   describeDestinationEntrySupport,
   getNavigationTargetForDestination,
   navigateToPOI,
+  navigationDestinationSnapshot,
   renderInteriorLegend,
   toggleAllGameElements,
   toggleAllLayers,
@@ -58,7 +59,7 @@ import {
   togglePropertyFilters,
   toggleRealEstate,
   updatePropertyPanel
-} from "./game/property-ui.js?v=9";
+} from "./game/property-ui.js?v=10";
 import {
   closeHistoricPanel,
   createHistoricCard,
@@ -69,8 +70,8 @@ import {
 } from "./game/historic-ui.js?v=2";
 import { escapeHtml, escapeJsString, formatPrice, toFiniteNumber } from "./game/ui-utils.js?v=1";
 
-function isPOIVisible(poiType) {
-  return isPoiMapLayerVisible(poiType, appCtx.mapLayers);
+function isPOIVisible(poiType, poi = null) {
+  return isPoiMapLayerVisible(poiType, appCtx.mapLayers) && (!poi || !!playablePoiTarget(poi, appCtx.poiLifecycle, appCtx.buildingEntranceByBuilding));
 }
 
 function showMapInfo(type, data) {
@@ -92,7 +93,7 @@ function showMapInfo(type, data) {
       <div>Source: <strong>${escapeHtml(data.sourceDataset || 'OpenStreetMap')}</strong></div>
       <div>Source ID: <strong>${escapeHtml(data.sourceId || 'Unknown')}</strong></div>
       <div>Last mapped timestamp: <strong>${escapeHtml(data.sourceTimestamp || 'Unknown')}</strong></div>
-      <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,255,204,.35);font-size:10px;opacity:.82">Public community mapping can be incomplete or outdated. Detection is a gameplay approximation. Virtual actions do not affect physical infrastructure.</div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid color-mix(in srgb, var(--wx-success) 35%, transparent);font-size:10px;opacity:.82">Public community mapping can be incomplete or outdated. Detection is a gameplay approximation. Virtual actions do not affect physical infrastructure.</div>
       <div style="margin-top:8px"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" style="color:#67e8f9">© OpenStreetMap contributors • ODbL</a></div>
     `;
     return;
@@ -106,7 +107,7 @@ function showMapInfo(type, data) {
     const safeId = escapeJsString(data.id);
     content.innerHTML = `
       <div style="margin-bottom:12px">
-        <div style="font-size:16px;font-weight:bold;color:#0ff;margin-bottom:6px">${formatPrice(toFiniteNumber(data.price, 0))}${data.priceType === 'rent' ? '/mo' : ''}</div>
+        <div style="font-size:16px;font-weight:bold;color:var(--wx-action);margin-bottom:6px">${formatPrice(toFiniteNumber(data.price, 0))}${data.priceType === 'rent' ? '/mo' : ''}</div>
         <div style="font-size:12px;opacity:0.9;margin-bottom:4px">${escapeHtml(data.address || 'Address unavailable')}</div>
         <div style="font-size:11px;opacity:0.8">${escapeHtml(data.city || '')}, ${escapeHtml(data.state || '')} ${escapeHtml(data.zipCode || '')}</div>
       </div>
@@ -121,8 +122,8 @@ function showMapInfo(type, data) {
         <div style="opacity:0.8">🏷️ Type: <strong>${escapeHtml(data.propertyType || 'Unknown')}</strong></div>
         <div style="opacity:0.8">🚪 Entry: <strong>${escapeHtml(entrySupportText)}</strong></div>
       </div>
-      <button onclick="navigateToProperty('${safeId}'); closeMapInfo();" style="width:100%;background:#0fc;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
-      <button onclick="openModalById('${safeId}'); closeMapInfo();" style="width:100%;background:rgba(0,255,200,0.2);color:#0fc;border:1px solid #0fc;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
+      <button onclick="navigateToProperty('${safeId}'); closeMapInfo();" style="width:100%;background:var(--wx-equipped-surface);color:var(--wx-text);border:none;border-radius:6px;padding:10px;font-family:var(--wx-font-ui);font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
+      <button onclick="openModalById('${safeId}'); closeMapInfo();" style="width:100%;background:color-mix(in srgb, var(--wx-equipped-surface) 20%, transparent);color:var(--wx-success);border:1px solid var(--wx-success);border-radius:6px;padding:8px;font-family:var(--wx-font-ui);font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
     `;
     return;
   }
@@ -137,11 +138,11 @@ function showMapInfo(type, data) {
     const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
     content.innerHTML = `
       <div style="margin-bottom:12px">
-        <div style="font-size:16px;font-weight:bold;color:#0ff;margin-bottom:6px">${safeName}</div>
-        <div style="font-size:11px;opacity:0.8">${escapeHtml(data.category || 'POI')}</div>
+        <div style="font-size:16px;font-weight:bold;color:var(--wx-action);margin-bottom:6px">${safeName}</div>
+        <div style="font-size:11px;opacity:0.8">Playable interior · ${escapeHtml(data.category || 'Place')}</div>
       </div>
       <div style="margin-bottom:12px;font-size:10px"><div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div></div>
-      <button onclick="navigateToPOI(${safeX}, ${safeZ}, '${safeNameJs}'); closeMapInfo();" style="width:100%;background:#0fc;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px">🧭 NAVIGATE HERE</button>
+      <button onclick="navigateToPOI(${safeX}, ${safeZ}, '${safeNameJs}'); closeMapInfo();" style="width:100%;background:var(--wx-equipped-surface);color:var(--wx-text);border:none;border-radius:6px;padding:10px;font-family:var(--wx-font-ui);font-weight:bold;cursor:pointer;font-size:11px">🧭 NAVIGATE HERE</button>
     `;
     return;
   }
@@ -153,15 +154,15 @@ function showMapInfo(type, data) {
   const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
   content.innerHTML = `
     <div style="margin-bottom:12px">
-      <div style="font-size:16px;font-weight:bold;color:#f59e0b;margin-bottom:6px">${safeName}</div>
+      <div style="font-size:16px;font-weight:bold;color:var(--wx-warning);margin-bottom:6px">${safeName}</div>
       <div style="font-size:11px;opacity:0.8">${escapeHtml(data.category || 'Historic')}</div>
     </div>
     <div style="margin-bottom:12px;font-size:10px">
       <div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div>
       <div style="opacity:0.8">🚪 Entry: <strong>${escapeHtml(describeDestinationEntrySupport(data))}</strong></div>
     </div>
-    <button onclick="navigateToHistoric('${safeNameJs}'); closeMapInfo();" style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
-    <button onclick="openHistoricModal('${safeNameJs}'); closeMapInfo();" style="width:100%;background:rgba(245,158,11,0.2);color:#f59e0b;border:1px solid #f59e0b;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
+    <button onclick="navigateToHistoric('${safeNameJs}'); closeMapInfo();" style="width:100%;background:var(--wx-selected);color:var(--wx-text);border:none;border-radius:6px;padding:10px;font-family:var(--wx-font-ui);font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
+    <button onclick="openHistoricModal('${safeNameJs}'); closeMapInfo();" style="width:100%;background:color-mix(in srgb, var(--wx-selected) 20%, transparent);color:var(--wx-warning);border:1px solid var(--wx-warning);border-radius:6px;padding:8px;font-family:var(--wx-font-ui);font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
   `;
 }
 
@@ -196,6 +197,7 @@ Object.assign(appCtx, {
   formatPrice,
   getActiveGameplayLeaderboard,
   getGameplayRegistrySnapshot,
+  getNavigationDestination: navigationDestinationSnapshot,
   hideResult,
   isPOIVisible,
   loadPropertiesAtCurrentLocation,

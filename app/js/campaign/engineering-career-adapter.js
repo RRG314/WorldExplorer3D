@@ -5,7 +5,7 @@ export function bindEngineeringCareer(
   runtime,
   experiences,
   {
-    loadHousing = async () => (await import('../game/property-ui.js?v=9')).getPersonalHousing(),
+    loadHousing = async () => (await import('../game/property-ui.js?v=10')).getPersonalHousing(),
   } = {}
 ) {
   let workspace = null;
@@ -38,9 +38,9 @@ export function bindEngineeringCareer(
           : null;
       return [homePlace || { ...current, id: 'engineering-selected-place', environment: 'earth' }];
     },
-    summary: ({ variantId }) =>
+    summary: ({ variantId, workspace: savedWorkspace }) =>
       engineeringSummary(
-        runtime.worldDiscoveryRuntime?.personalHome?.snapshot().workspace || workspace || {},
+        runtime.worldDiscoveryRuntime?.personalHome?.snapshot().workspace || savedWorkspace || workspace || {},
         variantId
       ),
     offer: ({ place }) =>

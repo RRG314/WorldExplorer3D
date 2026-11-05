@@ -34,7 +34,7 @@ test('hung place search times out and releases the serialized provider queue', a
     await result;
     const next = searchPlaces('next-city');
     await settle();
-    t.mock.timers.tick(1051);
+    t.mock.timers.tick(1201);
     await settle();
     assert.equal(requests.length, 2);
     requests[1].resolve([{ lat: '1', lon: '2', name: 'Next city' }]);
@@ -53,7 +53,7 @@ test('cancelling one caller does not cancel another search for the same place', 
   firstController.abort();
   await first;
   await settle();
-  t.mock.timers.tick(1051);
+  t.mock.timers.tick(1201);
   await settle();
   try {
     assert.equal(requests.length, 2, 'Independent cancellation requires independent requests.');
@@ -81,4 +81,30 @@ test('already cancelled search cannot publish even cached or coordinate results'
   controller.abort();
   await assert.rejects(searchPlaces('39.2904, -76.6122', { signal: controller.signal }), { name: 'AbortError' });
   assert.equal(requests.length, 0);
+});
+
+
+test('provider cooldown begins after a slow response completes', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_800_000_000_000 });
+  const requests = installProvider(t);
+  const { searchPlaces } = await freshSearch();
+  const first = searchPlaces('slow-city');
+  await settle();
+  assert.equal(requests.length, 1);
+  t.mock.timers.tick(5000);
+  requests[0].resolve([{ lat: '1', lon: '2', name: 'Slow city' }]);
+  await first;
+  const controller = new AbortController();
+  const next = searchPlaces('after-slow-city', {signal:controller.signal}).catch(error => error);
+  await settle();
+  try {
+    t.mock.timers.tick(1199);
+    await settle();
+    assert.equal(requests.length, 1, 'A slow lookup must not consume the following service cooldown.');
+    t.mock.timers.tick(1);
+    await settle();
+    assert.equal(requests.length, 2);
+    requests[1].resolve([{ lat: '3', lon: '4', name: 'Next city' }]);
+    assert.equal((await next)[0].name, 'Next city');
+  } finally { controller.abort(); await next; }
 });

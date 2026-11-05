@@ -1,3 +1,5 @@
+import {applyCareerFocus} from '../character/journey-preferences.js';
+import {presentCareerSummary} from './career-portfolio.js';
 import {beginSoloRacer,soloRacerSummary} from '../campaign/solo-racer.js';
 import {createExperienceEntry} from './entry.js';
 import {createExperienceBrowser} from '../ui/experience-browser.js';
@@ -12,6 +14,7 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
  async function travelToOcean(place,{isCurrent=()=>true}={}){
   if(!isCurrent()||place?.environment!=='ocean'||!Number.isFinite(place.lat)||!Number.isFinite(place.lon))return false;
   const title=getTitleUi(),globe=title?.getGlobeSelector?.();if(!globe?.startOcean)return false;
+  if(!runtime.gameStarted)title.getPlayerEntry?.()?.explore();
   closeMenus();runtime.toggleWorldDiscoveryJournal?.(false);runtime.stopGameplayPlugin?.('experience-travel',{resumeFree:false});title.selectGameMode('free');
   globe.open();globe.setSelection(place.lat,place.lon,{name:place.name,arrivalMode:'boat',focus:false});
   return globe.startOcean({isCurrent});
@@ -20,8 +23,13 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
    const current=context();if(current.loaded&&current.environment===place.environment&&current.place&&Math.abs(current.place.lat-place.lat)<.00001&&Math.abs(current.place.lon-place.lon)<.00001)return true;
    if(place.environment==='ocean')return travelToOcean(place);
    const title=getTitleUi(),globe=title?.getGlobeSelector?.();if(!title||!globe)return false;
+   if(!runtime.gameStarted)title.getPlayerEntry?.()?.explore();
    closeMenus();runtime.toggleWorldDiscoveryJournal?.(false);runtime.stopGameplayPlugin?.('experience-travel',{resumeFree:false});title.selectGameMode('free');
-   if(place.environment==='earth'){globe.setSelection(place.lat,place.lon,{name:place.name,arrivalMode:'walk',focus:false});return globe.startHere();}
+   if(place.environment==='earth'){
+    if(current.environment!=='earth')runtime.prepareTitleEnvironment?.();
+    globe.setSelection(place.lat,place.lon,{name:place.name,arrivalMode:'walk',focus:false});
+    return current.environment==='earth'?globe.startHere():runtime.triggerTitleStart?.({bypassCustomGate:true,launchMode:'earth'});
+   }
    title.setTitleLaunchMode(place.environment);return runtime.triggerTitleStart?.({bypassCustomGate:true,launchMode:place.environment});
  }
  const entry=createExperienceEntry({
@@ -46,11 +54,15 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
   summary:({profile,variantId})=>soloRacerSummary(profile?.soloRacer,{variantId}),
   async start({isCurrent,intent}){if(!isCurrent())return false;const garage=runtime.getVehicleGarage?.(),ownerUid=runtime.getAccountUserId?.()||'';const store=await getStore();if(!isCurrent())return false;await store.saveProfile(current=>({...current,soloRacer:beginSoloRacer(current.soloRacer,{garage,ownerUid,variantId:intent.variantId})}));if(!isCurrent())return false;return runtime.startGameplayPlugin?.('racing');}
  });
+ function adapterView(id,row){const adapter=adapters.get(id)||adapters.get(row.id);return adapter?.summary?{...adapter,summary:input=>presentCareerSummary(row,input.profile,adapter.summary(input),input)}:adapter;}
  const browser=createExperienceBrowser({
-  readContext:context,readProfile:async()=> (await getStore()).getProfile(),resolveAdapter:(id,row)=>adapters.get(id)||adapters.get(row.id),
+  readContext:context,readProfile:async()=> (await getStore()).getProfile(),resolveAdapter:adapterView,
+  onFocus:async id=>(await getStore()).saveProfile(current=>applyCareerFocus(current,id)),
   saveSelection:async intent=>(await getStore()).saveProfile(current=>({...current,activeExperience:{...intent,selectedAt:Date.now()}})),
   onBegin:intent=>entry.start(intent),onEntered:requestWorldFocus,onJournal,
   onLayer:open=>{runtime.screenLayout?.setPanelLayer('experiences',open);runtime.setPauseReason?.('experience-browser',open&&runtime.gameStarted);if(open)closeMenus();}
  });
- return Object.freeze({...browser,travelToOcean,travelToPlace,registerAdapter(id,adapter){if(adapters.has(id))throw Error('Activity adapter already registered: '+id);adapters.set(id,adapter);return()=>adapters.delete(id);},getStore,cancelEntry:()=>entry.cancel(),context});
+ return Object.freeze({...browser,travelToOcean,travelToPlace,
+  careerSummary:(entry,profile,options={})=>adapterView(entry.adapterId,entry)?.summary?.({entry,profile,...options})||null,
+  registerAdapter(id,adapter){if(adapters.has(id))throw Error('Activity adapter already registered: '+id);adapters.set(id,adapter);return()=>adapters.delete(id);},getStore,cancelEntry:()=>entry.cancel(),context});
 }

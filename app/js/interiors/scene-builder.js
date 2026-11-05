@@ -1,3 +1,6 @@
+import {interiorProgramForDefinition} from '../poi/interior-program.js';
+import {addHomeFixtures} from './home-fixtures.js';
+import {addBusinessFixtures} from './business-scene.js';
 import {addAquariumFixtures} from './aquarium-scene.js';
 import { buildCernInterior } from './cern-scene.js';
 import {addGalleryFixtures} from './gallery-scene.js';
@@ -234,7 +237,9 @@ function buildInteriorLevelScene(definition, options = {}) {
   const entryDistance = Math.hypot(entryDx, entryDz);
   if (entryDistance > 0.5) {
     const bounds = footprintBounds(shellFootprint);
-    const entryInset = Math.min(4.8, Math.max(2.4, Math.min(bounds.width, bounds.depth) * 0.18));
+    const entryInset = options.homeArrival
+      ? Math.min(.75,entryDistance*.45)
+      : Math.min(4.8, Math.max(2.4, Math.min(bounds.width, bounds.depth) * 0.18));
     desiredEntry = constrainPointToFootprint({
       x: desiredEntry.x + entryDx / entryDistance * entryInset,
       z: desiredEntry.z + entryDz / entryDistance * entryInset
@@ -483,6 +488,7 @@ function buildInteriorLevelScene(definition, options = {}) {
     layoutKind: options.connectorLayout
       ? 'multi_floor_core'
       : featurePlan.layoutKind || (effectiveMode === 'mapped' ? 'mapped' : 'open_plan'),
+    businessMaterials: {wallMaterial,accentWallMaterial},
     wallHeight,
     suppressionRadius: Math.min(180, Math.hypot(lightBounds.width, lightBounds.depth) * 0.5 + 14),
     entryPoint: {
@@ -752,6 +758,7 @@ export function buildInteriorScene(definition, options = {}) {
   const footprint = buildingFootprintPoints(building);
   const bounds = footprintBounds(footprint);
   const floorPlan = deriveInteriorFloorPlan(definition, bounds);
+  const businessProgram = options.curatedHome ? '' : interiorProgramForDefinition(definition);
   const requestedActiveLevel = finiteNumber(options.activeLevel, 0);
   const activeLevel = Math.max(0, Math.min(floorPlan.floorCount - 1, Math.round(requestedActiveLevel)));
   const loadedLevels = [...loadedInteriorLevels(floorPlan, activeLevel)];
@@ -764,11 +771,14 @@ export function buildInteriorScene(definition, options = {}) {
     levelStates = loadedLevels.map((level) => {
       const state = buildInteriorLevelScene(floorDefinition(definition, level), {
         suppressLights: level !== activeLevel,
-        suppressPartitions: options.curatedHome === true,
+        homeArrival:options.curatedHome&&!options.personalWorkspace,
+        suppressPartitions: options.curatedHome === true || (!!businessProgram && definition.mode !== 'mapped'),
         connectorLayout: connector,
         storyHeight: floorPlan.storyHeight,
         floorBaseY: Number.isFinite(options.floorBaseY) ? Number(options.floorBaseY) : undefined
       });
+      if(businessProgram)addBusinessFixtures(THREE,state,definition,businessProgram);
+      if(options.curatedHome&&!options.personalWorkspace&&definition.mode!=='mapped')addHomeFixtures(THREE,state,{contains:pointInPolygonSafe,metersPerUnit:appCtx.METERS_PER_WORLD_UNIT||1,createCollider:createWallCollider});
       state.group.name = `interior:${definition.key}:floor:${level}`;
       state.group.userData.floorId = interiorFloorIdentity(floorPlan, level).id;
       state.walkSurfaces.forEach((surface) => { surface.floorLevel = level; });
@@ -780,6 +790,7 @@ export function buildInteriorScene(definition, options = {}) {
     disposeFailedConstruction(root);
     throw error;
   }
+  if(options.curatedHome&&!options.personalWorkspace&&definition.mode!=='mapped')root.userData.fittedHomeFurniture=true;
   const activeState = levelStates.find((state) => state.level === activeLevel) || levelStates[0];
   const walkSurfaces = levelStates.flatMap((state) => state.walkSurfaces);
   const dynamicColliders = levelStates.flatMap((state) => state.dynamicColliders);

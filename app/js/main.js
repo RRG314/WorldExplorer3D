@@ -176,7 +176,7 @@ function showLoad(text, options = {}) {
   // Keep the overlay opaque while a fresh browser decodes the image. Using
   // the background shorthand reset the CSS black fallback to transparent and
   // briefly exposed the previously rendered city during location changes.
-  loading.style.backgroundColor = '#000';
+  loading.style.backgroundColor = "var(--wx-panel-solid)";
   loading.style.backgroundImage = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${background}')`;
   loading.style.backgroundPosition = 'center center';
   loading.style.backgroundSize = 'cover';

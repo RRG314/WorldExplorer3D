@@ -1,12 +1,15 @@
 {
   "schemaVersion": 1,
-  "targetVersion": "5.6.1",
+  "targetVersion": "5.7.0",
   "publicFiles": [
     "index.html",
     "about/index.html",
     "README.md",
     "github-pages/index.html",
-    "app/index.html"
+    "app/index.html",
+    "about/download.html",
+    "RELEASE_NOTES_5.7.0.md",
+    "legal/privacy.html"
   ],
   "allowedStatuses": [
     "review-required",
@@ -46,7 +49,7 @@
       "status": "candidate-verified",
       "source": {
         "file": "README.md",
-        "pattern": "Choose a location, step into a bounded playable world"
+        "pattern": "Each location opens a bounded playable area"
       },
       "evidenceCommands": [
         "verify:world",
@@ -322,6 +325,54 @@
         "verify:world-economy",
         "verify:connected-property-backend",
         "verify:connected-property-multiplayer"
+      ]
+    },
+    {
+      "id": "device-installation",
+      "status": "candidate-verified",
+      "source": {
+        "file": "about/download.html",
+        "pattern": "Download Android APK"
+      },
+      "evidenceCommands": [
+        "verify:source",
+        "verify:current-contracts"
+      ]
+    },
+    {
+      "id": "private-account-journey",
+      "status": "candidate-verified",
+      "source": {
+        "file": "legal/privacy.html",
+        "pattern": "private account backup"
+      },
+      "evidenceCommands": [
+        "verify:source",
+        "verify:current-contracts"
+      ]
+    },
+    {
+      "id": "starter-home-return",
+      "status": "candidate-verified",
+      "source": {
+        "file": "RELEASE_NOTES_5.7.0.md",
+        "pattern": "starter home"
+      },
+      "evidenceCommands": [
+        "verify:source",
+        "verify:current-contracts"
+      ]
+    },
+    {
+      "id": "guided-career-entry",
+      "status": "candidate-verified",
+      "source": {
+        "file": "RELEASE_NOTES_5.7.0.md",
+        "pattern": "Nineteen available careers"
+      },
+      "evidenceCommands": [
+        "verify:source",
+        "verify:current-contracts"
       ]
     }
   ]
