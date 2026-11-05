@@ -1,6 +1,6 @@
 # Player journey release acceptance — November 5
 
-This delivery continues the accepted cinematic application. Production and GitHub publication remain frozen. The live staging frontend is updated only after the isolated candidate checks below finish; personal-save service v1 and account cleanup v9 are already active in the staging project.
+This delivery continues the accepted cinematic application. Production and GitHub publication remain frozen. The complete test app uses https://we3d-staging-20260712.web.app/app/. Personal-save service v1 and account cleanup v9 are active in that staging project. The temporary trail preview rejects account API origins; use the standard staging address for the complete app. No API permissions were weakened to bypass that restriction.
 
 ## Ownership
 
@@ -17,7 +17,7 @@ The title return lease reuses only the identical current ready Earth publication
 | Same-place return | `return-1793906580915`: cold66,749ms, return273ms, same publication, actual walking. No repeat performance test. |
 | Personal purchase and persistence | Original atomic purchase receipt plus `home-1793910404428/purchased-home-envelope.json`: actual supported mapped home, exact wallet charge once, precise region and complete save preserved. |
 | Other-world home return | `home-1793910571477`: actual Moon→owned Earth interior. Functional admission accepted; rejected nested-house presentation replaced. |
-| Canonical collision, room, movement, exit | `home-1793911123006`: original building identity, fitted room, actual keyboard movement and normal exit. Final candidate rechecks changed entry framing/continuous furniture clearance only. |
+| Canonical collision, room, movement, exit | `home-1793911123006`: original building identity, fitted room, actual keyboard movement and normal exit. Exact candidate `home-1793912078618` rechecks changed entry framing/continuous furniture clearance, canonical identity, keyboard movement and normal exit with no page exceptions. Images reviewed. |
 | Career/free-roam reselection | `ui-1793908229187`: repeated real Continue returns Geologist after Racer selections; original records/items/character unchanged. Original introduction and field-method evidence reused. |
 | Final native Journey/board/touch controls | `final-ui-1793911675123`: 19 available career projections, all practical stages present, empty lunar slots count0; starter-home entry opens original globe; guest save panel offers correct controls; desktop/phone images reviewed. |
 | Interrupted restore | `indexeddb-1793909788961`: actual Chrome IndexedDB/Web Locks/localStorage; controlled quota failure retains gate; finish/rollback preserve full original state; other-account Undo rejected. |
@@ -34,4 +34,4 @@ Personal career milestones live in the existing rankings surface. They are label
 
 ## Publication boundary
 
-Finish at one immutable, byte-verified staging candidate and affected native images. Production activation remains a coordinated separate release: preserve existing production account environment and activate personal-save API plus account-deletion cleanup before promoting the matching frontend. Exact-build human production image review and remote publication checks are not inferred from historical approvals. No production data migration, broad user census, source/history deletion or GitHub mutation is part of this staging delivery.
+The isolated runtime candidate passed exact native home checks and hosted ordinary desktop/phone UI checks (`hosted-standard-1793912592209`); 482 critical runtime/HTML/CSS/Firebase files totaling9,713,989bytes match its verified package. The corrected verification adapter and this acceptance record are sealed into the final package without changing game code; final build identity and byte receipts are indexed by CURRENT-STATE.md. Accepted gameplay is reused at identical runtime/environment boundaries. The previous standard staging build e0ac9c947821 was retained at rollback channel `journey-before-20261105-1602` before updating the standard address. Production activation remains a coordinated separate release: preserve existing production account environment and activate personal-save API plus account-deletion cleanup before promoting the matching frontend. Exact-build human production image review and remote publication checks are not inferred from historical approvals. No production data migration, broad user census, source/history deletion or GitHub mutation is part of this staging delivery.

@@ -4,21 +4,31 @@ import assert from 'node:assert/strict';
 import {createFieldworkQaSession} from './fieldwork-qa-session.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
 const output=path.resolve(`output/verification/player-journey-20261105/home-${Date.now()}`),base=new URL('/app/',process.env.WE3D_VERIFY_BASE_URL||'http://127.0.0.1:4192').href;
-const backupFile=process.env.WE3D_HOME_BACKUP_FILE;
+const backupFile=process.env.WE3D_HOME_BACKUP_FILE,immutable=process.env.WE3D_REQUIRE_IMMUTABLE==='1';
+const savedEnvelope=backupFile?JSON.parse(await fs.readFile(backupFile,'utf8')):null;
 const qa=await createFieldworkQaSession({output,maximumDurationMs:440000}),{page,report}=qa;
 async function ready(){await page.waitForFunction(()=>__homeCtx.gameStarted&&!__homeCtx.worldLoading&&!__homeCtx.titleLaunchPending&&__homeCtx.initialEarthWorldReady&&!__homeCtx.onMoon,null,{timeout:180000});}
 async function journey(){await page.locator('#explorerGameMenuBtn').click();await page.locator('#explorerGameMenu [data-open-player-journey]').click();await page.waitForFunction(()=>document.querySelector('#playerJourney')?.getAttribute('aria-busy')==='false');}
-async function exportHome(name){const envelope=await page.evaluate(async()=>{const {captureJourneySnapshot}=await import('/app/js/player/journey-snapshot.js');return captureJourneySnapshot({store:__homeCtx.discoveryProfileStore,backpackStore:__homeCtx.playerBackpackStore,ownerUid:''});});await fs.writeFile(path.join(output,name),JSON.stringify(envelope)+'\n',{mode:0o600});}
+async function exportHome(name){
+ const envelope=await page.evaluate(async keys=>{
+  const exported=await __homeCtx.discoveryProfileStore.exportData({ownerUid:''}),{receiptOutbox=[],...journal}=exported;delete journal.exportedAt;
+  return {schemaVersion:1,ownerUid:'',journal,receiptOutbox,deviceState:{backpack:__homeCtx.playerBackpackStore.load(),local:Object.fromEntries(keys.map(key=>[key,localStorage.getItem(key)]))}};
+ },Object.keys(savedEnvelope?.deviceState.local||{}));
+ await fs.writeFile(path.join(output,name),JSON.stringify(envelope)+'\n',{mode:0o600});
+}
+async function nativeSnapshot(){return page.evaluate(()=>({walker:{x:__homeCtx.Walk.state.walker.x,y:__homeCtx.Walk.state.walker.y,z:__homeCtx.Walk.state.walker.z},paused:__homeCtx.paused}));}
+
 try{
+ if(immutable){const manifest=JSON.parse(await fs.readFile(path.join(process.env.WE3D_VERIFY_ROOT,'build-manifest.json'),'utf8'));report.buildId=manifest.buildId;}
  report.scope='Original mapped personal purchase and newly changed home interior/cross-environment return. Current-city performance and accepted field methods are not replayed.';
  await configureStagingAppCheck(page,base,{proxyGeospatial:false});
  await page.goto(base);await page.locator('#playerEntryScreen').waitFor({state:'visible',timeout:90000});
- await page.evaluate(async()=>window.__homeCtx=(await import('/app/js/shared-context.js?v=55')).ctx);
+ await page.evaluate(async()=>window.__homeCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx);
  await page.waitForFunction(()=>__homeCtx.canStartPlayerJourney?.()===true);
  if(backupFile){
-  const envelope=JSON.parse(await fs.readFile(backupFile,'utf8'));
-  await page.evaluate(async envelope=>{const {createJourneyRestoreOwner}=await import('/app/js/player/journey-snapshot.js');await createJourneyRestoreOwner({store:__homeCtx.discoveryProfileStore,backpackStore:__homeCtx.playerBackpackStore,writeBinding:()=>{},reload:()=>{}}).restore(envelope,null);},envelope);
-  await page.reload();await page.locator('#playerEntryScreen').waitFor({state:'visible',timeout:90000});await page.evaluate(async()=>window.__homeCtx=(await import('/app/js/shared-context.js?v=55')).ctx);await page.waitForFunction(()=>__homeCtx.canStartPlayerJourney?.()===true);
+  const envelope=savedEnvelope;
+  if(immutable){await page.evaluate(async envelope=>{await __homeCtx.playerBackpackStore.ready;if(!__homeCtx.playerBackpackStore.restoreJourneySnapshot(envelope.deviceState.backpack))throw Error('The original possessions owner rejected the accepted fixture.');await __homeCtx.discoveryProfileStore.importData(envelope.journal);},envelope);}else await page.evaluate(async envelope=>{const {createJourneyRestoreOwner}=await import('/app/js/player/journey-snapshot.js');await createJourneyRestoreOwner({store:__homeCtx.discoveryProfileStore,backpackStore:__homeCtx.playerBackpackStore,writeBinding:()=>{},reload:()=>{}}).restore(envelope,null);},envelope);
+  await page.reload();await page.locator('#playerEntryScreen').waitFor({state:'visible',timeout:90000});await page.evaluate(async()=>window.__homeCtx=(await import((globalThis.__WORLD_EXPLORER_PRODUCTION__?.sharedModulePrefix||document.documentElement.dataset.runtimeModulePrefix||'')+'/app/js/shared-context.js?v=55')).ctx);await page.waitForFunction(()=>__homeCtx.canStartPlayerJourney?.()===true);
  }else{
   await page.locator('#playerEntryScreen [data-entry=explore]').first().click();await page.evaluate(()=>__homeCtx.globeSelector.setSelection(39.2904,-76.6122,{name:'Baltimore',focus:false}));
   await page.locator('#globeSelectorStartBtn').click();await ready();await journey();await page.locator('#playerJourney [data-journey=homes]').click();
@@ -39,7 +49,7 @@ try{
   await page.waitForTimeout(900);await page.screenshot({path:path.join(output,'fitted-owned-home.png')});
   report.interior=await page.evaluate(()=>({fitted:__homeCtx.activeInterior.group.userData.fittedHomeFurniture,wholeHouse:!!__homeCtx.activeInterior.curatedHomeFurnishing,colliders:__homeCtx.activeInterior.dynamicColliders?.length,canonicalBuilding:__homeCtx.buildings.includes(__homeCtx.activeInterior.support.building),walker:{...__homeCtx.Walk.state.walker},camera:__homeCtx.camera.position.toArray()}));
   assert.equal(report.interior.fitted,true);assert.equal(report.interior.wholeHouse,false);assert.equal(report.interior.canonicalBuilding,true);
-  const before=await qa.snapshot();await page.keyboard.down('w');await page.waitForTimeout(800);await page.keyboard.up('w');const after=await qa.snapshot();report.movement={before:before.walker,after:after.walker};assert.ok(Math.hypot(after.walker.x-before.walker.x,after.walker.z-before.walker.z)>.15);
+  const before=await nativeSnapshot();await page.keyboard.down('w');await page.waitForTimeout(800);await page.keyboard.up('w');const after=await nativeSnapshot();report.movement={before:before.walker,after:after.walker};assert.ok(Math.hypot(after.walker.x-before.walker.x,after.walker.z-before.walker.z)>.15);
   await page.screenshot({path:path.join(output,'fitted-home-walking.png')});await page.keyboard.press('e');await page.waitForFunction(()=>!__homeCtx.activeInterior);await exportHome('accepted-home-envelope.json');await qa.succeed();
  }else{
  await page.locator('#playerEntryScreen [data-entry-world=moon]').click();
