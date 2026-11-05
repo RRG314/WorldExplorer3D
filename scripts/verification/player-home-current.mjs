@@ -3,6 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {createFieldworkQaSession} from './fieldwork-qa-session.mjs';
 import {configureStagingAppCheck} from './staging-app-check.mjs';
+import {JOURNEY_LOCAL_KEYS} from '../../app/js/player/journey-format.js';
 const output=path.resolve(`output/verification/player-journey-20261105/home-${Date.now()}`),base=new URL('/app/',process.env.WE3D_VERIFY_BASE_URL||'http://127.0.0.1:4192').href;
 const backupFile=process.env.WE3D_HOME_BACKUP_FILE,immutable=process.env.WE3D_REQUIRE_IMMUTABLE==='1';
 const savedEnvelope=backupFile?JSON.parse(await fs.readFile(backupFile,'utf8')):null;
@@ -13,7 +14,7 @@ async function exportHome(name){
  const envelope=await page.evaluate(async keys=>{
   const exported=await __homeCtx.discoveryProfileStore.exportData({ownerUid:''}),{receiptOutbox=[],...journal}=exported;delete journal.exportedAt;
   return {schemaVersion:1,ownerUid:'',journal,receiptOutbox,deviceState:{backpack:__homeCtx.playerBackpackStore.load(),local:Object.fromEntries(keys.map(key=>[key,localStorage.getItem(key)]))}};
- },Object.keys(savedEnvelope?.deviceState.local||{}));
+ },JOURNEY_LOCAL_KEYS);
  await fs.writeFile(path.join(output,name),JSON.stringify(envelope)+'\n',{mode:0o600});
 }
 async function nativeSnapshot(){return page.evaluate(()=>({walker:{x:__homeCtx.Walk.state.walker.x,y:__homeCtx.Walk.state.walker.y,z:__homeCtx.Walk.state.walker.z},paused:__homeCtx.paused}));}
