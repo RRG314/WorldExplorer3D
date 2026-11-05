@@ -1,5 +1,7 @@
 # Recommended direction for one coherent Explorer
 
+**Owner revision, November 5:** the requested visual introduction is now **choose gender/Explorer → choose career → choose beginning car → review departure**. The updated preview implements that sequence and a fuller landing, with design comparison controls hidden by default. This replaces the earlier B-first preview recommendation for the current review. The shared-progression architecture proposal still awaits selection; no new starter economy or persistent player migration is implied. See [revision details](INTRODUCTION_REVISION.md).
+
 **Recommend Model C: a career-guided sandbox over the existing classless Explorer, with onboarding B: learn one real interaction/result loop, then choose an optional direction. Use Field / cinematic as the default composition, Atlas as an optional map/planning view and Desk for deliberate evidence/preparation.** This is a recommendation for owner approval, not an architecture already selected or broadly implemented.
 
 Try the [interactive review](http://127.0.0.1:4192/docs/career-world-integration/index.html). It offers four models, three first-session routes, three visually distinct TRAIL compositions and desktop/phone views. It imports the original twenty-career catalog/eight backgrounds and genuine imagery. Run native prototypes separately to inspect actual existing ownership contracts. Preview results do not change game saves.

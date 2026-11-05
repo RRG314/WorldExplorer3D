@@ -1,5 +1,7 @@
 # One Explorer: career and world integration review
 
+**November 5 owner revision:** the preview now starts with a full landing and **Explorer → career → first car → departure** introduction, using actual gender/vehicle models. Comparison controls are collapsed below the app. See [the introduction revision](INTRODUCTION_REVISION.md). The earlier B-first recommendation below remains research history; the current preview reflects the owner’s requested career-first sequence. Persistent architecture and production deployment remain unapproved.
+
 Status: review packet prepared; final checks/publication recorded in [verification receipt](VERIFICATION.md). No architecture selected. TRAIL staging and production are unchanged. The owner’s three supplied texts are one deduplicated assignment: comprehensive system/progression R&D plus a first-time-player audit **before** the recommendation is finalized. Broad implementation is explicitly gated on owner review.
 
 **Start with the [interactive visual preview](http://127.0.0.1:4192/docs/career-world-integration/index.html), then the [recommendation](FINAL_ARCHITECTURE_RECOMMENDATION.md).** Four progression models, three introductions, three TRAIL compositions and desktop/phone views. Genuine current assets; no AI imagery or live save changes. “Run native prototypes” executes original source contracts separately from the design simulation.

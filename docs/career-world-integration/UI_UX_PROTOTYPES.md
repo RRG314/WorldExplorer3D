@@ -1,5 +1,7 @@
 # Interactive design review
 
+**Latest owner correction:** the main preview is now a fuller player landing plus a four-step gender/name, career, original-car and departure introduction. The earlier exposed top comparison strip is removed; review settings are collapsed below the app. Actual models rotate, choices survive Back/Edit and Begin carries them forward in preview memory. [Introduction revision](INTRODUCTION_REVISION.md) supersedes the entry-screen presentation described in the original evidence below. No live saves or grants are changed.
+
 Open [the local preview](http://127.0.0.1:4192/docs/career-world-integration/index.html). Source is [index.html](index.html), [preview.js](preview.js), [preview.css](preview.css). It runs through the existing4192 source server; no build/deploy or player save is needed. It uses the app’s TRAIL font/tokens, imported career/background catalog and genuine existing gameplay/reference imagery. No AI image generation or replacement of original player photographs.
 
 ## Three visual compositions

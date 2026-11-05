@@ -7,55 +7,24 @@
     <link rel="icon" href="../../favicon.svg" />
     <link rel="stylesheet" href="../../styles/world-explorer-tokens.css" />
     <link rel="stylesheet" href="preview.css" />
+    <link rel="stylesheet" href="intro.css" />
   </head>
   <body>
-    <div class="review-bar">
-      <a href="README.md">WORLD EXPLORER / DESIGN REVIEW</a
-      ><span>Interactive concept · no game saves changed</span
-      ><a href="FINAL_ARCHITECTURE_RECOMMENDATION.md">Read recommendation ↗</a>
-    </div>
-    <header class="review-controls" aria-label="Design comparison">
-      <label
-        >Progression model<select id="model">
-          <option value="A">A · Starting career + open world</option>
-          <option value="B">B · Classless specializations</option>
-          <option value="C" selected>C · Career-guided sandbox</option>
-          <option value="D">D · Professions + qualifications</option>
-        </select></label
-      >
-      <label
-        >First session<select id="intro">
-          <option value="A">A · Choose career first</option>
-          <option value="B" selected>B · Learn once, choose after</option>
-          <option value="C">C · Explore first</option>
-        </select></label
-      >
-      <label
-        >Composition<select id="composition">
-          <option value="field">Field · cinematic</option>
-          <option value="atlas">Atlas · map and route</option>
-          <option value="desk">Desk · journal and tools</option>
-        </select></label
-      >
-      <label
-        >Display<select id="device">
-          <option value="desktop">Desktop</option>
-          <option value="phone">Phone</option>
-        </select></label
-      >
-      <button id="nativeBtn">Run native prototypes</button
-      ><button id="resetBtn">Reset preview</button>
-    </header>
-    <p id="comparison" class="comparison"></p>
     <div class="app-frame" id="frame" data-device="desktop" data-composition="field">
       <div class="application" id="application">
         <header class="app-header">
           <button class="brand" data-screen="start" aria-label="World Explorer home">
             <span>◎</span> WORLD EXPLORER <em>3D</em>
           </button>
+          <div class="landing-navigation" aria-label="Main destinations">
+            <button data-screen="worlds">Explore</button>
+            <button data-screen="careers">Careers</button>
+            <button data-screen="home">Create</button>
+            <button data-screen="crew">Together</button>
+          </div>
           <div class="header-end">
-            <span class="device-save">◉ Device Journal</span
-            ><button id="menuBtn" aria-label="Open navigation" aria-expanded="false">☰</button>
+            <a class="account-link" href="../../account/">Sign in</a>
+            <button id="menuBtn" aria-label="Open navigation" aria-expanded="false">☰</button>
           </div>
         </header>
         <nav id="nav" aria-label="Explorer navigation" hidden></nav>
@@ -67,13 +36,50 @@
         </footer>
       </div>
     </div>
-    <aside class="review-note">
-      <strong>What is real here?</strong> The career list, backgrounds and imagery come from the
-      app. Screens are clickable design simulations. “Preview result” changes only this page’s
-      memory. The native prototypes separately execute original character, entry, Journal, Backpack
-      and room-policy code with disposable controlled fixtures. They do not complete fieldwork,
-      create an account, join a live room or award connected items.
-    </aside>
+    <details id="designTools" class="design-tools">
+      <summary>Design review &amp; comparison</summary>
+      <div class="review-controls" aria-label="Design comparison">
+        <label
+          >Progression model<select id="model">
+            <option value="A">A · Starting career + open world</option>
+            <option value="B">B · Classless specializations</option>
+            <option value="C" selected>C · Career-guided sandbox</option>
+            <option value="D">D · Professions + qualifications</option>
+          </select></label
+        >
+        <label
+          >First session<select id="intro">
+            <option value="A">A · Choose career first</option>
+            <option value="B" selected>B · Learn once, choose after</option>
+            <option value="C">C · Explore first</option>
+          </select></label
+        >
+        <label
+          >Composition<select id="composition">
+            <option value="field">Field · cinematic</option>
+            <option value="atlas">Atlas · map and route</option>
+            <option value="desk">Desk · journal and tools</option>
+          </select></label
+        >
+        <label
+          >Display<select id="device">
+            <option value="desktop">Desktop</option>
+            <option value="phone">Phone</option>
+          </select></label
+        >
+        <button id="nativeBtn">Run native prototypes</button
+        ><button id="resetBtn">Reset preview</button>
+      </div>
+      <p id="comparison" class="comparison"></p>
+      <p class="review-note">
+        Interactive design preview. Character and vehicle models are the original licensed game
+        assets. Intro choices stay in this page’s memory; no character, item, purchase or save is
+        changed. Existing Garage prices are shown for reference; this preview does not approve a new
+        starter grant. <a href="README.md">Full review</a> ·
+        <a href="FINAL_ARCHITECTURE_RECOMMENDATION.md">Architecture recommendation</a>
+      </p>
+    </details>
+    <p class="preview-scope">Design preview · changes stay here · no game saves affected</p>
     <dialog id="nativeDialog">
       <header>
         <h2>Native source prototypes</h2>
@@ -82,6 +88,8 @@
       <p>Controlled contracts, separate from simulated player screens. No live writes.</p>
       <div id="nativeResults" aria-live="polite"></div>
     </dialog>
+    <script src="../../app/vendor/three/build/three.min.js"></script>
+    <script src="../../app/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
     <script type="module" src="preview.js"></script>
   </body>
 </html>

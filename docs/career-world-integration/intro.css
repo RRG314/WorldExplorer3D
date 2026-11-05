@@ -1,0 +1,893 @@
+/* Player-first review: comparison controls live outside the application. */
+.app-frame {
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+}
+.application {
+  min-height: 100dvh;
+}
+.app-header {
+  padding-inline: clamp(20px, 4vw, 64px);
+}
+.landing-navigation {
+  display: flex;
+  gap: 4px;
+}
+.landing-navigation button {
+  background: transparent;
+  border: 0;
+  color: #d3dbd9;
+}
+.landing-navigation button:hover {
+  color: #ffac7c;
+}
+.account-link {
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.design-tools {
+  margin: 0;
+  padding: 12px 24px;
+  background: #101719;
+  border-top: 1px solid #4c5857;
+}
+.design-tools > summary {
+  width: max-content;
+  padding: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #c5cecb;
+}
+.design-tools .review-controls {
+  padding: 14px 0;
+}
+.design-tools .comparison,
+.design-tools .review-note {
+  margin: 12px 0;
+}
+.preview-scope {
+  padding: 12px 24px;
+  color: #a9b4b0;
+  font-size: 11px;
+  background: #101719;
+}
+.landing-hero {
+  min-height: 650px;
+  min-height: min(760px, calc(100dvh - 76px));
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  background: #1d292b;
+  overflow: hidden;
+}
+.landing-hero > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 56%;
+  z-index: -2;
+}
+.landing-hero > img {
+  transform: scale(1.17);
+}
+.landing-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, #0f191cf5, #122027ad 40%, #12212618 85%),
+    linear-gradient(0deg, #182124d4, transparent 45%);
+}
+.landing-hero-copy {
+  padding: 68px clamp(24px, 5vw, 80px);
+  display: grid;
+  gap: 24px;
+  max-width: 880px;
+}
+.landing-hero h1 {
+  font-size: clamp(56px, 6.4vw, 96px);
+  letter-spacing: -0.015em;
+}
+.landing-hero p {
+  font-size: 18px;
+  max-width: 520px;
+  line-height: 1.65;
+  color: #e1e7e4;
+}
+.landing-hero .actions button {
+  min-height: 52px;
+  padding-inline: 25px;
+}
+.landing-hero small {
+  color: #d4ded9;
+  font-size: 12px;
+}
+.landing-image-credit {
+  position: absolute;
+  right: 24px;
+  bottom: 16px;
+  font-size: 10px;
+  color: #dce7e1;
+}
+.landing-worlds,
+.landing-experiences,
+.landing-return {
+  padding: 55px clamp(24px, 5vw, 80px);
+  display: grid;
+  gap: 28px;
+}
+.landing-worlds {
+  background: #202a28;
+  border-bottom: 1px solid #4d5b54;
+}
+.landing-worlds h2 {
+  margin-top: 12px;
+  max-width: 670px;
+}
+.landing-worlds > button {
+  justify-self: start;
+}
+.world-destinations {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.world-destinations button {
+  background: transparent;
+  border: 0;
+  padding: 12px;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 8px;
+}
+.world-destinations button:hover {
+  background: #35413b;
+}
+.world-destinations img {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #819486;
+  margin-bottom: 8px;
+}
+.world-destinations strong {
+  font-size: 17px;
+}
+.world-destinations small {
+  font-size: 12px;
+  text-align: center;
+  color: #bdc9c1;
+}
+.landing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.landing-feature {
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  text-align: left;
+  background: #222c2b;
+  border-color: #55655e;
+}
+.landing-feature > img {
+  width: 100%;
+  height: 230px;
+  object-fit: cover;
+}
+.landing-feature > span {
+  padding: 26px;
+  display: grid;
+  gap: 12px;
+}
+.landing-feature strong {
+  font: 400 34px/1.1 var(--wx-font-display);
+  text-transform: uppercase;
+}
+.landing-feature p {
+  max-width: 480px;
+  color: #c7d1cc;
+}
+.landing-feature em {
+  color: #ffac7d;
+  font-size: 13px;
+  font-style: normal;
+}
+.landing-create {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-block: 1px solid #536259;
+  background: #202b26;
+}
+.landing-create > img {
+  width: 100%;
+  height: 100%;
+  min-height: 430px;
+  object-fit: cover;
+}
+.landing-create > div {
+  padding: 58px 48px;
+  display: grid;
+  gap: 24px;
+  align-content: center;
+}
+.landing-create p,
+.landing-return p {
+  max-width: 550px;
+  color: #c6d1ca;
+  line-height: 1.65;
+}
+.landing-return {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  background: #171f1e;
+}
+.landing-return h2 {
+  margin: 10px 0 18px;
+}
+.intro-sequence {
+  background: #1c2522;
+  color: #f4f5eb;
+}
+.landing-hero,
+.landing-worlds,
+.landing-experiences,
+.landing-create,
+.landing-return {
+  color: #f4f5eb;
+}
+.landing-experiences {
+  background: #1b2422;
+}
+.intro-progress {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 18px 32px;
+  border-bottom: 1px solid #536257;
+}
+.intro-progress ol {
+  display: flex;
+  gap: 32px;
+  list-style: none;
+  padding: 0;
+  margin: 0 auto;
+}
+.intro-progress li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a2b4a8;
+}
+.intro-progress li > span {
+  border: 1px solid #718b77;
+  border-radius: 50%;
+  min-width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+.intro-progress li > strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.intro-progress li[aria-current] {
+  color: #fff2e7;
+}
+.intro-progress li[aria-current] > span {
+  background: #ff965e;
+  border-color: #ff965e;
+  color: #152019;
+}
+.intro-progress li.done > span {
+  background: #415c49;
+  color: #d5eadb;
+}
+.intro-exit {
+  border: 0;
+  background: transparent;
+}
+.intro-step-count {
+  font-size: 12px;
+  color: #a4b8aa;
+}
+.intro-split {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  min-height: 670px;
+}
+.intro-showroom {
+  position: relative;
+  min-width: 0;
+  min-height: 670px;
+  overflow: hidden;
+  background: #192320;
+}
+.showroom-label {
+  position: absolute;
+  z-index: 1;
+  top: 34px;
+  left: 34px;
+  right: 34px;
+  pointer-events: none;
+}
+.showroom-label h2 {
+  font-size: 32px;
+  margin-top: 10px;
+}
+.intro-model {
+  position: absolute;
+  inset: 0;
+}
+.intro-model canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+  outline-offset: -4px;
+}
+.model-status {
+  position: absolute;
+  top: 50%;
+  left: 24px;
+  right: 24px;
+  text-align: center;
+  color: #dae6de;
+  pointer-events: none;
+}
+.showroom-tools {
+  position: absolute;
+  bottom: 54px;
+  left: 32px;
+  right: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.showroom-tools > span {
+  margin-right: auto;
+  font-size: 11px;
+  color: #b8cabd;
+}
+.showroom-tools button {
+  background: #243c30;
+  border-color: #78907f;
+  width: 44px;
+  padding: 0;
+  font-size: 21px;
+}
+.model-credit {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  bottom: 20px;
+  font-size: 10px;
+  color: #bccbbf;
+}
+.intro-choices {
+  padding: 44px clamp(28px, 4vw, 66px);
+  border-left: 1px solid #4f6455;
+  display: grid;
+  align-content: center;
+  gap: 24px;
+}
+.intro-choices h1 {
+  font-size: clamp(46px, 4.7vw, 70px);
+}
+.intro-choices > p {
+  color: #c6d4c9;
+  max-width: 500px;
+  font-size: 15px;
+  line-height: 1.65;
+}
+.intro-name {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 8px;
+}
+.intro-name > span {
+  margin-left: auto;
+  color: #a9bbae;
+  font-size: 11px;
+}
+.intro-name > input {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 14px;
+  color: #f4f4e9;
+  background: #141e19;
+  border: 1px solid #77907b;
+  border-radius: 3px;
+  font-size: 16px;
+}
+.intro-choices fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.intro-choices legend {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.gender-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.gender-choices button {
+  min-height: 65px;
+  text-align: left;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  background: #253429;
+  border-color: #718876;
+}
+.gender-choices button > span {
+  font-size: 24px;
+  color: #d2e2d2;
+}
+.gender-choices i {
+  margin-left: auto;
+  font-style: normal;
+  color: #ffb082;
+}
+.gender-choices button[aria-pressed='true'],
+.intro-car-list button[aria-pressed='true'] {
+  border: 2px solid #ff965e;
+  background: #354030;
+}
+.intro-hint {
+  color: #b7cab8;
+  font-size: 12px;
+  padding-left: 14px;
+  border-left: 2px solid #6e8b72;
+}
+.intro-bottom {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 32px;
+  border-top: 1px solid #627363;
+  background: #162019f5;
+  box-shadow: 0 -8px 22px #0002;
+}
+.intro-bottom p {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: #b9c8bc;
+}
+.intro-bottom button {
+  min-height: 48px;
+}
+.intro-bottom button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.intro-careers {
+  padding: 40px clamp(24px, 5vw, 70px);
+  display: grid;
+  gap: 28px;
+}
+.intro-section-heading {
+  display: flex;
+  gap: 32px;
+  align-items: end;
+  justify-content: space-between;
+}
+.intro-section-heading h1 {
+  font-size: 60px;
+  margin-top: 12px;
+}
+.intro-section-heading p {
+  color: #c4d3c6;
+  max-width: 420px;
+}
+.intro-career-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.intro-career-choice {
+  display: grid;
+  grid-template-columns: 90px 1fr 24px;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  text-align: left;
+  background: #27372b;
+  border-color: #687f6b;
+}
+.intro-career-choice img,
+.intro-career-symbol {
+  width: 90px;
+  height: 85px;
+  object-fit: cover;
+}
+.intro-career-symbol {
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  background: #354a39;
+  color: #ffae79;
+}
+.intro-career-choice[aria-pressed='true'] {
+  background: #3a462f;
+  border: 2px solid #ff965e;
+}
+.intro-career-copy {
+  display: grid;
+  gap: 7px;
+}
+.intro-career-copy strong {
+  font-size: 15px;
+}
+.intro-career-copy small {
+  color: #b6cbb9;
+  font-size: 11px;
+}
+.selection-mark {
+  color: #ffac79;
+  font-size: 22px;
+}
+.intro-selection {
+  background: #34452d;
+  padding: 22px 26px;
+  border-left: 3px solid #ff965e;
+  display: flex;
+  gap: 28px;
+  justify-content: space-between;
+  align-items: center;
+}
+.intro-selection h3 {
+  margin: 5px 0 8px;
+}
+.intro-selection p {
+  color: #cedac8;
+  font-size: 13px;
+}
+.intro-selection > span {
+  white-space: nowrap;
+  color: #d0dec8;
+  font-size: 11px;
+}
+.intro-car-list {
+  display: grid;
+  gap: 10px;
+}
+.intro-car-list button {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  padding: 15px 18px;
+  background: #273a2b;
+  border-color: #738b76;
+}
+.intro-car-list button > span:first-child {
+  display: grid;
+  gap: 6px;
+}
+.intro-car-list small {
+  font-size: 11px;
+  color: #c1d0be;
+}
+.intro-car-list button > span:last-child {
+  color: #ffad7b;
+  font-size: 22px;
+}
+.intro-departure {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+}
+.departure-image {
+  position: relative;
+  min-height: 650px;
+}
+.departure-image > img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+.departure-image:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #122019be, transparent 60%);
+}
+.departure-image > span {
+  position: absolute;
+  z-index: 1;
+  bottom: 24px;
+  left: 24px;
+  font-size: 10px;
+  color: #e0e9df;
+}
+.departure-copy {
+  padding: 44px clamp(28px, 4vw, 65px);
+  display: grid;
+  gap: 24px;
+}
+.departure-copy h1 {
+  font-size: 62px;
+}
+.departure-copy p {
+  color: #c7d8c8;
+}
+.departure-summary {
+  display: grid;
+  gap: 0;
+}
+.departure-summary button {
+  border: 0;
+  border-bottom: 1px solid #617961;
+  background: transparent;
+  padding: 16px 0;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+.departure-summary small {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #b6ccb5;
+}
+.departure-summary button > span {
+  font-size: 11px;
+  color: #ffad7c;
+}
+.first-assignment {
+  background: #35462e;
+  padding: 20px 22px;
+  border: 1px solid #768f6d;
+  display: grid;
+  gap: 8px;
+}
+.first-assignment p {
+  font-size: 13px;
+}
+.first-assignment small {
+  color: #ccddc5;
+  font-size: 11px;
+}
+@container (max-width:1000px) {
+  .landing-navigation {
+    display: none;
+  }
+  .intro-career-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .intro-progress {
+    gap: 12px;
+    padding: 14px 18px;
+  }
+  .intro-progress ol {
+    gap: 18px;
+  }
+  .intro-progress li strong {
+    font-size: 11px;
+  }
+}
+@container (max-width:700px) {
+  .intro-sequence {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: calc(100dvh - 66px);
+  }
+  .intro-sequence > :is(.intro-split, .intro-careers, .intro-departure) {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    min-height: 0;
+  }
+  .intro-sequence > .intro-split {
+    display: block;
+  }
+  .intro-sequence > .intro-departure {
+    display: block;
+  }
+  .intro-sequence .intro-bottom {
+    position: relative;
+    bottom: auto;
+  }
+  .app-header {
+    padding-inline: 16px;
+  }
+  .header-end {
+    gap: 15px;
+  }
+  .account-link {
+    font-size: 12px;
+  }
+  .landing-hero {
+    min-height: 570px;
+  }
+  .landing-hero-copy {
+    padding: 44px 24px 66px;
+    gap: 22px;
+  }
+  .landing-hero h1 {
+    font-size: 56px;
+  }
+  .landing-hero p {
+    font-size: 16px;
+  }
+  .landing-hero .actions {
+    gap: 12px;
+  }
+  .landing-hero .actions button {
+    padding-inline: 17px;
+  }
+  .landing-image-credit {
+    right: 18px;
+    font-size: 9px;
+  }
+  .landing-worlds,
+  .landing-experiences,
+  .landing-return {
+    padding: 34px 20px;
+  }
+  .landing-worlds h2,
+  .landing-experiences h2,
+  .landing-return h2 {
+    font-size: 34px;
+  }
+  .world-destinations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .world-destinations img {
+    height: 74px;
+    width: 74px;
+  }
+  .world-destinations button {
+    padding-inline: 0;
+  }
+  .landing-feature-grid {
+    grid-template-columns: 1fr;
+  }
+  .landing-feature > img {
+    height: 185px;
+  }
+  .landing-feature > span {
+    padding: 22px;
+  }
+  .landing-create {
+    grid-template-columns: 1fr;
+  }
+  .landing-create > img {
+    min-height: 250px;
+    max-height: 300px;
+  }
+  .landing-create > div {
+    padding: 32px 22px;
+  }
+  .landing-return {
+    grid-template-columns: 1fr;
+  }
+  .intro-progress ol {
+    gap: 10px;
+  }
+  .intro-progress li {
+    gap: 5px;
+  }
+  .intro-progress li strong {
+    display: none;
+  }
+  .intro-progress li > span {
+    min-width: 26px;
+    height: 26px;
+  }
+  .intro-step-count {
+    display: none;
+  }
+  .intro-split,
+  .intro-departure {
+    grid-template-columns: 1fr;
+  }
+  .intro-showroom {
+    min-height: 330px;
+  }
+  .showroom-label {
+    top: 22px;
+    left: 22px;
+  }
+  .showroom-label h2 {
+    font-size: 25px;
+  }
+  .showroom-label .eyebrow {
+    font-size: 9px;
+  }
+  .showroom-tools {
+    left: 22px;
+    right: 22px;
+    bottom: 40px;
+  }
+  .model-credit {
+    left: 22px;
+    right: 22px;
+    bottom: 12px;
+    font-size: 9px;
+  }
+  .intro-choices {
+    padding: 30px 22px;
+    border: 0;
+    border-top: 1px solid #536a55;
+    gap: 20px;
+  }
+  .intro-choices h1 {
+    font-size: 44px;
+  }
+  .intro-bottom {
+    padding: 14px 16px;
+    gap: 12px;
+    justify-content: space-between;
+  }
+  .intro-bottom p {
+    display: none;
+  }
+  .intro-bottom button {
+    font-size: 12px;
+    padding-inline: 12px;
+  }
+  .intro-section-heading {
+    display: block;
+  }
+  .intro-section-heading h1 {
+    font-size: 44px;
+    margin-bottom: 18px;
+  }
+  .intro-careers {
+    padding: 30px 18px;
+  }
+  .intro-career-grid {
+    grid-template-columns: 1fr;
+  }
+  .intro-career-choice {
+    padding: 12px;
+  }
+  .intro-selection {
+    padding: 18px;
+    gap: 12px;
+  }
+  .intro-selection > span {
+    display: none;
+  }
+  .departure-image {
+    min-height: 230px;
+  }
+  .departure-copy {
+    padding: 28px 22px;
+  }
+  .departure-copy h1 {
+    font-size: 46px;
+  }
+}
+@media (max-width: 650px) {
+  .app-frame {
+    margin: 0;
+  }
+  .design-tools {
+    padding: 10px 12px;
+  }
+}

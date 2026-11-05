@@ -5,6 +5,7 @@ import {
   experiencePresentation,
 } from '../../app/js/ui/experience-presentation.js';
 import { runNativePrototypes } from './native-prototypes.js';
+import { createIntroSequence } from './intro-sequence.js';
 
 const $ = (s) => document.querySelector(s),
   escape = (s) =>
@@ -75,7 +76,30 @@ const s = {
   crew: false,
   shop: false,
   notices: true,
+  explorerName: 'Explorer',
+  gender: 'man',
+  vehicleId: 'bmw_e34',
+  vehicleLabel: 'BMW 525i E34',
+  setupComplete: false,
 };
+const introFlow = createIntroSequence({
+  onChange: () => render(),
+  onBegin: (draft) => {
+    Object.assign(s, {
+      explorerName: draft.name.trim() || 'Explorer',
+      gender: draft.gender,
+      career: draft.careerId,
+      focus: draft.careerId === 'career:explorer' ? null : draft.careerId,
+      vehicleId: draft.vehicleId,
+      vehicleLabel: draft.vehicleLabel,
+      world: draft.destination.world,
+      setupComplete: true,
+      prepared: true,
+      screen: 'play',
+    });
+    render({ focus: true });
+  },
+});
 const params = new URLSearchParams(location.search);
 for (const key of ['model', 'intro', 'composition', 'device'])
   if ([...$('#' + key).options].some((o) => o.value === params.get(key))) s[key] = params.get(key);
@@ -111,19 +135,51 @@ function mapScene() {
     )}</svg><div class="map-label"><span class="eyebrow">TRAINING ROUTE · SCHEMATIC</span><h3>One task at a time</h3><small>Map context → field evidence → review</small></div><span class="map-caption">Gameplay chart + illustrative route; not live survey coordinates</span></div>`;
 }
 function start() {
-  const m = models[s.model];
-  return (
-    hero(
-      m.home,
-      'Earth, oceans and the Solar System. One Explorer, with room to change your mind.',
-      {
-        actions:
-          button(m.cta, m.target, 'primary') +
-          button('Continue without a focus', 'worlds', 'quiet'),
-      }
-    ) +
-    `<div class="content">${heading('A FIRST SESSION THAT FITS YOU', 'Start with a little guidance', 'No career locks. No required purchase. Keep the globe and every travel mode.')}<div class="cards">${card('Learn as you go', intros[s.intro], action('Try this introduction', 'intro', 'primary'), 'FIRST JOURNEY')}${card('Choose a place', 'Keep the familiar globe. Choose Earth, the ocean or a space destination.', button('Choose destination', 'worlds'), 'EXPLORE')}${card('Bring your progress', 'Returning players keep their character, tools, Journal, homes and active journeys.', button('See returning-player view', 'returning'), 'CONTINUE')}</div></div>`
-  );
+  const journeys = [
+    [
+      'RACE THE ROADS',
+      'Racing & driving',
+      'Choose a real car, find an event, or create a clean course of your own.',
+      'driving-1b41f3116f83.webp',
+      'career:racer',
+    ],
+    [
+      'FOLLOW YOUR CURIOSITY',
+      'Fieldwork & discovery',
+      'Read the landscape, uncover the past, and keep a record of what you learn.',
+      'museum-ec196f05eadc.webp',
+      'career:geologist',
+    ],
+    [
+      'GO BELOW THE SURFACE',
+      'Oceans & marine life',
+      'Board a research vessel, explore underwater, and return with a story.',
+      'diving-e47bc4881b7d.webp',
+      'career:oceanographer',
+    ],
+    [
+      'LOOK BEYOND EARTH',
+      'Space & the night sky',
+      'Navigate the Solar System and prepare for supported planetary fieldwork.',
+      'space-fd854981b14d.webp',
+      'career:planetary-scientist',
+    ],
+  ];
+  return `<section class="landing-hero"><img src="${asset('drone-cf7691b9c943.webp')}" alt="Actual World Explorer gameplay above mapped Baltimore"><div class="landing-hero-copy"><span class="eyebrow">ONE EXPLORER. A WORLD OF POSSIBILITIES.</span><h1>Make the world<br>your next story.</h1><p>Choose who you are. Find what moves you. Start on familiar streets, head out to sea, or set your sights beyond Earth.</p><div class="actions">${action('Start your journey →', 'start-journey', 'primary')}${s.setupComplete ? button(`Continue as ${escape(s.explorerName)}`, 'play', 'quiet') : button('Explore freely', 'worlds', 'quiet')}</div><small>Character → Career → First car → Begin</small></div><span class="landing-image-credit">Actual gameplay · mapped Baltimore</span></section>
+  <section class="landing-worlds"><div><span class="eyebrow">CHOOSE YOUR HORIZON</span><h2>A globe. An ocean. A sky full of places.</h2></div><div class="world-destinations">${[
+    ['earth', 'earth.jpg', 'Earth', 'Cities, roads & landscapes'],
+    ['moon', 'moon.jpg', 'Moon & Mars', 'Planetary exploration'],
+    ['space', 'space.jpg', 'Space', 'Stars, planets & journeys'],
+    ['ocean', 'ocean-gameplay-20261104.png', 'Ocean', 'Vessels, reefs & research'],
+  ]
+    .map(
+      ([id, img, name, sub]) =>
+        `<button data-landing-world="${id}"><img src="../../app/assets/textures/ui-thumbnails/${img}" alt="${name}"><strong>${name}</strong><small>${sub}</small></button>`
+    )
+    .join('')}</div>${button('Open the globe selector ↗', 'worlds')}</section>
+  <section class="landing-experiences"><div class="section-heading"><div><span class="eyebrow">FIND YOUR KIND OF ADVENTURE</span><h2>More than one way to explore.</h2></div>${button('See all careers', 'careers', 'quiet')}</div><div class="landing-feature-grid">${journeys.map(([tag, title, body, img, id]) => `<button class="landing-feature" data-career="${id}"><img src="${asset(img)}" alt="Actual ${title.toLowerCase()} gameplay"><span><small class="eyebrow">${tag}</small><strong>${title}</strong><p>${body}</p><em>Discover more ↗</em></span></button>`).join('')}</div></section>
+  <section class="landing-create"><img src="${asset('research-interior-cf113dcb5303.webp')}" alt="Actual game research interior"><div><span class="eyebrow">MAKE SOMETHING WORTH RETURNING TO</span><h2>A place of your own.<br>A journey to share.</h2><p>Build a useful workspace, create a route or track, keep an album, and meet other Explorers in shared rooms.</p><div class="actions">${button('Create & build', 'home', 'primary')}${button('Explore together', 'crew')}</div></div></section>
+  <section class="landing-return"><div><span class="eyebrow">ALREADY AN EXPLORER?</span><h2>Your story keeps going.</h2><p>Return to your Journal, tools, vehicles and unfinished work. Choose a new direction whenever you like.</p></div><div class="actions">${button('Continue exploring', 'returning', 'primary')}${button('Open Journal', 'journal')}</div></section>`;
 }
 function worlds() {
   return (
@@ -169,17 +225,8 @@ function careerDetail() {
       eyebrow: c.assignment,
       image: p.image,
       actions:
-        action(
-          s.model === 'A'
-            ? 'Use as starting direction'
-            : s.model === 'D'
-              ? 'Follow this pathway'
-              : s.model === 'B'
-                ? 'Find related work'
-                : 'Track this focus',
-          'focus',
-          'primary'
-        ) + button('Back to all interests', 'careers'),
+        action('Start with this career →', 'career-journey', 'primary') +
+        button('Back to all interests', 'careers'),
     }) +
     `<div class="content"><div class="split"><div class="stack">${heading('FIRST PLAYABLE WORK', c.assignment)}<ol class="step-list"><li>Review the place, tools and original activity requirements.</li><li>Start the actual assignment through its existing entry.</li><li>Do the work in the world, then review its saved record.</li></ol><div class="notice">${c.id === 'career:expedition-pilot' ? 'Harbor Run currently starts with a road delivery. A complete aviation profession is a future extension.' : c.id === 'career:mining-engineer' ? 'A fictional quarry training yard. Map references do not create deposits, land rights or extraction permission.' : 'Existing gameplay stays with its original owner. A focus changes guidance, not the rules of the world.'}</div></div><div class="stack">${card('What carries across', 'One character, Backpack and Journal. Your other studies and travel are kept.', button('See shared progress', 'progress'))}${card('Prepare first', 'The course may provide instruments. Other equipment remains in your existing Backpack and stores.', button('Inspect your kit', 'kit'))}${card('Your starting character', 'Background and interests are separate. Existing players never receive a forced replacement.', button('See backgrounds', 'identity'))}</div></div></div>`
   );
@@ -196,27 +243,35 @@ function play() {
     ? CAREER_EXPERIENCES.find((c) => c.id === s.focus)?.label
     : 'Free exploration';
   const objectives =
-    s.world === 'ocean'
+    c.id === 'career:racer' && s.focus
       ? [
-          'Review the vessel chart',
-          'Use the provided instrument at a station',
-          'Return and compare the records',
+          'Review your selected car in the Garage',
+          'Choose a supported event and finish your first race',
+          'Keep the result and review your car’s condition',
         ]
-      : s.world === 'space' || s.world === 'moon'
+      : s.world === 'ocean'
         ? [
-            'Check the mission and return reserve',
-            'Compare supported field observations',
-            'Return to the ship and review',
+            'Review the vessel chart',
+            'Use the provided instrument at a station',
+            'Return and compare the records',
           ]
-        : [
-            'Approach the offered field lead',
-            'Use its actual interaction and finish the work',
-            'Record and review the result',
-          ];
+        : s.world === 'space' || s.world === 'moon'
+          ? [
+              'Check the mission and return reserve',
+              'Compare supported field observations',
+              'Return to the ship and review',
+            ]
+          : [
+              'Approach the offered field lead',
+              'Use its actual interaction and finish the work',
+              'Record and review the result',
+            ];
   return (
     hero(
       s.world === 'earth' ? 'Baltimore' : s.world === 'ocean' ? 'Coral Shelf' : 'Solar System',
-      'The world stays in view. One deliberate objective; everything else is in the menu.',
+      s.setupComplete
+        ? `${s.explorerName} · ${focus} · ${s.vehicleLabel}. Follow your first chapter, or explore at your own pace.`
+        : 'The world stays in view. One deliberate objective; everything else is in the menu.',
       {
         eyebrow: focus,
         actions: action('Preview a result', 'record', 'primary') + button('Change focus', 'switch'),
@@ -343,6 +398,7 @@ const screens = {
   travel,
   home,
   controls,
+  setup: () => introFlow.render(),
   switch: () =>
     `<div class="content">${heading('CHANGE DIRECTION · KEEP YOUR STORY', 'What interests you next?', 'A new focus never spends credits, grants duplicates or abandons an active task. Starting another activity is a separate action.')}<div class="cards">${CAREER_EXPERIENCES.filter(
       (c) => ['career:geologist', 'career:racer', 'career:oceanographer'].includes(c.id)
@@ -372,6 +428,9 @@ const nav = [
 ];
 $('#nav').innerHTML = nav.map(([id, t]) => button(t, id)).join('');
 function render({ focus = false } = {}) {
+  const previousIntroStep = $('#application').dataset.introStep;
+  const introScroll =
+    $('#view').querySelector('.intro-split,.intro-careers,.intro-departure')?.scrollTop || 0;
   for (const key of ['model', 'intro', 'composition', 'device']) $('#' + key).value = s[key];
   $('#frame').dataset.device = s.device;
   $('#frame').dataset.composition = s.composition;
@@ -379,7 +438,16 @@ function render({ focus = false } = {}) {
     `${models[s.model].title}: ${models[s.model].note} First session ${s.intro}: ${intros[s.intro]}`;
   $('#identityLabel').textContent =
     `ONE EXPLORER · ${s.focus ? models[s.model].identity + ': ' + career().label.toUpperCase() : 'FREE EXPLORATION'}`;
+  if (s.screen !== 'setup') introFlow.dispose();
   $('#view').innerHTML = (screens[s.screen] || start)();
+  $('#application').dataset.screen = s.screen;
+  if (s.screen === 'setup') introFlow.mount($('#view'));
+  if (s.screen === 'setup' && previousIntroStep === String(introFlow.snapshot().step)) {
+    const pane = $('#view').querySelector('.intro-split,.intro-careers,.intro-departure');
+    if (pane) pane.scrollTop = introScroll;
+  }
+  $('#application').dataset.introStep =
+    s.screen === 'setup' ? String(introFlow.snapshot().step) : '';
   $('#nav').hidden = !(s.composition === 'atlas' && s.device === 'desktop' && innerWidth >= 1050);
   $('#menuBtn').setAttribute('aria-expanded', String(!$('#nav').hidden));
   if (focus) $('#view').focus({ preventScroll: true });
@@ -429,7 +497,41 @@ document.addEventListener('click', async (e) => {
       step: 0,
       crew: false,
       shop: false,
+      explorerName: 'Explorer',
+      gender: 'man',
+      vehicleId: 'bmw_e34',
+      vehicleLabel: 'BMW 525i E34',
+      setupComplete: false,
     });
+    introFlow.reset();
+    render({ focus: true });
+    return;
+  }
+  if (s.screen === 'setup') {
+    if (b.dataset.intro === 'exit') {
+      s.screen = 'start';
+      render({ focus: true });
+      return;
+    }
+    const oldStep = introFlow.snapshot().step;
+    if (introFlow.click(b)) {
+      if (introFlow.snapshot().step !== oldStep) {
+        $('#view').focus({ preventScroll: true });
+        $('#view').scrollIntoView({ block: 'start' });
+      } else
+        for (const key of ['gender', 'introCareer', 'introCar', 'introGroup'])
+          if (b.dataset[key])
+            $('#view')
+              .querySelector(
+                `[data-${key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}="${b.dataset[key]}"]`
+              )
+              ?.focus({ preventScroll: true });
+      return;
+    }
+  }
+  if (b.dataset.landingWorld) {
+    s.world = b.dataset.landingWorld;
+    s.screen = 'worlds';
     render({ focus: true });
     return;
   }
@@ -455,6 +557,18 @@ document.addEventListener('click', async (e) => {
     return;
   }
   const a = b.dataset.action;
+  if (a === 'start-journey') {
+    s.screen = 'setup';
+    introFlow.restart();
+    $('#view').scrollIntoView({ block: 'start' });
+    return;
+  }
+  if (a === 'career-journey') {
+    s.screen = 'setup';
+    introFlow.startWithCareer(s.career);
+    $('#view').scrollIntoView({ block: 'start' });
+    return;
+  }
   if (a === 'intro') s.screen = 'intro';
   if (a === 'focus') {
     s.focus = s.career;
@@ -478,6 +592,7 @@ document.addEventListener('click', async (e) => {
   }
   if (a) render({ focus: true });
 });
+document.addEventListener('input', (e) => introFlow.input(e.target));
 document.addEventListener('change', (e) => {
   if (e.target.id === 'prepared') {
     s.prepared = e.target.checked;
@@ -503,4 +618,6 @@ window.render_game_to_text = () =>
     scope: 'design-simulation-no-game-saves',
     ...s,
     native: window.nativePrototypeResult?.ok ?? null,
+    introduction: introFlow.snapshot(),
   });
+addEventListener('pagehide', () => introFlow.dispose());

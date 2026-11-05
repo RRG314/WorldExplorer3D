@@ -1,5 +1,22 @@
 # R&D verification receipt
 
+## November 5 landing/introduction revision
+
+Owner asked to replace the exposed comparison strip with a simple gender/career/first-car introduction and a fuller landing. This is review-prototype work only. The latest presentation is documented in [Introduction revision](INTRODUCTION_REVISION.md); original full-app/gameplay evidence below stays accepted.
+
+- `introduction-1793882476403`: initial full desktop and native-touch sequence passes. Both original character models, four real car assets, family filters, Back/Edit and name/gender/career/car carry-through, free exploration, no localStorage write and model lease release. All10images opened. Functional acceptance retained; initial raw multi-car BMW and pale floor images invalidated for presentation.
+- `introduction-1793882685584`: corrected original single-car E34 preparation and dark showroom, scoped desktop/phone visual checks pass. Corrected BMW and character images opened. Existing loader/model-owner code reused, not a new source-asset transformation policy.
+- `introduction-1793882823951`: retained phone verifier failure. It hit-tested an offscreen gender control after focusing the name; failure message incorrectly attributed this to the footer. No page or console error. Corrected verifier explicitly scrolls the target into view.
+- `introduction-1793882898681`: native touch/visible-control hit test passes with separate mobile content/action rows. Image review also motivated preserving the content scroll position when a selection rerenders.
+- `introduction-1793883090400`: affected phone-only sequence passes after scroll preservation, including native selection of Woman/Racer/BMW M3, correct Begin values, no page/console errors and released leases. It checks that choosing a car does not jump the selection list.
+- `introduction-1793882987740`: focused keyboard-step focus, preview Reset and rapid leaving-during-load checks pass; all original model leases release. Reset changes only disposable preview state.
+- The source guard then caught an asynchronous `waitForFunction` predicate in the lease verifier. Earlier lease-wait assertions are superseded, while their UI/choice/image observations remain valid. The helper now resolves its import first, uses a synchronous predicate and explicitly reads the result. Focused resource/reset/late-load recheck `introduction-1793883304598` passes with no page/console errors. This verification-only correction does not replay accepted gameplay.
+- The prescribed skill client `intro-official-loop` reports the correct Woman selection, but its direct WebGL canvas export is black because the on-demand renderer does not preserve its drawing buffer. That image is **not** accepted model evidence; actual browser page captures above show the models. A separate `intro-official-navigation` run exercises the new landing’s Earth entry with a page image/state.
+
+No new production/staging candidate, account, item grant, purchase, character/profile write or deployed render loop. Original accepted science/racing procedures were not repeated. Publication/source gate results for this revision are recorded with the exact commit in CURRENT-STATE.md and the local ledger.
+
+---
+
 Baseline source98dbf5d4, branch `steven/career-world-rnd-20261105`, based on the completed TRAIL staging branch. This is a research review packet plus an independent local tutorial presentation repair. No major career architecture selected, no live player writes, no staged replacement or production deployment. Existing accepted careers, venue laps, steady-driving, save/media, backend and platform evidence remain accepted at their original scopes.
 
 ## New evidence
