@@ -30,7 +30,7 @@ finish() {
     xcrun simctl spawn "$APPLE_SIMULATOR" log show --style compact --info --debug --last 20m --predicate 'process == "LivingPortalWidget" OR (eventMessage CONTAINS[c] "worldexplorer" AND (subsystem BEGINSWITH[c] "com.apple.widgetkit" OR process == "runningboardd" OR process == "SpringBoard"))' > "$APPLE_PRIVATE/widget-system.log" 2>&1 || true
     sanitize "$APPLE_PRIVATE/widget-system.log" "apple-portal-evidence/widget-system.log"
   fi
-  for step in resolve build test native-live; do
+  for step in resolve build test native-live archive; do
     if test -f "$APPLE_PRIVATE/$step.log"; then sanitize "$APPLE_PRIVATE/$step.log" "apple-portal-evidence/$step.log"; fi
   done
   if test -d "$APPLE_PRIVATE/Portal.xcresult"; then
@@ -116,3 +116,12 @@ Path('apple-portal-evidence/journey-status.json').write_text(json.dumps({'uiExit
 PY
 test "$APPLE_UI_STATUS" = 0
 test "$APPLE_LIVE_STATUS" = not-requested || test "$APPLE_LIVE_STATUS" = 0
+
+# Produce device binaries without exporting or sharing any signing credential.
+# Local signing and App Store upload remain separate from simulator acceptance.
+if test "${WE3D_PORTAL_APPLE_APP_ONLY:-false}" = true; then
+    printf '%s\n' 'Apple phase: archive the release device app without signing credentials'
+    xcodebuild archive -project apple/WorldExplorerPortal.xcodeproj -scheme WorldExplorerPortal -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/WorldExplorer3D.xcarchive" -clonedSourcePackagesDirPath "$RUNNER_TEMP/we3d-apple-packages" -disableAutomaticPackageResolution CODE_SIGNING_ALLOWED=NO > "$APPLE_PRIVATE/archive.log" 2>&1
+    tar -czf apple-portal-evidence/WorldExplorer3D-unsigned.xcarchive.tar.gz -C "$RUNNER_TEMP" WorldExplorer3D.xcarchive
+    printf '%s\n' 'Unsigned archive only; not an installable iPhone app or TestFlight submission.' > apple-portal-evidence/archive-status.txt
+fi
