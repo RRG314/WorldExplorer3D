@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
 import { fixture, envelope } from './helpers/journey-service-fixture.mjs';
 import { createMemoryDiscoveryProfileStore } from '../app/js/discovery/profile-store.js';
 import { createLocalBackpackStore } from '../app/js/player/backpack-store.js';
@@ -12,15 +11,22 @@ import {
   createJourneyRestoreOwner,
 } from '../app/js/player/journey-snapshot.js';
 import { encodeJourney, decodeJourney } from '../app/js/player/journey-codec.js';
-const seed = JSON.parse(
-  await fs.readFile(
-    new URL(
-      '../output/verification/cinematic-app-20261105/journey-1793890040223/qa-fieldwork-backup.json',
-      import.meta.url
-    ),
-    'utf8'
-  )
-);
+// Portable component fixture built by the original store. Browser acceptance
+// separately retains the genuine saved Journal; CI must not depend on output/.
+const seed = await createMemoryDiscoveryProfileStore({
+  profile: {
+    journeyPreferences: { explorerName: 'River' },
+    activeExperience: {
+      schemaVersion: 1, experienceId: 'career:geologist', definitionVersion: 1,
+      revision: 1, variantId: 'campaign', resumeId: '', selectedAt: 1000,
+      place: { id: 'druid-hill-geology', name: 'Druid Hill Park', environment: 'earth', lat: 39.3189, lon: -76.6363 },
+    },
+  },
+  events: [{ eventId: 'test:journal:observation', type: 'explorer-story', schemaVersion: 1,
+    eventType: 'observation-recorded', occurredAt: 1000, name: 'Test field note',
+    sourceSystem: 'test-fixture', sourceId: 'observation', metadata: {} }],
+}).exportData();
+
 function memoryStorage() {
   const map = new Map();
   return {
@@ -103,7 +109,7 @@ test('codec and authenticated transport preserve a multi-block save and reject c
   });
   await assert.rejects(other.download(owner, manifest), (e) => e.status === 404);
 });
-test('real Journal and personal Backpack restore across devices without adding rewards, then stay logically identical after reload', async () => {
+test('original Journal store and personal Backpack restore across devices without adding rewards, then stay logically identical after reload', async () => {
   const f = fixture(),
     a = device(f, { backup: seed }),
     b = device(f);

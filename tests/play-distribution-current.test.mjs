@@ -126,3 +126,12 @@ test('App Store links retain context with storage denied and cannot be inherited
   assert.equal(page({ storageFails: true, referrer: link.href }).distribution.isAppStore, true);
   assert.equal(page({ referrer: 'https://other.example/?distribution=app-store' }).distribution.isStoreEdition, false);
 });
+
+
+test('a retained version-one Play bootstrap still rejects web purchases', async () => {
+  const p = page();
+  p.context.WorldExplorerDistribution = Object.freeze({ isGooglePlay: true, url: href => href });
+  const { api, requests } = await billing(p);
+  await assert.rejects(api.redirectToCheckout('pro'), /Purchases are unavailable/);
+  assert.equal(requests.length, 0);
+});
