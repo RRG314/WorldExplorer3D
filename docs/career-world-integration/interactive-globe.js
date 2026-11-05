@@ -1,5 +1,5 @@
 import { createGlobeSelectorScene } from '../../app/js/ui/globe-selector/scene.js?v=22';
-import { searchPlaces } from '../../app/js/places/place-search.js?v=4';
+import { searchPlaces } from '../../app/js/places/place-search.js?v=5';
 
 const escape = (value) =>
   String(value).replace(

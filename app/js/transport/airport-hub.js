@@ -1,5 +1,5 @@
 import {completeAirportTransfer} from './airport-transfer.js';
-import { searchPlaces } from '../places/place-search.js?v=4';
+import { searchPlaces } from '../places/place-search.js?v=5';
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);

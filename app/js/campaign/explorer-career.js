@@ -32,7 +32,7 @@ export function explorerCareerView(profile = {}, events = []) {
       id: 'delivery',
       label: 'Harbor Run',
       complete: profile.harborRun?.phase === 'complete',
-      target: 'career:expedition-pilot',
+      target: 'activity:harbor-run',
       recordId: 'event:campaign-completed:harbor-run:v1',
       branch: true,
     },

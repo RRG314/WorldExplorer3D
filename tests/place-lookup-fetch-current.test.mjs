@@ -10,3 +10,21 @@ test('authenticated data transport never acquires a token for an unrelated endpo
  let tokenCalls=0;const request=createPlaceLookupFetch({getToken:async()=>{tokenCalls++;return 'test';},fetchImpl:async()=>new Response('{}')});
  await assert.rejects(request('/unrelated'),TypeError);assert.equal(tokenCalls,0);
 });
+
+test('shared lookup cooldown retries are bounded, authenticated and honor Retry-After',async()=>{
+ let calls=0,tokens=0;const waits=[];
+ const request=createPlaceLookupFetch({getToken:async()=>{tokens++;return 'test-attestation';},waitImpl:async ms=>waits.push(ms),fetchImpl:async(url,options)=>{
+  assert.equal(options.headers.get('X-Firebase-AppCheck'),'test-attestation');calls++;
+  return calls<3?new Response('{}',{status:429,headers:{'Retry-After':'2'}}):new Response('[]');
+ }});
+ assert.equal((await request('/api/geospatial/search')).status,200);assert.equal(calls,3);assert.equal(tokens,1);assert.deepEqual(waits,[2000,2000]);
+ calls=0;const busy=createPlaceLookupFetch({getToken:async()=>'',waitImpl:async()=>{},fetchImpl:async()=>{calls++;return new Response('{}',{status:429,headers:{'Retry-After':'2'}});}});
+ assert.equal((await busy('/api/geospatial/search')).status,429);assert.equal(calls,3);
+});
+test('closing a search interrupts its cooldown before another request',async()=>{
+ const controller=new AbortController();let calls=0;
+ const request=createPlaceLookupFetch({getToken:async()=>'',fetchImpl:async()=>{calls++;return new Response('{}',{status:429,headers:{'Retry-After':'2'}});}});
+ const pending=request('/api/geospatial/search',{signal:controller.signal});
+ await new Promise(resolve=>setTimeout(resolve,5));controller.abort();
+ await assert.rejects(pending,{name:'AbortError'});assert.equal(calls,1);
+});

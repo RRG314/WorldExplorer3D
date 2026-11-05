@@ -1,7 +1,7 @@
 import {CORAL_SHELF_SITE} from '../ocean/habitat-plan.js';
 import { oceanEntryDecision } from '../ocean/entry-policy.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { searchPlaces } from '../places/place-search.js?v=4';
+import { searchPlaces } from '../places/place-search.js?v=5';
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=3';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
@@ -247,7 +247,7 @@ function createGlobeSelector(options = {}) {
     if (!startBtn) return;
     startBtn.disabled = !!isBusy || !selected;
     startBtn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
-    startBtn.textContent = isBusy ? 'Loading...' : 'Explore';
+    startBtn.textContent = isBusy ? 'Loading...' : (options.startLabel?.() || 'Explore');
   }
 
   function setSelection(lat, lon, meta = {}) {
@@ -656,6 +656,7 @@ function createGlobeSelector(options = {}) {
       const available = options.canGoBack?.() !== false;
       backBtn.hidden = !available;
       backBtn.style.display = available ? '' : 'none';
+      backBtn.textContent = options.backLabel?.() || 'Close';
     }
     document.body.classList.add('start-hub-open');
     setGlobeSelectorScrollLock(true);

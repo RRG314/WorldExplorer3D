@@ -1,3 +1,4 @@
+import {applyCareerFocus} from '../character/journey-preferences.js';
 import {beginSoloRacer,soloRacerSummary} from '../campaign/solo-racer.js';
 import {createExperienceEntry} from './entry.js';
 import {createExperienceBrowser} from '../ui/experience-browser.js';
@@ -48,6 +49,7 @@ export function createExperienceController({runtime,getTitleUi,onJournal,closeMe
  });
  const browser=createExperienceBrowser({
   readContext:context,readProfile:async()=> (await getStore()).getProfile(),resolveAdapter:(id,row)=>adapters.get(id)||adapters.get(row.id),
+  onFocus:async id=>(await getStore()).saveProfile(current=>applyCareerFocus(current,id)),
   saveSelection:async intent=>(await getStore()).saveProfile(current=>({...current,activeExperience:{...intent,selectedAt:Date.now()}})),
   onBegin:intent=>entry.start(intent),onEntered:requestWorldFocus,onJournal,
   onLayer:open=>{runtime.screenLayout?.setPanelLayer('experiences',open);runtime.setPauseReason?.('experience-browser',open&&runtime.gameStarted);if(open)closeMenus();}

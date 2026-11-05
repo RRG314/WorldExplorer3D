@@ -11,7 +11,7 @@ export const EXPERIENCE_GROUPS = Object.freeze([
 ].map(Object.freeze));
 
 const groups = {
-  racer:'motion', 'expedition-pilot':'motion',
+  'harbor-run':'motion', racer:'motion', 'expedition-pilot':'motion',
   geologist:'land', archaeologist:'land', 'mining-engineer':'land', palaeontologist:'land', 'wildlife-ecologist':'land', botanist:'land',
   oceanographer:'water', 'marine-biologist':'water', hydrologist:'water', meteorologist:'water',
   'planetary-scientist':'space', astronomer:'space', 'accelerator-scientist':'space',
@@ -19,6 +19,7 @@ const groups = {
 };
 const references = {geologist:'granite', 'mining-engineer':'quartz', palaeontologist:'fossil-shells', 'wildlife-ecologist':'white-tailed-deer', botanist:'dandelion', 'companion-handler':'trail-hound'};
 const gameplay = {
+  'harbor-run':['driving-1b41f3116f83.webp','Driving a road delivery vehicle in mapped Baltimore','Gameplay · Road delivery'],
   racer:['driving-1b41f3116f83.webp','Driving a BMW on a mapped Baltimore street','Gameplay · Baltimore'],
   'expedition-pilot':['flight-f22b1898aa92.webp','Flying above mapped Baltimore','Gameplay · Flight'],
   oceanographer:['research-deck-40e79f50319d.webp','Walking on the research vessel deck','Gameplay · Research vessel'],
@@ -30,7 +31,7 @@ const gameplay = {
 const symbols = {archaeologist:'⌘',hydrologist:'≈',meteorologist:'☁',cartographer:'⌖','planetary-scientist':'◒','accelerator-scientist':'◎','field-engineer':'◇'};
 
 export function experiencePresentation(entry) {
-  const id=String(entry?.id||'').replace(/^career:/,'');
+  const id=String(entry?.id||'').replace(/^(career:|activity:)/,'');
   const group=groups[id]||'all';
   const reference=REFERENCE_VISUALS[references[id]];
   const capture=gameplay[id];

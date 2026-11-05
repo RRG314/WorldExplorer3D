@@ -1,5 +1,7 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/player-introduction-current.test.mjs',
+  'tests/geospatial-gateway-route-current.test.mjs',
   'tests/nova-presentation-current.test.mjs',
   'tests/document-theme-current.test.mjs',
   'tests/walking-close-camera-current.test.mjs',

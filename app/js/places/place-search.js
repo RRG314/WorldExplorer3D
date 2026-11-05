@@ -3,7 +3,7 @@ const SEARCH_ENDPOINT = '/api/geospatial/search';
 const CACHE_KEY = 'world-explorer-place-search-v1';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_LIMIT = 40;
-const MIN_REQUEST_INTERVAL_MS = 1050;
+const MIN_REQUEST_INTERVAL_MS = 1200;
 const REQUEST_TIMEOUT_MS = 10_000;
 
 const memoryCache = new Map();
@@ -152,6 +152,9 @@ function queueProviderRequest(url, signal, fetchImpl = fetchPlaceLookup) {
       if (controller.signal.aborted) throw controller.signal.reason;
       return payload;
     } finally {
+      // The shared service starts its cooldown AFTER completing a lookup.
+      // Pacing from dispatch made an ordinary second search arrive too soon.
+      lastRequestAt = Date.now();
       clearTimeout(timer);
       signal?.removeEventListener('abort', cancel);
     }

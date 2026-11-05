@@ -6,6 +6,9 @@ export async function deployResearchSubmarineFromDeck(page) {
     (__marineEntryContext.boatDeck?.active || __marineEntryContext.oceanMode?.active),null,{timeout:120000});
   if(await page.evaluate(()=>!!__marineEntryContext.oceanMode?.active))return;
   await page.getByLabel('Deck destination').selectOption('sub');
+  // The native select owns keyboard input until the player returns focus to
+  // the world. Do not mistake that deliberate input isolation for stalled walking.
+  await page.evaluate(()=>__marineEntryContext.renderer.domElement.focus());
   const moveUntil=async(key,predicate)=>{
     await page.keyboard.down(key);
     try{await page.waitForFunction(predicate,null,{timeout:12000});}
