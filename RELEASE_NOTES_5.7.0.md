@@ -1,17 +1,14 @@
 # World Explorer 3D 5.7 — Careers, homes and a fresh start
 
-[![Version 5.7 Preview 1](https://img.shields.io/badge/5.7-PREVIEW_1-e9a16b?style=for-the-badge&labelColor=18231f)](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.1)
-[![Play in your browser](https://img.shields.io/badge/PLAY-IN_YOUR_BROWSER-28594b?style=for-the-badge&labelColor=18231f)](https://we3d-staging-20260712.web.app/app/)
-[![Android testing](https://img.shields.io/badge/ANDROID-TESTING-546e7a?style=for-the-badge&logo=android&logoColor=white&labelColor=18231f)](#play-and-download)
-[![Source available](https://img.shields.io/badge/LICENSE-SOURCE_AVAILABLE-546e7a?style=for-the-badge&labelColor=18231f)](https://github.com/RRG314/WorldExplorer3D/blob/stable/LICENSE)
+[![Web 5.7 live](https://img.shields.io/badge/WEB_5.7-LIVE-ff925d?style=for-the-badge&labelColor=181a1e)](https://worldexplorer3d.io/) [![Source Preview 2](https://img.shields.io/badge/SOURCE-PREVIEW_2-c7c5c1?style=for-the-badge&labelColor=181a1e)](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.2) [![Android testing](https://img.shields.io/badge/ANDROID-TESTING-546e7a?style=for-the-badge&logo=android&logoColor=white&labelColor=181a1e)](https://worldexplorer3d.io/about/download.html) [![Source available](https://img.shields.io/badge/LICENSE-SOURCE_AVAILABLE-546e7a?style=for-the-badge&labelColor=181a1e)](https://github.com/RRG314/WorldExplorer3D/blob/stable/LICENSE)
 
 **Choose a starting place. Create your explorer. See where it takes you.**
 
 5.7 gives World Explorer a clearer beginning and more reasons to return. Choose your character and first car, follow a career or explore freely, find a home, and keep your discoveries together in your Journal. Your supported personal progress can continue on another device when you sign in and save it to your account.
 
-> **Public preview:** Try 5.7 while building improvements and remaining compatibility checks continue. This release does not update the live production game. The newer interior overhaul is still in development and is not included in this preview.
+> **Live web update — November 6, 2026:** Version 5.7.0 is now available at worldexplorer3d.io. This source release remains a public preview while building interiors and wider device support continue to improve. The newer interior overhaul is not included.
 
-**[Try the 5.7 preview](https://we3d-staging-20260712.web.app/app/)** · [Play the live game](https://worldexplorer3d.io/app/) · [Known issues](#known-issues-and-work-in-progress) · [Report a problem](#help-improve-the-preview)
+**[Play World Explorer 3D](https://worldexplorer3d.io/)** · [Get the app](https://worldexplorer3d.io/about/download.html) · [Known issues](#known-issues-and-work-in-progress) · [Report a problem](#report-a-problem)
 
 <!-- public-gallery:drone -->
 ![Baltimore at dusk in World Explorer 3D 5.7, viewed in Drone mode](assets/gallery/5.7/drone-13189f8a014d.jpg)
@@ -29,19 +26,33 @@
 
 This is the cumulative 5.7 overview since the last numbered release, **5.6.1**. The racing features below first went live in the October 31 update and remain part of 5.7.
 
+## November 6: the globe and your first steps
+
+- The public landing page remains at **worldexplorer3d.io**. Enter the game to see the globe immediately, or choose **Create your Explorer** or **Browse careers** from the landing page.
+- Left navigation, search across the top and place details on the right leave the globe as the main view. The selector uses the same colors and typography as the rest of the game and site.
+- **Character & career** opens the original introduction: appearance, career or free roam, first car and starting place. Canceling brings you back to the globe.
+- **Careers** opens the career list directly. Available paths appear first; unfinished choices stay marked **Coming soon**.
+- Phone layouts keep the globe, world choices, location search and launch controls together. Enlarged text and the light/dark appearance option remain supported.
+- Character and career links respect any account-save choice already in progress. Opening a link does not replace your journey or start a new one.
+
 ## Start anywhere, go your own way
 
 The interactive globe remains the starting point for choosing a place. Search for a city, landmark, airport or coordinates, select a point on Earth, or choose the Moon, Mars, Ocean or Space. Free exploration is available from the beginning.
 
 The new introduction takes you through your explorer, career choice, first car and departure. Available careers appear first; unfinished choices are marked **Coming soon**. You can change interests later without discarding the assignment you left behind.
 
-| Choose your place | Choose your first car |
-| :--: | :--: |
-| ![Interactive Earth globe with location search and Earth, Moon, Mars, Space and Ocean choices](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/world-explorer-5.7-globe.jpg) | ![The new first-car selection screen showing the BMW E34](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/world-explorer-5.7-first-car.jpg) |
+![The current 5.7 globe selector with left navigation, location search and place details](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.2/world-explorer-5.7-globe.png)
+
+<details>
+<summary>See the phone layout</summary>
+
+<img src="https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.2/world-explorer-5.7-mobile.png" alt="The current phone globe selector with search, character and career setup, and Explore" width="280">
+
+</details>
 
 ## Careers with a next step
 
-Careers now share a place in Activities and your personal journey. Open an assignment, review its stages, carry out the work and return to your saved result. Journal records and achievements remain available when you move to another interest.
+Open Careers from the globe or Browse careers from the landing page. Your personal journey connects career progress with the rest of your explorer. Open an assignment, review its stages, carry out the work and return to your saved result. Journal records and achievements remain available when you move to another interest.
 
 The work differs by career. Geology asks you to compare rock exposures and samples. Archaeology follows objects in their layers and locations. Oceanography takes you between coastal stations and the research ship. Racing connects preparation, clean finishes and your race record. These are playable courses and follow-on studies; campaign length and depth vary by path.
 
@@ -110,7 +121,7 @@ Preview the course, edit its shape, test it, then save it or share it with your 
 
 ## From familiar streets to other worlds
 
-The new beginning sits above the existing sandbox. Walking, driving, flight, sailing, diving, building, companions, multiplayer and space travel remain available. Detailed Earth streets and activities load around your selected location; optional traveling scenery extends terrain and mapped buildings as you move farther away.
+Alongside these additions, the existing sandbox remains available. Walking, driving, flight, sailing, diving, building, companions, multiplayer and space travel remain available. Detailed Earth streets and activities load around your selected location; optional traveling scenery extends terrain and mapped buildings as you move farther away.
 
 | The Moon | Mars |
 | :--: | :--: |
@@ -148,7 +159,7 @@ Baltimore's existing venue visits remain available: the National Aquarium's limi
 
 | Area | Current limitation / next work |
 | :-- | :-- |
-| Buildings and interiors | Room detail, layouts, stair openings, lifts, furniture scale and facade flicker need further work. The newer interior overhaul is not part of this preview. |
+| Buildings and interiors | Room detail, layouts, stair openings, lifts, furniture scale and facade flicker need further work. The newer interior overhaul is not part of this live build. |
 | Museum and aquarium | The playable visits cover limited routes. Full venue layouts, all exhibitions and more detailed displays are still being developed. |
 | Loading and performance | Dense cities and detailed scenes can load slowly or pause, especially on devices with little memory. Faster same-session return does not eliminate first-load costs. |
 | Careers | Nineteen paths have playable assignments; depth varies. Expedition pilot is disabled as Coming soon. |
@@ -163,17 +174,17 @@ Baltimore's existing venue visits remain available: the National Aquarium's limi
 
 | Option | Availability |
 | :-- | :-- |
-| **5.7 browser preview** | [Open the staging version](https://we3d-staging-20260712.web.app/app/). This is the recommended way to try the features in these notes. |
-| **Live browser game** | [Play World Explorer 3D](https://worldexplorer3d.io/app/). Production is updated separately. |
+| **Live browser game — 5.7.0** | [Play World Explorer 3D](https://worldexplorer3d.io/). The landing page offers direct exploration, character setup and career browsing. |
+| **Staging** | [Try upcoming changes](https://we3d-staging-20260712.web.app/app/). Staging can change independently of the live game. |
 | **Install the web app** | Use the browser's install or Add to Home Screen option on supported devices. [Installation help](https://worldexplorer3d.io/about/download.html). |
-| **Android launcher** | The signed [5.7.0 APK](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/world-explorer-5.7.0.apk) is attached below. It opens the live hosted game; it does not switch that service to the 5.7 staging preview. Google Play access is through the closed test. |
+| **Android launcher** | The signed [5.7.0 APK](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.2/world-explorer-5.7.0.apk) is attached below. It opens the live 5.7 hosted game and receives web content updates online. Google Play access is through the closed test. |
 | **iPhone and iPad** | The web app is available now. The separate App Store edition is in preparation. |
-| **Source** | GitHub supplies source archives for this preview tag. Use the APK to install the Android launcher; the source archives are for development. |
+| **Source** | GitHub supplies source archives for this source release. Use the APK to install the Android launcher; the source archives are for development. |
 
-An internet connection is required. APK users can check the file against the attached [SHA256SUMS](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/SHA256SUMS). An Android App Bundle is a store-publishing file and is not offered as a direct installation download.
+An internet connection is required. APK users can check the file against the attached [SHA256SUMS](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.2/SHA256SUMS). An Android App Bundle is a store-publishing file and is not offered as a direct installation download.
 
-## Help improve the preview
+## Report a problem
 
 [Report a bug](https://github.com/RRG314/WorldExplorer3D/issues/new). Include your browser and device, the place or world, the action you were taking, what you expected and what happened. A screenshot or short recording helps. Keep passwords, account emails and private room codes out of public reports.
 
-[Changes since 5.6.1](https://github.com/RRG314/WorldExplorer3D/compare/v5.6.1...v5.7.0-preview.1) · [Changes since the racing update](https://github.com/RRG314/WorldExplorer3D/compare/production-racing-2026-10-31...v5.7.0-preview.1) · [Changelog](https://github.com/RRG314/WorldExplorer3D/blob/stable/CHANGELOG.md) · [Data and asset credits](https://github.com/RRG314/WorldExplorer3D/blob/stable/ATTRIBUTION.md)
+[Changes since 5.6.1](https://github.com/RRG314/WorldExplorer3D/compare/v5.6.1...v5.7.0-preview.2) · [Changes since the racing update](https://github.com/RRG314/WorldExplorer3D/compare/production-racing-2026-10-31...v5.7.0-preview.2) · [Changelog](https://github.com/RRG314/WorldExplorer3D/blob/stable/CHANGELOG.md) · [Data and asset credits](https://github.com/RRG314/WorldExplorer3D/blob/stable/ATTRIBUTION.md)

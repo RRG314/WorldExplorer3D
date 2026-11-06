@@ -2,6 +2,31 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.7.0-preview.2] - 2026-11-06
+
+Version 5.7.0 is live in the browser. The source release remains a public preview;
+unfinished building improvements and wider device support are listed in
+[Known issues](KNOWN_ISSUES.md).
+
+### Improved
+
+- Enter the game directly at the working globe, with left navigation, top search
+  and place details on the right. The public address retains its landing page.
+- Start character setup or browse careers directly from the landing page.
+  Character setup remains optional and follows appearance, career or free roam,
+  first car and departure.
+- Open Careers directly from the globe; cancel setup or close the list to return
+  to the globe. Initial entry and Escape no longer expose an empty title screen.
+- Match selector colors and typography to the rest of the game and site.
+- Give the globe more usable space on desktop and phone, with readable enlarged
+  text, reachable navigation and credits outside the interactive view.
+- Wait for any account-save decision before following a character or career link;
+  consume the link once so reload does not repeat setup.
+
+This update includes the careers, homes, account saves and racing features in
+the cumulative [5.7 release notes](RELEASE_NOTES_5.7.0.md). The newer interior
+overhaul is still in development and is not included.
+
 ## [5.7.0-preview.1] - 2026-11-05
 
 Public pre-release. Available on staging; the live production game is updated
@@ -213,7 +238,7 @@ journey passed. Occasional GC pauses and physical-phone acceptance remain limits
   and shared expedition cargo.
 - Star and planet information and supported travel actions outside the Solar
   System, observer-dependent star positions and spatial galactic environments.
-- Building-aligned interior photo editing, saved revisions, phone handoff,
+- Building-aligned interior photo editing, saved revisions, phone sharing,
   account review and entry into approved interiors.
 
 ### Changed
@@ -303,7 +328,7 @@ See [5.3 release notes](RELEASE_NOTES_5.3.0.md) for scope and known limitations.
 - Preserved one Pathfinder and one Solis Reach identity across launch, landing,
   surface return, rendezvous, docking, ship entry, and Earth return.
 - Prevented Wayfinder assistance and manual input from competing during
-  destination handoff.
+  arrival.
 - Kept solid planetary surfaces opaque and prevented below-ground traversal on
   supported landing worlds.
 - Completed route-dependent civic response approaches and prevented a completed
@@ -451,10 +476,8 @@ See [5.3 release notes](RELEASE_NOTES_5.3.0.md) for scope and known limitations.
   jagged at-grade junction wedges and conflicting road/terrain cross-sections.
 - Aligned non-player vehicles to four-wheel road contact on grades and kept
   pedestrians off vehicle-only transport surfaces.
-- Preserved the nearest valid mapped arrival instead of relocating the player
-  to a different road solely to satisfy a test.
-- Removed obsolete hosted assets and internal audit, handoff and R&D records
-  from the public release tip.
+- Kept arrivals on the nearest valid mapped road.
+- Removed obsolete hosted assets.
 
 ## [4.3.0] - 2026-08-17
 
