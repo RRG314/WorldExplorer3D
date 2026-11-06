@@ -236,7 +236,7 @@ function setupUI() {
     send:(input,options)=>postProtectedFunction('/syncExplorerJourney',input,{...options,label:'Account save',forceRefreshToken:false,
       timeoutMs:input.action==='head'?15000:input.action==='commit'?120000:45000}),
     beforeRestore:async()=>{journey.close({focus:false});experiences.close({restoreFocus:false});appCtx.toggleWorldDiscoveryJournal?.(false);if(appCtx.gameStarted)goToMainMenu();},
-    onState:state=>syncView.update(state)
+    onState:state=>{syncView.update(state);titleUi.resumeEntryIntent?.(state);}
   });
   appCtx.canStartPlayerJourney=()=>journeySync.canPlay();
   appCtx.openJourneySync=()=>syncView.open();

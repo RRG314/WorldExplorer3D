@@ -52,7 +52,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/map-explorer.css?v=5">
 <link rel="stylesheet" href="styles/accessibility.css?v=5">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
-<link rel="stylesheet" href="styles/product-shell.css?v=3">
+<link rel="stylesheet" href="styles/product-shell.css?v=4">
 <link rel="stylesheet" href="styles/player-entry.css?v=1">
 <link rel="stylesheet" href="styles/player-journey.css?v=1">
 <link rel="stylesheet" href="styles/gameplay-shell.css?v=3">
@@ -638,13 +638,16 @@ Continue ocean exploration beyond the dive site
 <div id="globeSelectorScreen" aria-hidden="true">
 
 <div class="globe-selector-shell">
-<div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
+<a class="globe-selector-brand" href="../" aria-label="World Explorer 3D home"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></a>
 <nav class="globe-app-rail" aria-label="Main sections">
   <button class="active" type="button" data-globe-destination="location"><span>◎</span>Explore</button>
-  <button type="button" data-globe-destination="games"><span>⌖</span>Activities</button>
+  <button type="button" data-globe-destination="games"><span>⌖</span>Careers</button>
   <button type="button" data-globe-destination="journal"><span>▤</span>Journal</button>
   <button type="button" data-globe-destination="create"><span>◇</span>Create</button>
   <button type="button" data-globe-destination="multiplayer"><span>♙</span>Together</button>
+  <button type="button" data-globe-destination="live-earth" data-globe-extra><span>⌁</span>Live Data</button>
+  <button type="button" data-globe-destination="library" data-globe-extra><span>▤</span>My Places</button>
+  <button type="button" data-globe-destination="controls" data-globe-extra><span>?</span>Quick Start</button>
 </nav>
 <div class="globe-selector-top">
 <div class="globe-hub-search">
@@ -653,7 +656,7 @@ Continue ocean exploration beyond the dive site
 <button id="globeLocationSearchBtn" type="button">Search</button>
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
-<button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
+<button id="appSignInBtn" class="auth-float-toggle" type="button" aria-label="Sign in / Account" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
 <button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
 <button id="globeHubThemeBtn" type="button" title="Switch to light appearance" aria-label="Switch to light appearance" aria-pressed="false">☼</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
@@ -662,20 +665,10 @@ Continue ocean exploration beyond the dive site
 </div>
 </div>
 <div class="globe-selector-side">
-<section class="globe-launch-summary" aria-label="Selected place">
-<div class="globe-selector-stat">
-<div class="globe-selector-stat-label">Selected place</div>
-<div id="globeSelectorPlace" class="globe-selector-stat-value">Choose a place on the globe.</div>
-<div id="globeSelectorLatLon" class="globe-selector-stat-label">No point selected</div>
-<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
+<div class="globe-mobile-search">
+  <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
+  <button id="globeMobileLocationSearchBtn" type="button">Search</button>
 </div>
-<div class="globe-selector-actions">
-<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
-<button id="globeExplorerSetupBtn" class="globe-selector-action-btn" type="button">Set up Explorer</button>
-<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
-</div>
-</section>
-<nav class="globe-explore-tools" aria-label="Explore tools"><button type="button" data-globe-destination="library">My Places</button><button type="button" data-globe-destination="live-earth">Live Data</button><button type="button" data-globe-destination="controls">Quick Start</button></nav>
 <div class="globe-location-entry-pair" aria-label="Choose how to use your location">
   <button id="globeSelectorLocateBtn" class="globe-location-entry-card globe-location-current" type="button">
     <span class="location-entry-icon" aria-hidden="true">◎</span>
@@ -686,14 +679,24 @@ Continue ocean exploration beyond the dive site
     <span class="location-entry-copy"><strong data-location-entry-label>Live GPS</strong><small>Follow as I move</small></span>
   </button>
 </div>
-<div class="globe-mobile-search">
-  <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
-  <button id="globeMobileLocationSearchBtn" type="button">Search</button>
-</div>
 <div class="globe-search-feedback">
 <div id="globeLocationSearchStatus" role="status" aria-live="polite" style="font-size:12px;min-height:16px;color:var(--wx-action)">Search for a place or choose one from the globe.</div>
 <div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 </div>
+<section class="globe-launch-summary" aria-label="Selected place">
+<div class="globe-selector-stat">
+<div class="globe-selector-stat-label">Selected place</div>
+<div id="globeSelectorPlace" class="globe-selector-stat-value">Choose a place on the globe.</div>
+<div id="globeSelectorLatLon" class="globe-selector-stat-label">No point selected</div>
+<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
+</div>
+<div class="globe-selector-actions">
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
+<button id="globeExplorerSetupBtn" class="globe-selector-action-btn" type="button">Character &amp; career</button>
+<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
+</div>
+</section>
+<nav class="globe-explore-tools" aria-label="Explore tools"><button type="button" data-globe-destination="library">My Places</button><button type="button" data-globe-destination="live-earth">Live Data</button><button type="button" data-globe-destination="controls">Quick Start</button></nav>
 <section class="globe-first-journey" aria-label="Start or return">
   <button id="globeGuidedStartBtn" type="button"><strong>Start a guided walk</strong><small>Baltimore · move, try an activity, keep a discovery</small></button>
   <button id="globeReturnPlaceBtn" type="button" hidden><strong id="globeReturnPlaceLabel">Return to your last place</strong><small>Start at its arrival point · Journal saved on this device</small></button>

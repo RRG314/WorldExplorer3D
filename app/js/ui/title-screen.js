@@ -1,4 +1,5 @@
 import { createPlayerEntry } from './player-entry.js';
+import { createEntryIntent } from './entry-intent.js';
 import { requestGuidedJourney, consumeGuidedJourney, readReturnPlace } from '../tutorial/entry-journey.js';
 import {createPortalGameEntry} from '../portal/game-entry.js';
 import { createLaunchMeasurement } from '../platform/launch-telemetry.js';
@@ -970,6 +971,13 @@ function initTitleScreenUi({
       return started;
     }
   });
+  const entryIntent = createEntryIntent({
+    href: window.location.href,
+    blocked: !!portalEntry.intent || !!sharedExperienceParams,
+    replaceHref: href => window.history.replaceState(window.history.state, '', href),
+    openCharacter: () => void playerEntry.introduce(),
+    openCareers: () => void openActivities({view:'careers'}),
+  });
   document.getElementById('globeExplorerSetupBtn')?.addEventListener('click', () => void playerEntry.introduce());
   window.addEventListener('pagehide',event=>{if(!event.persisted)playerEntry?.dispose();});
   if (!appCtx.gameStarted) {
@@ -977,6 +985,7 @@ function initTitleScreenUi({
     // Explorer setup remains optional, alongside the existing Explore action.
     window.requestAnimationFrame(() => {
       playerEntry.explore();
+      entryIntent.globeOpened();
     });
   }
 
@@ -986,6 +995,7 @@ function initTitleScreenUi({
     setTitleLaunchMode: (mode) => setLaunchMode(mode),
     getGlobeSelector: () => globeSelector,
     getPlayerEntry:()=>playerEntry,
+    resumeEntryIntent:state=>entryIntent.accountState(state),
     primeMultiplayerUi,
     isTouchPreferredClient
   };

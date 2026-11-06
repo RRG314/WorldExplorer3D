@@ -182,7 +182,7 @@ function setupGlobeHub({
 
   const openPanel = (destination) => {
     if (destination !== 'create' && createPanel) createPanel.hidden = true;
-    if(destination==='games'&&onActivities){closePanel();void onActivities();return true;}
+    if(destination==='games'&&onActivities){closePanel();void onActivities({view:'careers'});return true;}
     if(destination==='journal'&&onJournal){closePanel();onJournal();return true;}
     if (destination === 'create' && createPanel && overlay && panelHost) {
       closePanel();

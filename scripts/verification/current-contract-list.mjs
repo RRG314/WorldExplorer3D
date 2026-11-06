@@ -6,6 +6,7 @@ export const currentContractTests = [
   'tests/player-journey-release-current.test.mjs',
   'tests/home-fixtures-current.test.mjs',
   'tests/player-introduction-current.test.mjs',
+  'tests/entry-intent-current.test.mjs',
   'tests/geospatial-gateway-route-current.test.mjs',
   'tests/nova-presentation-current.test.mjs',
   'tests/document-theme-current.test.mjs',

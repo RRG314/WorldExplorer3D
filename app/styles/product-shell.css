@@ -231,38 +231,52 @@
   #globeSelectorScreen .globe-location-entry-card { border-radius: var(--wx-radius); }
   .globe-selector-stat-value { font-size: calc(1.5rem * var(--wx-text-scale)); line-height: 1.3; }
 
+  /* The selector keeps the owner's three-pane layout. The original globe,
+     search and navigation owners keep their DOM and lifecycle. */
+  .globe-selector-brand { color: var(--hub-text); text-decoration: none; }
+  .globe-selector-brand:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -3px; }
+  #globeSelectorScreen { --hub-blue: #2563eb; --hub-action-text: #fff; }
+  html:not([data-hub-theme="day"]) #globeSelectorScreen {
+    --hub-bg: #040c10; --hub-bar: #030b0f; --hub-panel: #061319;
+    --hub-panel-2: #0b1b24; --hub-input: #040f16; --hub-active: #112b48;
+    --hub-hover: #102432; --hub-text: #ecf2f8; --hub-muted: #aab8c4;
+  }
   @media (min-width: 901px) and (pointer: fine) {
     #globeSelectorScreen .globe-selector-shell {
-      grid-template-columns: minmax(0, 1fr) 320px;
-      grid-template-rows: max(56px, calc(44px * var(--wx-text-scale))) max(52px, calc(44px * var(--wx-text-scale))) minmax(0, 1fr);
-      padding: 0 12px 8px; gap: 0 12px;
+      grid-template-columns: 160px minmax(0, 1fr) 332px;
+      grid-template-rows: max(76px, calc(44px * var(--wx-text-scale))) minmax(0, 1fr);
+      height: 100dvh; padding: 0; gap: 0;
     }
-    .globe-selector-brand { grid-column: 1; grid-row: 1; width: 180px; padding: 0; z-index: 4; font-size: 11px; letter-spacing: .025em; }
-    .globe-selector-top { display: contents; }
-    #globeSelectorScreen .globe-hub-search { grid-column: 2; grid-row: 2; align-self: center; min-width: 0; }
-    #globeSelectorScreen .globe-hub-tools { grid-column: 2; grid-row: 1; justify-content: flex-end; gap: 4px; }
+    #globeSelectorScreen .globe-selector-brand { grid-column: 1; grid-row: 1; width: auto; padding: 0 8px; z-index: 4; font-size: 10px; letter-spacing: 0; background: var(--hub-bar); }
+    #globeSelectorScreen .globe-selector-top { display: grid; grid-column: 2 / 4; grid-row: 1; grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 0 18px 0 24px; gap: 20px; background: var(--hub-bar); }
+    #globeSelectorScreen .globe-hub-search { min-width: 0; align-self: center; }
+    #globeSelectorScreen .globe-hub-tools { justify-content: flex-end; gap: 6px; }
     #globeSelectorScreen .globe-hub-tools button { min-width: 44px; }
-    body.start-hub-open #appSignInBtn { min-width: 60px; width: 60px; padding: 0; font-size: 0; }
-    body.start-hub-open #appSignInBtn::before { content: 'Account'; font: 600 11px/1.2 var(--wx-font-ui); }
-    #globeSelectorScreen .globe-app-rail { grid-column: 1; grid-row: 1; justify-self: stretch; align-self: center; flex-direction: row; width: calc(100% - 190px); margin-left: 190px; padding: 3px; gap: 2px; box-sizing: border-box; overflow-x: auto; }
-    #globeSelectorScreen .globe-app-rail button { flex: 1 0 auto; min-height: 44px; gap: 0; padding: 8px; flex-direction: row; font-size: calc(12px * var(--wx-text-scale)); }
-    #globeSelectorScreen .globe-app-rail button span { display: none; }
-    .globe-selector-map { grid-column: 1; grid-row: 2 / 4; }
-    .globe-selector-side { grid-column: 2; grid-row: 3; padding: 10px; gap: 8px; }
-    #globeSelectorScreen .globe-selector-stat-value { font-size: calc(clamp(1.375rem, 2vw, 1.875rem) * var(--wx-text-scale)); }
-    #globeSelectorScreen .globe-map-footer .globe-destination-bar { min-height: 58px; padding-inline: 12px; }
-    #globeSelectorScreen .globe-map-footer .globe-destination-bar button { width: 54px; height: 54px; }
-    .globe-hub-overlay { grid-column: 1 / 3; grid-row: 2 / 4; }
-    html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .globe-app-rail {
-      overflow-x: auto; justify-content: start;
-    }
-    html:is([data-we3d-text-scale="160"], [data-we3d-text-scale="200"]) .globe-app-rail button { flex: 1 0 auto; }
+    #globeSelectorScreen #appSignInBtn { width: auto; padding-inline: 12px; font-size: 12px; }
+    #globeSelectorScreen #appSignInBtn::before { content: none; }
+    #globeSelectorScreen .globe-app-rail { position: static; grid-column: 1; grid-row: 2; justify-self: stretch; align-self: stretch; flex-direction: column; width: auto; height: auto; margin: 0; padding: 0; gap: 0; border-radius: 0; border-width: 0 1px 0 0; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; }
+    #globeSelectorScreen .globe-app-rail button { flex: 1 0 44px; min-height: 44px; width: 100%; gap: 4px; padding: 5px 4px; flex-direction: column; font-size: calc(11px * var(--wx-text-scale)); border-radius: 0; border-bottom: 1px solid var(--hub-line); }
+    #globeSelectorScreen .globe-app-rail button span { display: block; font-size: 20px; }
+    #globeSelectorScreen .globe-app-rail button.active { color: var(--hub-text); background: var(--hub-active); box-shadow: inset 4px 0 var(--hub-blue); }
+    #globeSelectorScreen .globe-selector-map { grid-column: 2; grid-row: 2; }
+    #globeSelectorScreen .globe-selector-side { grid-column: 3; grid-row: 2; padding: 18px 16px 12px; gap: 10px; border-radius: 0; }
+    #globeSelectorScreen .globe-selector-stage { border-radius: 0; }
+    #globeSelectorScreen .globe-selector-stat-value { font: 700 calc(18px * var(--wx-text-scale))/1.3 var(--wx-font-ui); letter-spacing: 0; }
+    #globeSelectorScreen .globe-map-footer .globe-destination-bar { min-height: 76px; padding-inline: 12px; }
+    #globeSelectorScreen .globe-map-footer .globe-destination-bar button { width: 60px; height: 60px; }
+    #globeSelectorScreen .globe-explore-tools { display: none; }
+    #globeSelectorScreen .globe-hub-overlay { grid-column: 2 / 4; grid-row: 2; }
   }
   @media (max-width: 900px), (pointer: coarse) {
+    #globeSelectorScreen .globe-hub-tools { justify-self: end; width: max-content; max-width: 100%; }
     #globeSelectorScreen .globe-selector-shell { grid-template-rows: 52px minmax(240px, 1.4fr) auto minmax(220px, 1fr); height: calc(100dvh - 56px - env(safe-area-inset-bottom)); }
     #globeSelectorScreen .globe-selector-map > .globe-map-footer { grid-row: 3; }
     #globeSelectorScreen .globe-selector-side { grid-row: 4; padding: 10px; gap: 8px; }
     #globeSelectorScreen .globe-app-rail { height: calc(56px + env(safe-area-inset-bottom)); }
+    #globeSelectorScreen .globe-app-rail [data-globe-extra] { display: none; }
+    #globeSelectorScreen .globe-mobile-search { order: -3; }
+    #globeSelectorScreen .globe-search-feedback { order: -2; }
+    #globeSelectorScreen .globe-launch-summary { order: -1; }
     #globeSelectorScreen .globe-app-rail button { min-height: 56px; }
   }
   @media (min-width: 621px) and (max-width: 900px) and (max-height: 520px), (min-width: 621px) and (pointer: coarse) and (max-height: 520px) {

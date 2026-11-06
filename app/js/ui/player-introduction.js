@@ -13,7 +13,7 @@ const escape = (s) =>
   );
 const starterIds = ['bmw_e34', 'bmw_m3_e46', 'porsche_carrera_4s', 'datsun_280z'];
 const cars = PERSONAL_VEHICLES.filter((v) => starterIds.includes(v.id));
-const steps = ['Your Explorer', 'Your direction', 'Your first car', 'Your departure'];
+const steps = ['Your Explorer', 'Career or free roam', 'Your first car', 'Your departure'];
 
 export function createPlayerIntroduction({
   onBegin,
@@ -91,7 +91,7 @@ export function createPlayerIntroduction({
   }
   return {
     render() {
-      return `<section class="intro-sequence"><header class="intro-progress"><button data-intro="exit" class="intro-exit">← Home</button><ol aria-label="Introduction progress">${steps.map((l, i) => `<li aria-label="${escape(l)}" ${i === draft.step ? 'aria-current="step"' : ''} class="${i < draft.step ? 'done' : ''}"><span>${i < draft.step ? '✓' : i + 1}</span><strong>${l}</strong></li>`).join('')}</ol><span class="intro-step-count">${draft.step + 1} / 4</span></header>${panel()}<footer class="intro-bottom"><button data-intro="back" ${draft.step === 0 ? 'disabled' : ''}>← Back</button><p>${draft.step === 3 ? 'Your appearance, interests and collection stay together.' : 'Take your time. You can go back and change anything.'}</p><button class="primary" data-intro="next">${draft.step === 3 ? 'Begin journey →' : draft.step === 0 ? 'Choose a career →' : draft.step === 1 ? 'Choose your car →' : 'Review your beginning →'}</button></footer></section>`;
+      return `<section class="intro-sequence"><header class="intro-progress"><button data-intro="exit" class="intro-exit">← Back to globe</button><ol aria-label="Introduction progress">${steps.map((l, i) => `<li aria-label="${escape(l)}" ${i === draft.step ? 'aria-current="step"' : ''} class="${i < draft.step ? 'done' : ''}"><span>${i < draft.step ? '✓' : i + 1}</span><strong>${l}</strong></li>`).join('')}</ol><span class="intro-step-count">${draft.step + 1} / 4</span></header>${panel()}<footer class="intro-bottom"><button data-intro="back" ${draft.step === 0 ? 'disabled' : ''}>← Back</button><p>${draft.step === 3 ? 'Your appearance, interests and collection stay together.' : 'Take your time. You can go back and change anything.'}</p><button class="primary" data-intro="next">${draft.step === 3 ? 'Begin journey →' : draft.step === 0 ? 'Choose a career →' : draft.step === 1 ? 'Choose your car →' : 'Review your beginning →'}</button></footer></section>`;
     },
     mount(root) {
       const node = root.querySelector('[data-intro-model]');
