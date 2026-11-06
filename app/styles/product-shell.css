@@ -235,12 +235,6 @@
      search and navigation owners keep their DOM and lifecycle. */
   .globe-selector-brand { color: var(--hub-text); text-decoration: none; }
   .globe-selector-brand:focus-visible { outline: 2px solid var(--hub-blue); outline-offset: -3px; }
-  #globeSelectorScreen { --hub-blue: #2563eb; --hub-action-text: #fff; }
-  html:not([data-hub-theme="day"]) #globeSelectorScreen {
-    --hub-bg: #040c10; --hub-bar: #030b0f; --hub-panel: #061319;
-    --hub-panel-2: #0b1b24; --hub-input: #040f16; --hub-active: #112b48;
-    --hub-hover: #102432; --hub-text: #ecf2f8; --hub-muted: #aab8c4;
-  }
   @media (min-width: 901px) and (pointer: fine) {
     #globeSelectorScreen .globe-selector-shell {
       grid-template-columns: 160px minmax(0, 1fr) 332px;
@@ -261,7 +255,7 @@
     #globeSelectorScreen .globe-selector-map { grid-column: 2; grid-row: 2; }
     #globeSelectorScreen .globe-selector-side { grid-column: 3; grid-row: 2; padding: 18px 16px 12px; gap: 10px; border-radius: 0; }
     #globeSelectorScreen .globe-selector-stage { border-radius: 0; }
-    #globeSelectorScreen .globe-selector-stat-value { font: 700 calc(18px * var(--wx-text-scale))/1.3 var(--wx-font-ui); letter-spacing: 0; }
+    #globeSelectorScreen .globe-selector-stat-value { font: 400 calc(1.5rem * var(--wx-text-scale))/1.1 var(--wx-font-display); letter-spacing: .015em; }
     #globeSelectorScreen .globe-map-footer .globe-destination-bar { min-height: 76px; padding-inline: 12px; }
     #globeSelectorScreen .globe-map-footer .globe-destination-bar button { width: 60px; height: 60px; }
     #globeSelectorScreen .globe-explore-tools { display: none; }
