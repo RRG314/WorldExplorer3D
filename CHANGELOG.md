@@ -2,16 +2,48 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [5.7.0] - 2026-11-05
+## [5.7.0-preview.1] - 2026-11-05
 
-- New cinematic Home, guided explorer setup and career/free exploration entry, with the original interactive globe and all five destinations.
-- Nineteen ready careers, clear Coming soon entries, saved assignments, achievements and Journal progression.
-- Starter home purchase and precise return, including a furnished explorable refuge.
-- Private account saves across devices, explicit conflicting-save choices and recovery; guest backups retained.
-- Faster return to the currently loaded city, less crowded gameplay controls and improved globe/mobile layouts.
-- Device installation page, updated mobile packages and private-save disclosure.
+Public pre-release. Available on staging; the live production game is updated
+separately. The newer interior overhaul is still in development.
 
-[Release notes](RELEASE_NOTES_5.7.0.md).
+### Added
+
+- Guided explorer setup with character, starting career or free exploration,
+  first car and departure, using the original interactive globe.
+- Nineteen available career paths with saved assignments, follow-on studies
+  where available, personal achievements and Journal progression.
+- A personal journey view connecting explorer setup, garage, starter home,
+  first discoveries and career progress.
+- Starter-home purchase with a saved exact location and return from another
+  destination.
+- Private account saves for supported personal journey data across signed-in
+  devices, explicit conflicting-save choices and recovery copies.
+- Device installation guidance and a signed Android launcher download.
+
+### Improved
+
+- Cinematic Home and clearer activity hierarchy, with available careers first
+  and unfinished choices marked Coming soon.
+- A quieter gameplay menu, more usable globe space, mobile layouts, keyboard
+  focus and loading-screen shortcut hints.
+- Reopening the city already loaded in the current session, without a full
+  world rebuild.
+- Guest backup and restore guidance alongside account-save controls.
+
+### Included from the October racing update
+
+- Silverstone GP and pit lane, Nordschleife T13, Daytona tri-oval and pit branch.
+- Real BMW and Porsche vehicles, garage upgrades, damage and condition handling.
+- Overhead-road, drive-recording and open-ground track creation, room sharing,
+  Journal results, rivals, crews and comparable race rankings.
+
+Building detail and furniture, mapped interiors, full museum/aquarium expansion,
+facade flicker and broader physical-device testing remain open. Google Play is
+in closed testing; the separate iPhone/iPad App Store edition is in preparation.
+
+[Full illustrated release notes](RELEASE_NOTES_5.7.0.md) ·
+[Known issues](KNOWN_ISSUES.md).
 
 ## Coherent careers and world UI — deployed 2026-11-04
 
