@@ -556,3 +556,5 @@ footer a:hover { color: var(--ink); }
 .marine-preview-more > summary { cursor:pointer; color:var(--ink); padding:12px 0; min-height:44px; }
 .marine-preview-more > summary:focus-visible { outline:2px solid currentColor; outline-offset:4px; }
 .marine-preview-more[open] > .gallery { margin-top:16px; }
+
+.hero-entry-hint{max-width:58ch;margin:14px 0 10px;color:var(--muted);font-size:14px;line-height:1.6}.hero-entry-links{display:flex;gap:10px 22px;flex-wrap:wrap;margin:0 0 14px;font-size:13px}.hero-entry-links a{color:inherit;text-underline-offset:4px}

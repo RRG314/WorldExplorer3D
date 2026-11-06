@@ -657,6 +657,7 @@ function createGlobeSelector(options = {}) {
       backBtn.hidden = !available;
       backBtn.style.display = available ? '' : 'none';
       backBtn.textContent = options.backLabel?.() || 'Close';
+      backBtn.setAttribute('aria-label', backBtn.textContent);
     }
     document.body.classList.add('start-hub-open');
     setGlobeSelectorScrollLock(true);

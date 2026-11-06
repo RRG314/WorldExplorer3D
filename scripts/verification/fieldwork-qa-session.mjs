@@ -4,7 +4,7 @@ import {chromium} from 'playwright';
 import {closeOwnedBrowser, withinDeadline} from './owned-browser.mjs';
 import {createHostResourceGuard} from './host-resource-guard.mjs';
 
-export async function createFieldworkQaSession({output, careerId, rootDir = process.cwd(), maximumDurationMs = 12 * 60 * 1000, walkLegMaximumDurationMs = 22000, pageOptions = {}, headless = true}) {
+export async function createFieldworkQaSession({output, careerId, rootDir = process.cwd(), maximumDurationMs = 12 * 60 * 1000, walkLegMaximumDurationMs = 22000, pageOptions = {}, headless = true, browserChannel = 'chrome'}) {
   await fs.mkdir(output, {recursive: true});
   let server, browser, page;
   const report = {scope: 'Actual source world; keyboard walking with controlled facing, no position teleport or time advance. Disposable browser data; production unchanged.', checks: [], errors: [], providerErrors: []};
@@ -12,7 +12,7 @@ export async function createFieldworkQaSession({output, careerId, rootDir = proc
     stopOwnedTask: async cause => {report.resourceStop = cause; await server?.kill();}, record: row => fs.appendFile(`${output}/host-resources.jsonl`, JSON.stringify(row) + '\n')});
   await guard.start();
   try {
-    server = await chromium.launchServer({channel: 'chrome', headless, host: '127.0.0.1'});
+    server = await chromium.launchServer({...(browserChannel ? {channel: browserChannel} : {}), headless, host: '127.0.0.1', timeout: 30000});
     report.ownedBrowserPid = server.process().pid; browser = await chromium.connect(server.wsEndpoint());
     page = await browser.newPage({viewport: {width: 1280, height: 800}, ...pageOptions});
     page.setDefaultTimeout(10000);

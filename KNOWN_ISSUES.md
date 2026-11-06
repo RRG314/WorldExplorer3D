@@ -1,15 +1,15 @@
 # Known Issues and Limitations
 
-Last reviewed: November 5, 2026, for the 5.7 public preview. These are known
+Last reviewed: November 6, 2026, for the live 5.7 browser build. These are known
 product limits, not a promise that every location or device has been tested.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.
 
 ## 5.7 preview status
 
-- 5.7 is a public pre-release on staging. Publishing the GitHub release does not
-  update the live production game. Use the preview link in the release notes
-  to try the features described there.
+- 5.7.0 is live at [worldexplorer3d.io](https://worldexplorer3d.io/). The source
+  release remains a public preview while the limitations below are addressed.
+  Staging can contain changes that have not reached the live game.
 - The newer building/interior overhaul is still in development and is not part
   of this preview. Room layouts, stairs and lifts, furniture size, wall endings,
   room detail and facade flicker during movement remain active work.
@@ -19,15 +19,15 @@ published versions.
   Harbor Run road deliveries remain available.
 - Google Play is in closed testing. The iPhone/iPad App Store edition is being
   prepared. The downloadable Android launcher opens the live hosted game, not
-  the separate 5.7 staging preview.
+  staging.
 - Back up guest progress before testing a preview. Check your account-save
   status before changing devices; guest saves do not follow you automatically.
 
 ## Visual detail and device support
 
-- Phone performance is still being checked across devices. Browser touch-layout
-  checks do not establish battery life, heat or reliable resume behavior on every
-  phone. Desktop is recommended for the largest city scenes.
+- Phone performance varies with memory, browser and scene complexity. Battery
+  life, heat and resume behavior still need wider device testing. Desktop is
+  recommended for the largest city scenes.
 - Licensed ship furnishings replace major placeholders, but galley appliances,
   hydroponics, thermal/life-support equipment, exercise/EVA fittings and parts
   of fabrication still use simpler custom geometry. Art detail is not uniform.

@@ -252,6 +252,7 @@ export function createPlayerEntry({
       profile = await (await getStore()).getProfile();
     } catch {
       runtime.showToast?.('Your Explorer could not load. Your saved progress is kept. Try again.');
+      explore();
       return;
     }
     hideLanding();
@@ -335,7 +336,7 @@ export function createPlayerEntry({
     if (!button || busy) return;
     if (button.dataset.intro === 'exit') {
       closeIntroduction();
-      void open();
+      explore();
       return;
     }
     if (button.dataset.intro === 'choose-place') {
@@ -364,12 +365,9 @@ export function createPlayerEntry({
     event.preventDefault();
     if (!busy) {
       closeIntroduction();
-      void open();
+      explore();
     }
   });
-  document
-    .getElementById('globeSelectorBackBtn')
-    ?.setAttribute('aria-label', 'Back to home or the current world');
   return {
     open,
     explore,
@@ -412,7 +410,7 @@ export function createPlayerEntry({
         choosingPlace = false;
         if (!dialog.open) dialog.showModal();
         renderIntroduction();
-      } else void open();
+      } else explore();
     },
     snapshot: () => ({
       home: !landing.hidden,

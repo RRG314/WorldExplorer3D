@@ -1,12 +1,8 @@
 # World Explorer 3D
 
-[Play](https://worldexplorer3d.io/app/) · [Get the app](https://worldexplorer3d.io/about/download.html) · [5.7 preview](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.1) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
+[Play](https://worldexplorer3d.io/app/) · [Get the app](https://worldexplorer3d.io/about/download.html) · [5.7 release notes](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.2) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
-[![Play in your browser](https://img.shields.io/badge/Play-in_your_browser-1677ff?style=flat-square)](https://worldexplorer3d.io/app/)
-[![5.7 Preview 1](https://img.shields.io/badge/5.7-PREVIEW_1-e9a16b?style=flat-square)](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.1)
-[![Latest stable release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=stable)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
-[![Platform: WebGL](https://img.shields.io/badge/platform-WebGL-546e7a?style=flat-square)](https://worldexplorer3d.io/app/)
-[![License: Source Available](https://img.shields.io/badge/license-source_available-546e7a?style=flat-square)](LICENSE)
+[![Web 5.7 live](https://img.shields.io/badge/WEB_5.7-LIVE-ff925d?style=flat-square&labelColor=181a1e)](https://worldexplorer3d.io/) [![Source Preview 2](https://img.shields.io/badge/SOURCE-PREVIEW_2-c7c5c1?style=flat-square&labelColor=181a1e)](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.2) [![Android closed testing](https://img.shields.io/badge/ANDROID-CLOSED_TESTING-546e7a?style=flat-square&labelColor=181a1e)](https://worldexplorer3d.io/about/download.html) [![License: Source Available](https://img.shields.io/badge/LICENSE-SOURCE_AVAILABLE-546e7a?style=flat-square&labelColor=181a1e)](LICENSE)
 
 **The real world. Your next adventure.**
 
@@ -14,28 +10,31 @@ Pick a place and see where it takes you. Explore real cities and wild places,
 drive real roads, build a home, or start a career. Go your own way or bring
 friends along—from familiar streets to the ocean floor and beyond Earth.
 
-The **5.7 public preview** introduces a cinematic interface, guided explorer setup,
-nineteen available careers, starter homes and private personal saves across
-signed-in devices. Free exploration and the interactive globe remain available
-from the start. Each location opens a bounded playable area; optional continuous
-exploration brings surrounding terrain and buildings with you.
+**5.7 is live in your browser.** Create your explorer, follow one of nineteen
+available careers, find a starter home and save your supported personal progress
+across signed-in devices. Explore freely from the interactive globe, with search
+above it and place details beside it. Each location opens a bounded playable area;
+optional continuous exploration brings surrounding terrain and buildings with you.
 
-**[Try the 5.7 preview](https://we3d-staging-20260712.web.app/app/)** · [Read the full illustrated release](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.1) · [Play the live game](https://worldexplorer3d.io/app/)
+**[Play World Explorer 3D](https://worldexplorer3d.io/)** · [Read the illustrated 5.7 release](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.2) · [Get the app](https://worldexplorer3d.io/about/download.html)
 
-5.7 is a pre-release while the remaining building and device checks finish.
-The live production game is updated separately. The newer interior overhaul
-is still in development; current limitations are listed in [Known issues](KNOWN_ISSUES.md).
+The source release remains a public preview. Building interiors, terrain and road
+presentation, and wider device compatibility are still being improved. The newer
+interior overhaul is not included in the live build. See [Known issues](KNOWN_ISSUES.md).
 
 ## A clearer beginning
 
-Create your explorer, choose a starting career or free exploration, pick a first
-car and choose your destination on the original interactive globe. Your journey
-brings setup, the garage, a starter home and first discoveries together. Sign in
-and save your supported personal progress to continue on another device.
+The main address opens the landing page. **Enter World Explorer** takes you
+directly to the working globe. **Create your Explorer** starts character setup,
+then career or free roam, first car and departure. **Browse careers** opens the
+career list without requiring setup.
 
-| Choose anywhere on the globe | Choose your first car |
-| :--: | :--: |
-| ![Location selection on the interactive globe in the 5.7 preview](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/world-explorer-5.7-globe.jpg) | ![The 5.7 first-car selection screen showing the BMW E34](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/world-explorer-5.7-first-car.jpg) |
+Choose any supported location by searching, entering coordinates or selecting a
+point on the globe. Character setup is optional, and canceling returns to the
+globe. Your journey connects the garage, starter home and first discoveries;
+sign in and check your account save before continuing on another device.
+
+![The current globe selector with left navigation, top search, a large Earth view and place details on the right](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.2/world-explorer-5.7-globe.png)
 
 Nineteen available careers include racing, archaeology, geology, oceanography,
 marine biology, cartography, astronomy and more. Each opens a playable assignment
