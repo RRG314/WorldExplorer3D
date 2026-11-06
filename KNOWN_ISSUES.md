@@ -1,9 +1,27 @@
 # Known Issues and Limitations
 
-Last reviewed: October 19, 2026, for 5.6.1. These are known product
-limits, not a promise that every location or device has been validated.
+Last reviewed: November 5, 2026, for the 5.7 public preview. These are known
+product limits, not a promise that every location or device has been tested.
 The [GitHub releases](https://github.com/RRG314/WorldExplorer3D/releases) identify
 published versions.
+
+## 5.7 preview status
+
+- 5.7 is a public pre-release on staging. Publishing the GitHub release does not
+  update the live production game. Use the preview link in the release notes
+  to try the features described there.
+- The newer building/interior overhaul is still in development and is not part
+  of this preview. Room layouts, stairs and lifts, furniture size, wall endings,
+  room detail and facade flicker during movement remain active work.
+- Available careers offer playable assignments, saved next steps and personal
+  achievements. Their length and depth vary; these are not full-length campaigns
+  for every profession. Expedition pilot is marked Coming soon; free flight and
+  Harbor Run road deliveries remain available.
+- Google Play is in closed testing. The iPhone/iPad App Store edition is being
+  prepared. The downloadable Android launcher opens the live hosted game, not
+  the separate 5.7 staging preview.
+- Back up guest progress before testing a preview. Check your account-save
+  status before changing devices; guest saves do not follow you automatically.
 
 ## Visual detail and device support
 
@@ -87,7 +105,7 @@ published versions.
   lunar fieldwork provide opening journeys. Full campaigns for every explorer
   profession are not yet available.
 - CERN, fully furnished airport and port packs, and terrain-based farming remain
-  planned rather than included in the 5.6 update.
+  planned beyond the current preview.
 
 ## Performance and compatibility
 
@@ -167,9 +185,25 @@ published versions.
 - Expansion-pack entries currently use reference presentation unless separately
   reviewed media or creature models are available. Missing media does not block
   identification, Journal, life-list, or activity progress.
-- The complete Journal, Guide, companion history, and local Backpack history are
-  stored in the current browser. Backup and restore are available, but full
-  cross-device Journal sync is not yet provided.
+- Guest Journal, Guide, companion and Backpack history stay in the current
+  browser. Backup and restore are available. In 5.7, signed-in players can save
+  their supported personal journey to their account and restore it on another
+  device. Check the save status before switching; signing in alone is not a
+  substitute for a completed save or restore.
+- Different device saves can conflict. The account-save controls let you choose
+  which version to keep and retain recovery copies. Keep a separate backup for
+  progress you do not want to risk during preview testing.
+
+## Racing and created tracks
+
+- The included major venues are Silverstone GP, Nordschleife T13 and Daytona.
+  The other researched venue packs are deferred.
+- These are game interpretations of real venues and vehicles, with authored
+  handling. They are not factory-certified simulations or official venue products.
+- Room-created tracks are unranked and award no competitive Credits. Reviewed
+  public events use separate ranking and reward rules.
+- An open-ground track needs supported terrain and clear space. Roads, bridges,
+  dense scenery and larger vehicles can limit a usable layout.
 
 ## Online features
 

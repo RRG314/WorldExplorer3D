@@ -1,9 +1,10 @@
 # World Explorer 3D
 
-[Play](https://worldexplorer3d.io/app/) · [Get the app](https://worldexplorer3d.io/about/download.html) · [5.7 release notes](RELEASE_NOTES_5.7.0.md) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
+[Play](https://worldexplorer3d.io/app/) · [Get the app](https://worldexplorer3d.io/about/download.html) · [5.7 preview](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.1) · [Known limitations](KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md)
 
 [![Play in your browser](https://img.shields.io/badge/Play-in_your_browser-1677ff?style=flat-square)](https://worldexplorer3d.io/app/)
-[![Latest release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=release)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
+[![5.7 Preview 1](https://img.shields.io/badge/5.7-PREVIEW_1-e9a16b?style=flat-square)](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.1)
+[![Latest stable release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date&style=flat-square&label=stable)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![Platform: WebGL](https://img.shields.io/badge/platform-WebGL-546e7a?style=flat-square)](https://worldexplorer3d.io/app/)
 [![License: Source Available](https://img.shields.io/badge/license-source_available-546e7a?style=flat-square)](LICENSE)
 
@@ -13,18 +14,33 @@ Pick a place and see where it takes you. Explore real cities and wild places,
 drive real roads, build a home, or start a career. Go your own way or bring
 friends along—from familiar streets to the ocean floor and beyond Earth.
 
-Version **5.7.0** introduces a cinematic interface, guided explorer setup,
+The **5.7 public preview** introduces a cinematic interface, guided explorer setup,
 nineteen available careers, starter homes and private personal saves across
 signed-in devices. Free exploration and the interactive globe remain available
 from the start. Each location opens a bounded playable area; optional continuous
 exploration brings surrounding terrain and buildings with you.
 
-<p align="center">
-  <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
-  · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.7.0.md">5.7 release notes</a>
-  · <a href="ROADMAP.md">Roadmap</a>
-</p>
+**[Try the 5.7 preview](https://we3d-staging-20260712.web.app/app/)** · [Read the full illustrated release](https://github.com/RRG314/WorldExplorer3D/releases/tag/v5.7.0-preview.1) · [Play the live game](https://worldexplorer3d.io/app/)
+
+5.7 is a pre-release while the remaining building and device checks finish.
+The live production game is updated separately. The newer interior overhaul
+is still in development; current limitations are listed in [Known issues](KNOWN_ISSUES.md).
+
+## A clearer beginning
+
+Create your explorer, choose a starting career or free exploration, pick a first
+car and choose your destination on the original interactive globe. Your journey
+brings setup, the garage, a starter home and first discoveries together. Sign in
+and save your supported personal progress to continue on another device.
+
+| Choose anywhere on the globe | Choose your first car |
+| :--: | :--: |
+| ![Location selection on the interactive globe in the 5.7 preview](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/world-explorer-5.7-globe.jpg) | ![The 5.7 first-car selection screen showing the BMW E34](https://github.com/RRG314/WorldExplorer3D/releases/download/v5.7.0-preview.1/world-explorer-5.7-first-car.jpg) |
+
+Nineteen available careers include racing, archaeology, geology, oceanography,
+marine biology, cartography, astronomy and more. Each opens a playable assignment
+with saved progress and a next step. Career depth varies; Expedition pilot is
+marked Coming soon. [Explore the careers and 5.7 changes](RELEASE_NOTES_5.7.0.md).
 
 ## Race real places and create your own tracks
 
@@ -188,7 +204,8 @@ For setup and contributions, see [Contributing](CONTRIBUTING.md).
 
 ## More about the project
 
-- [What changed in 5.6](RELEASE_NOTES_5.6.1.md)
+- [What is new in the 5.7 preview](RELEASE_NOTES_5.7.0.md)
+- [Previous release: 5.6.1](RELEASE_NOTES_5.6.1.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
