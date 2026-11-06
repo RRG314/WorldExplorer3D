@@ -21,7 +21,7 @@
 ## What's new in 5.7
 
 - **A fresh interface and a guided start.** Create your explorer, choose a first car and set out with a career or free exploration.
-- **Nineteen playable career paths.** Saved assignments, field reports, achievements and a clear next step bring your interests into the same journey.
+- **Nineteen available careers.** Saved assignments, field reports, achievements and a clear next step bring your interests into the same journey.
 - **A home to return to.** Find a starter home, keep its exact location and return after exploring elsewhere.
 - **Personal saves across devices.** Sign in to carry supported career records, Journal, equipment, home and exploration progress between devices.
 - **A quieter gameplay screen.** Extra options move into a menu, the globe has more space, and loading screens explain useful shortcuts.
@@ -155,7 +155,7 @@ Baltimore's existing venue visits remain available: the National Aquarium's limi
 | Ocean and deep space | Wildlife coverage, crew animation, mission variety, room art and sound remain uneven. Interstellar Expeditions is still Alpha. |
 | Phones and VR | Touch layouts are available. Wider testing of physical phones, Safari, heat, battery use, resume and headsets remains necessary. |
 | Map data and services | Road, building, height and indoor data vary by location. Provider outages can delay search or scenery. |
-| Native stores | Google Play is in closed testing. The iPhone/iPad App Store edition is being prepared and is not publicly available yet. |
+| App stores | Google Play is in closed testing. The iPhone/iPad App Store edition is being prepared and is not publicly available yet. |
 
 [Full known issues and limitations](https://github.com/RRG314/WorldExplorer3D/blob/stable/KNOWN_ISSUES.md).
 
