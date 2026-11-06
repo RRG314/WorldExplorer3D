@@ -412,10 +412,15 @@ function initTitleScreenUi({
   globeLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
 
   globeSelector = createGlobeSelector({
-    canGoBack: () => appCtx.gameStarted === true || !!playerEntry,
-    backLabel: () => appCtx.gameStarted ? 'Return to world' : playerEntry?.isChoosingPlace() ? 'Back to your Explorer' : 'Home',
+    canGoBack: () => appCtx.gameStarted === true || playerEntry?.isChoosingPlace() === true,
+    backLabel: () => appCtx.gameStarted ? 'Return to world' : 'Back to your Explorer',
     startLabel: () => playerEntry?.isChoosingPlace() ? 'Use this starting place' : 'Explore',
-    onOpen: () => { refreshReturnPlace(); emitTutorialEvent('opened_globe_selector'); },
+    onOpen: () => {
+      const setup = document.getElementById('globeExplorerSetupBtn');
+      if (setup) setup.hidden = appCtx.gameStarted === true || playerEntry?.isChoosingPlace() === true;
+      refreshReturnPlace();
+      emitTutorialEvent('opened_globe_selector');
+    },
     onUseMyLocation: () => runUseMyLocation('globe'),
     onBack: () => { customPanel?.classList.remove('show'); if(!appCtx.gameStarted)playerEntry?.backFromGlobe(); },
     onStartHere: async (selection = null) => {
@@ -965,13 +970,13 @@ function initTitleScreenUi({
       return started;
     }
   });
+  document.getElementById('globeExplorerSetupBtn')?.addEventListener('click', () => void playerEntry.introduce());
   window.addEventListener('pagehide',event=>{if(!event.persisted)playerEntry?.dispose();});
   if (!appCtx.gameStarted) {
-    // Shared/Portal arrivals keep their original location review. Ordinary
-    // entry starts at the cinematic home, with an unrestricted globe one click away.
+    // The interactive globe is the first screen for ordinary and linked arrivals.
+    // Explorer setup remains optional, alongside the existing Explore action.
     window.requestAnimationFrame(() => {
-      if(portalEntry.intent||sharedExperienceParams)globeSelector.open();
-      else void playerEntry.open();
+      playerEntry.explore();
     });
   }
 
